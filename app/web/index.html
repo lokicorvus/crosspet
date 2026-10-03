@@ -106,7 +106,7 @@ const $ = id => document.getElementById(id)
 const pick = list => list[Math.floor(Math.random() * list.length)]
 let manifest = { characters: {} }
 let charId = null, pose = null, poseSince = 0, currentUrl = ''
-let active = $('a'), spare = $('b')
+let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
 const charState = {}, quota = {}
@@ -119,10 +119,13 @@ function framesFor(p) {
 }
 
 // ---- 画面 ----
-// 交叉淡入：新图加载好之后再盖上来，旧图淡出，不会出现空白
+// 两张图轮流交叉淡入：新图加载好之后再盖上来，旧图淡出，不会出现空白。
+// 每次换图都清掉旧的 onload，回调里再核对一次身份，避免过期回调把两张图的前后顺序搅乱。
+const imgA = $('a'), imgB = $('b')
 function showImage(url, instant) {
   if (!url || url === currentUrl) return
   currentUrl = url
+  imgA.onload = imgB.onload = null
   if (instant) {  // 换角色时舞台是隐藏的，直接换图，不要和上一个角色叠在一起
     spare.classList.remove('on'); spare.removeAttribute('src')
     active.src = url; active.classList.add('on')
@@ -130,12 +133,22 @@ function showImage(url, instant) {
   }
   const next = spare
   next.onload = () => {
-    if (currentUrl !== url) return
+    next.onload = null
+    if (currentUrl !== url || next !== spare) return
     next.classList.add('on'); active.classList.remove('on')
     spare = active; active = next
   }
   next.src = url
 }
+// 兜底：任何时候都保证正好有一张图在显示
+setInterval(() => {
+  if (active === spare) spare = active === imgA ? imgB : imgA
+  if (!active.classList.contains('on') && !spare.classList.contains('on')) {
+    if (!active.getAttribute('src') && currentUrl) active.src = currentUrl
+    active.classList.add('on')
+  }
+}, 2000)
+
 function setFx(p) {
   const fx = $('fx')
   fx.classList.add('hide')
@@ -148,7 +161,8 @@ function setFx(p) {
 function setPose(p, instant) {
   if (p === pose) return
   pose = p; poseSince = Date.now()
-  showImage(pick(framesFor(p)), instant)
+  const frames = framesFor(p)
+  showImage(instant ? frames[0] : pick(frames), instant)
   $('body').className = MOTION[p] || 'm-bob'
   const aura = (window.CrossFx && CrossFx.AURA[p]) || ['#ffd9b0', .35]
   document.documentElement.style.setProperty('--aura', aura[0])
