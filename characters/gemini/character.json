@@ -1,0 +1,59 @@
+{
+  "name": "Gemini",
+  "accent": "#7b5cd6",
+  "apps": [
+    "com.google.GeminiMacOS"
+  ],
+  "greeting": "喵～Gemini 上线！",
+  "lines": {
+    "idle": [
+      "喵？",
+      "（尾巴甩来甩去）",
+      "✦"
+    ],
+    "listening": [
+      "听着呢喵！",
+      "说吧说吧～"
+    ],
+    "thinking": [
+      "让我想想喵…",
+      "嗯…两个答案都不错喵"
+    ],
+    "reading": [
+      "翻翻看喵"
+    ],
+    "writing": [
+      "写写写～"
+    ],
+    "running": [
+      "冲呀！"
+    ],
+    "searching": [
+      "搜一下喵～"
+    ],
+    "delegating": [
+      "交给分身喵"
+    ],
+    "happy": [
+      "好耶喵！",
+      "✦ 搞定 ✦"
+    ],
+    "pat": [
+      "呼噜呼噜…",
+      "再摸一下喵"
+    ],
+    "surprised": [
+      "喵！？"
+    ],
+    "hum": [
+      "♪ 喵喵喵～"
+    ],
+    "stretch": [
+      "伸——懒——腰——"
+    ],
+    "drawing": [
+      "画画喵～",
+      "✦ 灵感来了 ✦"
+    ]
+  }
+}

@@ -1,0 +1,359 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@property --aura { syntax: '<color>'; inherits: true; initial-value: #ffd9b0; }
+:root { --aura: #ffd9b0; --aura-o: .35; }
+html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-select: none; cursor: default;
+  font-family: -apple-system, "PingFang SC", sans-serif; }
+#wrap { display: flex; flex-direction: column; align-items: center; }
+#bubble { max-width: 228px; min-height: 18px; margin-top: 4px; padding: 5px 11px; border-radius: 12px;
+  background: rgba(255,255,255,.95); border: 1.5px solid var(--accent, #e0b48a); color: #4a2418;
+  font-size: 13px; line-height: 1.35; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  transition: opacity .3s, transform .3s; }
+#bubble.hide { opacity: 0; transform: translateY(4px); }
+#stage { position: relative; width: 250px; height: 241px; transition: transform .22s ease, opacity .22s ease; }
+#stage.swap { transform: scale(.82); opacity: 0; }
+#aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
+  border-radius: 50%; opacity: var(--aura-o);
+  background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
+  transition: --aura 0.8s, opacity .8s; animation: pulse 3s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.04); } }
+#shadow { position: absolute; left: 50%; bottom: 7px; width: 110px; height: 10px; margin-left: -55px;
+  border-radius: 50%; background: rgba(0,0,0,.13); }
+#body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; }
+#body img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%;
+  opacity: 0; transition: opacity .35s ease; }
+#body img.on { opacity: 1; }
+#body img#blink { transition: none; }
+#fx { position: absolute; inset: 0; transition: opacity .3s; pointer-events: none; }
+#fx.hide { opacity: 0; }
+#fx svg { width: 100%; height: 100%; overflow: visible; }
+#poof { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; }
+#poof i { position: absolute; width: 46px; height: 46px; margin: -23px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 2px rgba(74,36,24,.25); opacity: 0; }
+#poof.go i { animation: puff .6s ease-out forwards; }
+@keyframes puff { 0% { opacity: .95; transform: translate(0,0) scale(.3); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.3); } }
+.m-dash  { animation: dash 2.2s ease-in-out forwards; }
+@keyframes dash { 0%, 55% { transform: none; } 100% { transform: translateX(28%) rotate(4deg); opacity: 0; } }
+#caption { margin-top: -2px; padding: 2px 9px; border-radius: 8px; background: rgba(255,255,255,.85);
+  color: #6b4a3a; font-size: 11px; min-height: 14px; }
+#caption:empty { visibility: hidden; }
+#quota { max-width: 236px; text-align: center; line-height: 1.35; margin-top: 2px; padding: 1px 8px; border-radius: 7px; background: rgba(255,255,255,.8); color: #6b4a3a; font-size: 10px; }
+#quota:empty { display: none; }
+#quota.low { color: #c0392b; background: rgba(255,236,236,.92); }
+
+/* 身体动作：切换时用 animation 平滑接上 */
+.m-bob   { animation: bob 3.2s ease-in-out infinite; }
+.m-hop   { animation: bob-big .8s ease-in-out infinite; }
+.m-jump  { animation: jump .7s ease-in-out infinite; }
+.m-quick { animation: bob-small .45s ease-in-out infinite; }
+.m-rock  { animation: rock 3s ease-in-out infinite; }
+.m-sway  { animation: rock 1.8s ease-in-out infinite; }
+.m-slow  { animation: bob-tiny 4.5s ease-in-out infinite; }
+.m-shake { animation: shake 1.4s ease-in-out infinite; }
+.m-squish{ animation: squish 1.6s ease-in-out infinite; }
+.m-jolt  { animation: jolt .55s cubic-bezier(.3,1.6,.5,1) 1, bob 3.2s ease-in-out .55s infinite; }
+@keyframes bob { 50% { transform: translateY(-2.5%); } }
+@keyframes bob-big { 50% { transform: translateY(-5%); } }
+@keyframes bob-small { 50% { transform: translateY(-1.8%); } }
+@keyframes bob-tiny { 50% { transform: translateY(-.8%) scale(1.01, 1.015); } }
+@keyframes jump { 0%,100% { transform: translateY(0) scale(1.02,.98); } 50% { transform: translateY(-9%) scale(.98,1.02); } }
+@keyframes rock { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes shake { 0%,50%,100% { transform: translateX(0); } 10% { transform: translateX(-3%); } 20% { transform: translateX(3%); }
+  30% { transform: translateX(-2%); } 40% { transform: translateX(2%); } }
+@keyframes squish { 50% { transform: scale(.96, 1.05); } }
+@keyframes jolt { 0% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-3%, -4%) rotate(-4deg) scale(.97,1.04); } 60% { transform: translate(1%, 0) rotate(1.5deg); } 100% { transform: none; } }
+</style></head>
+<body>
+<div id="wrap">
+  <div id="bubble" class="hide"></div>
+  <div id="stage">
+    <div id="aura"></div><div id="shadow"></div>
+    <div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div>
+    <div id="fx"></div>
+    <div id="poof"><i style="--dx:-60px;--dy:-30px"></i><i style="--dx:55px;--dy:-35px"></i><i style="--dx:-45px;--dy:40px"></i><i style="--dx:50px;--dy:35px"></i><i style="--dx:0;--dy:-60px"></i></div>
+  </div>
+  <div id="caption"></div>
+  <div id="quota"></div>
+</div>
+<script src="effects.js"></script>
+<script>
+// CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
+//   init(manifest)          角色清单（characters/*/character.json + 立绘）
+//   setCharacter(id)        切换角色（按前台应用自动切，或右键菜单）
+//   applyCharState(id, s)   某个 AI 的工作状态（各接入写的 <id>-state.json）
+//   setQuota(id, q)         某个 AI 的额度 / 余额（<id>-quota.json，或 GPT 的 Codex 会话记录）
+//   handleClick(kind)       单击 = pat（摸摸头），右键菜单「戳一下」= poke
+//   playEgg(force)          彩蛋
+
+const MOTION = {
+  idle: 'm-bob', listening: 'm-hop', thinking: 'm-rock', reading: 'm-rock', writing: 'm-bob', running: 'm-quick',
+  searching: 'm-sway', delegating: 'm-sway', happy: 'm-jump', proud: 'm-hop', oops: 'm-shake', surprised: 'm-jolt',
+  pat: 'm-sway', sleeping: 'm-slow', tired: 'm-slow', hum: 'm-sway', stretch: 'm-squish', yawn: 'm-squish', drawing: 'm-rock',
+  pop: 'm-hop', pretend: 'm-bob', caught: 'm-shake', bye: 'm-dash',
+}
+const LOCAL_LINES = {
+  idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
+  yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
+}
+const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
+const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
+const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
+const LISTEN_TO_THINKING = 1800 // 收到消息先「听」，稍后自动转「思考」
+const SLEEP_AFTER = 10 * 60 * 1000
+
+const $ = id => document.getElementById(id)
+const pick = list => list[Math.floor(Math.random() * list.length)]
+let manifest = { characters: {} }
+let charId = null, pose = null, poseSince = 0, currentUrl = ''
+let active = $('a'), spare = $('b')
+let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
+let lastActive = Date.now()
+const charState = {}, quota = {}
+
+const char = () => manifest.characters[charId]
+const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
+function framesFor(p) {
+  const c = char(); if (!c) return []
+  return c.poses[p] || c.poses.idle || c.poses.default || []
+}
+
+// ---- 画面 ----
+// 交叉淡入：新图加载好之后再盖上来，旧图淡出，不会出现空白
+function showImage(url) {
+  if (!url || url === currentUrl) return
+  currentUrl = url
+  const next = spare
+  next.onload = () => {
+    if (currentUrl !== url) return
+    next.classList.add('on'); active.classList.remove('on')
+    spare = active; active = next
+  }
+  next.src = url
+}
+function setFx(p) {
+  const fx = $('fx')
+  fx.classList.add('hide')
+  setTimeout(() => {
+    const inner = window.CrossFx ? CrossFx.surroundings(p) : ''
+    fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
+    fx.classList.remove('hide')
+  }, 220)
+}
+function setPose(p) {
+  if (p === pose) return
+  pose = p; poseSince = Date.now()
+  showImage(pick(framesFor(p)))
+  $('body').className = MOTION[p] || 'm-bob'
+  const aura = (window.CrossFx && CrossFx.AURA[p]) || ['#ffd9b0', .35]
+  document.documentElement.style.setProperty('--aura', aura[0])
+  document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
+  setFx(p)
+}
+function say(line) {
+  const b = $('bubble')
+  if (!line) { b.classList.add('hide'); return }
+  b.textContent = line
+  b.classList.remove('hide')
+}
+function renderQuota() {
+  const q = egg ? null : quota[charId], el = $('quota')
+  el.textContent = q?.text || ''
+  el.className = q?.low ? 'low' : ''
+}
+function restPose() { return quota[charId]?.low ? 'tired' : 'idle' }
+
+// 换到某个状态：遵守最短停留；短暂状态过后回到常态（闲着 / 额度紧张时累了）
+function show(p, urgent) {
+  const wait = shownAt + DWELL - Date.now()
+  clearTimeout(pending)
+  if (!urgent && wait > 0) { pending = setTimeout(() => show(p, true), wait); return }
+  shownAt = Date.now()
+  clearTimeout(revertTimer)
+  if (p !== pose) {
+    setPose(p)
+    const lines = linesOf(p)
+    say(lines ? pick(lines) : '')
+  }
+  if (TRANSIENT[p]) revertTimer = setTimeout(() => { setPose(restPose()); say('') }, TRANSIENT[p])
+}
+
+// ---- 由 Swift 调用 ----
+function init(m) {
+  manifest = m
+  for (const c of Object.values(m.characters))
+    for (const list of Object.values(c.poses)) for (const u of list) { const i = new Image(); i.src = u }
+  if (!charId || !manifest.characters[charId]) setCharacter(Object.keys(m.characters).find(k => !m.characters[k].egg), true)
+  else { $('caption').textContent = char().name }
+}
+
+function setCharacter(id, quiet) {
+  if (egg) { clearEggTimers(); egg = null; charId = null }
+  if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
+  const stage = $('stage')
+  stage.classList.add('swap')
+  setTimeout(() => {
+    charId = id; pose = null; currentUrl = ''
+    const c = char()
+    document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
+    $('blink').src = c.blink || ''
+    $('caption').textContent = c.name
+    const s = charState[id]
+    const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
+    setPose(busy ? s.pose : restPose())
+    say(quiet ? '' : (c.greeting || `${c.name} 在这儿～`))
+    renderQuota()
+    stage.classList.remove('swap')
+  }, 230)
+}
+
+function setName(id, name) {
+  if (!manifest.characters[id]) return
+  manifest.characters[id].name = name
+  if (id === charId) $('caption').textContent = name
+}
+
+function applyCharState(id, s) {
+  charState[id] = s
+  if (egg) { if (egg.host === id && s.pose && s.pose !== 'idle') endEgg(); return }
+  if (id !== charId || !s.pose) return
+  lastActive = Date.now()
+  clearTimeout(thinkTimer)
+  const ev = s.event || ''
+  if (ev === 'PostToolUse' || ev === 'AfterTool' || ev === 'SubagentStop') {
+    if (s.pose === 'oops') show('oops')
+    else thinkTimer = setTimeout(() => show('thinking'), BACK_TO_THINKING)
+  } else if (ev === 'UserPromptSubmit' || ev === 'BeforeAgent') {
+    show('listening', true)
+    thinkTimer = setTimeout(() => show('thinking'), LISTEN_TO_THINKING)
+  } else {
+    show(s.pose)
+  }
+}
+
+function setQuota(id, q) {
+  const wasLow = quota[id]?.low
+  quota[id] = q
+  if (id !== charId || egg) return
+  renderQuota()
+  if (q?.low && pose === 'idle') { setPose('tired'); if (!wasLow) say(pick(linesOf('tired') || [''])) }
+  if (!q?.low && pose === 'tired') setPose('idle')
+}
+
+function handleClick(kind) {
+  if (egg) { catchEgg(); return }
+  lastActive = Date.now()
+  if (kind === 'pat' && Math.random() < EGG_CLICK_CHANCE && playEgg(true)) return
+  if (pose === 'sleeping') { show('yawn', true); say('唔…你回来啦'); return }
+  show(kind === 'poke' ? 'surprised' : 'pat', true)
+}
+
+// ---- 闲着的时候：偶尔哼歌 / 伸懒腰 / 打哈欠，太久没动静就睡 ----
+setInterval(() => {
+  if (egg || (pose !== 'idle' && pose !== 'tired')) return
+  const quiet = Date.now() - lastActive
+  if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
+  const r = Math.random()
+  if (r < .2) show('hum', true)
+  else if (r < .32) show('stretch', true)
+  else if (r < .42 && quiet > 3 * 60 * 1000) show('yawn', true)
+}, 20000)
+
+// ---- 彩蛋：角色闲着时，偶尔变成 cos 它的 DeepSeek ----
+// 流程：跳出来 → 装模作样（一直装，等你点她）→ 你点一下 → 被识破 → 溜走 → 变回原角色
+const EGG_POP_MS = 2200, EGG_CAUGHT_MS = 2000, EGG_BYE_MS = 2200
+const EGG_WAIT_MS = 40000           // 一直没人点，她就得意地自己溜走
+const EGG_PRETEND_LINE_MS = 9000    // 装模作样时隔一会儿换句台词
+const EGG_CHANCE_PER_MIN = 1 / 40   // 闲着时每分钟的触发概率，约每小时 1~2 次
+const EGG_CLICK_CHANCE = 0.03       // 点她时也有一点点概率触发
+let egg = null  // 正在演：{ host, timers, waiting }
+
+function eggFor(host) {
+  return Object.entries(manifest.characters).find(([, c]) => c.egg && c.host === host)?.[0]
+}
+function clearEggTimers() { egg?.timers.forEach(t => { clearTimeout(t); clearInterval(t) }); if (egg) egg.timers = [] }
+function poof(then) {
+  const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
+  const stage = $('stage'); stage.classList.add('swap')
+  setTimeout(() => { then(); stage.classList.remove('swap') }, 230)
+}
+function eggLine(step) { return pick((char().lines && char().lines[step]) || ['']) }
+function eggStep(step) {
+  setPose(step)
+  document.documentElement.style.setProperty('--aura', char().aura || '#bcd4ff')
+}
+function playEgg(force) {
+  if (egg || !charId || char()?.egg) return false
+  const eggId = eggFor(charId)
+  if (!eggId) return false
+  if (!force && pose !== 'idle') return false
+  const host = charId
+  egg = { host, timers: [], waiting: false }
+  clearTimeout(revertTimer); clearTimeout(pending)
+  poof(() => {
+    charId = eggId; pose = null; currentUrl = ''
+    const c = char()
+    document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
+    $('caption').textContent = `${manifest.characters[host].name}？`
+    renderQuota()
+    eggStep('pop'); say(eggLine('pop'))
+    egg.timers.push(setTimeout(() => {
+      eggStep('pretend'); say(eggLine('pretend'))
+      egg.waiting = true
+      egg.timers.push(setInterval(() => say(eggLine('pretend')), EGG_PRETEND_LINE_MS))
+      egg.timers.push(setTimeout(() => leaveEgg(pick((c.lines && c.lines.escape) || ['没人发现～下次见！'])), EGG_WAIT_MS))
+    }, EGG_POP_MS))
+  })
+  return true
+}
+function catchEgg() {
+  if (!egg || !egg.waiting) return
+  egg.waiting = false
+  clearEggTimers()
+  eggStep('caught'); say(eggLine('caught'))
+  egg.timers.push(setTimeout(() => leaveEgg(eggLine('bye')), EGG_CAUGHT_MS))
+}
+function leaveEgg(line) {
+  if (!egg) return
+  egg.waiting = false
+  clearEggTimers()
+  eggStep('bye'); say(line)
+  egg.timers.push(setTimeout(() => endEgg(), EGG_BYE_MS))
+}
+function endEgg() {
+  if (!egg) return
+  const host = egg.host
+  clearEggTimers()
+  egg = null
+  poof(() => {
+    charId = host; pose = null; currentUrl = ''
+    const c = char()
+    document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
+    $('blink').src = c.blink || ''
+    $('caption').textContent = c.name
+    setPose(restPose()); say('')
+    renderQuota()
+  })
+}
+setInterval(() => { if (!egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
+
+// ---- 生动一点：同一状态有多张图时停留久了换一张；有眨眼帧就偶尔眨眼 ----
+setInterval(() => {
+  const frames = framesFor(pose)
+  if (frames.length > 1 && Date.now() - poseSince > 8000) {
+    poseSince = Date.now()
+    showImage(pick(frames.filter(u => u !== currentUrl)))
+  }
+}, 2000)
+;(function blinkLoop() {
+  setTimeout(() => {
+    const blink = $('blink'), c = char()
+    if (c && c.blink && (pose === 'idle' || pose === 'listening') && currentUrl === (c.poses.idle || [])[0]) {
+      blink.classList.add('on')
+      setTimeout(() => blink.classList.remove('on'), 140)
+    }
+    blinkLoop()
+  }, 3000 + Math.random() * 3500)
+})()
+</script>
+</body></html>
