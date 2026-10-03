@@ -82,16 +82,16 @@ const sweat = (x        , y        ) =>
 
 // 思考云朵，里面三个点依次亮
 const thoughtCloud = (() => {
-  const x = 440, y = 70
+  const x = 470, y = 58
   const cloud = `<path d="M${x - 50} ${y + 18} a22 22 0 0 1 10 -40 a28 28 0 0 1 50 -10 a24 24 0 0 1 40 18 a20 20 0 0 1 -6 38 z" fill="#fff" stroke="${INK}" stroke-width="3"/>`
-  const tail = `<circle cx="${x - 70}" cy="${y + 40}" r="8" fill="#fff" stroke="${INK}" stroke-width="3"/><circle cx="${x - 88}" cy="${y + 60}" r="5" fill="#fff" stroke="${INK}" stroke-width="3"/>`
+  const tail = `<circle cx="${x - 62}" cy="${y + 38}" r="8" fill="#fff" stroke="${INK}" stroke-width="3"/><circle cx="${x - 74}" cy="${y + 54}" r="5" fill="#fff" stroke="${INK}" stroke-width="3"/>`
   const dots = [0, 1, 2].map(i => `<circle cx="${x - 22 + i * 22}" cy="${y + 2}" r="6" fill="#5b8def" opacity="0.2"><animate attributeName="opacity" values="0.2;1;0.2" dur="1.2s" begin="${i * 0.3}s" ${loop}/></circle>`).join('')
   return `<g>${tail}${cloud}${dots}<animateTransform attributeName="transform" type="translate" values="0 0;0 -5;0 0" dur="2.4s" ${loop}/></g>`
 })()
 
 // 读书：左侧飘起的字符和书页
 const floatingGlyphs = ['A', 'あ', '{ }', '∑', '文'].map((g, i) =>
-  `<g transform="translate(${40 + (i % 2) * 34} ${400 - i * 6})" opacity="0"><text font-size="${26 + (i % 3) * 4}" fill="#b5651d" font-family="serif" font-weight="bold">${g}</text>${fadeLoop('3.5s', `${i * 0.7}s`)}${rise('3.5s', `${i * 0.7}s`, -230, 12)}</g>`,
+  `<g transform="translate(${14 + (i % 2) * 30} ${330 - i * 6})" opacity="0"><text font-size="${24 + (i % 3) * 4}" style="fill: var(--glyph, #b5651d); stroke: var(--glyph-stroke, none); stroke-width: 1.2px; paint-order: stroke" font-family="serif" font-weight="bold">${g}</text>${fadeLoop('3.5s', `${i * 0.7}s`)}${rise('3.5s', `${i * 0.7}s`, -200, 6)}</g>`,
 ).join('')
 
 
@@ -124,13 +124,13 @@ const browser = (() => {
     `<rect x="${x + 26}" y="${y + 29}" width="0" height="4" rx="2" fill="#8a93a0"><animate attributeName="width" values="0;52;52" keyTimes="0;0.28;1" dur="3.2s" ${loop}/></rect>` +
     `${results}<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="2.4s" ${loop}/></g>`
 })()
-const plane = `<path d="M430 300 Q500 260 575 170" stroke="#9a8fd0" stroke-width="2.5" stroke-dasharray="6 8" fill="none" opacity="0.7"/>` +
-  `<g><path d="M0 0 L40 14 L0 28 L9 14Z" fill="#fff" stroke="${INK}" stroke-width="2.5"/><animateMotion path="M430 300 Q500 260 575 170" rotate="auto" dur="1.8s" ${loop}/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.8;1" dur="1.8s" ${loop}/></g>`
+const plane = `<path d="M488 300 Q525 240 578 160" stroke="#9a8fd0" stroke-width="2.5" stroke-dasharray="6 8" fill="none" opacity="0.7"/>` +
+  `<g><path d="M0 0 L40 14 L0 28 L9 14Z" fill="#fff" stroke="${INK}" stroke-width="2.5"/><animateMotion path="M488 300 Q525 240 578 160" rotate="auto" dur="1.8s" ${loop}/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.8;1" dur="1.8s" ${loop}/></g>`
 
 const confetti = Array.from({ length: 10 }, (_, i) => {
-  const x = 60 + i * 48
+  const x = i < 5 ? 14 + i * 18 : 486 + (i - 5) * 18
   const colors = ['#ff6b81', '#ffd54a', '#5b8def', '#7ed957', '#ff9f43']
-  return `<rect x="${x}" y="-10" width="9" height="14" rx="2" fill="${colors[i % 5]}" opacity="0"><animate attributeName="opacity" values="0;1;1;0" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/><animateTransform attributeName="transform" type="translate" values="0 0;${(i % 2 ? 1 : -1) * 20} 300" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/></rect>`
+  return `<rect x="${x}" y="-10" width="9" height="14" rx="2" fill="${colors[i % 5]}" opacity="0"><animate attributeName="opacity" values="0;1;1;0" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/><animateTransform attributeName="transform" type="translate" values="0 0;${(i % 2 ? 1 : -1) * 8} 300" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/></rect>`
 }).join('')
 
 const crown = `<g transform="translate(${HEAD.x - 40} ${HEAD.y - 70})"><path d="M0 40 L8 8 L24 28 L40 0 L56 28 L72 8 L80 40 Z" fill="#ffd54a" stroke="#c48a00" stroke-width="3"/><circle cx="40" cy="22" r="5" fill="#ff6b81"/>` +
@@ -138,7 +138,7 @@ const crown = `<g transform="translate(${HEAD.x - 40} ${HEAD.y - 70})"><path d="
 
 // 被戳：头边弹出一个「!」小气泡（只弹一次），三道短冲击线闪一下就消失
 const pokeBurst = (() => {
-  const x = 430, y = 118
+  const x = 452, y = 104
   const once = (begin        , dur        ) => `begin="${begin}" dur="${dur}" fill="freeze"`
   const bubble = `<g transform="translate(${x} ${y})"><g transform="scale(0)">` +
     `<path d="M-22 -18 h44 a10 10 0 0 1 10 10 v18 a10 10 0 0 1 -10 10 h-30 l-10 10 l2 -10 h-6 a10 10 0 0 1 -10 -10 v-18 a10 10 0 0 1 10 -10z" fill="#fff" stroke="${INK}" stroke-width="2.5"/>` +
@@ -159,13 +159,13 @@ const zz = `<g font-family="sans-serif" font-weight="900" fill="#e8a33d" stroke=
 // 额度低：一个快没电的电池
 const battery = `<g transform="translate(450 70)"><rect width="70" height="34" rx="6" fill="#fff" stroke="${INK}" stroke-width="3"/><rect x="70" y="10" width="7" height="14" rx="2" fill="${INK}"/>` +
   `<rect x="5" y="5" width="12" height="24" rx="2" fill="#ff5f56"><animate attributeName="opacity" values="1;0.2;1" dur="1.2s" ${loop}/></rect></g>`
-const gloom = [0, 1, 2, 3].map(i => `<line x1="${200 + i * 22}" y1="${AY - 30}" x2="${200 + i * 22}" y2="${AY + 10 + (i % 2) * 10}" stroke="#8b86a8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>`).join('')
+const gloom = [0, 1, 2, 3].map(i => `<line x1="${248 + i * 22}" y1="${AY - 62}" x2="${248 + i * 22}" y2="${AY - 22 + (i % 2) * 8}" stroke="#8b86a8" stroke-width="4" stroke-linecap="round" opacity="0.6"/>`).join('')
 
 // 伸懒腰：头顶几颗暖色小光点慢慢升起、淡出（取代原来的弧线）
 const stretchGlow = [0, 1, 2, 3].map(i =>
-  `<g transform="translate(${215 + i * 48} ${120 + (i % 2) * 18})" opacity="0">` +
+  `<g transform="translate(${208 + i * 52} ${96 + (i % 2) * 10})" opacity="0">` +
   `<path d="M0 -7 L1.8 -1.8 L7 0 L1.8 1.8 L0 7 L-1.8 1.8 L-7 0 L-1.8 -1.8Z" fill="#ffcf8a"/>` +
-  `${fadeLoop('2.8s', `${i * 0.5}s`)}${rise('2.8s', `${i * 0.5}s`, -40)}</g>`).join('')
+  `${fadeLoop('2.8s', `${i * 0.5}s`)}${rise('2.8s', `${i * 0.5}s`, -36)}</g>`).join('')
 const yawnBubble = `<g transform="translate(440 140)" opacity="0"><text font-size="34" fill="#9a8fd0" font-family="sans-serif" font-weight="bold">~♡</text>${fadeLoop('3s', '0s')}${rise('3s', '0s', -40, 10)}</g>`
 
 
@@ -294,6 +294,19 @@ const easelCard = (() => {
     `${strokes}${palette}${brush}${floatY('2.8s')}</g>`
 })()
 
+
+// ---- 可被角色点名使用的特效（character.json 的 fx 字段）----
+// 深海泡泡：两侧和头顶的泡泡摇摇晃晃往上冒（DeepSeek 思考 / 深度思考 / 游泳）
+const bubbles = [[40, 330, 9], [70, 380, 6], [26, 250, 7], [505, 340, 10], [540, 300, 6], [520, 230, 8], [300, 96, 7], [250, 108, 5]].map(([x, y, r], i) =>
+  `<g transform="translate(${x} ${y})" opacity="0"><circle r="${r}" fill="#bfe6ff" fill-opacity="0.35" stroke="#5aa9e6" stroke-width="2"/>` +
+  `<circle cx="${-r * 0.35}" cy="${-r * 0.35}" r="${Math.max(1.5, r * 0.25)}" fill="#fff" opacity="0.9"/>` +
+  `${fadeLoop(`${2.6 + (i % 3) * 0.4}s`, `${(i * 0.37).toFixed(2)}s`)}${rise(`${2.6 + (i % 3) * 0.4}s`, `${(i * 0.37).toFixed(2)}s`, y > 200 ? -110 : -50, i % 2 ? 8 : -8)}</g>`).join('')
+// 饭碗冒热气：右上角三缕蒸汽（DeepSeek 吃白饭）
+const steam = [0, 1, 2].map(i =>
+  `<path d="M${470 + i * 18} 140 q-8 -12 0 -24 t0 -24" stroke="#d9d4cc" stroke-width="4" fill="none" stroke-linecap="round" opacity="0">` +
+  `${fadeLoop('2.2s', `${i * 0.5}s`)}<animateTransform attributeName="transform" type="translate" values="0 0;0 -26" dur="2.2s" begin="${i * 0.5}s" ${loop} additive="sum"/></path>`).join('')
+const named = { bubbles, steam }
+
 // 每个姿态周围的细节
 const surroundings = (p      )         => {
   switch (p) {
@@ -312,7 +325,7 @@ const surroundings = (p      )         => {
     case 'pat': return heart(440, 160, 1.8, '0s') + heart(480, 220, 1.3, '0.7s') + heart(110, 190, 1.5, '1.1s') + heart(90, 280, 1.1, '1.6s')
     case 'sleeping': return moonStars + zz
     case 'tired': return battery + gloom
-    case 'hum': return musicCard + note(100, 200, '♪', '0s', '#e07a9a') + note(130, 240, '♫', '1.2s')
+    case 'hum': return musicCard + note(40, 250, '♪', '0s', '#e07a9a') + note(70, 290, '♫', '1.2s')
     case 'stretch': return stretchGlow
     case 'yawn': return yawnBubble
     case 'drawing': return easelCard
@@ -327,4 +340,4 @@ const sceneSvg = (art     , p      )         => {
     `${surroundings(p)}</svg>`
 }
 
-window.CrossFx = { surroundings, AURA, CW, CH, AX, AY, AW, AH }
+window.CrossFx = { surroundings, named, AURA, CW, CH, AX, AY, AW, AH }

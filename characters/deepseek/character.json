@@ -61,7 +61,51 @@
     "tired": [
       "余额不多了……要饿肚子了",
       "给大鱼充点饭钱嘛～"
+    ],
+    "eat": [
+      "开饭啦！白饭最好吃～",
+      "（扒饭）……别看我",
+      "再来一碗！"
+    ],
+    "slack": [
+      "摸鱼中……别告诉别人",
+      "（趴）今天的鱼也很好摸",
+      "五分钟，就五分钟"
+    ],
+    "swim": [
+      "游一圈～",
+      "咕噜咕噜～",
+      "深海遨游中"
+    ],
+    "deepthink": [
+      "深度思考中……",
+      "让我潜到问题最深处",
+      "嗯……这题有点深"
+    ],
+    "pout": [
+      "不许叫我胖！",
+      "哼！戳什么戳",
+      "我只是骨架大！"
     ]
   },
-  "lowBalance": 5
+  "lowBalance": 5,
+  "glyph": {
+    "fill": "#3b6fd8"
+  },
+  "idleActions": [
+    "eat",
+    "slack",
+    "swim"
+  ],
+  "pokePose": "pout",
+  "longThink": {
+    "after": 20,
+    "pose": "deepthink"
+  },
+  "fx": {
+    "thinking": "bubbles",
+    "deepthink": "bubbles",
+    "swim": "bubbles",
+    "eat": "steam"
+  }
 }

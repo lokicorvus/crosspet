@@ -91,6 +91,8 @@ const MOTION = {
   searching: 'm-sway', delegating: 'm-sway', happy: 'm-jump', proud: 'm-hop', oops: 'm-shake', surprised: 'm-jolt',
   pat: 'm-sway', sleeping: 'm-slow', tired: 'm-slow', hum: 'm-sway', stretch: 'm-squish', yawn: 'm-squish', drawing: 'm-rock',
   pop: 'm-hop', pretend: 'm-bob', caught: 'm-shake', bye: 'm-dash',
+  // 角色专属姿态（没列出的默认轻轻浮动）
+  deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
@@ -153,7 +155,9 @@ function setFx(p) {
   const fx = $('fx')
   fx.classList.add('hide')
   setTimeout(() => {
-    const inner = window.CrossFx ? CrossFx.surroundings(p) : ''
+    // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
+    const named = char()?.fx?.[p]
+    const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
   }, 220)
@@ -181,6 +185,15 @@ function renderQuota() {
   el.className = q?.low ? 'low' : ''
 }
 function restPose() { return quota[charId]?.low ? 'tired' : 'idle' }
+// 这个角色有没有某个姿态的专属立绘
+const hasPose = p => !!char()?.poses?.[p]
+// 角色外观相关的 CSS 变量：气泡边框、读书时飘的字符颜色
+function applyLook(c) {
+  const root = document.documentElement.style
+  root.setProperty('--accent', c.accent || '#e0b48a')
+  root.setProperty('--glyph', c.glyph?.fill || '#b5651d')
+  root.setProperty('--glyph-stroke', c.glyph?.stroke || 'none')
+}
 
 // 换到某个状态：遵守最短停留；短暂状态过后回到常态（闲着 / 额度紧张时累了）
 function show(p, urgent) {
@@ -215,7 +228,7 @@ function setCharacter(id, quiet) {
   setTimeout(() => {
     charId = id; pose = null; currentUrl = ''
     const c = char()
-    document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
+    applyLook(c)
     $('blink').src = c.blink || ''
     $('caption').textContent = c.name
     const s = charState[id]
@@ -272,7 +285,8 @@ function handleClick(kind) {
   lastActive = Date.now()
   if (kind === 'pat' && Math.random() < EGG_CLICK_CHANCE && playEgg(true)) return
   if (pose === 'sleeping') { show('yawn', true); say('唔…你回来啦'); return }
-  show(kind === 'poke' ? 'surprised' : 'pat', true)
+  const pokePose = char()?.pokePose && hasPose(char().pokePose) ? char().pokePose : 'surprised'
+  show(kind === 'poke' ? pokePose : 'pat', true)
 }
 
 // ---- 闲着的时候：偶尔哼歌 / 伸懒腰 / 打哈欠，太久没动静就睡 ----
@@ -280,11 +294,21 @@ setInterval(() => {
   if (egg || (pose !== 'idle' && pose !== 'tired')) return
   const quiet = Date.now() - lastActive
   if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
-  const r = Math.random()
-  if (r < .2) show('hum', true)
-  else if (r < .32) show('stretch', true)
-  else if (r < .42 && quiet > 3 * 60 * 1000) show('yawn', true)
+  if (Math.random() > .42) return
+  const builtin = ['hum', 'stretch', ...(quiet > 3 * 60 * 1000 ? ['yawn'] : [])]
+  const own = (char()?.idleActions || []).filter(hasPose)
+  const pool = own.length ? [...own, ...own, ...builtin] : builtin  // 有专属动作时优先用专属的
+  const a = pick(pool)
+  if (!TRANSIENT[a]) TRANSIENT[a] = 4000
+  show(a, true)
 }, 20000)
+
+// 想得久了换成专属的「深度思考」：character.json 里 longThink: { after: 秒, pose: 姿态 }
+setInterval(() => {
+  const lt = char()?.longThink
+  if (!lt || egg || pose !== 'thinking' || !hasPose(lt.pose)) return
+  if (Date.now() - poseSince > (lt.after || 20) * 1000) show(lt.pose, true)
+}, 1000)
 
 // ---- 彩蛋：角色闲着时，偶尔变成 cos 它的 DeepSeek ----
 // 流程：跳出来 → 装模作样（一直装，等你点她）→ 你点一下 → 被识破 → 溜走 → 变回原角色
@@ -355,7 +379,7 @@ function endEgg() {
   poof(() => {
     charId = host; pose = null; currentUrl = ''
     const c = char()
-    document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
+    applyLook(c)
     $('blink').src = c.blink || ''
     $('caption').textContent = c.name
     setPose(restPose(), true); say('')
