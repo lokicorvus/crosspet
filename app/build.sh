@@ -18,6 +18,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>CrossPet</string>
   <key>CFBundleIdentifier</key><string>io.github.crosspet</string>
   <key>CFBundleExecutable</key><string>CrossPet</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
@@ -33,6 +34,16 @@ for arch in arm64 x86_64; do
 done
 lipo -create build/CrossPet-arm64 build/CrossPet-x86_64 -output "$APP/Contents/MacOS/CrossPet"
 rm build/CrossPet-arm64 build/CrossPet-x86_64
+
+# 图标：从 app/icon/AppIcon.png（1024，已带圆角）生成全套尺寸
+ICONSET=build/AppIcon.iconset
+rm -rf "$ICONSET" && mkdir -p "$ICONSET"
+for s in 16 32 128 256 512; do
+  sips -z $s $s app/icon/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s*2)) $((s*2)) app/icon/AppIcon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+rm -rf "$ICONSET"
 
 cp -R app/web "$APP/Contents/Resources/web"
 cp -R characters "$APP/Contents/Resources/characters"
