@@ -48,6 +48,10 @@ rm -rf "$ICONSET"
 cp -R app/web "$APP/Contents/Resources/web"
 cp -R characters "$APP/Contents/Resources/characters"
 cp integrations/crosspet-hook.py "$APP/Contents/Resources/crosspet-hook.py"
+# 接入部分也打进包里：App 启动时会把已经装过的 Claude mod / DeepSeek 插件更新到新版
+mkdir -p "$APP/Contents/Resources/integrations/claude-code" "$APP/Contents/Resources/integrations/deepseek"
+cp -R integrations/claude-code/mod "$APP/Contents/Resources/integrations/claude-code/mod"
+cp -R integrations/deepseek/dsh-plugin-crosspet "$APP/Contents/Resources/integrations/deepseek/dsh-plugin-crosspet"
 find "$APP/Contents/Resources/characters" -name raw -type d -prune -exec rm -rf {} +
 
 codesign --force --deep -s - "$APP"

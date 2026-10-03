@@ -202,12 +202,25 @@ def gemini(install: bool) -> None:
 TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini}
 
 
+def has_hooks(p: Path) -> bool:
+    try:
+        return any(ours(g) for gs in load_json(p).get("hooks", {}).values() for g in gs)
+    except Exception:
+        return False
+
+
+def installed() -> list:
+    dsh = DSH_PROFILE / "cordis.patch.yml"
+    found = []
+    if has_hooks(CLAUDE_SETTINGS): found.append("claude-hooks")
+    if CLAUDE_MOD_DIR.exists(): found.append("claude-mod")
+    if has_hooks(CODEX_HOOKS): found.append("codex")
+    if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): found.append("deepseek")
+    if has_hooks(GEMINI_SETTINGS): found.append("gemini")
+    return found
+
+
 def status() -> None:
-    def has_hooks(p: Path) -> bool:
-        try:
-            return any(ours(g) for gs in load_json(p).get("hooks", {}).values() for g in gs)
-        except Exception:
-            return False
     print("Claude Code 标准钩子:", "已接入" if has_hooks(CLAUDE_SETTINGS) else "未接入")
     print("Claude Code mod     :", "已接入" if CLAUDE_MOD_DIR.exists() else "未接入")
     print("Codex               :", "已接入" if has_hooks(CODEX_HOOKS) else "未接入")
@@ -219,6 +232,10 @@ def status() -> None:
 if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "status":
         status()
+    elif len(sys.argv) == 2 and sys.argv[1] == "refresh":
+        for t in installed():
+            print(f"更新 {t}：")
+            TARGETS[t](True)
     elif len(sys.argv) == 3 and sys.argv[1] in ("install", "uninstall") and sys.argv[2] in TARGETS:
         print(f"{'接入' if sys.argv[1] == 'install' else '撤销'} {sys.argv[2]}：")
         TARGETS[sys.argv[2]](sys.argv[1] == "install")

@@ -61,6 +61,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var displayNames: [String: String] = [:]  // id → 显示名（含用户改的名）
     var appToCharacter: [String: String] = [:]
     var stamps: [String: Date] = [:]
+    var pendingSwitch: DispatchWorkItem?
+    var latestRelease: (tag: String, url: URL)?
 
     // MARK: 启动
 
@@ -105,7 +107,52 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota() }
+        Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkForUpdate(manual: false) }
     }
+
+    // MARK: 更新
+    // 每天查一次 GitHub 上最新的 Release（只读公开的版本号，不发送任何数据）。
+    // 自己 fork 的话改这里的仓库名。
+    let repoSlug = "lokicorvus/crosspet"
+    var currentVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0" }
+
+    func isNewer(_ tag: String, than current: String) -> Bool {
+        let a = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV")).split(separator: ".").map { Int($0) ?? 0 }
+        let b = current.split(separator: ".").map { Int($0) ?? 0 }
+        for i in 0..<max(a.count, b.count) {
+            let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+            if x != y { return x > y }
+        }
+        return false
+    }
+
+    func checkForUpdate(manual: Bool) {
+        guard let url = URL(string: "https://api.github.com/repos/\(repoSlug)/releases/latest") else { return }
+        var req = URLRequest(url: url, timeoutInterval: 15)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            guard let self = self else { return }
+            let obj = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            let tag = obj?["tag_name"] as? String ?? ""
+            let page = (obj?["html_url"] as? String).flatMap(URL.init(string:))
+            DispatchQueue.main.async {
+                if !tag.isEmpty, let page = page, self.isNewer(tag, than: self.currentVersion) {
+                    let isFresh = self.latestRelease?.tag != tag
+                    self.latestRelease = (tag, page)
+                    if isFresh || manual { self.js("notifyUpdate(\(self.quote(tag)))") }
+                } else if manual {
+                    let alert = NSAlert()
+                    alert.messageText = tag.isEmpty ? "暂时连不上 GitHub" : "已经是最新版（\(self.currentVersion)）"
+                    NSApp.activate(ignoringOtherApps: true)
+                    alert.runModal()
+                }
+            }
+        }.resume()
+    }
+
+    @objc func openRelease() { if let url = latestRelease?.url { NSWorkspace.shared.open(url) } }
+    @objc func manualCheck() { checkForUpdate(manual: true) }
 
     /// 把 App 包里的 web/、钩子脚本和内置角色同步到运行目录。用户自己加的角色目录不动。
     func syncBundledResources() {
@@ -119,6 +166,17 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         if fm.fileExists(atPath: res.appendingPathComponent("web").path) { replace("web", in: root, from: res) }
         if fm.fileExists(atPath: res.appendingPathComponent("crosspet-hook.py").path) { replace("crosspet-hook.py", in: root, from: res) }
+        // 已经接入过的才更新，没接入的不碰
+        let mods = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/mods/crosspet")
+        let modSrc = res.appendingPathComponent("integrations/claude-code/mod")
+        if fm.fileExists(atPath: mods.path), fm.fileExists(atPath: modSrc.path) {
+            try? fm.removeItem(at: mods); try? fm.copyItem(at: modSrc, to: mods)
+        }
+        let dsh = root.appendingPathComponent("dsh-plugin-crosspet")
+        let dshSrc = res.appendingPathComponent("integrations/deepseek/dsh-plugin-crosspet")
+        if fm.fileExists(atPath: dsh.path), fm.fileExists(atPath: dshSrc.path) {
+            try? fm.removeItem(at: dsh); try? fm.copyItem(at: dshSrc, to: dsh)
+        }
         let bundled = res.appendingPathComponent("characters")
         for dir in (try? fm.contentsOfDirectory(atPath: bundled.path)) ?? [] {
             replace(dir, in: charactersDir, from: bundled)
@@ -183,11 +241,18 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         js("setCharacter(\(quote(id)))")
     }
 
+    /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
+    /// App 启动时窗口会短暂地抢焦点、让焦点，立即响应会来回闪。
     @objc func appActivated(_ note: Notification) {
-        guard ready,
-              let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-              let bundle = app.bundleIdentifier, let id = appToCharacter[bundle] else { return }
-        switchTo(id)
+        guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+        pendingSwitch?.cancel()
+        guard let bundle = app.bundleIdentifier, let id = appToCharacter[bundle], id != currentId else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
+            self?.switchTo(id)
+        }
+        pendingSwitch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
     }
 
     // MARK: 状态与额度
@@ -281,6 +346,10 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func showMenu(_ event: NSEvent, in view: NSView) {
         let menu = NSMenu()
+        if let r = latestRelease {
+            add(menu, "⬆️ 有新版本 \(r.tag)，点这里下载", #selector(openRelease))
+            menu.addItem(.separator())
+        }
         add(menu, "摸摸头", #selector(pat))
         add(menu, "戳一下", #selector(poke))
         add(menu, "召唤彩蛋", #selector(egg))
@@ -303,6 +372,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         add(menu, "打开角色文件夹", #selector(openCharacters))
         add(menu, "重新载入", #selector(reload))
         add(menu, "回到右下角", #selector(resetPosition))
+        add(menu, "检查更新（当前 \(currentVersion)）", #selector(manualCheck))
         menu.addItem(.separator())
         add(menu, "退出 CrossPet", #selector(quit))
         NSMenu.popUpContextMenu(menu, with: event, for: view)

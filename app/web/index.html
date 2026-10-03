@@ -11,8 +11,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
   font-size: 13px; line-height: 1.35; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.12);
   transition: opacity .3s, transform .3s; }
 #bubble.hide { opacity: 0; transform: translateY(4px); }
-#stage { position: relative; width: 250px; height: 241px; transition: transform .22s ease, opacity .22s ease; }
-#stage.swap { transform: scale(.82); opacity: 0; }
+#stage { position: relative; width: 250px; height: 241px; transition: transform .32s ease, opacity .32s ease; }
+#stage.swap { transform: scale(.9) translateY(4%); opacity: 0; }
 #aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
   border-radius: 50%; opacity: var(--aura-o);
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
@@ -120,9 +120,14 @@ function framesFor(p) {
 
 // ---- 画面 ----
 // 交叉淡入：新图加载好之后再盖上来，旧图淡出，不会出现空白
-function showImage(url) {
+function showImage(url, instant) {
   if (!url || url === currentUrl) return
   currentUrl = url
+  if (instant) {  // 换角色时舞台是隐藏的，直接换图，不要和上一个角色叠在一起
+    spare.classList.remove('on'); spare.removeAttribute('src')
+    active.src = url; active.classList.add('on')
+    return
+  }
   const next = spare
   next.onload = () => {
     if (currentUrl !== url) return
@@ -140,10 +145,10 @@ function setFx(p) {
     fx.classList.remove('hide')
   }, 220)
 }
-function setPose(p) {
+function setPose(p, instant) {
   if (p === pose) return
   pose = p; poseSince = Date.now()
-  showImage(pick(framesFor(p)))
+  showImage(pick(framesFor(p)), instant)
   $('body').className = MOTION[p] || 'm-bob'
   const aura = (window.CrossFx && CrossFx.AURA[p]) || ['#ffd9b0', .35]
   document.documentElement.style.setProperty('--aura', aura[0])
@@ -191,6 +196,7 @@ function setCharacter(id, quiet) {
   if (egg) { clearEggTimers(); egg = null; charId = null }
   if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
   const stage = $('stage')
+  const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   stage.classList.add('swap')
   setTimeout(() => {
     charId = id; pose = null; currentUrl = ''
@@ -200,11 +206,18 @@ function setCharacter(id, quiet) {
     $('caption').textContent = c.name
     const s = charState[id]
     const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
-    setPose(busy ? s.pose : restPose())
+    setPose(busy ? s.pose : restPose(), true)
     say(quiet ? '' : (c.greeting || `${c.name} 在这儿～`))
     renderQuota()
-    stage.classList.remove('swap')
-  }, 230)
+    // 新立绘加载好再淡入，避免先看到空白
+    const reveal = () => stage.classList.remove('swap')
+    if (active.complete && spare.complete) setTimeout(reveal, 60); else setTimeout(reveal, 160)
+  }, 330)
+}
+
+function notifyUpdate(tag) {
+  if (egg) return
+  say(`有新版本 ${tag} 啦～右键菜单里可以下载`)
 }
 
 function setName(id, name) {
@@ -275,7 +288,7 @@ function clearEggTimers() { egg?.timers.forEach(t => { clearTimeout(t); clearInt
 function poof(then) {
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   const stage = $('stage'); stage.classList.add('swap')
-  setTimeout(() => { then(); stage.classList.remove('swap') }, 230)
+  setTimeout(() => { then(); stage.classList.remove('swap') }, 330)
 }
 function eggLine(step) { return pick((char().lines && char().lines[step]) || ['']) }
 function eggStep(step) {
@@ -296,7 +309,7 @@ function playEgg(force) {
     document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
     $('caption').textContent = `${manifest.characters[host].name}？`
     renderQuota()
-    eggStep('pop'); say(eggLine('pop'))
+    setPose('pop', true); document.documentElement.style.setProperty('--aura', c.aura || '#bcd4ff'); say(eggLine('pop'))
     egg.timers.push(setTimeout(() => {
       eggStep('pretend'); say(eggLine('pretend'))
       egg.waiting = true
@@ -331,7 +344,7 @@ function endEgg() {
     document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
     $('blink').src = c.blink || ''
     $('caption').textContent = c.name
-    setPose(restPose()); say('')
+    setPose(restPose(), true); say('')
     renderQuota()
   })
 }
