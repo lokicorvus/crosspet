@@ -85,6 +85,18 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "name": "crosspet",
+            "type": "command",
+            "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-hook.py\" gemini",
+            "timeout": 5000
+          }
+        ]
+      }
     ]
   }
 }

@@ -135,13 +135,13 @@ let statusWaiters = []
 
 // ---- 各姿态什么时候出现（和 docs/自定义角色.md 一致）----
 const BUILTIN = ['idle', 'listening', 'thinking', 'reading', 'writing', 'running', 'searching', 'delegating', 'drawing',
-  'happy', 'proud', 'oops', 'surprised', 'pat', 'sleeping', 'tired', 'hum', 'stretch', 'yawn', 'compact']
+  'happy', 'proud', 'oops', 'surprised', 'pat', 'sleeping', 'tired', 'hum', 'stretch', 'yawn', 'compact', 'asking']
 const EGG_POSES = ['pop', 'pretend', 'caught', 'bye']
 const WHEN = {
   idle: '平时', listening: '收到你的消息', thinking: '思考', reading: '读文件、搜代码', writing: '写文件、改代码', running: '跑命令',
   searching: '上网查资料', delegating: '派子任务', drawing: '画图', happy: '一轮完成', proud: '一轮用了 8 次以上工具的大活完成',
   oops: '出错', surprised: '被打断 / 被戳', pat: '被摸头', sleeping: '10 分钟没动静', tired: '额度快用完', hum: '闲着时哼歌',
-  stretch: '闲着时伸懒腰', yawn: '闲着时打哈欠', compact: '压缩上下文', reset: 'Codex 额度提前重置', feast: '余额增加（充值）',
+  stretch: '闲着时伸懒腰', yawn: '闲着时打哈欠', compact: '压缩上下文', asking: 'AI 问你问题 / 等你授权', reset: 'Codex 额度提前重置', feast: '余额增加（充值）',
   sorry: '出错 / 被打断后你又发消息', pop: '彩蛋：跳出来', pretend: '彩蛋：装模作样（等你点她）', caught: '彩蛋：被识破', bye: '彩蛋：溜走',
 }
 
@@ -285,6 +285,9 @@ const SCENES = [
   { id: 'oops', name: '出错，然后被你纠正', exp: '跑命令 → <b>出错</b>（错误卡片）→ 3 秒后你发消息 → 有 correctedPose 的角色先<b>认错</b>（Claude：「You\'re absolutely right!」），其他角色是普通的「在听」→ 思考',
     run: async (id, prog) => { st(id, 'running', 'PreToolUse', 'Bash'); await wait(2500); st(id, 'oops', 'PostToolUse', 'Bash'); await wait(2700); st(id, 'oops', 'Stop')
       prog('3 秒后发消息…'); await wait(3000); st(id, 'listening', 'UserPromptSubmit'); await wait(3500); prog('') } },
+  { id: 'asking', name: 'AI 问你问题', exp: '读文件 → AI 停下来问你（提问 / 要你授权）→ <b>等你回答</b>，一直保持到你回答 → 你回答后回到思考 → 开心',
+    run: async (id, prog) => { st(id, 'reading', 'PreToolUse', 'Read'); await wait(2600); st(id, 'asking', 'PreToolUse', 'AskUserQuestion')
+      prog('等你回答中（8 秒）'); await wait(8000); st(id, 'thinking', 'PostToolUse', 'AskUserQuestion'); await wait(2600); st(id, 'happy', 'Stop'); prog('') } },
   { id: 'abort', name: '被打断', exp: '干活中途被你按停 → <b>surprised</b>（「诶？！」）约 3 秒',
     run: async (id) => { st(id, 'writing', 'PreToolUse', 'Edit'); await wait(2500); st(id, 'surprised', 'Stop') } },
   { id: 'compact', name: '压缩上下文', exp: '<b>compact</b>：往小箱子里硬塞东西（身体有挤压的动作）→ 压缩完回到思考 → 开心',

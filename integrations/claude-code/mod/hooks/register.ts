@@ -5,6 +5,7 @@ import type { EngineInterface, Register } from 'claude-code'
 // - 额度：session.measure 推来的 5 小时 / 每周窗口 → claude-quota.json
 // - 被打断 / 出错：turn.complete 的 reason
 // - 压缩上下文：session.compact
+// - 等你回答：AskUserQuestion 提问、tool.check 判定要你授权
 // 状态目录和桌宠、其他接入一致：CROSSPET_STATE_DIR > Windows 的 %LOCALAPPDATA%\CrossPet\state > macOS 的 /tmp/crosspet。
 
 let dir: string | undefined
@@ -25,6 +26,7 @@ type Limit = { kind: string; percentUsed: number; resetsAt?: string }
 
 function poseForTool(tool: string): string {
   const t = tool.toLowerCase()
+  if (t === 'askuserquestion') return 'asking'  // 停下来问你问题、让你选选项
   if (/image_gen|imagegen|generate_image|draw|paint/.test(t)) return 'drawing'
   if (/read|grep|glob|list|view|cat/.test(t)) return 'reading'
   if (/write|edit|patch|replace|create/.test(t)) return 'writing'
@@ -85,6 +87,14 @@ export const register: Register = on => {
     tools = 0
     await write($, `${ID}-state.json`, { pose, event: 'Stop', tool: '', ts: Date.now() / 1000 })
     return r
+  })
+
+  // 要你授权：引擎判定为「问用户」时换成等你回答的表情。只旁听，判定原样返回，不改变任何行为
+  on('tool.check', async ($, e, next) => {
+    const verdict = await next(e)
+    if ((verdict as { decision?: string } | undefined)?.decision === 'ask')
+      await write($, `${ID}-state.json`, { pose: 'asking', event: 'PermissionRequest', tool: e.tool, ts: Date.now() / 1000 })
+    return verdict
   })
 
   // 压缩上下文（/compact 或自动）：只管主对话，后台预先压缩（precompute）和子任务的不算

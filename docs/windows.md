@@ -2,6 +2,21 @@
 
 支持 Windows 11（x64 和 ARM64 共用一个安装包）。Windows 10 需要系统里有「Microsoft Edge WebView2 运行时」，没有的话第一次打开会提示去微软官网装。
 
+## 测试情况
+
+作者手边没有 Windows 电脑，这一版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
+
+| 功能 | 状态 |
+|---|---|
+| 透明显示、拖动、置顶、托盘、右键菜单、改名、开机启动 | ✅ 已测 |
+| 跟随前台程序换角色 | ✅ 已测 |
+| Codex 接入、DeepSeek Harness 接入、DeepSeek 余额（API Key 和账号登录两种） | ✅ 已测 |
+| 开发者控制台 | ✅ 已测 |
+| Claude Code 标准钩子 / 增强版 mod（额度）、Gemini（Antigravity）额度、Antigravity / Gemini CLI 钩子 | ⚠️ 没测过（虚拟机里没装） |
+| 实体 x64 电脑、多显示器、Windows 10 | ⚠️ 没测过 |
+
+遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
+
 ## 安装
 
 1. 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
