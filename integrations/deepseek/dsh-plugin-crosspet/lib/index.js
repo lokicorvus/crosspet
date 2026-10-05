@@ -4,6 +4,7 @@
 // 状态目录默认 /tmp/crosspet，可在插件配置里改 stateDir。插件只观察，不改变 DeepSeek 的任何行为。
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 export const name = "crosspet";
 export const inject = ["credentials"];
@@ -29,7 +30,8 @@ function failed(result) {
 }
 
 export function apply(ctx, config = {}) {
-  const dir = config.stateDir || process.env.CROSSPET_STATE_DIR || "/tmp/crosspet";
+  const dir = config.stateDir || process.env.CROSSPET_STATE_DIR ||
+    (process.platform === "win32" ? join(process.env.TEMP || process.env.TMP || tmpdir(), "crosspet") : "/tmp/crosspet");
   const lowBalance = typeof config.lowBalance === "number" ? config.lowBalance : 5;
   let tools = 0;
 

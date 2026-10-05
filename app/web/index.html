@@ -223,7 +223,7 @@ function show(p, urgent) {
   if (TRANSIENT[p]) revertTimer = setTimeout(() => { setPose(restPose()); say('') }, TRANSIENT[p])
 }
 
-// ---- 由 Swift 调用 ----
+// ---- 由桌面宿主调用（macOS / Windows）----
 function init(m) {
   manifest = m
   for (const c of Object.values(m.characters))

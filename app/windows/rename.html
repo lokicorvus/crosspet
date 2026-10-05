@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
+<title>Rename character</title>
+<style>body{font:14px 'Segoe UI',sans-serif;margin:20px;background:#faf5ee}input{box-sizing:border-box;width:100%;padding:8px;margin:12px 0}button{padding:7px 18px;float:right}</style>
+<form><label for="name">Character name (leave blank to reset)</label><input id="name" maxlength="80" autofocus><button>Save</button></form>
+<script>document.querySelector('form').onsubmit = event => { event.preventDefault(); window.crosspet.rename(document.getElementById('name').value) }</script>
+</html>

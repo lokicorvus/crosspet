@@ -4,6 +4,7 @@
 
 [![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
+![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-blue)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
 [![立绘 CC BY-NC-SA 4.0](https://img.shields.io/badge/%E7%AB%8B%E7%BB%98-CC%20BY--NC--SA%204.0-orange)](characters/LICENSE.md)
 
@@ -39,7 +40,21 @@ Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的�
 
 ## 快速开始
 
-**要求**：macOS 13 及以上，Apple 芯片和 Intel 都行。
+**支持**：macOS 13 及以上（Apple 芯片 / Intel）；Windows 10 / 11。
+
+### Windows：从源码安装
+
+安装 Node.js 22.12 及以上（含 npm），在本仓库目录打开 PowerShell：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+会编译 Windows 版、装到 `%LOCALAPPDATA%\Programs\CrossPet`，创建开始菜单快捷方式并启动。仅编译用 `app\build.ps1`，生成的 `build\CrossPet-win32-x64\CrossPet.exe` 可直接运行（保留整个文件夹）。
+
+接入 AI 另需 Python 3.9+，例如 `python tools\integrate.py install codex`。支持 Claude 标准钩子、Codex、Gemini CLI、Antigravity 钩子与 DeepSeek 插件。完整步骤、测试、卸载以及 Windows 功能差异见 **[Windows 使用说明](docs/windows.md)**。
+
+**下面三种安装方式仅适用于 macOS。**
 
 ### 方式一：一条命令（推荐）
 

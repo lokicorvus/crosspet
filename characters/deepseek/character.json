@@ -1,5 +1,6 @@
 {
   "name": "DeepSeek",
+  "windowsApps": ["DeepSeek.exe", "DeepSeek Harness.exe", "dsh.exe"],
   "accent": "#3b5bb5",
   "apps": [
     "com.deepseek.dsh"

@@ -19,13 +19,17 @@ from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SUPPORT = HOME / "Library/Application Support/CrossPet"
+WINDOWS = sys.platform == "win32"
+SUPPORT = Path(os.environ.get("CROSSPET_HOME") or (
+    str(Path(os.environ.get("LOCALAPPDATA", HOME / "AppData/Local")) / "CrossPet")
+    if WINDOWS else str(HOME / "Library/Application Support/CrossPet")
+))
 MARK = "crosspet-hook.py"
 
 
 def backup(path: Path) -> None:
     if path.exists():
-        dst = path.with_name(f"{path.name}.bak-crosspet-{time.strftime('%Y%m%d-%H%M%S')}")
+        dst = path.with_name(f"{path.name}.bak-crosspet-{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 1_000_000_000:09d}")
         shutil.copy2(path, dst)
         print(f"  已备份 {path} → {dst.name}")
 
@@ -33,7 +37,7 @@ def backup(path: Path) -> None:
 def load_json(path: Path) -> dict:
     if not path.exists():
         return {}
-    text = path.read_text(encoding="utf-8").strip()
+    text = path.read_text(encoding="utf-8-sig").strip()
     return json.loads(text) if text else {}
 
 
@@ -46,11 +50,42 @@ def ours(group: dict) -> bool:
     return any(MARK in str(h.get("command", "")) for h in group.get("hooks", []))
 
 
+def hook_template(path: Path) -> dict:
+    """Keep the shared hook events; resolve the command for the Windows shell."""
+    data = load_json(path)
+    if not WINDOWS:
+        return data
+    # `python` works in cmd, PowerShell and Git Bash; a quoted executable path
+    # would require PowerShell's & operator. Python must be on PATH on Windows.
+    prefix = f'python "{(SUPPORT / MARK).as_posix()}"'
+
+    def adapt(value):
+        if isinstance(value, dict):
+            command = value.get("command")
+            if isinstance(command, str) and MARK in command:
+                value["command"] = prefix + command.split(MARK + '"', 1)[1]
+            for child in value.values():
+                adapt(child)
+        elif isinstance(value, list):
+            for child in value:
+                adapt(child)
+
+    adapt(data)
+    return data
+
+
+def install_hook() -> None:
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    source = REPO / "integrations" / MARK
+    if source.resolve() != (SUPPORT / MARK).resolve():
+        shutil.copy2(source, SUPPORT / MARK)
+
+
 def merge_hooks(target: Path, template: Path) -> None:
     """把模板里的钩子按事件追加进 target 的 hooks 字段（已存在的 CrossPet 条目先删再加，保证不重复）。"""
     data = load_json(target)
     hooks = data.setdefault("hooks", {})
-    for event, groups in load_json(template)["hooks"].items():
+    for event, groups in hook_template(template)["hooks"].items():
         kept = [g for g in hooks.get(event, []) if not ours(g)]
         hooks[event] = kept + groups
     backup(target)
@@ -94,6 +129,8 @@ def claude_hooks(install: bool) -> None:
 
 
 def claude_mod(install: bool) -> None:
+    if WINDOWS:
+        raise SystemExit("Claude's sandboxed mod is macOS-only. Use install claude-hooks on Windows.")
     data = load_json(CLAUDE_SETTINGS)
     env = data.setdefault("env", {})
     dirs = [d for d in env.get("CLAUDE_CODE_PLUGIN_DIRS", "").split(":") if d]
@@ -122,7 +159,7 @@ def claude_mod(install: bool) -> None:
 
 
 # ---- Codex ----
-CODEX_HOOKS = HOME / ".codex/hooks.json"
+CODEX_HOOKS = Path(os.environ.get("CODEX_HOME", HOME / ".codex")) / "hooks.json"
 
 
 def codex(install: bool) -> None:
@@ -166,17 +203,24 @@ def deepseek(install: bool) -> None:
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
         shutil.copytree(REPO / "integrations/deepseek/dsh-plugin-crosspet", DSH_PLUGIN_DIR)
-        deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR}"
+        deps[DSH_PLUGIN_NAME] = f"file:{DSH_PLUGIN_DIR.as_posix()}" if WINDOWS else f"link:{DSH_PLUGIN_DIR}"
         link.parent.mkdir(parents=True, exist_ok=True)
-        if link.is_symlink() or link.exists():
+        if link.is_symlink():
             link.unlink()
-        link.symlink_to(DSH_PLUGIN_DIR)
+        elif link.exists():
+            shutil.rmtree(link)
+        if WINDOWS:  # Directory symlinks require extra privileges on Windows.
+            shutil.copytree(DSH_PLUGIN_DIR, link)
+        else:
+            link.symlink_to(DSH_PLUGIN_DIR, target_is_directory=True)
         patch = patch.rstrip("\n") + "\n" + DSH_BLOCK
         print(f"  已安装插件到 {DSH_PLUGIN_DIR}")
     else:
         deps.pop(DSH_PLUGIN_NAME, None)
         if link.is_symlink():
             link.unlink()
+        elif WINDOWS and link.exists():
+            shutil.rmtree(link)
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
     backup(pkg_path)
@@ -209,7 +253,7 @@ def antigravity(install: bool) -> None:
         return
     data = load_json(ANTIGRAVITY_HOOKS) if ANTIGRAVITY_HOOKS.exists() else {}
     if install:
-        data.update(load_json(REPO / "integrations/antigravity/hooks.json"))
+        data.update(hook_template(REPO / "integrations/antigravity/hooks.json"))
     elif data.pop("crosspet", None) is None:
         return
     if ANTIGRAVITY_HOOKS.exists():
@@ -264,10 +308,13 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == "status":
         status()
     elif len(sys.argv) == 2 and sys.argv[1] == "refresh":
+        install_hook()
         for t in installed():
             print(f"更新 {t}：")
             TARGETS[t](True)
     elif len(sys.argv) == 3 and sys.argv[1] in ("install", "uninstall") and sys.argv[2] in TARGETS:
+        if sys.argv[1] == "install":
+            install_hook()
         print(f"{'接入' if sys.argv[1] == 'install' else '撤销'} {sys.argv[2]}：")
         TARGETS[sys.argv[2]](sys.argv[1] == "install")
     else:

@@ -15,13 +15,16 @@
 import json
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
 
 BIG_JOB_TOOLS = 8  # 一轮里用了这么多次工具，结束时「得意」一下
 
 character = sys.argv[1] if len(sys.argv) > 1 else "claude"
-state_dir = Path(os.environ.get("CROSSPET_STATE_DIR", "/tmp/crosspet"))
+default_state = (Path(os.environ.get("TEMP") or os.environ.get("TMP") or tempfile.gettempdir()) / "crosspet"
+                 if sys.platform == "win32" else Path("/tmp/crosspet"))
+state_dir = Path(os.environ.get("CROSSPET_STATE_DIR") or default_state)
 
 try:
     event = json.load(sys.stdin)

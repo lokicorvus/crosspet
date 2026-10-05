@@ -1,5 +1,6 @@
 {
   "name": "Gemini",
+  "windowsApps": ["Antigravity.exe", "Gemini.exe"],
   "accent": "#7b5cd6",
   "apps": [
     "com.google.GeminiMacOS",

@@ -1,5 +1,6 @@
 {
   "name": "Claude",
+  "windowsApps": ["Claude.exe"],
   "accent": "#e8a33d",
   "apps": [
     "com.anthropic.claudefordesktop"

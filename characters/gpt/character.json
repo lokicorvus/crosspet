@@ -1,5 +1,6 @@
 {
   "name": "GPT",
+  "windowsApps": ["Codex.exe", "ChatGPT.exe"],
   "accent": "#7a8fa8",
   "apps": [
     "com.openai.codex",
