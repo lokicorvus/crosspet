@@ -2,7 +2,7 @@
 // 用法见 tools/fxcheck/run.sh
 const fs = require('fs'); global.window = {}
 require(process.argv[2]); const F = window.CrossFx
-const poses = ['idle','listening','thinking','reading','writing','running','searching','delegating','drawing','happy','proud','oops','surprised','pat','sleeping','tired','hum','stretch','yawn']
+const poses = ['idle','listening','thinking','reading','writing','running','searching','delegating','drawing','happy','proud','oops','surprised','pat','sleeping','tired','hum','stretch','yawn','asking']
 // 把「往上飘」「往下落」的元素在起点、中途、终点各画一份，静态检查也能覆盖移动路径
 function envelope(svg) {
   const groupRise = /<g transform="translate\(([-\d.]+) ([-\d.]+)\)((?: scale\([^)]*\))?)" opacity="0">(.*?)<animateTransform attributeName="transform" type="translate" values="0 0;([-\d.]+) ([-\d.]+)"[^>]*additive="sum"\/><\/g>/g

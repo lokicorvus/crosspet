@@ -56,6 +56,7 @@ const AURA                                 = {
   happy: ['#fff08a', 0.6], proud: ['#ffd54a', 0.6], oops: ['#ff9b9b', 0.5], surprised: ['#e8e2f0', 0.3],
   pat: ['#ffb6c8', 0.6], sleeping: ['#7f8fd1', 0.45], tired: ['#c9c2b8', 0.45], hum: ['#ffd0e6', 0.45],
   stretch: ['#ffe0b8', 0.35], yawn: ['#d8d0f0', 0.4], drawing: ['#ffd6e8', 0.45],
+  asking: ['#c9d4ff', 0.5],
 }
 // 叠几层半透明圆当柔光（渐变的 stop-opacity 有的渲染器不认，这样最稳）
 const aura = (p      ) => {
@@ -211,6 +212,25 @@ const chatCard = (() => {
     `${floatY()}</g>`
 })()
 
+// 等你回答：选项卡片——上面一行问题，后面三个点一跳一跳（在等你），下面两个选项，
+// 一道蓝色高亮在两个选项之间来回挪（在等你挑），和聊天卡片、小终端同一套画法
+const choiceCard = (() => {
+  const x = 432, y = 30, D = '2.8s'
+  const dots = [0, 1, 2].map(i =>
+    `<circle cx="${x + 94 + i * 9}" cy="${y + 34}" r="3" fill="#9aa3ad"><animate attributeName="cy" values="${y + 34};${y + 30};${y + 34}" dur="0.9s" begin="${i * 0.15}s" ${loop}/></circle>`).join('')
+  const option = (oy, w) =>
+    `<rect x="${x + 12}" y="${oy}" width="102" height="20" rx="10" fill="#fff" stroke="#d5dbe3" stroke-width="2"/>` +
+    `<circle cx="${x + 24}" cy="${oy + 10}" r="5" fill="#fff" stroke="#9aa3ad" stroke-width="2"/>` +
+    `<rect x="${x + 36}" y="${oy + 7}" width="${w}" height="6" rx="3" fill="#c9ced6"/>`
+  // 高亮：蓝边框 + 选中的小圆点，在两个选项之间来回挪，每个停一会儿
+  const highlight = `<g><rect x="${x + 12}" y="${y + 48}" width="102" height="20" rx="10" fill="#5b8def" fill-opacity="0.14" stroke="#5b8def" stroke-width="2.5"/>` +
+    `<circle cx="${x + 24}" cy="${y + 58}" r="2.6" fill="#5b8def"/>` +
+    `<animateTransform attributeName="transform" type="translate" values="0 0;0 0;0 26;0 26;0 0" keyTimes="0;0.35;0.5;0.85;1" calcMode="spline" keySplines="0 0 1 1;0.45 0 0.55 1;0 0 1 1;0.45 0 0.55 1" dur="${D}" ${loop}/></g>`
+  return `<g>${winFrame(x, y, 126, 104, false, '#eef0fb')}` +
+    `<rect x="${x + 12}" y="${y + 30}" width="74" height="7" rx="3.5" fill="#6b4a3a" opacity="0.55"/>${dots}` +
+    `${option(y + 48, 58)}${option(y + 74, 46)}${highlight}${floatY('2.6s')}</g>`
+})()
+
 // 读文件：代码查看器，一条高亮扫描线逐行往下扫
 const viewerCard = (() => {
   const x = 432, y = 36
@@ -345,6 +365,7 @@ const surroundings = (p      )         => {
   switch (p) {
     case 'idle': return star(80, 180, 0.6, '0s', '#ffc58a', '3s') + star(500, 260, 0.5, '1.5s', '#ffc58a', '3s')
     case 'listening': return chatCard
+    case 'asking': return choiceCard
     case 'thinking': return thoughtCloud
     case 'reading': return viewerCard + floatingGlyphs
     case 'writing': return editorCard
