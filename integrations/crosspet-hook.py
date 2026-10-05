@@ -21,10 +21,12 @@ from pathlib import Path
 BIG_JOB_TOOLS = 8  # 一轮里用了这么多次工具，结束时「得意」一下
 
 character = sys.argv[1] if len(sys.argv) > 1 else "claude"
-state_dir = Path(os.environ.get("CROSSPET_STATE_DIR", "/tmp/crosspet"))
+default_data = Path(os.environ.get("CROSSPET_DATA_DIR") or str(Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "CrossPet"))
+state_dir = Path(os.environ.get("CROSSPET_STATE_DIR") or (str(default_data / "state") if os.name == "nt" else "/tmp/crosspet"))
 
 try:
-    event = json.load(sys.stdin)
+    # 按 UTF-8 读：Windows 上 Python 默认用系统编码（中文系统是 GBK），事件里一有中文就会解码失败
+    event = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
 except Exception:
     sys.exit(0)
 

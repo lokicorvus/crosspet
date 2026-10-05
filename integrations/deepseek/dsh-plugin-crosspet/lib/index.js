@@ -1,14 +1,16 @@
 // CrossPet × DeepSeek Harness
 // - 监听 DeepSeek 的工作事件（收到消息 / 调工具 / 子任务 / 一轮结束），写 <状态目录>/deepseek-state.json
-// - 通过 DeepSeek Harness 官方凭据接口取 API Key，每 10 分钟查一次余额，写 <状态目录>/deepseek-quota.json
+// - 每 10 分钟查一次余额（有 API Key 用 Key；没有就用 Harness 里登录的账号），写 <状态目录>/deepseek-quota.json
 // 状态目录默认 /tmp/crosspet，可在插件配置里改 stateDir。插件只观察，不改变 DeepSeek 的任何行为。
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
+const PLUGIN_VERSION = "1.1.1";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 10 * 60 * 1000;
 
@@ -29,13 +31,16 @@ function failed(result) {
 }
 
 export function apply(ctx, config = {}) {
-  const dir = config.stateDir || process.env.CROSSPET_STATE_DIR || "/tmp/crosspet";
+  const data = process.env.CROSSPET_DATA_DIR || join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "CrossPet");
+  const dir = config.stateDir || process.env.CROSSPET_STATE_DIR || (process.platform === "win32" ? join(data, "state") : "/tmp/crosspet");
   const lowBalance = typeof config.lowBalance === "number" ? config.lowBalance : 5;
   let tools = 0;
 
+  let writes = 0;
   async function writeJson(file, data) {
     await mkdir(dir, { recursive: true });
-    const tmp = join(dir, `.${file}`);
+    // 临时文件名每次不同：几次写入同时发生时（比如启动时查两次余额、连续的工作事件）不会互相抢同一个文件
+    const tmp = join(dir, `.${file}.${process.pid}.${++writes}`);
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, join(dir, file));
   }
@@ -74,26 +79,81 @@ export function apply(ctx, config = {}) {
   });
   ctx.on("subagent/end", () => state("thinking", "SubagentStop"));
 
-  // ---- 余额：用官方凭据接口拿 Key（值只在内存里用，不写盘、不打日志）----
+  // ---- 余额 ----
+  // 两条路，都是 Harness 官方接口，Key / 登录凭据都只在 Harness 内部使用，插件只拿到余额数字：
+  // 1. 配置了 API Key（模型页填的 sk-…）：用凭据接口取 Key，调官方余额接口（值只在内存里用，不写盘、不打日志）
+  // 2. 没有 Key、但在 Harness 里登录了 DeepSeek 账号：调 Harness 自己的账号服务 deepseekAccount.getBalance
+  // 账号服务不是每个版本都有：用 ctx.inject 声明成「有就用」，没有时插件照常工作
+  let account = null;
+  try {
+    ctx.inject(["deepseekAccount"], (sub) => {
+      account = sub.deepseekAccount;
+      sub.effect(() => {
+        pollBalance();
+        return () => { account = null; };
+      }, "crosspet: account balance");
+    });
+  } catch (e) {
+    // 万一这个版本的 Harness 不支持：只是少了「用账号查余额」，工作状态和用 Key 查余额照常
+    ctx.logger?.warn?.(`crosspet: 账号服务不可用 ${String(e?.message ?? e)}`);
+  }
+
+  const show = (total, currency, available = true) => writeJson(`${ID}-quota.json`, {
+    text: `余额 ${currency === "USD" ? "$" : "¥"}${total.toFixed(2)}`,
+    balance: total,  // 桌宠比对用：余额变多（充值）时播「大口吃白饭」
+    low: !available || total < lowBalance,
+  });
+
+  async function balanceByKey() {
+    const hit = await ctx.credentials.resolve("DEEPSEEK_API_KEY");
+    if (!hit?.value) return "no-key";
+    const res = await fetch("https://api.deepseek.com/user/balance", {
+      headers: { Authorization: `Bearer ${hit.value}`, Accept: "application/json" },
+    });
+    if (!res.ok) return `HTTP ${res.status}`;
+    const body = await res.json();
+    const info = body?.balance_infos?.[0];
+    if (!info) return "no-balance";
+    await show(Number(info.total_balance) || 0, info.currency, body.is_available !== false);
+    return "ok";
+  }
+
+  async function balanceByAccount() {
+    if (!account?.getBalance) return "no-account";
+    const r = await account.getBalance({
+      version: "crosspet", locale: "zh-CN", timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60,
+    });
+    if (r === null) return "not-signed-in";
+    if (r?.status !== "ready") return "failed";
+    // 现金钱包 + 赠送钱包，人民币优先
+    const wallets = [...(r.value || []), ...(r.bonusWallets || [])];
+    const currency = wallets.some((w) => w.currency === "CNY") ? "CNY" : wallets[0]?.currency;
+    if (!currency) return "no-balance";
+    const total = wallets.filter((w) => w.currency === currency).reduce((sum, w) => sum + (Number(w.balance) || 0), 0);
+    await show(total, currency);
+    return "ok";
+  }
+
+  // 每次查余额都把过程记到 deepseek-plugin.json（只有结果代码，没有 Key / 令牌），
+  // 余额不显示时看它就知道卡在哪一步：Harness 的日志不落盘，没有别的办法看
+  const diagnose = (info) => writeJson(`${ID}-plugin.json`, { plugin: PLUGIN_VERSION, at: new Date().toISOString(),
+    accountService: !!account?.getBalance, ...info }).catch(() => {});
+
   async function pollBalance() {
+    let byKey = "not-tried", byAccount = "not-tried";
     try {
-      const hit = await ctx.credentials.resolve("DEEPSEEK_API_KEY");
-      if (!hit?.value) return;
-      const res = await fetch("https://api.deepseek.com/user/balance", {
-        headers: { Authorization: `Bearer ${hit.value}`, Accept: "application/json" },
-      });
-      if (!res.ok) return;
-      const body = await res.json();
-      const info = body?.balance_infos?.[0];
-      if (!info) return;
-      const total = Number(info.total_balance) || 0;
-      const sym = info.currency === "USD" ? "$" : "¥";
-      await writeJson(`${ID}-quota.json`, {
-        text: `余额 ${sym}${total.toFixed(2)}`,
-        balance: total,  // 桌宠比对用：余额变多（充值）时播「大口吃白饭」
-        low: body.is_available === false || total < lowBalance,
-      });
+      byKey = await balanceByKey().catch((e) => `error: ${String(e?.message ?? e)}`);
+      if (byKey !== "ok") byAccount = await balanceByAccount().catch((e) => `error: ${String(e?.message ?? e)}`);
+      await diagnose({ apiKey: byKey, account: byAccount });
+      if (byKey === "ok" || byAccount === "ok") return;
+      if (byKey === "no-key" && ["no-account", "not-signed-in"].includes(byAccount)) {
+        // 两样都没有：名牌上说清楚怎么办，别一声不吭
+        await writeJson(`${ID}-quota.json`, { text: "余额：请在 Harness 登录账号或填 API Key", low: false });
+        return;
+      }
+      ctx.logger?.warn?.(`crosspet: 查余额失败（API Key：${byKey}，账号：${byAccount}）`);
     } catch (e) {
+      await diagnose({ apiKey: byKey, account: byAccount, error: String(e?.message ?? e) });
       ctx.logger?.warn?.(`crosspet: 查余额失败 ${String(e?.message ?? e)}`);
     }
   }
