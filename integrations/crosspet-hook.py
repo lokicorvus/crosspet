@@ -35,6 +35,22 @@ tool = str(event.get("tool_name") or call.get("name", "")).lower()
 tool_input = json.dumps(event.get("tool_input") or call.get("args", ""), ensure_ascii=False).lower()
 
 
+# Antigravity 的工具名（文档里的名字和内部步骤名都可能出现）
+ANTIGRAVITY_TOOLS = {
+    "reading": ("view_file", "view_file_outline", "view_code_item", "view_content_chunk", "list_dir", "list_directory",
+                "find_by_name", "find", "grep_search", "code_search", "find_all_references", "read_notebook", "read_resource"),
+    "writing": ("write_to_file", "replace_file_content", "multi_replace_file_content", "code_action", "file_change",
+                "propose_code", "edit_notebook", "write_blob", "delete_directory", "move"),
+    "running": ("run_command", "command_status", "send_command_input", "read_terminal", "shell_exec", "execute_notebook"),
+    "searching": ("search_web", "read_url_content", "open_browser_url", "read_browser_page", "browser_subagent"),
+    "drawing": ("generate_image",),
+    "delegating": ("invoke_subagent",),
+}
+# 这些是 Antigravity 内部的记账 / 提问步骤，不算干活
+ANTIGRAVITY_IGNORE = ("task_boundary", "notify_user", "planner_response", "ask_question", "ask_permission",
+                      "manage_task", "checkpoint", "ephemeral_message", "system_message", "finish", "wait")
+
+
 def pose_for_tool(t: str) -> str:
     # 画图：Codex 内置 image_gen 工具，或用脚本 image_gen.py 生成
     if any(k in t for k in ("image_gen", "imagegen", "generate_image", "draw", "paint")) or "image_gen" in tool_input:
@@ -83,7 +99,19 @@ def set_turn_tools(n: int) -> None:
 state_dir.mkdir(parents=True, exist_ok=True)
 
 pose = None
-if name in ("SessionStart",):
+if arg_event and name == "PostToolUse":
+    # Antigravity：不挂 PreToolUse（它要求钩子回答「放行 / 拦截」，会干扰正常的权限确认），
+    # 工具跑完时再按工具名显示动作，下一次调用模型（PreInvocation）时回到思考
+    agy = next((p for p, names in ANTIGRAVITY_TOOLS.items() if tool in names), None)
+    if tool_failed():
+        pose = "oops"
+    elif not tool or tool in ANTIGRAVITY_IGNORE:
+        pose = None
+    else:
+        set_turn_tools(turn_tools() + 1)
+        pose = agy or ("searching" if tool.startswith("browser") else pose_for_tool(tool))
+    name = "PreToolUse"  # 让桌宠当作「正在用这个工具」显示，而不是「工具结束、回去思考」
+elif name in ("SessionStart",):
     pose = "idle"
 elif name in ("UserPromptSubmit", "BeforeAgent"):
     set_turn_tools(0)
