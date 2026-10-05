@@ -21,7 +21,9 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #shadow { position: absolute; left: 50%; bottom: 7px; width: 110px; height: 10px; margin-left: -55px;
   border-radius: 50%; background: rgba(0,0,0,.13); }
 #body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; }
-#body img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%;
+/* 立绘按高度占满人物框；比框宽的（张开翅膀、带小帮手、抱大碗……）往左右多伸出去，最多到整个舞台宽，
+   而不是整体缩小——这样所有姿态里人物一样高 */
+#body img { position: absolute; top: 0; bottom: 0; left: -27.5%; width: 155%; height: 100%; object-fit: contain; object-position: 50% 100%;
   opacity: 0; transition: opacity .35s ease; }
 #body img.on { opacity: 1; }
 #body img#blink { transition: none; }

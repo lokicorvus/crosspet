@@ -26,7 +26,7 @@ def body_for(poses):
     for d in chars:
         for pose in poses:
             for f in frames(d,pose):
-                im=Image.open(f).convert('RGBA'); s=min(AW/im.width, AH/im.height)
+                im=Image.open(f).convert('RGBA'); s=min(AW*1.55/im.width, AH/im.height)  # 和 App 一样：按高度占满，宽的往两边伸
                 w,h=round(im.width*s),round(im.height*s); a=im.split()[3].resize((w,h))
                 m=Image.new('L',(CW,CH),0); m.paste(a,(AX+(AW-w)//2, AY+AH-h)); body=ImageChops.lighter(body,m)
     body=body.point(lambda v:255 if v>100 else 0)

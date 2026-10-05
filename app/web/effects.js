@@ -326,7 +326,7 @@ const easelCard = (() => {
 
 // ---- 可被角色点名使用的特效（character.json 的 fx 字段）----
 // 深海泡泡：两侧和头顶的泡泡摇摇晃晃往上冒（DeepSeek 思考 / 深度思考 / 游泳）
-const bubbles = [[40, 330, 9], [70, 380, 6], [26, 250, 7], [505, 340, 10], [540, 300, 6], [520, 230, 8], [300, 96, 7], [250, 108, 5]].map(([x, y, r], i) =>
+const bubbles = [[30, 340, 9], [44, 400, 6], [26, 250, 7], [548, 350, 10], [540, 290, 6], [546, 220, 8], [300, 96, 7], [250, 108, 5]].map(([x, y, r], i) =>
   `<g transform="translate(${x} ${y})" opacity="0"><circle r="${r}" fill="#bfe6ff" fill-opacity="0.35" stroke="#5aa9e6" stroke-width="2"/>` +
   `<circle cx="${-r * 0.35}" cy="${-r * 0.35}" r="${Math.max(1.5, r * 0.25)}" fill="#fff" opacity="0.9"/>` +
   `${fadeLoop(`${2.6 + (i % 3) * 0.4}s`, `${(i * 0.37).toFixed(2)}s`)}${rise(`${2.6 + (i % 3) * 0.4}s`, `${(i * 0.37).toFixed(2)}s`, y > 200 ? -110 : -50, i % 2 ? 8 : -8)}</g>`).join('')
@@ -335,9 +335,9 @@ const steam = [0, 1, 2].map(i =>
   `<path d="M${470 + i * 18} 140 q-8 -12 0 -24 t0 -24" stroke="#d9d4cc" stroke-width="4" fill="none" stroke-linecap="round" opacity="0">` +
   `${fadeLoop('2.2s', `${i * 0.5}s`)}<animateTransform attributeName="transform" type="translate" values="0 0;0 -26" dur="2.2s" begin="${i * 0.5}s" ${loop} additive="sum"/></path>`).join('')
 // 庆祝：两侧彩纸 + 闪光（GPT reset、DeepSeek 吃大餐）
-const fxCelebrate = confetti + star(500, 170, 1, '0.5s', '#ffd54a') + star(80, 200, 0.9, '0.9s', '#ffd54a') + star(490, 380, 0.8, '0.3s')
+const fxCelebrate = confetti + star(500, 170, 1, '0.5s', '#ffd54a') + star(80, 200, 0.9, '0.9s', '#ffd54a') + star(548, 392, 0.8, '0.3s')
 // 大成功但立绘里已经画了皇冠：只留几颗金色闪光，不再叠特效皇冠和奖杯
-const fxVictory = star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a') + star(70, 200, 0.9, '0.8s', '#ffd54a') + star(60, 330, 0.7, '1.1s', '#ffd54a')
+const fxVictory = star(510, 140, 1.1, '0.4s', '#ffd54a') + star(548, 330, 0.8, '0.2s', '#ffd54a') + star(70, 200, 0.9, '0.8s', '#ffd54a') + star(60, 330, 0.7, '1.1s', '#ffd54a')
 const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory }
 
 // 每个姿态周围的细节
@@ -351,8 +351,8 @@ const surroundings = (p      )         => {
     case 'running': return terminal
     case 'searching': return magnifier + browser
     case 'delegating': return taskCard  // 子任务依次完成；「派出分身」交给立绘表现
-    case 'happy': return checklist + confetti + star(500, 170, 1, '0.5s') + star(490, 380, 0.9, '0.3s')
-    case 'proud': return trophy + crown + star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a')
+    case 'happy': return checklist + confetti + star(500, 170, 1, '0.5s') + star(548, 392, 0.9, '0.3s')
+    case 'proud': return trophy + crown + star(510, 140, 1.1, '0.4s', '#ffd54a') + star(548, 330, 0.8, '0.2s', '#ffd54a')
     case 'oops': return errorCard
     case 'surprised': return pokeBurst
     case 'pat': return heart(440, 160, 1.8, '0s') + heart(480, 220, 1.3, '0.7s') + heart(110, 190, 1.5, '1.1s') + heart(90, 280, 1.1, '1.6s')

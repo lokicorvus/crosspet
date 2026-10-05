@@ -148,7 +148,7 @@ def tile(cid, pose, line, quota, fx_img, aura):
     files = sorted((CHARS / cid).glob(f"{pose}.webp")) or sorted((CHARS / cid).glob(f"{pose}-*.webp")) or [CHARS / cid / "idle.webp"]
     art = Image.open(files[0]).convert("RGBA")
     bw, bh = STAGE_W * .645 * S, STAGE_H * .75 * S
-    k = min(bw / art.width, bh / art.height)
+    k = min(bw * 1.55 / art.width, bh / art.height)  # 和 App 一样：按高度占满，宽的往两边伸
     art = art.resize((int(art.width * k), int(art.height * k)), Image.LANCZOS)
     bx = sx + STAGE_W * .178 * S + (bw - art.width) / 2
     by = sy + STAGE_H * .211 * S + bh - art.height
