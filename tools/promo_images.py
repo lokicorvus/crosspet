@@ -221,9 +221,9 @@ def slide_install():
     art = rounded(cover_art().resize((300, 300), Image.LANCZOS), 40)
     shadowed(bg, art, ((W - 300) // 2, 200), r=40)
     steps = [
-        ("1", "GitHub 搜 lokicorvus/crosspet", "Releases 里下载 CrossPet.zip，解压拖进「应用程序」"),
-        ("2", "第一次打开放行一次", "macOS 15+：系统设置 → 隐私与安全性 → 最下面「仍要打开」"),
-        ("3", "接上你用的 AI", "照 README 运行一条命令，就能跟着 AI 干活"),
+        ("1", "GitHub 搜 lokicorvus/crosspet", "打开项目主页，README 第一条就是安装命令"),
+        ("2", "复制那一行命令到终端", "自动下载、安装、接上你用的 AI，不用去系统设置里放行"),
+        ("3", "不想用终端？", "下载 CrossPet.zip 手动装，第一次在「隐私与安全性」里放行"),
     ]
     y = 580
     for n, title, sub in steps:
