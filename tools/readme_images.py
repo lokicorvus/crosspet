@@ -34,6 +34,8 @@ ACTIONS = [
     ("deepseek", "compact", "塞、塞不下了！", None), ("gemini", "float", "反——重——力——喵～", None),
     ("claude", "clawd", "Clawd 也在陪我～", None), ("gpt", "searching", "查一查。", None),
     ("deepseek", "swim", "咕噜咕噜～", None), ("gemini", "delegating", "交给分身喵", None),
+    ("claude", "asking", "能帮我选一下吗？", None), ("gpt", "compact", "整理一下记忆。", None),
+    ("deepseek", "asking", "快来快来！要你选！", None), ("gemini", "compact", "压缩压缩喵～", None),
 ]
 EGGS = [
     ("egg-claude", "pretend", "（翻书）嗯……这个问题很有意思呢。", None),

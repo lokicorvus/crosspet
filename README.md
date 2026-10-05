@@ -4,10 +4,11 @@
 
 [![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
+![Windows 11](https://img.shields.io/badge/Windows-11-lightgrey)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
 [![立绘 CC BY-NC-SA 4.0](https://img.shields.io/badge/%E7%AB%8B%E7%BB%98-CC%20BY--NC--SA%204.0-orange)](characters/LICENSE.md)
 
-一只浮在桌面角落的小桌宠。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
+一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
 ![Claude、GPT、DeepSeek、Gemini 四个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
@@ -17,7 +18,8 @@
 
 ![思考、读文件、跑命令、吃饭、画画、大成功、查资料、游泳、派子任务等动作](docs/images/actions.webp)
 
-- **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞。AI 停下来问你问题、让你选选项或者请求授权时，她会一直看着你、等你回答。
+- **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞。
+- **等你回答**：AI 停下来问你问题、让你选选项，或者请求授权时，她会一直看着你、等你回答，你回答了才回去干活（目前支持 Claude Code 和 DeepSeek Harness）。
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。
 - **各有性格，还懂社区梗**：
@@ -28,28 +30,22 @@
 
 ## 支持的 AI
 
-| AI | 自动换形象 | 跟着干活 | 额度 / 余额 |
-|---|:---:|---|---|
-| **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 |
-| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读 Codex 会话记录 |
-| **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额 |
-| **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
+| AI | 自动换形象 | 跟着干活 | 额度 / 余额 | 等你回答 |
+|---|:---:|---|---|:---:|
+| **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 | ✅ |
+| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读 Codex 会话记录 | — |
+| **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额（填了 API Key 或登录了账号都行） | ✅ |
+| **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity | — |
 
-Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。
-
-## Windows 版
-
-支持 Windows 11（x64 和 ARM64 同一个安装包，约 20 MB）。到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，解压到本地磁盘后双击 `install.cmd`。功能和接入方法见 [Windows 说明](docs/windows.md)。
-
-> **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
-> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台。
-> **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
+Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。Codex 提问时不触发钩子、而且是异步的，Antigravity 没有提问的信号，所以这两个暂时识别不了「等你回答」。
 
 ## 快速开始
 
+### macOS
+
 **要求**：macOS 13 及以上，Apple 芯片和 Intel 都行。
 
-### 方式一：一条命令（推荐）
+#### 方式一：一条命令（推荐）
 
 打开「终端」，粘贴这一行回车：
 
@@ -67,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
 curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash -s -- uninstall
 ```
 
-### 方式二：手动下载
+#### 方式二：手动下载
 
 1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
 2. 第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
@@ -75,7 +71,7 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
    - **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
 3. 这样装好后，切到各个 AI 的 App 时她会换形象；想让她**跟着 AI 干活**，还要接入 AI：运行一次方式一的命令（已经装好的 App 会直接替换成同一版），或者用方式三。
 
-### 方式三：从源码安装
+#### 方式三：从源码安装
 
 需要苹果命令行工具（没有的话运行 `xcode-select --install`）：
 
@@ -92,6 +88,20 @@ python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mo
 python3 tools/integrate.py status            # 看看现在接了哪些
 ```
 
+### Windows
+
+**要求**：Windows 11，x64 和 ARM64 同一个安装包（约 20 MB）。用系统自带的 WebView2 显示，不用另装任何运行库。
+
+1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
+2. 双击里面的 `install.cmd`：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，然后自动打开。不需要管理员权限。
+3. 右键桌宠 →「接入 AI」，把你用的 AI 逐个「接入 / 更新」。
+
+更多说明见 [Windows 说明](docs/windows.md)。
+
+> **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
+> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台。
+> **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
+
 ### 接入 AI 改了什么
 
 不管用哪种方式，接入都只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份，撤销后恢复原样。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
@@ -105,7 +115,8 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 |---|---|
 | 单击 | 摸摸头 |
 | 拖动 | 换个位置（会记住） |
-| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、登录时自动启动、打开角色文件夹、检查更新……（按住 ⌥ 再右键，还有「开发者控制台」） |
+| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、登录时自动启动、打开角色文件夹、检查更新……（按住 ⌥ 再右键，Windows 是按住 Shift 再右键，还有「开发者控制台」） |
+| 托盘图标（Windows） | 右键是同一个菜单，双击让她回到右下角 |
 
 ## 彩蛋
 
@@ -116,15 +127,15 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 ## 自定义
 
 - **改名**：右键 →「给当前角色改名…」，留空就恢复默认。
-- **换立绘、改台词、加新角色**：看 [自定义角色](docs/自定义角色.md)。改完可以**按住 ⌥ 再右键**打开「开发者控制台」，把每个姿态和场景挨个过一遍。一个文件夹就是一个角色，放几张图、写个 `character.json` 就能用。
+- **换立绘、改台词、加新角色**：看 [自定义角色](docs/自定义角色.md)。改完可以**按住 ⌥（Windows 是 Shift）再右键**打开「开发者控制台」，把每个姿态和场景挨个过一遍。一个文件夹就是一个角色，放几张图、写个 `character.json` 就能用。
 - **用 AI 画新立绘**：[角色生图提示词](docs/prompts/角色生图提示词.md) · [彩蛋生图提示词](docs/prompts/彩蛋生图提示词.md)，配好了参考图。
 
 ## 隐私
 
-- 钩子只拿到「哪个事件、用了哪个工具」，写到本机 `/tmp/crosspet/`，不保存任何对话内容。
+- 钩子只拿到「哪个事件、用了哪个工具」，写到本机的状态目录（macOS 是 `/tmp/crosspet/`，Windows 是 `%LOCALAPPDATA%\CrossPet\state`），不保存任何对话内容。
 - GPT 额度默认关闭。打开后只从 Codex 会话记录里提取额度那几个数字。
 - Gemini 额度默认关闭。打开后向本机正在运行的 Antigravity 后台服务问一次额度（和它自己界面上显示额度的方式一样），用的是它每次启动随机生成、只在本机有效的令牌，不碰你的 Google 账号凭据。
-- DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处。
+- DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处；没填 Key 时调 Harness 自己的账号服务查，登录凭据始终留在 Harness 里，插件只拿到余额数字。
 - CrossPet 自己只联网做一件事：每天查一次 GitHub 上有没有新版本。
 
 ## 更新与卸载
@@ -133,6 +144,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 - **一条命令装的**：再运行一次安装命令就是更新；卸载命令见上面「方式一」。
 - **手动下载的**：下载新的 `CrossPet.zip` 替换旧 App 即可；已接入的钩子、插件、mod 会在新版第一次启动时自动更新。
 - **从源码装的**：`./update.sh` 更新，`./uninstall.sh` 卸载。
+- **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `install.cmd`，覆盖安装即可，设置和角色都保留；卸载双击 `uninstall.cmd`。
 
 遇到问题先看 [常见问题](docs/常见问题.md)。各版本改了什么见 [更新记录](CHANGELOG.md)。
 

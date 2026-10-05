@@ -126,7 +126,7 @@ def readme_cover():
         d.rounded_rectangle([xx, 470, xx + tw, 522], 26, fill=(255, 255, 255, 235), outline=color, width=3)
         d.text((xx + tw / 2, 496), t, font=f, fill=color, anchor="mm")
         xx += tw + 14
-    d.text((x + 4, 560), "macOS · 免费开源 · 非官方同人", font=font(26), fill=MUTED)
+    d.text((x + 4, 560), "macOS / Windows · 免费开源 · 非官方同人", font=font(26), fill=MUTED)
     bg.convert("RGB").save(REPO / "docs/images/cover.webp", quality=90, method=6)
     print("docs/images/cover.webp")
 
@@ -140,7 +140,7 @@ def slide_cover():
     art = rounded(cover_art().resize((1000, 1000), Image.LANCZOS), 70)
     shadowed(bg, art, ((W - 1000) // 2, 360), r=70)
     chips(d, 1410, [(n, ACCENT[n.lower()]) for n in ["Claude", "GPT", "DeepSeek", "Gemini"]], font(36, True))
-    text_center(d, 1500, "Mac 桌面小窗 · 免费开源", font(38), INK)
+    text_center(d, 1500, "Mac / Windows 桌面小窗 · 免费开源", font(38), INK)
     footer(d)
     return bg
 
@@ -221,9 +221,9 @@ def slide_install():
     art = rounded(cover_art().resize((300, 300), Image.LANCZOS), 40)
     shadowed(bg, art, ((W - 300) // 2, 200), r=40)
     steps = [
-        ("1", "GitHub 搜 lokicorvus/crosspet", "打开项目主页，README 第一条就是安装命令"),
-        ("2", "复制那一行命令到终端", "自动下载、安装、接上你用的 AI，不用去系统设置里放行"),
-        ("3", "不想用终端？", "下载 CrossPet.zip 手动装，第一次在「隐私与安全性」里放行"),
+        ("1", "GitHub 搜 lokicorvus/crosspet", "打开项目主页，「快速开始」里按系统选"),
+        ("2", "Mac：复制那一行命令到终端", "自动下载、安装、接上你用的 AI，不用去系统设置里放行"),
+        ("3", "Windows：下载安装包", "解压后双击 install.cmd，不需要管理员权限"),
     ]
     y = 580
     for n, title, sub in steps:
@@ -233,7 +233,7 @@ def slide_install():
         d.text((260, y + 48), title, font=font(44, True), fill=INK)
         d.text((260, y + 118), sub, font=font(28), fill=MUTED)
         y += 220
-    text_center(d, y + 30, "只支持 macOS 13+（Apple 芯片 / Intel 都行）", font(34), INK)
+    text_center(d, y + 30, "macOS 13+（Apple 芯片 / Intel）· Windows 11（x64 / ARM64）", font(34), INK)
     text_center(d, y + 90, "免费 · 开源 · 不收集任何数据", font(40, True), (123, 92, 214))
     footer(d)
     return bg

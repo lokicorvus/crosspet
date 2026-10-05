@@ -102,12 +102,18 @@ def load_template(template: Path, via_cmd: bool = False) -> dict:
 
 
 def merge_hooks(target: Path, template: Path) -> None:
-    """把模板里的钩子按事件追加进 target 的 hooks 字段（已存在的 CrossPet 条目先删再加，保证不重复）。"""
+    """把模板里的钩子按事件追加进 target 的 hooks 字段。
+    先清掉所有事件里 CrossPet 自己的旧条目（包括新版模板已经不用的事件），再按模板加回去，保证不重复、不残留。"""
     data = load_json(target)
     hooks = data.setdefault("hooks", {})
+    for event in list(hooks):
+        kept = without_ours(hooks[event])
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
     for event, groups in load_template(template)["hooks"].items():
-        kept = without_ours(hooks.get(event, []))
-        hooks[event] = kept + groups
+        hooks[event] = hooks.get(event, []) + groups
     backup(target)
     save_json(target, data)
     print(f"  已写入 {target}")
