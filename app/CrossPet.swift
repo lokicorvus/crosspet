@@ -212,10 +212,12 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 .filter { $0.hasSuffix(".webp") || $0.hasSuffix(".png") }.sorted()
             var poses: [String: [String]] = [:]
             var blink: String?
+            var blinkBase: String?  // 眨眼帧是照着 idle 本身（不是 idle-2、idle-3）画的
             for f in files {
                 let name = (f as NSString).deletingPathExtension
                 let url = dir.appendingPathComponent(f).absoluteString
                 if name == "idle-blink" { blink = url; continue }
+                if name == "idle" { blinkBase = url }
                 let pose = name.split(separator: "-").first.map(String.init) ?? name
                 poses[pose, default: []].append(url)
             }
@@ -225,6 +227,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             if !isEgg, let custom = renamed[id], !custom.isEmpty { info["name"] = custom }
             info["poses"] = poses
             info["blink"] = blink ?? NSNull()
+            info["blinkBase"] = blinkBase ?? NSNull()
             chars[id] = info
             if isEgg { continue }
             characterIds.append(id)

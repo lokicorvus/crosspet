@@ -107,7 +107,7 @@ const SLEEP_AFTER = 10 * 60 * 1000
 const $ = id => document.getElementById(id)
 const pick = list => list[Math.floor(Math.random() * list.length)]
 let manifest = { characters: {} }
-let charId = null, pose = null, poseSince = 0, currentUrl = ''
+let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
@@ -127,6 +127,7 @@ const imgA = $('a'), imgB = $('b')
 function showImage(url, instant) {
   if (!url || url === currentUrl) return
   currentUrl = url
+  swappedAt = Date.now()
   imgA.onload = imgB.onload = null
   if (instant) {  // 换角色时舞台是隐藏的，直接换图，不要和上一个角色叠在一起
     spare.classList.remove('on'); spare.removeAttribute('src')
@@ -139,6 +140,7 @@ function showImage(url, instant) {
     if (currentUrl !== url || next !== spare) return
     next.classList.add('on'); active.classList.remove('on')
     spare = active; active = next
+    swappedAt = Date.now()
   }
   next.src = url
 }
@@ -399,7 +401,9 @@ setInterval(() => {
 ;(function blinkLoop() {
   setTimeout(() => {
     const blink = $('blink'), c = char()
-    if (c && c.blink && (pose === 'idle' || pose === 'listening') && currentUrl === (c.poses.idle || [])[0]) {
+    // 只在显示的正是眨眼帧对应的那张 idle、而且换图淡入已经结束时眨眼，否则会和别的图叠在一起
+    if (c && c.blink && c.blinkBase && (pose === 'idle' || pose === 'listening') && currentUrl === c.blinkBase
+        && active.getAttribute('src') === c.blinkBase && !spare.classList.contains('on') && Date.now() - swappedAt > 600) {
       blink.classList.add('on')
       setTimeout(() => blink.classList.remove('on'), 140)
     }
