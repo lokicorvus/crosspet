@@ -53,7 +53,16 @@ ANTIGRAVITY_IGNORE = ("task_boundary", "notify_user", "planner_response", "ask_q
                       "manage_task", "checkpoint", "ephemeral_message", "system_message", "finish", "wait")
 
 
+# AI 停下来问你问题、让你选选项的工具：Claude Code 的 AskUserQuestion、Codex 的 request_user_input、
+# DeepSeek Harness 的 ask_user_question 等
+ASKING_TOOLS = ("askuserquestion", "request_user_input", "ask_user_question", "ask_user", "ask_question")
+# Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI）；idle_prompt 是一轮做完后闲着，不算
+ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission")
+
+
 def pose_for_tool(t: str) -> str:
+    if t in ASKING_TOOLS:
+        return "asking"
     # 画图：Codex 内置 image_gen 工具，或用脚本 image_gen.py 生成
     if any(k in t for k in ("image_gen", "imagegen", "generate_image", "draw", "paint")) or "image_gen" in tool_input:
         return "drawing"
@@ -113,6 +122,13 @@ if arg_event and name == "PostToolUse":
         set_turn_tools(turn_tools() + 1)
         pose = agy or ("searching" if tool.startswith("browser") else pose_for_tool(tool))
     name = "PreToolUse"  # 让桌宠当作「正在用这个工具」显示，而不是「工具结束、回去思考」
+elif name in ("PermissionRequest",):
+    pose = "asking"  # 等你授权（Codex）
+elif name in ("Notification",):
+    kind = str(event.get("notification_type", "")).lower()
+    message = str(event.get("message", "")).lower()
+    if kind in ASKING_NOTIFICATIONS or (not kind and "permission" in message):
+        pose = "asking"
 elif name in ("SessionStart",):
     pose = "idle"
 elif name in ("UserPromptSubmit", "BeforeAgent"):

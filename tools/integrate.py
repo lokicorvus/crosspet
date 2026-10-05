@@ -19,7 +19,7 @@ from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SUPPORT = HOME / "Library/Application Support/CrossPet"
+SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet") if os.name == "nt" else str(HOME / "Library/Application Support/CrossPet")))
 MARK = "crosspet-hook.py"
 
 
@@ -46,12 +46,67 @@ def ours(group: dict) -> bool:
     return any(MARK in str(h.get("command", "")) for h in group.get("hooks", []))
 
 
+def without_ours(groups: list) -> list:
+    """Keep other commands even when they share a matcher group with CrossPet."""
+    kept = []
+    for group in groups:
+        if not ours(group):
+            kept.append(group)
+            continue
+        hooks = [h for h in group.get("hooks", []) if MARK not in str(h.get("command", ""))]
+        if hooks:
+            kept.append({**group, "hooks": hooks})
+    return kept
+
+
+def win_arg(path: Path) -> str:
+    """钩子命令里的一个路径。各家 AI 在 Windows 上用不同的壳跑钩子（cmd、PowerShell、Git Bash），
+    带引号的写法总有一种会坏：cmd 会剥掉首尾引号，PowerShell 会把开头带引号的东西当成字符串而不是命令。
+    所以尽量不加引号：没有空格直接用正斜杠路径；有空格先换成 8.3 短路径（不含空格）；都不行才加引号。"""
+    text = str(path)
+    if " " in text:
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(1024)
+            if ctypes.windll.kernel32.GetShortPathNameW(text, buf, 1024) and " " not in buf.value:
+                text = buf.value
+        except Exception:
+            pass
+    text = Path(text).as_posix()
+    return f'"{text}"' if " " in text else text
+
+
+def load_template(template: Path, via_cmd: bool = False) -> dict:
+    """读接入模板；在 Windows 上把 macOS 的 python3 + $HOME 路径换成随包 Python 和本机钩子脚本的绝对路径。
+    via_cmd：这个 AI 用 cmd /c 跑钩子（Antigravity），命令以引号开头时要再包一层引号，抵消 cmd 剥引号。"""
+    data = load_json(template)
+    if os.name != "nt":
+        return data
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / "crosspet-hook.py")
+    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)}"
+    original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py"'
+
+    def command(value: str) -> str:
+        cmd = prefix + value[len(original):]
+        return f'"{cmd}"' if via_cmd and cmd.startswith('"') else cmd
+
+    def adapt(obj):
+        if isinstance(obj, dict):
+            return {key: (command(value) if key == "command" and isinstance(value, str) and value.startswith(original) else adapt(value))
+                    for key, value in obj.items()}
+        if isinstance(obj, list):
+            return [adapt(item) for item in obj]
+        return obj
+    return adapt(data)
+
+
 def merge_hooks(target: Path, template: Path) -> None:
     """把模板里的钩子按事件追加进 target 的 hooks 字段（已存在的 CrossPet 条目先删再加，保证不重复）。"""
     data = load_json(target)
     hooks = data.setdefault("hooks", {})
-    for event, groups in load_json(template)["hooks"].items():
-        kept = [g for g in hooks.get(event, []) if not ours(g)]
+    for event, groups in load_template(template)["hooks"].items():
+        kept = without_ours(hooks.get(event, []))
         hooks[event] = kept + groups
     backup(target)
     save_json(target, data)
@@ -65,8 +120,8 @@ def remove_hooks(target: Path) -> None:
     hooks = data.get("hooks", {})
     changed = False
     for event in list(hooks):
-        kept = [g for g in hooks[event] if not ours(g)]
-        if len(kept) != len(hooks[event]):
+        kept = without_ours(hooks[event])
+        if kept != hooks[event]:
             changed = True
             if kept:
                 hooks[event] = kept
@@ -81,8 +136,10 @@ def remove_hooks(target: Path) -> None:
 
 
 # ---- Claude Code ----
-CLAUDE_SETTINGS = HOME / ".claude/settings.json"
-CLAUDE_MOD_DIR = HOME / ".claude/mods/crosspet"
+# 各 AI 的配置目录都可以用环境变量挪走：CLAUDE_CONFIG_DIR、CODEX_HOME、DSH_HOME，没设就用用户目录下的默认位置
+CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or HOME / ".claude")
+CLAUDE_SETTINGS = CLAUDE_HOME / "settings.json"
+CLAUDE_MOD_DIR = CLAUDE_HOME / "mods/crosspet"
 
 
 def claude_hooks(install: bool) -> None:
@@ -94,9 +151,12 @@ def claude_hooks(install: bool) -> None:
 
 
 def claude_mod(install: bool) -> None:
+    if not install and not CLAUDE_MOD_DIR.exists() and not CLAUDE_SETTINGS.exists():
+        return  # 从没装过：别凭空建出一个 settings.json
     data = load_json(CLAUDE_SETTINGS)
     env = data.setdefault("env", {})
-    dirs = [d for d in env.get("CLAUDE_CODE_PLUGIN_DIRS", "").split(":") if d]
+    # 多个目录用系统的路径分隔符连接：macOS 是冒号，Windows 是分号（Windows 路径里本身就有冒号）
+    dirs = [d for d in env.get("CLAUDE_CODE_PLUGIN_DIRS", "").split(os.pathsep) if d]
     dirs = [d for d in dirs if Path(os.path.expanduser(d)) != CLAUDE_MOD_DIR]
     if install:
         if CLAUDE_MOD_DIR.exists():
@@ -109,7 +169,7 @@ def claude_mod(install: bool) -> None:
             shutil.rmtree(CLAUDE_MOD_DIR)
             print(f"  已删除 {CLAUDE_MOD_DIR}")
     if dirs:
-        env["CLAUDE_CODE_PLUGIN_DIRS"] = ":".join(dirs)
+        env["CLAUDE_CODE_PLUGIN_DIRS"] = os.pathsep.join(dirs)
     else:
         env.pop("CLAUDE_CODE_PLUGIN_DIRS", None)
     if not env:
@@ -122,7 +182,7 @@ def claude_mod(install: bool) -> None:
 
 
 # ---- Codex ----
-CODEX_HOOKS = HOME / ".codex/hooks.json"
+CODEX_HOOKS = Path(os.environ.get("CODEX_HOME", str(HOME / ".codex"))) / "hooks.json"
 
 
 def codex(install: bool) -> None:
@@ -134,7 +194,7 @@ def codex(install: bool) -> None:
 
 
 # ---- DeepSeek Harness（插件）----
-DSH_PROFILE = HOME / ".dsh/profiles/desktop"
+DSH_PROFILE = Path(os.environ.get("DSH_HOME") or HOME / ".dsh") / "profiles/desktop"
 DSH_PLUGIN_NAME = "@local/dsh-plugin-crosspet"
 DSH_PLUGIN_DIR = SUPPORT / "dsh-plugin-crosspet"
 DSH_BLOCK_START = "# ── CrossPet 桌宠（integrations/deepseek）"
@@ -146,6 +206,26 @@ DSH_BLOCK = f"""
       name: '{DSH_PLUGIN_NAME}'
 # ── CrossPet 结束 ──
 """
+
+
+def make_link(link: Path, target: Path) -> None:
+    """macOS 用软链接；Windows 建软链接要管理员或开发者模式，改用不需要权限的目录联接（junction）。"""
+    if os.name == "nt":
+        import _winapi
+        _winapi.CreateJunction(str(target), str(link))
+    else:
+        link.symlink_to(target)
+
+
+def remove_link(link: Path) -> None:
+    """只拆链接本身，绝不顺着链接删到插件本体。"""
+    if link.is_symlink() or (hasattr(os.path, "isjunction") and os.path.isjunction(link)):
+        os.rmdir(link) if os.name == "nt" and link.is_dir() else link.unlink()
+    elif link.exists():
+        if link.is_dir():
+            shutil.rmtree(link)
+        else:
+            link.unlink()
 
 
 def deepseek(install: bool) -> None:
@@ -166,17 +246,15 @@ def deepseek(install: bool) -> None:
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
         shutil.copytree(REPO / "integrations/deepseek/dsh-plugin-crosspet", DSH_PLUGIN_DIR)
-        deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR}"
+        deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR.as_posix()}"
         link.parent.mkdir(parents=True, exist_ok=True)
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(DSH_PLUGIN_DIR)
+        remove_link(link)
+        make_link(link, DSH_PLUGIN_DIR)
         patch = patch.rstrip("\n") + "\n" + DSH_BLOCK
         print(f"  已安装插件到 {DSH_PLUGIN_DIR}")
     else:
         deps.pop(DSH_PLUGIN_NAME, None)
-        if link.is_symlink():
-            link.unlink()
+        remove_link(link)
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
     backup(pkg_path)
@@ -184,7 +262,10 @@ def deepseek(install: bool) -> None:
     backup(patch_path)
     patch_path.write_text(patch, encoding="utf-8")
     print(f"  已更新 {pkg_path.name} 和 {patch_path.name}")
-    print("  → 完全退出（⌘Q）再打开 DeepSeek Harness 生效")
+    if os.name == "nt":
+        print("  → 完全退出 DeepSeek Harness（包括任务栏右下角的托盘图标）再打开生效")
+    else:
+        print("  → 完全退出（⌘Q）再打开 DeepSeek Harness 生效")
 
 
 # ---- Gemini CLI ----
@@ -209,7 +290,7 @@ def antigravity(install: bool) -> None:
         return
     data = load_json(ANTIGRAVITY_HOOKS) if ANTIGRAVITY_HOOKS.exists() else {}
     if install:
-        data.update(load_json(REPO / "integrations/antigravity/hooks.json"))
+        data.update(load_template(REPO / "integrations/antigravity/hooks.json", via_cmd=True))
     elif data.pop("crosspet", None) is None:
         return
     if ANTIGRAVITY_HOOKS.exists():

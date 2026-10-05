@@ -10,13 +10,14 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
-const PLUGIN_VERSION = "1.1.1";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
+const PLUGIN_VERSION = "1.2.0";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 10 * 60 * 1000;
 
 function poseForTool(name, args) {
   const t = String(name ?? "").toLowerCase();
   const input = (() => { try { return JSON.stringify(args ?? "").toLowerCase(); } catch { return ""; } })();
+  if (t === "ask_user_question" || t === "ask_user") return "asking";  // 停下来问你问题、让你选选项
   if (/image_gen|imagegen|generate_image|draw|paint/.test(t) || input.includes("image_gen")) return "drawing";
   if (/read|grep|glob|list|view|cat/.test(t)) return "reading";
   if (/write|edit|patch|replace|create/.test(t)) return "writing";
@@ -70,6 +71,16 @@ export function apply(ctx, config = {}) {
   ctx.on("agent/turn-stopping", () => {
     state(tools >= BIG_JOB_TOOLS ? "proud" : "happy", "Stop");
     tools = 0;
+  });
+  // 要你授权：只旁听，决定原样交回给 Harness。自动放行的请求也会经过这里，
+  // 所以超过 0.4 秒还没答复（真的在等人）才换成等你回答的表情，免得干活时一闪一闪
+  ctx.on("approval/request", async (_request, next) => {
+    const waiting = setTimeout(() => state("asking", "PermissionRequest"), 400);
+    try {
+      return await next();
+    } finally {
+      clearTimeout(waiting);
+    }
   });
   ctx.on("subagent/start", () => state("delegating", "SubagentStart"));
   // 压缩上下文：会话日志里的 compaction/start、compaction/end

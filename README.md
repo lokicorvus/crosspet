@@ -17,7 +17,7 @@
 
 ![思考、读文件、跑命令、吃饭、画画、大成功、查资料、游泳、派子任务等动作](docs/images/actions.webp)
 
-- **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞。
+- **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞。AI 停下来问你问题、让你选选项或者请求授权时，她会一直看着你、等你回答。
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。
 - **各有性格，还懂社区梗**：
@@ -36,6 +36,14 @@
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 
 Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。
+
+## Windows 版
+
+支持 Windows 11（x64 和 ARM64 同一个安装包，约 20 MB）。到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，解压到本地磁盘后双击 `install.cmd`。功能和接入方法见 [Windows 说明](docs/windows.md)。
+
+> **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
+> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台。
+> **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
 
 ## 快速开始
 

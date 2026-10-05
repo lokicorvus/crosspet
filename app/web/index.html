@@ -99,13 +99,14 @@ const MOTION = {
   // 角色专属姿态（没列出的默认轻轻浮动）
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
+  asking: 'm-hop',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
-const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening' }
+const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」

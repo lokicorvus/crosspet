@@ -1,13 +1,24 @@
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 
 // CrossPet × Claude Code（增强版 mod）
 // 和标准钩子输出同一种状态（<状态目录>/claude-state.json），另外多两样：
 // - 额度：session.measure 推来的 5 小时 / 每周窗口 → claude-quota.json
 // - 被打断 / 出错：turn.complete 的 reason
 // - 压缩上下文：session.compact
-// 状态目录固定 /tmp/crosspet（和桌宠、其他接入一致）。
+// - 等你回答：AskUserQuestion 提问、tool.check 判定要你授权
+// 状态目录和桌宠、其他接入一致：CROSSPET_STATE_DIR > Windows 的 %LOCALAPPDATA%\CrossPet\state > macOS 的 /tmp/crosspet。
 
-const DIR = '/tmp/crosspet'
+let dir: string | undefined
+async function stateDir($: EngineInterface): Promise<string> {
+  if (dir) return dir
+  const custom = await $.env.get('CROSSPET_STATE_DIR')
+  const local = await $.env.get('LOCALAPPDATA')  // 只有 Windows 有这个变量
+  dir = custom || (local ? `${local}\\CrossPet\\state` : '/tmp/crosspet')
+  return dir
+}
+async function write($: EngineInterface, file: string, data: unknown): Promise<void> {
+  await $.fs.write(`${await stateDir($)}/${file}`, JSON.stringify(data))
+}
 const ID = 'claude'
 const BIG_JOB_TOOLS = 8
 
@@ -15,6 +26,7 @@ type Limit = { kind: string; percentUsed: number; resetsAt?: string }
 
 function poseForTool(tool: string): string {
   const t = tool.toLowerCase()
+  if (t === 'askuserquestion') return 'asking'  // 停下来问你问题、让你选选项
   if (/image_gen|imagegen|generate_image|draw|paint/.test(t)) return 'drawing'
   if (/read|grep|glob|list|view|cat/.test(t)) return 'reading'
   if (/write|edit|patch|replace|create/.test(t)) return 'writing'
@@ -46,25 +58,25 @@ export const register: Register = on => {
   let tools = 0
 
   on('session.start', async ($, e, next) => {
-    await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 }))
+    await write($, `${ID}-state.json`, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
     const usage = await $.session.usage()
     const q = quotaOf(usage.rateLimits)
-    if (q) await $.fs.write(`${DIR}/${ID}-quota.json`, JSON.stringify(q))
+    if (q) await write($, `${ID}-quota.json`, q)
     return next(e)
   })
 
   on('prompt.submit', async ($, e, next) => {
     tools = 0
-    await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 }))
+    await write($, `${ID}-state.json`, { pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 })
     return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
     tools += 1
-    await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: poseForTool(e.tool), event: 'PreToolUse', tool: e.tool, ts: Date.now() / 1000 }))
+    await write($, `${ID}-state.json`, { pose: poseForTool(e.tool), event: 'PreToolUse', tool: e.tool, ts: Date.now() / 1000 })
     const r = await next(e)
     const failed = 'deny' in r && r.deny !== undefined ? true : r.isError === true
-    await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: failed ? 'oops' : 'thinking', event: 'PostToolUse', tool: e.tool, ts: Date.now() / 1000 }))
+    await write($, `${ID}-state.json`, { pose: failed ? 'oops' : 'thinking', event: 'PostToolUse', tool: e.tool, ts: Date.now() / 1000 })
     return r
   })
 
@@ -73,22 +85,30 @@ export const register: Register = on => {
     const pose =
       e.reason === 'answer' ? (tools >= BIG_JOB_TOOLS ? 'proud' : 'happy') : e.reason === 'aborted' ? 'surprised' : 'oops'
     tools = 0
-    await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose, event: 'Stop', tool: '', ts: Date.now() / 1000 }))
+    await write($, `${ID}-state.json`, { pose, event: 'Stop', tool: '', ts: Date.now() / 1000 })
     return r
+  })
+
+  // 要你授权：引擎判定为「问用户」时换成等你回答的表情。只旁听，判定原样返回，不改变任何行为
+  on('tool.check', async ($, e, next) => {
+    const verdict = await next(e)
+    if ((verdict as { decision?: string } | undefined)?.decision === 'ask')
+      await write($, `${ID}-state.json`, { pose: 'asking', event: 'PermissionRequest', tool: e.tool, ts: Date.now() / 1000 })
+    return verdict
   })
 
   // 压缩上下文（/compact 或自动）：只管主对话，后台预先压缩（precompute）和子任务的不算
   on('session.compact', async ($, e, next) => {
     const shown = (e.trigger === 'manual' || e.trigger === 'auto') && !e.agentId
-    if (shown) await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 }))
+    if (shown) await write($, `${ID}-state.json`, { pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 })
     const r = await next(e)
-    if (shown) await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 }))
+    if (shown) await write($, `${ID}-state.json`, { pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 })
     return r
   })
 
   on('session.measure', async ($, e, next) => {
     const q = quotaOf(e.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt })))
-    if (q) await $.fs.write(`${DIR}/${ID}-quota.json`, JSON.stringify(q))
+    if (q) await write($, `${ID}-quota.json`, q)
     return next(e)
   })
 }
