@@ -136,8 +136,10 @@ def remove_hooks(target: Path) -> None:
 
 
 # ---- Claude Code ----
-CLAUDE_SETTINGS = HOME / ".claude/settings.json"
-CLAUDE_MOD_DIR = HOME / ".claude/mods/crosspet"
+# 各 AI 的配置目录都可以用环境变量挪走：CLAUDE_CONFIG_DIR、CODEX_HOME、DSH_HOME，没设就用用户目录下的默认位置
+CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or HOME / ".claude")
+CLAUDE_SETTINGS = CLAUDE_HOME / "settings.json"
+CLAUDE_MOD_DIR = CLAUDE_HOME / "mods/crosspet"
 
 
 def claude_hooks(install: bool) -> None:
@@ -191,7 +193,7 @@ def codex(install: bool) -> None:
 
 
 # ---- DeepSeek Harness（插件）----
-DSH_PROFILE = HOME / ".dsh/profiles/desktop"
+DSH_PROFILE = Path(os.environ.get("DSH_HOME") or HOME / ".dsh") / "profiles/desktop"
 DSH_PLUGIN_NAME = "@local/dsh-plugin-crosspet"
 DSH_PLUGIN_DIR = SUPPORT / "dsh-plugin-crosspet"
 DSH_BLOCK_START = "# ── CrossPet 桌宠（integrations/deepseek）"

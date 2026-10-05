@@ -154,8 +154,13 @@ function integrate(action, target) {
   if (!fs.existsSync(python)) { dialog.showErrorBox('未找到随包 Python', '请使用 build:windows 生成的完整目录，或在源码目录使用 Python 运行 tools/integrate.py。'); return; }
   execFile(python, [path.join(source, 'tools/integrate.py'), action, target], {
     windowsHide: true, timeout: 15000, env: { ...process.env, PYTHONUTF8: '1', CROSSPET_DATA_DIR: dirs.data, CROSSPET_STATE_DIR: dirs.state },
-  }, (err, stdout, stderr) => dialog.showMessageBox({ type: err ? 'error' : 'info', title: 'CrossPet AI 接入',
-    message: err ? '接入操作未完成' : '接入配置已更新', detail: `${stdout || ''}\n${stderr || ''}`.trim() || String(err || ''), buttons: ['确定'] }));
+  }, (err, stdout, stderr) => {
+    // 没找到 AI 的配置目录时脚本正常退出但什么都没改，不能显示成「已更新」
+    const missing = /没找到/.test(stdout || '');
+    dialog.showMessageBox({ type: err ? 'error' : missing ? 'warning' : 'info', title: 'CrossPet AI 接入',
+      message: err ? '接入操作未完成' : missing ? '没有接入：没找到这个 AI 的配置' : '接入配置已更新',
+      detail: `${stdout || ''}\n${stderr || ''}`.trim() || String(err || ''), buttons: ['确定'] });
+  });
 }
 // 每天查一次 GitHub 上最新的 Release（只读公开的版本号，不发送任何数据），和 macOS 版一样
 let latestRelease = null;
