@@ -94,6 +94,7 @@ const MOTION = {
   pop: 'm-hop', pretend: 'm-bob', caught: 'm-shake', bye: 'm-dash',
   // 角色专属姿态（没列出的默认轻轻浮动）
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
+  reset: 'm-jump', feast: 'm-bob',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
@@ -242,6 +243,8 @@ function setCharacter(id, quiet) {
     setPose(busy ? s.pose : restPose(), true)
     say(quiet ? '' : (c.greeting || `${c.name} 在这儿～`))
     renderQuota()
+    const pend = pendingCelebration[id]
+    if (pend && Date.now() - pend.at < 10 * 60 * 1000) setTimeout(() => celebrate(id, pend.ev), 1200)
     // 新立绘加载好再淡入，避免先看到空白
     const reveal = () => stage.classList.remove('swap')
     if (active.complete && spare.complete) setTimeout(reveal, 60); else setTimeout(reveal, 160)
@@ -285,9 +288,54 @@ function applyCharState(id, s) {
   }
 }
 
+// ---- 额度里的「社区梗」时刻 ----
+// GPT：某个额度窗口在预定重置时间之前突然恢复一大截（官方 reset / 重置卡）→ reset
+// DeepSeek：余额比上次多了（充值）→ feast 大口吃白饭
+// 上次的数值记在本机（localStorage），App 重启后也能比较；没有专属立绘时用 happy / eat 顶上
+const CELEBRATE = { reset: ['reset', 'happy'], feast: ['feast', 'eat'] }
+const pendingCelebration = {}
+function quotaMemory(update) {
+  let m = {}
+  try { m = JSON.parse(localStorage.getItem('crosspet-quota-memory')) || {} } catch {}
+  if (update) { update(m); try { localStorage.setItem('crosspet-quota-memory', JSON.stringify(m)) } catch {} }
+  return m
+}
+function quotaEvent(id, q) {
+  if (!q) return null
+  let ev = null
+  quotaMemory(m => {
+    const prev = m[id] || {}, now = Date.now() / 1000
+    if (Array.isArray(q.windows)) {
+      for (const w of q.windows) {
+        const p = (prev.windows || []).find(x => x.label === w.label)
+        if (p && p.reset && now < p.reset - 600 && p.used - w.used >= 15) ev = 'reset'
+      }
+      m[id] = { ...prev, windows: q.windows }
+    }
+    const bal = typeof q.balance === 'number' ? q.balance : parseFloat(((q.text || '').match(/[¥$]\s*([\d.]+)/) || [])[1])
+    if (!isNaN(bal)) {
+      if (typeof prev.balance === 'number' && bal - prev.balance >= 0.5) ev = 'feast'
+      m[id] = { ...(m[id] || prev), balance: bal }
+    }
+  })
+  return ev
+}
+function celebrate(id, ev) {
+  if (id !== charId || egg) { pendingCelebration[id] = { ev, at: Date.now() }; return }  // 等切到她时再演
+  delete pendingCelebration[id]
+  const [own, fallback] = CELEBRATE[ev]
+  const p = hasPose(own) ? own : fallback
+  show(p, true)
+  say(pick(linesOf(own) || linesOf(p) || ['']))
+  clearTimeout(revertTimer)
+  revertTimer = setTimeout(() => { setPose(restPose()); say('') }, 6500)
+}
+
 function setQuota(id, q) {
   const wasLow = quota[id]?.low
   quota[id] = q
+  const ev = quotaEvent(id, q)
+  if (ev) celebrate(id, ev)
   if (id !== charId || egg) return
   renderQuota()
   if (q?.low && pose === 'idle') { setPose('tired'); if (!wasLow) say(pick(linesOf('tired') || [''])) }

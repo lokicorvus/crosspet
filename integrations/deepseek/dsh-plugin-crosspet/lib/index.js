@@ -85,6 +85,7 @@ export function apply(ctx, config = {}) {
       const sym = info.currency === "USD" ? "$" : "¥";
       await writeJson(`${ID}-quota.json`, {
         text: `余额 ${sym}${total.toFixed(2)}`,
+        balance: total,  // 桌宠比对用：余额变多（充值）时播「大口吃白饭」
         low: body.is_available === false || total < lowBalance,
       });
     } catch (e) {

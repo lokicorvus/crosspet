@@ -337,7 +337,11 @@ const bubbles = [[40, 330, 9], [70, 380, 6], [26, 250, 7], [505, 340, 10], [540,
 const steam = [0, 1, 2].map(i =>
   `<path d="M${470 + i * 18} 140 q-8 -12 0 -24 t0 -24" stroke="#d9d4cc" stroke-width="4" fill="none" stroke-linecap="round" opacity="0">` +
   `${fadeLoop('2.2s', `${i * 0.5}s`)}<animateTransform attributeName="transform" type="translate" values="0 0;0 -26" dur="2.2s" begin="${i * 0.5}s" ${loop} additive="sum"/></path>`).join('')
-const named = { bubbles, steam }
+// 庆祝：两侧彩纸 + 闪光（GPT reset、DeepSeek 吃大餐）
+const fxCelebrate = confetti + star(500, 170, 1, '0.5s', '#ffd54a') + star(80, 200, 0.9, '0.9s', '#ffd54a') + star(490, 380, 0.8, '0.3s')
+// 大成功但立绘里已经画了皇冠：只要奖杯和闪光，不再叠特效皇冠
+const fxVictory = trophy + star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a')
+const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory }
 
 // 每个姿态周围的细节
 const surroundings = (p      )         => {

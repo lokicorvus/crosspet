@@ -86,6 +86,11 @@
       "不许叫我胖！",
       "哼！戳什么戳",
       "我只是骨架大！"
+    ],
+    "feast": [
+      "有钱啦！再来十碗！",
+      "开饭开饭——大碗的！",
+      "（狼吞虎咽）唔唔好吃！"
     ]
   },
   "lowBalance": 5,
@@ -106,6 +111,7 @@
     "thinking": "bubbles",
     "deepthink": "bubbles",
     "swim": "bubbles",
-    "eat": "steam"
+    "eat": "steam",
+    "feast": "celebrate"
   }
 }

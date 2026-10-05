@@ -339,7 +339,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 }
                 return piece
             }
-            return ["text": parts.joined(separator: " ｜ "), "low": maxUsed >= 90]
+            // windows 给桌宠比对用：某个窗口在预定重置时间前突然恢复一大截 → 播 reset 动画
+            let raw = windows.map { w -> [String: Any] in ["label": w.label, "used": w.used, "reset": w.reset ?? 0] }
+            return ["text": parts.joined(separator: " ｜ "), "low": maxUsed >= 90, "windows": raw]
         }
         return nil
     }
