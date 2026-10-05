@@ -133,9 +133,6 @@ const confetti = Array.from({ length: 10 }, (_, i) => {
   return `<rect x="${x}" y="-10" width="9" height="14" rx="2" fill="${colors[i % 5]}" opacity="0"><animate attributeName="opacity" values="0;1;1;0" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/><animateTransform attributeName="transform" type="translate" values="0 0;${(i % 2 ? 1 : -1) * 8} 300" dur="2.4s" begin="${(i % 5) * 0.35}s" ${loop}/></rect>`
 }).join('')
 
-const crown = `<g transform="translate(${HEAD.x - 40} ${HEAD.y - 70})"><path d="M0 40 L8 8 L24 28 L40 0 L56 28 L72 8 L80 40 Z" fill="#ffd54a" stroke="#c48a00" stroke-width="3"/><circle cx="40" cy="22" r="5" fill="#ff6b81"/>` +
-  `<animateTransform attributeName="transform" type="translate" values="${HEAD.x - 40} ${HEAD.y - 70};${HEAD.x - 40} ${HEAD.y - 80};${HEAD.x - 40} ${HEAD.y - 70}" dur="1s" ${loop}/></g>`
-
 // 被戳：头边弹出一个「!」小气泡（只弹一次），三道短冲击线闪一下就消失
 const pokeBurst = (() => {
   const x = 452, y = 104
@@ -178,6 +175,32 @@ const floatY = (dur = '2.4s', amp = 4) =>
   `<animateTransform attributeName="transform" type="translate" values="0 0;0 ${-amp};0 0" dur="${dur}" ${loop}/>`
 const appear = (from        , to        , dur        ) =>
   `<animate attributeName="opacity" values="0;0;1;1" keyTimes="0;${from.toFixed(2)};${to.toFixed(2)};1" dur="${dur}" ${loop}/>`
+
+// 大活完成：头顶落下一顶皇冠（回弹一下），金色渐变 + 珍珠尖 + 宝石，高光扫过，周围小星星闪
+const crown = (() => {
+  const W = 112, H = 70, x = HEAD.x - W / 2, y = HEAD.y - 88  // 底边 y≈101，留在头顶上方
+  const body = 'M10 50 L4 14 L31 33 L56 3 L81 33 L108 14 L102 50 Z'
+  const defs = `<defs><linearGradient id="cpGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4b8"/><stop offset="0.45" stop-color="#ffd54a"/><stop offset="1" stop-color="#e59a00"/></linearGradient>` +
+    `<linearGradient id="cpBand" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffcf3a"/><stop offset="1" stop-color="#c98200"/></linearGradient>` +
+    `<clipPath id="cpClip"><path d="${body}"/><rect x="5" y="46" width="102" height="18" rx="6"/></clipPath></defs>`
+  const gem = (cx, cy, r, c) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}" stroke="${INK}" stroke-width="2.5"/><circle cx="${cx - r * 0.35}" cy="${cy - r * 0.35}" r="${r * 0.32}" fill="#fff" opacity="0.9"/>`
+  const pearl = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fffaf0" stroke="${INK}" stroke-width="2.5"/><circle cx="${cx - r * 0.3}" cy="${cy - r * 0.3}" r="${r * 0.35}" fill="#fff"/>`
+  const crownArt = `<path d="${body}" fill="url(#cpGold)" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<path d="M12 46 L8 22 M31 37 L50 14" stroke="#fffbe0" stroke-width="3.5" stroke-linecap="round" fill="none" opacity="0.85"/>` +
+    `<rect x="5" y="46" width="102" height="18" rx="6" fill="url(#cpBand)" stroke="${INK}" stroke-width="3"/>` +
+    `<path d="M56 18 l10 12 l-10 12 l-10 -12z" fill="#ff5d7a" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/><path d="M52 26 l4 -5 l3 4z" fill="#fff" opacity="0.9"/>` +
+    gem(26, 55, 5, '#5b8def') + gem(56, 55, 5.5, '#7ed957') + gem(86, 55, 5, '#5b8def') +
+    pearl(4, 14, 6) + pearl(56, 3, 7) + pearl(108, 14, 6) +
+    `<g clip-path="url(#cpClip)"><rect x="-40" y="-10" width="16" height="90" fill="#fff" opacity="0.7" transform="skewX(-20)">` +
+    `<animate attributeName="x" values="-40;-40;150" keyTimes="0;0.55;1" dur="2.4s" begin="0.7s" ${loop}/></rect></g>`
+  // 入场：从上面落下来回弹一下；之后轻轻上下浮、左右微晃
+  const enter = `<animateTransform attributeName="transform" type="translate" values="0 -70;0 6;0 -2;0 0" keyTimes="0;0.6;0.8;1" dur="0.7s" fill="freeze" additive="sum"/>`
+  const sway = `<animateTransform attributeName="transform" type="rotate" values="-3 ${W / 2} ${H};3 ${W / 2} ${H};-3 ${W / 2} ${H}" dur="2.6s" begin="0.7s" ${loop} additive="sum"/>`
+  const sparkles = [[-22, 18, 1.1, '0.8s'], [W + 18, 10, 1.2, '1.3s'], [W + 8, 50, 0.8, '1.9s'], [-12, 52, 0.9, '2.3s']]
+    .map(([sx, sy, sc, b]) => `<path transform="translate(${sx} ${sy}) scale(0)" d="M0 -12 C1 -3 3 -1 12 0 C3 1 1 3 0 12 C-1 3 -3 1 -12 0 C-3 -1 -1 -3 0 -12Z" fill="#ffd54a" stroke="#fff" stroke-width="2" paint-order="stroke">` +
+      `<animateTransform attributeName="transform" type="scale" values="0;${sc};0" dur="1.4s" begin="${b}" ${loop} additive="sum"/></path>`).join('')
+  return `<g transform="translate(${x} ${y})">${defs}<g>${enter}<g>${floatY('2s', 5)}<g>${sway}${crownArt}</g>${sparkles}</g></g></g>`
+})()
 
 // 听你说话：聊天卡片，你的消息滑进来，然后「正在输入」三个点跳动
 const chatCard = (() => {
@@ -268,14 +291,23 @@ const musicCard = (() => {
     `${floatY('2.6s')}</g>`
 })()
 
-// 大活完成：奖杯，上面一道高光扫过
+// 大活完成：金奖杯（渐变 + 星星徽章 + 高光扫过），底下一块深色底座
 const trophy = (() => {
-  const x = 40, y = 70
-  return `<g><path d="M${x} ${y} h60 v18 a30 30 0 0 1 -60 0z" fill="#ffd54a" stroke="#c48a00" stroke-width="3"/>` +
-    `<path d="M${x} ${y + 6} h-12 a12 12 0 0 0 14 18 M${x + 60} ${y + 6} h12 a12 12 0 0 1 -14 18" fill="none" stroke="#c48a00" stroke-width="3"/>` +
-    `<rect x="${x + 24}" y="${y + 46}" width="12" height="12" fill="#e0a800"/><rect x="${x + 12}" y="${y + 58}" width="36" height="9" rx="3" fill="#c48a00"/>` +
-    `<rect x="${x + 6}" y="${y + 4}" width="7" height="30" rx="3.5" fill="#fff" opacity="0"><animate attributeName="opacity" values="0;0.8;0" dur="1.6s" ${loop}/><animateTransform attributeName="transform" type="translate" values="0 0;40 0" dur="1.6s" ${loop}/></rect>` +
-    `${floatY('1.8s', 6)}</g>`
+  const x = 34, y = 62
+  const cup = 'M8 4 H72 V26 C72 46 58 58 40 58 C22 58 8 46 8 26 Z'
+  const defs = `<defs><linearGradient id="cpTro" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e59a00"/><stop offset="0.35" stop-color="#ffe680"/><stop offset="0.6" stop-color="#ffd54a"/><stop offset="1" stop-color="#d08800"/></linearGradient>` +
+    `<clipPath id="cpTroClip"><path d="${cup}"/></clipPath></defs>`
+  return `<g transform="translate(${x} ${y})">${defs}<g>` +
+    `<path d="M10 10 H0 C-2 30 10 36 18 38 M70 10 H80 C82 30 70 36 62 38" fill="none" stroke="${INK}" stroke-width="7" stroke-linecap="round"/>` +
+    `<path d="M10 10 H0 C-2 30 10 36 18 38 M70 10 H80 C82 30 70 36 62 38" fill="none" stroke="#ffcf3a" stroke-width="3.5" stroke-linecap="round"/>` +
+    `<path d="${cup}" fill="url(#cpTro)" stroke="${INK}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<rect x="4" y="0" width="72" height="9" rx="4.5" fill="#ffe680" stroke="${INK}" stroke-width="3"/>` +
+    `<path transform="translate(40 30)" d="M0 -12 L3.5 -4 L12 -3.5 L5.5 2 L7.5 10.5 L0 6 L-7.5 10.5 L-5.5 2 L-12 -3.5 L-3.5 -4Z" fill="#fff6c2" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
+    `<g clip-path="url(#cpTroClip)"><rect x="-30" y="-10" width="12" height="80" fill="#fff" opacity="0.75" transform="skewX(-20)">` +
+    `<animate attributeName="x" values="-30;-30;110" keyTimes="0;0.5;1" dur="2.2s" begin="0.4s" ${loop}/></rect></g>` +
+    `<path d="M34 58 H46 V68 H34Z" fill="#e0a800" stroke="${INK}" stroke-width="2.5"/>` +
+    `<rect x="18" y="67" width="44" height="13" rx="4" fill="#6b4a3a" stroke="${INK}" stroke-width="2.5"/><rect x="30" y="71" width="20" height="5" rx="2" fill="#ffd54a"/>` +
+    `${floatY('1.8s', 6)}</g></g>`
 })()
 
 // 画画：画板卡片，彩色笔触一笔笔画出来，小画笔跟着走，下面一排调色盘
