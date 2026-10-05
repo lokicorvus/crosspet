@@ -3,12 +3,12 @@
 ## 1.2.0 · Windows 版 + 等你回答（2026-10-06）
 
 **Windows 版**
-- 第一次正式发布：Windows 11，x64 和 ARM64 同一个安装包，约 22 MB。用系统自带的 WebView2 显示，不另装运行库
+- 第一次正式发布：Windows 10（1903 及以上）/ 11，x64 和 ARM64 同一个安装包，约 22 MB。用系统自带的 WebView2 显示，不另装运行库
 - 和 macOS 版功能对齐：透明置顶的桌宠、托盘、跟随前台程序 / 工作事件换角色、接入 Claude Code（标准钩子 / 增强版 mod）、Codex、DeepSeek Harness、Antigravity、Gemini CLI、GPT / Gemini 额度、DeepSeek 余额、开发者控制台（Shift + 右键）、每天检查更新
-- 在 Parallels 虚拟机（Windows 11 ARM64）里测试；Claude 增强版 mod 的额度、Gemini 额度还没测过，详见 [Windows 说明](docs/windows.md)
+- 在 Parallels 虚拟机（Windows 11 ARM64）里测试；Claude 增强版 mod 的额度、Gemini 额度、Windows 10 还没测过，详见 [Windows 说明](docs/windows.md)
 
 **新动作**
-- 等你回答：AI 停下来问你问题、让你选选项，或者请求授权时，她会一直看着你等回答。目前支持 Claude Code 和 DeepSeek Harness；Codex 的提问不触发钩子、而且是异步的，暂不支持；Antigravity 没有这个信号
+- 等你回答：AI 停下来问你问题、让你选选项，或者请求授权时，她会一直看着你等回答（Claude Code、DeepSeek Harness；Codex 提问不触发钩子，Antigravity 没有这个信号）
 
 **DeepSeek**
 - 没填 API Key 时，用 Harness 里登录的账号查余额

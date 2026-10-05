@@ -1,6 +1,8 @@
 # Windows 版
 
-支持 Windows 11（x64 和 ARM64 共用一个安装包）。Windows 10 需要系统里有「Microsoft Edge WebView2 运行时」，没有的话第一次打开会提示去微软官网装。
+支持 Windows 10（1903 及以上）和 Windows 11，x64 和 ARM64 共用一个安装包。需要系统里有「Microsoft Edge WebView2 运行时」（Windows 11 自带，Windows 10 一般已经通过系统更新装好），没有的话第一次打开会提示去微软官网装。
+
+> 为什么是 1903：桌宠的透明窗口用到了 Windows 10 1903（2019 年 5 月更新）起才有的屏幕捕获接口。
 
 ## 测试情况
 

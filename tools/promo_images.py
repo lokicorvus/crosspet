@@ -233,7 +233,7 @@ def slide_install():
         d.text((260, y + 48), title, font=font(44, True), fill=INK)
         d.text((260, y + 118), sub, font=font(28), fill=MUTED)
         y += 220
-    text_center(d, y + 30, "macOS 13+（Apple 芯片 / Intel）· Windows 11（x64 / ARM64）", font(34), INK)
+    text_center(d, y + 30, "macOS 13+（Apple 芯片 / Intel）· Windows 10 / 11", font(34), INK)
     text_center(d, y + 90, "免费 · 开源 · 不收集任何数据", font(40, True), (123, 92, 214))
     footer(d)
     return bg
