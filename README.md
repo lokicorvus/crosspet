@@ -1,5 +1,7 @@
 # CrossPet · 跨 AI 桌宠
 
+![CrossPet 跨 AI 桌宠：Claude、GPT、DeepSeek、Gemini 四个角色](docs/images/cover.webp)
+
 [![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
@@ -43,7 +45,14 @@ Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的�
 
 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
 
-第一次打开时，要在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。本项目没有付费的苹果开发者签名，macOS 第一次会拦一下，这样放行一次就好。
+第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
+
+- **macOS 15 及以上**：双击 CrossPet，弹出「无法验证」时点「完成」；打开「系统设置 → 隐私与安全性」，拉到最下面，在「已阻止使用 CrossPet」旁边点「仍要打开」，输入开机密码，再点「打开」。
+- **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
+- **不想点来点去**：在终端运行一条命令，所有版本通用：
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/CrossPet.app
+  ```
 
 桌宠会出现在屏幕右下角。现在切到 Claude、ChatGPT、DeepSeek Harness 或 Antigravity，她就会变身。
 
@@ -122,4 +131,4 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 - 代码：[MIT](LICENSE)
 - 角色立绘与设定（`characters/`、`docs/prompts/`、`docs/images/`）：[CC BY-NC-SA 4.0](characters/LICENSE.md)。可以转载和二创，须署名、**不得商用**，衍生作品用同样的协议。
 
-README 里的配图由 `python3 tools/readme_images.py` 按 App 的真实布局生成。
+README 里的配图由 `python3 tools/readme_images.py` 按 App 的真实布局生成，顶部横幅和宣传图由 `python3 tools/promo_images.py` 生成。

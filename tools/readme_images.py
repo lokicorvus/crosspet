@@ -196,35 +196,36 @@ def sheet(tiles, cols, pad=16):
     return bg.resize((w, int(bg.height * w / bg.width)), Image.LANCZOS)
 
 
-def main():
-    groups = [("characters", HERO, 4), ("actions", ACTIONS, 4), ("eggs", EGGS, 3)]
+def render_tiles(shots):
+    """按 App 的布局把一组 (角色, 姿态, 气泡, 额度) 画成一格格透明底的图（宣传图脚本也用它）。"""
     jobs = []
-    for _, shots, _ in groups:
-        for cid, pose, _, _ in shots:
-            cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
-            named = (cfg.get("fx") or {}).get(pose)
-            if not cfg.get("egg"):
-                jobs.append([pose, named or ""])
+    for cid, pose, _, _ in shots:
+        cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
+        if not cfg.get("egg"):
+            jobs.append([pose, (cfg.get("fx") or {}).get(pose) or ""])
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
         (tmp / "fx.js").write_text(FX_JS)
         res = json.loads(subprocess.run(["node", str(tmp / "fx.js"), str(REPO / "app/web/effects.js"), json.dumps(jobs)],
                                         check=True, capture_output=True, text=True).stdout)
-        OUT.mkdir(parents=True, exist_ok=True)
-        for name, shots, cols in groups:
-            svgs, metas = [], []
-            for cid, pose, line, quota in shots:
-                cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
-                named = (cfg.get("fx") or {}).get(pose) or ""
-                svg = "" if cfg.get("egg") else res["fx"].get(f"{pose}|{named}", "")
-                svgs.append(glyph_color(svg, cfg))
-                metas.append((cid, pose, line, quota, res["aura"].get(pose, ["#ffd9b0", .35])))
-            fxs = render_fx(svgs, tmp)
-            tiles = [tile(cid, pose, line, quota, fx if svg else None, aura)
-                     for (cid, pose, line, quota, aura), fx, svg in zip(metas, fxs, svgs)]
-            img = sheet(tiles, cols)
-            img.convert("RGB").save(OUT / f"{name}.webp", quality=88, method=6)
-            print(f"docs/images/{name}.webp  {img.width}x{img.height}")
+        svgs, metas = [], []
+        for cid, pose, line, quota in shots:
+            cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
+            named = (cfg.get("fx") or {}).get(pose) or ""
+            svg = "" if cfg.get("egg") else res["fx"].get(f"{pose}|{named}", "")
+            svgs.append(glyph_color(svg, cfg))
+            metas.append((cid, pose, line, quota, res["aura"].get(pose, ["#ffd9b0", .35])))
+        fxs = render_fx(svgs, tmp)
+        return [tile(cid, pose, line, quota, fx if svg else None, aura)
+                for (cid, pose, line, quota, aura), fx, svg in zip(metas, fxs, svgs)]
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    for name, shots, cols in [("characters", HERO, 4), ("actions", ACTIONS, 4), ("eggs", EGGS, 3)]:
+        img = sheet(render_tiles(shots), cols)
+        img.convert("RGB").save(OUT / f"{name}.webp", quality=88, method=6)
+        print(f"docs/images/{name}.webp  {img.width}x{img.height}")
 
 
 if __name__ == "__main__":
