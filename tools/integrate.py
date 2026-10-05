@@ -151,11 +151,12 @@ def claude_hooks(install: bool) -> None:
 
 
 def claude_mod(install: bool) -> None:
-    if os.name == "nt":
-        raise SystemExit("Windows 预览版暂不安装 Claude 增强 mod，请使用 claude-hooks。")
+    if not install and not CLAUDE_MOD_DIR.exists() and not CLAUDE_SETTINGS.exists():
+        return  # 从没装过：别凭空建出一个 settings.json
     data = load_json(CLAUDE_SETTINGS)
     env = data.setdefault("env", {})
-    dirs = [d for d in env.get("CLAUDE_CODE_PLUGIN_DIRS", "").split(":") if d]
+    # 多个目录用系统的路径分隔符连接：macOS 是冒号，Windows 是分号（Windows 路径里本身就有冒号）
+    dirs = [d for d in env.get("CLAUDE_CODE_PLUGIN_DIRS", "").split(os.pathsep) if d]
     dirs = [d for d in dirs if Path(os.path.expanduser(d)) != CLAUDE_MOD_DIR]
     if install:
         if CLAUDE_MOD_DIR.exists():
@@ -168,7 +169,7 @@ def claude_mod(install: bool) -> None:
             shutil.rmtree(CLAUDE_MOD_DIR)
             print(f"  已删除 {CLAUDE_MOD_DIR}")
     if dirs:
-        env["CLAUDE_CODE_PLUGIN_DIRS"] = ":".join(dirs)
+        env["CLAUDE_CODE_PLUGIN_DIRS"] = os.pathsep.join(dirs)
     else:
         env.pop("CLAUDE_CODE_PLUGIN_DIRS", None)
     if not env:

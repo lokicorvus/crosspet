@@ -25,14 +25,14 @@
 
 | AI | 接入后 |
 |---|---|
-| Claude Code | 跟着工作状态动（标准钩子；增强版 mod 暂未支持 Windows） |
+| Claude Code | 标准钩子：跟着工作状态动。增强版 mod：另外显示 5 小时 / 每周额度、识别被打断（需要支持 mod 的 Claude Code 版本），两者选一个 |
 | Codex | 跟着工作状态动。新钩子要在 Codex 里输入 `/hooks` 亲自信任一次 |
 | DeepSeek Harness | 工作状态 + 余额。余额优先用你填的 API Key 查；没填 Key 就用 Harness 里登录的账号查。接入后要从托盘完全退出 Harness 再打开 |
 | Antigravity | 跟着工作状态动 |
 | Gemini CLI | 跟着工作状态动 |
 
 - GPT 额度：右键勾选「显示 GPT 额度」，从 Codex 会话记录里只读额度数字。
-- Gemini（Antigravity）额度暂未支持 Windows。
+- Gemini 额度：右键勾选「显示 Gemini 额度」，需要 Antigravity 开着。和 macOS 版一样，只在本机向 Antigravity 后台服务问额度（用它每次启动随机生成、只在本机有效的令牌），不碰账号凭据。
 - 钩子命令用随包的 Python 运行，不需要另装 Python。用户名里没有空格时，命令里不带任何引号，cmd、PowerShell、Git Bash 都能直接跑。
 
 ## 数据在哪

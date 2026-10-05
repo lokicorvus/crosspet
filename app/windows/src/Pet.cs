@@ -227,9 +227,26 @@ namespace CrossPet
 
         void RefreshQuota()
         {
-            if (!ready || !Store.Flag("gptQuota")) return;
-            var q = CodexQuota.Read();
-            if (q != null) Js($"setQuota('gpt', {Store.Json.Serialize(q)})");
+            if (!ready) return;
+            if (Store.Flag("gptQuota"))
+            {
+                var q = CodexQuota.Read();
+                if (q != null) Js($"setQuota('gpt', {Store.Json.Serialize(q)})");
+            }
+            if (Store.Flag("agyQuota")) _ = RefreshGeminiQuota();
+        }
+        bool askingGemini;
+        async Task RefreshGeminiQuota()
+        {
+            if (askingGemini) return;
+            askingGemini = true;
+            try
+            {
+                var q = await Task.Run(AntigravityQuota.Read);   // 进程查询比较慢，放到后台
+                Js($"setQuota('gemini', {(q == null ? "null" : Store.Json.Serialize(q))})");   // Antigravity 没开就不显示
+            }
+            catch (Exception e) { Store.Log("Gemini 额度: " + e.Message); }
+            finally { askingGemini = false; }
         }
 
         // ---------------- 鼠标：单击摸头、拖动换位置、右键菜单 ----------------
@@ -316,9 +333,14 @@ namespace CrossPet
                 Toggle("gptQuota");
                 if (Store.Flag("gptQuota")) RefreshQuota(); else Js("setQuota('gpt', null)");
             }, Store.Flag("gptQuota")));
+            menu.Items.Add(Item("显示 Gemini 额度（询问本机 Antigravity）", () =>
+            {
+                Toggle("agyQuota");
+                if (Store.Flag("agyQuota")) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
+            }, Store.Flag("agyQuota")));
             menu.Items.Add(Item("登录时自动启动", ToggleLogin, LoginEnabled));
             var integrate = new Forms.ToolStripMenuItem("接入 AI");
-            foreach (var (target, label) in new[] { ("claude-hooks", "Claude Code"), ("codex", "Codex"), ("deepseek", "DeepSeek Harness"), ("antigravity", "Antigravity"), ("gemini", "Gemini CLI") })
+            foreach (var (target, label) in new[] { ("claude-hooks", "Claude Code（标准钩子）"), ("claude-mod", "Claude Code 增强版（多显示额度，需支持 mod 的版本）"), ("codex", "Codex"), ("deepseek", "DeepSeek Harness"), ("antigravity", "Antigravity"), ("gemini", "Gemini CLI") })
             {
                 var sub = new Forms.ToolStripMenuItem(label);
                 var t = target;
