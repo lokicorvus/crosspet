@@ -1,5 +1,26 @@
 # 更新记录
 
+## 1.2.0 · Windows 版 + 等你回答（2026-10-06）
+
+**Windows 版**
+- 第一次正式发布：Windows 11，x64 和 ARM64 同一个安装包，约 22 MB。用系统自带的 WebView2 显示，不另装运行库
+- 和 macOS 版功能对齐：透明置顶的桌宠、托盘、跟随前台程序 / 工作事件换角色、接入 Claude Code（标准钩子 / 增强版 mod）、Codex、DeepSeek Harness、Antigravity、Gemini CLI、GPT / Gemini 额度、DeepSeek 余额、开发者控制台（Shift + 右键）、每天检查更新
+- 在 Parallels 虚拟机（Windows 11 ARM64）里测试；Claude 增强版 mod 的额度、Gemini 额度还没测过，详见 [Windows 说明](docs/windows.md)
+
+**新动作**
+- 等你回答：AI 停下来问你问题、让你选选项，或者请求授权时，她会一直看着你等回答（Claude Code、Codex、DeepSeek Harness、Gemini CLI；Antigravity 没有这个信号）
+
+**DeepSeek**
+- 没填 API Key 时，用 Harness 里登录的账号查余额
+- 插件自带诊断记录 `deepseek-plugin.json`，余额不显示时能看出卡在哪一步
+- 修复插件同时写两次文件时的冲突
+
+**其他**
+- 钩子脚本一律按 UTF-8 读事件（Windows 中文系统下带中文的事件不再失效）
+- 接入工具认 `DSH_HOME`、`CLAUDE_CONFIG_DIR` 环境变量
+
+**升级提示**：这一版新加了「等你回答」用的钩子事件，已经接入过的 AI 要再接入一次才会生效——macOS 运行一次安装命令或 `./update.sh`；Windows 在右键「接入 AI」里逐个「接入 / 更新」。Codex 之后要在 `/hooks` 里重新信任。
+
 ## 1.1.0 · 正式版（2026-10-05）
 
 第一个正式版，汇总了 1.0.x 测试期间的所有改动。
