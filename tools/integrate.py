@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity
     python3 tools/integrate.py status
 
 原则：
@@ -199,7 +199,36 @@ def gemini(install: bool) -> None:
         remove_hooks(GEMINI_SETTINGS)
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini}
+# ---- Antigravity ----
+# 它的 hooks.json 是「名字 → 各事件」的格式，CrossPet 只占 "crosspet" 这一项
+ANTIGRAVITY_HOOKS = HOME / ".gemini/config/hooks.json"
+
+
+def antigravity(install: bool) -> None:
+    if not install and not ANTIGRAVITY_HOOKS.exists():
+        return
+    data = load_json(ANTIGRAVITY_HOOKS) if ANTIGRAVITY_HOOKS.exists() else {}
+    if install:
+        data.update(load_json(REPO / "integrations/antigravity/hooks.json"))
+    elif data.pop("crosspet", None) is None:
+        return
+    if ANTIGRAVITY_HOOKS.exists():
+        backup(ANTIGRAVITY_HOOKS)
+    ANTIGRAVITY_HOOKS.parent.mkdir(parents=True, exist_ok=True)
+    save_json(ANTIGRAVITY_HOOKS, data)
+    print(f"  已更新 {ANTIGRAVITY_HOOKS}")
+    if install:
+        print("  → 重开 Antigravity 生效；桌面版和 Antigravity CLI 都有效")
+
+
+def has_antigravity() -> bool:
+    try:
+        return "crosspet" in load_json(ANTIGRAVITY_HOOKS)
+    except Exception:
+        return False
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity}
 
 
 def has_hooks(p: Path) -> bool:
@@ -217,6 +246,7 @@ def installed() -> list:
     if has_hooks(CODEX_HOOKS): found.append("codex")
     if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): found.append("deepseek")
     if has_hooks(GEMINI_SETTINGS): found.append("gemini")
+    if has_antigravity(): found.append("antigravity")
     return found
 
 
@@ -227,6 +257,7 @@ def status() -> None:
     dsh = (DSH_PROFILE / "cordis.patch.yml")
     print("DeepSeek Harness    :", "已接入" if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8") else "未接入")
     print("Gemini CLI          :", "已接入" if has_hooks(GEMINI_SETTINGS) else "未接入")
+    print("Antigravity         :", "已接入" if has_antigravity() else "未接入")
 
 
 if __name__ == "__main__":

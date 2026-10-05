@@ -30,6 +30,7 @@ elif ask "  或者接入 Claude Code 增强版 mod（多显示额度，需要 Cl
 fi
 ask "接入 Codex（写入 ~/.codex/hooks.json）？" && python3 tools/integrate.py install codex
 ask "接入 DeepSeek Harness 桌面版（安装插件，显示余额）？" && python3 tools/integrate.py install deepseek
+ask "接入 Antigravity（写入 ~/.gemini/config/hooks.json，Gemini 角色跟着 Antigravity 干活）？" && python3 tools/integrate.py install antigravity
 ask "接入 Gemini CLI（写入 ~/.gemini/settings.json；Gemini 桌面 App 无法接入）？" && python3 tools/integrate.py install gemini
 
 open "$HOME/Applications/CrossPet.app"

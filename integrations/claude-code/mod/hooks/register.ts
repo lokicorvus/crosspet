@@ -22,7 +22,7 @@ function poseForTool(tool: string): string {
   return 'running'
 }
 
-// 各窗口百分比，只给用得最多的那个标重置时间
+// 各窗口显示「剩余」百分比，只给剩得最少的那个标重置时间
 function quotaOf(limits: Limit[]) {
   const shown = limits.filter(l => l.kind === 'five_hour' || l.kind === 'seven_day' || l.kind === 'spend_limit')
   if (shown.length === 0) return null
@@ -30,7 +30,7 @@ function quotaOf(limits: Limit[]) {
   const pad = (n: number) => String(n).padStart(2, '0')
   const parts = shown.map(l => {
     const label = l.kind === 'five_hour' ? '5小时' : l.kind === 'seven_day' ? '本周' : '花费'
-    let piece = `${label} ${Math.round(l.percentUsed)}%`
+    let piece = `${label}剩余 ${Math.max(0, 100 - Math.round(l.percentUsed))}%`
     if (l === top && l.resetsAt) {
       const d = new Date(l.resetsAt)
       const soon = d.getTime() - Date.now() < 86_400_000

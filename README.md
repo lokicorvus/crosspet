@@ -4,10 +4,11 @@
 
 一只浮在桌面上的小桌宠，**跟着你正在用的 AI 换形象，跟着 AI 的工作状态做动作**。
 
-- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Gemini，桌宠自动换成对应的 AI 娘
+- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Gemini / Antigravity，桌宠自动换成对应的 AI 娘
 - AI 在思考、读文件、写代码、跑命令、查资料、画图、派子任务、完成、出错……桌宠都有对应的立绘和小动画
 - 名牌下显示额度：Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额；快用完时她会累
 - 单击摸摸头，右键戳一下；闲着会哼歌、伸懒腰，太久没理她会睡着
+- DeepSeek 有专属的吃饭、摸鱼、游泳、深度思考、生气小动作
 - 彩蛋：偶尔会有一条穿着别人衣服的 DeepSeek 混进来，等你揪出她
 
 > **非官方同人项目。** 与 Anthropic、OpenAI、DeepSeek、Google 无关。角色形象来自社区二创，详见 [致谢与授权](#致谢与授权)。
@@ -19,7 +20,7 @@
 | Claude（Claude Code / Claude 桌面版） | ✅ | ✅ 标准钩子或增强版 mod | ✅ 需增强版 mod |
 | GPT（Codex / ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读取 Codex 会话记录 |
 | DeepSeek（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查询余额 |
-| Gemini | ✅ | ⚠️ 仅 Gemini CLI；Gemini 桌面 App 没有接口 | — |
+| Gemini（Antigravity / Gemini 桌面版） | ✅ | ✅ Antigravity 钩子（Gemini 桌面 App 没有接口） | — |
 
 只支持 macOS 13 及以上（Apple 芯片和 Intel 都可以）。
 
@@ -37,7 +38,7 @@
 需要苹果命令行工具（没有的话运行 `xcode-select --install`）。
 
 ```bash
-git clone https://github.com/<你的用户名>/crosspet.git
+git clone https://github.com/lokicorvus/crosspet.git
 cd crosspet
 ./install.sh
 ```
@@ -88,7 +89,7 @@ cd crosspet
 - **DeepSeek 娘**：原型「溟月」由 **上善无形** 创作（2025-06，CC BY-NC-SA 4.0）；深蓝女仆鲸鱼娘（社区昵称「大肥鱼」）由 B 站 **ZipZipPipe** 二创。
 - **GPT 娘（白龙）**：社区通称「御姐白龙」，出自 B 站 **ZipZipPipe**。
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
-- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」是各自公司的商标，本项目仅用于指代对应产品。
+- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」是各自公司的商标，本项目仅用于指代对应产品。
 
 如果你是原作者并且对使用方式有异议，请提 Issue，我会第一时间修改或下架。
 

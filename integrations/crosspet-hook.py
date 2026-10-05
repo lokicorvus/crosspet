@@ -3,12 +3,13 @@
 
 用法（在各 AI 的钩子配置里）：
     python3 crosspet-hook.py <角色id>          # 角色id：claude / gpt / deepseek / gemini
-钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI 的事件名。
+    python3 crosspet-hook.py <角色id> <事件名>  # 事件 JSON 里不带事件名的（Antigravity）
+钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
 
 只写状态目录（默认 /tmp/crosspet，可用环境变量 CROSSPET_STATE_DIR 改）里的两个小文件：
     <角色id>-state.json   当前状态，桌宠读取
     <角色id>-turn.json    本轮用了几次工具（判断「大活」用）
-不向 stdout 输出任何东西，不影响 AI 本身的行为。
+不影响 AI 本身的行为：一般不向 stdout 输出；Antigravity 要求回一个 JSON，就回空的 {}。
 用 /tmp 是因为有的 AI（比如 DeepSeek Harness）的钩子跑在沙箱里，只允许写 /tmp。
 """
 import json
@@ -27,17 +28,21 @@ try:
 except Exception:
     sys.exit(0)
 
-name = event.get("hook_event_name", "")
-tool = str(event.get("tool_name", "")).lower()
-tool_input = json.dumps(event.get("tool_input", ""), ensure_ascii=False).lower()
+arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
+name = event.get("hook_event_name") or arg_event
+call = event.get("toolCall") if isinstance(event.get("toolCall"), dict) else {}  # Antigravity
+tool = str(event.get("tool_name") or call.get("name", "")).lower()
+tool_input = json.dumps(event.get("tool_input") or call.get("args", ""), ensure_ascii=False).lower()
 
 
 def pose_for_tool(t: str) -> str:
     # 画图：Codex 内置 image_gen 工具，或用脚本 image_gen.py 生成
     if any(k in t for k in ("image_gen", "imagegen", "generate_image", "draw", "paint")) or "image_gen" in tool_input:
         return "drawing"
-    if "view_image" in t:
+    if "view_image" in t or t == "find_by_name":
         return "reading"
+    if t in ("read_url_content",) or t.startswith("browser"):
+        return "searching"
     if any(k in t for k in ("read", "grep", "glob", "list", "view", "cat")):
         return "reading"
     if any(k in t for k in ("write", "edit", "patch", "replace", "create")):
@@ -50,6 +55,8 @@ def pose_for_tool(t: str) -> str:
 
 
 def tool_failed() -> bool:
+    if event.get("error"):  # Antigravity
+        return True
     resp = event.get("tool_response")
     if isinstance(resp, dict):
         if resp.get("is_error") is True or resp.get("success") is False:
@@ -87,13 +94,16 @@ elif name in ("PreToolUse", "BeforeTool"):
 elif name in ("PostToolUse", "AfterTool"):
     pose = "oops" if tool_failed() else "thinking"
 elif name in ("Stop", "AfterAgent"):
-    pose = "proud" if turn_tools() >= BIG_JOB_TOOLS else "happy"
+    if event.get("error"):  # Antigravity：出错停下
+        pose = "oops"
+    else:
+        pose = "proud" if turn_tools() >= BIG_JOB_TOOLS else "happy"
     set_turn_tools(0)
 elif name in ("SubagentStart",):
     pose = "delegating"
 elif name in ("SubagentStop",):
     pose = "thinking"
-elif name in ("BeforeModel",):
+elif name in ("BeforeModel", "PreInvocation"):
     pose = "thinking"
 elif name in ("SessionEnd",):
     pose = "sleeping"
@@ -102,4 +112,6 @@ if pose:
     tmp = state_dir / f".{character}-state.json"
     tmp.write_text(json.dumps({"pose": pose, "event": name, "tool": tool, "ts": time.time()}))
     tmp.replace(state_dir / f"{character}-state.json")
+if arg_event:
+    print("{}")
 sys.exit(0)

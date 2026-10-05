@@ -2,7 +2,8 @@
   "name": "Gemini",
   "accent": "#7b5cd6",
   "apps": [
-    "com.google.GeminiMacOS"
+    "com.google.GeminiMacOS",
+    "com.google.antigravity"
   ],
   "greeting": "喵～Gemini 上线！",
   "lines": {
@@ -54,6 +55,24 @@
     "drawing": [
       "画画喵～",
       "✦ 灵感来了 ✦"
+    ],
+    "oops": [
+      "喵呜…出错了",
+      "尾巴打结了喵"
+    ],
+    "proud": [
+      "✦ 大功告成喵 ✦",
+      "夸我夸我！"
+    ],
+    "tired": [
+      "额度快没了喵…",
+      "要充电了喵"
+    ],
+    "sleeping": [
+      "Zzz…喵…"
+    ],
+    "yawn": [
+      "哈——啊喵"
     ]
   },
   "glyph": {

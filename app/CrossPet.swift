@@ -221,7 +221,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
             let id = dir.lastPathComponent
             let isEgg = info["egg"] as? Bool == true  // 彩蛋角色：不进菜单、不绑应用
-            guard isEgg || poses["idle"] != nil || poses["default"] != nil else { continue }
+            guard isEgg ? poses["pop"] != nil : (poses["idle"] != nil || poses["default"] != nil) else { continue }
             if !isEgg, let custom = renamed[id], !custom.isEmpty { info["name"] = custom }
             info["poses"] = poses
             info["blink"] = blink ?? NSNull()
@@ -286,26 +286,34 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let fm = FileManager.default
         let base = fm.homeDirectoryForCurrentUser.appendingPathComponent(".codex/sessions")
         let cal = Calendar.current
-        var newest: (URL, Date)?
+        var files: [(URL, Date)] = []
         for back in 0..<4 {
             guard let day = cal.date(byAdding: .day, value: -back, to: Date()) else { continue }
             let c = cal.dateComponents([.year, .month, .day], from: day)
             let dir = base.appendingPathComponent(String(format: "%04d/%02d/%02d", c.year!, c.month!, c.day!))
             for f in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
             where f.pathExtension == "jsonl" {
-                let m = (try? f.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                if newest == nil || m > newest!.1 { newest = (f, m) }
+                files.append((f, (try? f.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
             }
         }
-        guard let file = newest?.0, let h = try? FileHandle(forReadingFrom: file) else { return nil }
+        // 从最新的会话往前找：刚开的会话可能还没有额度记录
+        for (file, _) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
+            if let q = quotaIn(file) { return q }
+        }
+        return nil
+    }
+
+    func quotaIn(_ file: URL) -> [String: Any]? {
+        guard let h = try? FileHandle(forReadingFrom: file) else { return nil }
         defer { try? h.close() }
         let size = (try? h.seekToEnd()) ?? 0
         try? h.seek(toOffset: size > 1_000_000 ? size - 1_000_000 : 0)
-        guard let data = try? h.readToEnd(), let text = String(data: data, encoding: .utf8) else { return nil }
+        guard let data = try? h.readToEnd() else { return nil }
+        let text = String(decoding: data, as: UTF8.self)  // 从中间截断可能切在中文字符里，容错解码
         for line in text.split(separator: "\n").reversed() where line.contains("\"rate_limits\"") {
             guard let obj = try? JSONSerialization.jsonObject(with: Data(line.utf8)),
                   let rl = findRateLimits(obj) else { continue }
-            // 各窗口百分比，只给用得最多的那个标重置时间
+            // 各窗口显示「剩余」百分比（和 Codex 自己的「使用情况」一致），只给剩得最少的那个标重置时间
             var windows: [(label: String, used: Double, reset: Double?)] = []
             for key in ["primary", "secondary"] {
                 guard let w = rl[key] as? [String: Any], let used = (w["used_percent"] as? NSNumber)?.doubleValue else { continue }
@@ -317,7 +325,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let maxUsed = windows.map { $0.used }.max() ?? 0
             var marked = false
             let parts = windows.map { w -> String in
-                var piece = "\(w.label) \(Int(w.used.rounded()))%"
+                var piece = "\(w.label)剩余 \(max(0, 100 - Int(w.used.rounded())))%"
                 if !marked, w.used == maxUsed, let reset = w.reset {
                     marked = true
                     let d = Date(timeIntervalSince1970: reset)
