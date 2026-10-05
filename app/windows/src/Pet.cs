@@ -93,7 +93,6 @@ namespace CrossPet
 
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), RefreshQuota);
-            Every(TimeSpan.FromSeconds(1.5), RefreshCodexWaiting);
             Every(TimeSpan.FromHours(24), () => _ = CheckForUpdate());
             var first = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
             first.Tick += (_, __) => { first.Stop(); _ = CheckForUpdate(); };
@@ -236,15 +235,6 @@ namespace CrossPet
             }
             if (Store.Flag("agyQuota")) _ = RefreshGeminiQuota();
         }
-        bool lastCodexWaiting;
-        void RefreshCodexWaiting()
-        {
-            if (!ready || !Store.Flag("gptQuota")) return;
-            var pending = CodexQuota.QuestionPending();
-            if (pending == lastCodexWaiting) return;
-            lastCodexWaiting = pending;
-            Js($"setWaiting('gpt', {(pending ? "true" : "false")})");
-        }
         bool askingGemini;
         async Task RefreshGeminiQuota()
         {
@@ -338,11 +328,10 @@ namespace CrossPet
             Sep();
             menu.Items.Add(Item("跟随前台 AI 应用", () => Toggle("followApps"), Store.Flag("followApps")));
             menu.Items.Add(Item("跟随 AI 工作事件（含终端）", () => Toggle("followEvents"), Store.Flag("followEvents")));
-            menu.Items.Add(Item("读取 Codex 会话记录（额度 + 识别提问）", () =>
+            menu.Items.Add(Item("显示 GPT 额度（读取 Codex 会话记录）", () =>
             {
                 Toggle("gptQuota");
-                if (Store.Flag("gptQuota")) { RefreshQuota(); RefreshCodexWaiting(); }
-                else { Js("setQuota('gpt', null); setWaiting('gpt', false)"); lastCodexWaiting = false; }
+                if (Store.Flag("gptQuota")) RefreshQuota(); else Js("setQuota('gpt', null)");
             }, Store.Flag("gptQuota")));
             menu.Items.Add(Item("显示 Gemini 额度（询问本机 Antigravity）", () =>
             {

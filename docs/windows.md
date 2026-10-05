@@ -46,7 +46,7 @@
 | Antigravity | 跟着工作状态动 |
 | Gemini CLI | 跟着工作状态动 |
 
-- GPT 额度 + 识别 Codex 提问：右键勾选「读取 Codex 会话记录（额度 + 识别提问）」，只读额度数字和记录类型，不读对话内容。
+- GPT 额度：右键勾选「显示 GPT 额度」，从 Codex 会话记录里只读额度数字。
 - Gemini 额度：右键勾选「显示 Gemini 额度」，需要 Antigravity 开着。和 macOS 版一样，只在本机向 Antigravity 后台服务问额度（用它每次启动随机生成、只在本机有效的令牌），不碰账号凭据。
 - 钩子命令用随包的 Python 运行，不需要另装 Python。用户名里没有空格时，命令里不带任何引号，cmd、PowerShell、Git Bash 都能直接跑。
 
