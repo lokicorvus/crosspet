@@ -9,6 +9,7 @@
 
 **新动作**
 - 等你回答：AI 停下来问你问题、让你选选项，或者请求授权时，她会一直看着你等回答（Claude Code、Codex、DeepSeek Harness、Gemini CLI；Antigravity 没有这个信号）
+- Codex 的提问没有钩子、而且是异步的：打开「读取 Codex 会话记录（额度 + 识别提问）」后才能识别（原来的「显示 GPT 额度」开关改名，一个开关管两件事，默认关）
 
 **DeepSeek**
 - 没填 API Key 时，用 Harness 里登录的账号查余额

@@ -111,6 +111,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
+        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in self?.refreshCodexWaiting() }
         Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkForUpdate(manual: false) }
     }
@@ -300,7 +301,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         js("setQuota('gpt', \(arg))")
     }
 
-    func codexQuota() -> [String: Any]? {
+    /// 最近 4 天的 Codex 会话记录，新的在前
+    func codexSessionFiles() -> [URL] {
         let fm = FileManager.default
         let base = fm.homeDirectoryForCurrentUser.appendingPathComponent(".codex/sessions")
         let cal = Calendar.current
@@ -314,11 +316,78 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 files.append((f, (try? f.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast))
             }
         }
+        return files.sorted(by: { $0.1 > $1.1 }).map { $0.0 }
+    }
+
+    func codexQuota() -> [String: Any]? {
         // 从最新的会话往前找：刚开的会话可能还没有额度记录
-        for (file, _) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
+        for file in codexSessionFiles().prefix(8) {
             if let q = quotaIn(file) { return q }
         }
         return nil
+    }
+
+    // MARK: Codex 提问还挂着吗
+    // Codex 提问（request_user_input）不触发钩子，而且是异步的：问题一发出这一轮就算结束，你的回答是下一条新消息。
+    // 所以看会话记录：最近一次提问之后还没开始新的一轮，并且提问还没返回、或者返回后这一轮已经结束 → 在等你回答。
+    // 只读每条记录的类型、工具名、编号和时间，不读问题、选项和对话内容。和 GPT 额度共用一个开关，默认关。
+    var codexAskCache: (path: String, stamp: Date, size: Int, askAt: Date?, pending: Bool)?
+
+    func refreshCodexWaiting() {
+        guard ready, defaults.bool(forKey: "gptQuota") else { return }
+        let pending = codexQuestionPending()
+        if pending != lastCodexWaiting {
+            lastCodexWaiting = pending
+            js("setWaiting('gpt', \(pending))")
+        }
+    }
+    var lastCodexWaiting = false
+
+    func codexQuestionPending() -> Bool {
+        guard let file = codexSessionFiles().first,
+              let attrs = try? FileManager.default.attributesOfItem(atPath: file.path),
+              let stamp = attrs[.modificationDate] as? Date, let size = (attrs[.size] as? NSNumber)?.intValue else { return false }
+        var result: (askAt: Date?, pending: Bool)
+        if let c = codexAskCache, c.path == file.path, c.stamp == stamp, c.size == size {
+            result = (c.askAt, c.pending)
+        } else {
+            result = scanCodexQuestion(file)
+            codexAskCache = (file.path, stamp, size, result.askAt, result.pending)
+        }
+        // 超过 15 分钟没回答的不算（比如点了「跳过」），免得一直挂着
+        guard result.pending, let askAt = result.askAt, Date().timeIntervalSince(askAt) < 15 * 60 else { return false }
+        return true
+    }
+
+    func scanCodexQuestion(_ file: URL) -> (askAt: Date?, pending: Bool) {
+        guard let h = try? FileHandle(forReadingFrom: file) else { return (nil, false) }
+        defer { try? h.close() }
+        let size = (try? h.seekToEnd()) ?? 0
+        try? h.seek(toOffset: size > 512_000 ? size - 512_000 : 0)
+        guard let data = try? h.readToEnd() else { return (nil, false) }
+        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var askId: String?, askAt: Date?, answered = false, ended = false, newTurn = false
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            // 先用字符串粗筛，只解析可能相关的几种记录
+            guard line.contains("request_user_input") || line.contains("task_started") || line.contains("task_complete")
+                || (askId != nil && line.contains("function_call_output")) else { continue }
+            guard let o = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                  let p = o["payload"] as? [String: Any], let type = p["type"] as? String else { continue }
+            switch type {
+            case "function_call", "custom_tool_call":
+                if (p["name"] as? String ?? "").contains("request_user_input") {
+                    askId = p["call_id"] as? String
+                    askAt = (o["timestamp"] as? String).flatMap { iso.date(from: $0) } ?? Date()
+                    answered = false; ended = false; newTurn = false
+                }
+            case "function_call_output", "custom_tool_call_output":
+                if askId != nil, p["call_id"] as? String == askId { answered = true }
+            case "task_complete": if askId != nil { ended = true }
+            case "task_started": if askId != nil { newTurn = true }
+            default: break
+            }
+        }
+        return (askAt, askId != nil && !newTurn && (!answered || ended))
     }
 
     func quotaIn(_ file: URL) -> [String: Any]? {
@@ -504,7 +573,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         menu.addItem(.separator())
         add(menu, "给当前角色改名…", #selector(rename))
-        let gpt = add(menu, "显示 GPT 额度（读取 Codex 会话记录）", #selector(toggleGPTQuota))
+        let gpt = add(menu, "读取 Codex 会话记录（额度 + 识别提问）", #selector(toggleGPTQuota))
         gpt.state = defaults.bool(forKey: "gptQuota") ? .on : .off
         let agy = add(menu, "显示 Gemini 额度（询问本机 Antigravity）", #selector(toggleAntigravityQuota))
         agy.state = defaults.bool(forKey: "agyQuota") ? .on : .off
@@ -566,7 +635,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func toggleGPTQuota() {
         let on = !defaults.bool(forKey: "gptQuota")
         defaults.set(on, forKey: "gptQuota")
-        if on { refreshGPTQuota() } else { js("setQuota('gpt', null)") }
+        if on { refreshGPTQuota(); refreshCodexWaiting() } else { js("setQuota('gpt', null); setWaiting('gpt', false)"); lastCodexWaiting = false }
     }
 
     @objc func toggleLogin() {

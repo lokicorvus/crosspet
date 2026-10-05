@@ -120,7 +120,7 @@ let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
-const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
+const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}, waiting = {}
 
 const char = () => manifest.characters[charId]
 const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
@@ -247,7 +247,7 @@ function setCharacter(id, quiet) {
     $('caption').textContent = c.name
     const s = charState[id]
     const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
-    setPose(busy ? s.pose : restPose(), true)
+    setPose(waiting[id] ? 'asking' : busy ? s.pose : restPose(), true)
     say(quiet ? '' : (c.greeting || `${c.name} 在这儿～`))
     renderQuota()
     const pend = pendingCelebration[id]
@@ -269,6 +269,17 @@ function setName(id, name) {
   if (id === charId) $('caption').textContent = name
 }
 
+// ---- 提问还挂着：有的 AI（Codex）提问后这一轮就算结束了，你的回答是下一条新消息 ----
+// 由外壳读会话记录判断后调用 setWaiting(id, true/false)：等你回答期间就算收到「一轮结束」也继续看着你，
+// 你一发新消息（UserPromptSubmit）就解除
+function setWaiting(id, on) {
+  if (!!waiting[id] === !!on) return
+  waiting[id] = !!on
+  if (id !== charId || egg) return
+  if (on) { clearTimeout(revertTimer); clearTimeout(thinkTimer); show('asking', true) }
+  else if (pose === 'asking') { setPose(restPose()); say('') }
+}
+
 function applyCharState(id, s) {
   charState[id] = s
   if (egg) { if (egg.host === id && s.pose && s.pose !== 'idle') endEgg(); return }
@@ -276,6 +287,11 @@ function applyCharState(id, s) {
   lastActive = Date.now()
   clearTimeout(thinkTimer)
   const ev = s.event || ''
+  if (ev === 'UserPromptSubmit' || ev === 'BeforeAgent') waiting[id] = false   // 你回答了
+  else if (waiting[id] && (ev === 'Stop' || ev === 'AfterAgent' || s.pose === 'idle')) {
+    if (pose !== 'asking') show('asking', true)   // 问题还挂着：一轮结束了也继续等你
+    return
+  }
   if (s.pose === 'oops' || (ev === 'Stop' && s.pose === 'surprised')) lastTrouble[id] = Date.now()
   else if (ev === 'Stop' && (s.pose === 'happy' || s.pose === 'proud')) lastTrouble[id] = 0  // 最后顺利完成了，不算
   // 工具动作被紧跟着的「思考」盖掉时，状态里会捎带上它（after）：没演过的话先演，停够了再思考
