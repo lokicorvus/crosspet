@@ -111,7 +111,7 @@ let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
-const charState = {}, quota = {}
+const charState = {}, quota = {}, seenTool = {}
 
 const char = () => manifest.characters[charId]
 const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
@@ -262,6 +262,14 @@ function applyCharState(id, s) {
   lastActive = Date.now()
   clearTimeout(thinkTimer)
   const ev = s.event || ''
+  // 工具动作被紧跟着的「思考」盖掉时，状态里会捎带上它（after）：没演过的话先演，停够了再思考
+  if (ev === 'PreToolUse' || ev === 'BeforeTool') seenTool[id] = s.ts
+  if (s.after && s.afterTs !== seenTool[id]) {
+    seenTool[id] = s.afterTs
+    show(s.after, true)
+    show(s.pose)
+    return
+  }
   if (ev === 'PostToolUse' || ev === 'AfterTool' || ev === 'SubagentStop') {
     if (s.pose === 'oops') show('oops')
     else thinkTimer = setTimeout(() => show('thinking'), BACK_TO_THINKING)

@@ -136,9 +136,20 @@ elif name in ("BeforeModel", "PreInvocation"):
 elif name in ("SessionEnd",):
     pose = "sleeping"
 
+state = {"pose": pose, "event": name, "tool": tool, "ts": time.time()}
+if pose and name == "PreInvocation":
+    # Antigravity 工具一结束就（几毫秒内）开始下一轮思考，桌宠每 0.3 秒才读一次，
+    # 刚写的工具动作会被直接盖掉。所以把它捎带上：桌宠先演完那个动作再进入思考。
+    try:
+        prev = json.loads((state_dir / f"{character}-state.json").read_text())
+        if prev.get("event") == "PreToolUse" and time.time() - float(prev.get("ts", 0)) < 3:
+            state.update(after=prev.get("pose"), afterTs=prev.get("ts"), tool=prev.get("tool", ""))
+    except Exception:
+        pass
+
 if pose:
     tmp = state_dir / f".{character}-state.json"
-    tmp.write_text(json.dumps({"pose": pose, "event": name, "tool": tool, "ts": time.time()}))
+    tmp.write_text(json.dumps(state))
     tmp.replace(state_dir / f"{character}-state.json")
 if arg_event:
     print("{}")
