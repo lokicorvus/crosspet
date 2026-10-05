@@ -10,6 +10,7 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
+const PLUGIN_VERSION = "1.1.1";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 10 * 60 * 1000;
 
@@ -84,13 +85,18 @@ export function apply(ctx, config = {}) {
   // 2. 没有 Key、但在 Harness 里登录了 DeepSeek 账号：调 Harness 自己的账号服务 deepseekAccount.getBalance
   // 账号服务不是每个版本都有：用 ctx.inject 声明成「有就用」，没有时插件照常工作
   let account = null;
-  ctx.inject(["deepseekAccount"], (sub) => {
-    account = sub.deepseekAccount;
-    sub.effect(() => {
-      pollBalance();
-      return () => { account = null; };
-    }, "crosspet: account balance");
-  });
+  try {
+    ctx.inject(["deepseekAccount"], (sub) => {
+      account = sub.deepseekAccount;
+      sub.effect(() => {
+        pollBalance();
+        return () => { account = null; };
+      }, "crosspet: account balance");
+    });
+  } catch (e) {
+    // 万一这个版本的 Harness 不支持：只是少了「用账号查余额」，工作状态和用 Key 查余额照常
+    ctx.logger?.warn?.(`crosspet: 账号服务不可用 ${String(e?.message ?? e)}`);
+  }
 
   const show = (total, currency, available = true) => writeJson(`${ID}-quota.json`, {
     text: `余额 ${currency === "USD" ? "$" : "¥"}${total.toFixed(2)}`,
@@ -128,12 +134,18 @@ export function apply(ctx, config = {}) {
     return "ok";
   }
 
+  // 每次查余额都把过程记到 deepseek-plugin.json（只有结果代码，没有 Key / 令牌），
+  // 余额不显示时看它就知道卡在哪一步：Harness 的日志不落盘，没有别的办法看
+  const diagnose = (info) => writeJson(`${ID}-plugin.json`, { plugin: PLUGIN_VERSION, at: new Date().toISOString(),
+    accountService: !!account?.getBalance, ...info }).catch(() => {});
+
   async function pollBalance() {
+    let byKey = "not-tried", byAccount = "not-tried";
     try {
-      const byKey = await balanceByKey();
-      if (byKey === "ok") return;
-      const byAccount = await balanceByAccount();
-      if (byAccount === "ok") return;
+      byKey = await balanceByKey().catch((e) => `error: ${String(e?.message ?? e)}`);
+      if (byKey !== "ok") byAccount = await balanceByAccount().catch((e) => `error: ${String(e?.message ?? e)}`);
+      await diagnose({ apiKey: byKey, account: byAccount });
+      if (byKey === "ok" || byAccount === "ok") return;
       if (byKey === "no-key" && ["no-account", "not-signed-in"].includes(byAccount)) {
         // 两样都没有：名牌上说清楚怎么办，别一声不吭
         await writeJson(`${ID}-quota.json`, { text: "余额：请在 Harness 登录账号或填 API Key", low: false });
@@ -141,6 +153,7 @@ export function apply(ctx, config = {}) {
       }
       ctx.logger?.warn?.(`crosspet: 查余额失败（API Key：${byKey}，账号：${byAccount}）`);
     } catch (e) {
+      await diagnose({ apiKey: byKey, account: byAccount, error: String(e?.message ?? e) });
       ctx.logger?.warn?.(`crosspet: 查余额失败 ${String(e?.message ?? e)}`);
     }
   }
