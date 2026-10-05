@@ -3,3 +3,4 @@ build/
 **/raw/
 *.bak-crosspet-*
 __pycache__/
+node_modules/

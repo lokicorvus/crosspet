@@ -1,0 +1,19 @@
+{
+  "name": "crosspet",
+  "productName": "CrossPet",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Cross-AI desktop pet — Windows preview",
+  "author": "lokicorvus",
+  "license": "MIT",
+  "main": "app/windows/main.cjs",
+  "scripts": {
+    "start:windows": "electron .",
+    "test:windows": "node --test tests/windows.test.cjs",
+    "build:windows": "node tools/build-windows.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "@electron/packager": "20.3.0"
+  }
+}
