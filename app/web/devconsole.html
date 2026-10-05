@@ -125,7 +125,8 @@ textarea { min-height: 300px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
 
 <script>
 const $ = id => document.getElementById(id)
-const post = msg => window.crosspet ? window.crosspet.postDev(msg) : window.webkit?.messageHandlers?.dev?.postMessage(msg)
+// macOS：WKWebView 的 webkit.messageHandlers；Windows：WebView2 的 chrome.webview
+const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.dev?.postMessage(msg)
 const pet = code => post({ cmd: 'pet', code })
 const wait = ms => new Promise(r => setTimeout(r, ms))
 const J = v => JSON.stringify(v)

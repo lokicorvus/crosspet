@@ -1,5 +1,0 @@
-<!doctype html><meta charset="utf-8">
-<style>body{font:14px 'Segoe UI',sans-serif;padding:18px;background:#fff8f0;color:#4a2418}input{width:95%;padding:8px;margin:12px 0}button{padding:7px 20px;float:right}</style>
-<label for="name">给当前角色改名（留空恢复默认）</label>
-<form><input id="name" maxlength="40" autofocus><button>保存</button></form>
-<script>document.querySelector('form').onsubmit=e=>{e.preventDefault();window.crosspet.rename(document.querySelector('input').value)}</script>

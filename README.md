@@ -37,9 +37,9 @@
 
 Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。
 
-## Windows 预览版
+## Windows 版
 
-新增 Electron Windows 外壳，复用角色、动画和状态协议，提供 ARM64 / x64 构建。当前为本地预览，功能范围、构建和安装方法见 [Windows 说明](docs/windows.md)。macOS 的安装方式不变。
+支持 Windows 11（x64 和 ARM64 同一个安装包，约 20 MB）。下载 `CrossPet-Windows.zip`，解压后双击 `install.cmd`。功能和接入方法见 [Windows 说明](docs/windows.md)。
 
 ## 快速开始
 

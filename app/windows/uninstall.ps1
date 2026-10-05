@@ -13,27 +13,23 @@ try {
     Set-Location -LiteralPath ([IO.Path]::GetTempPath())
     [Environment]::CurrentDirectory = [IO.Path]::GetTempPath()
     if (!(Test-Path -LiteralPath $destination)) {
-        Write-Host 'No installed CrossPet was found. A portable copy can be removed by deleting its extracted folder after exiting it.'
+        Write-Host '没有找到已安装的 CrossPet。解压后直接运行的，退出后删掉那个文件夹就行。'
     } else {
         $exe = Join-Path $destination 'CrossPet.exe'
-        $python = Join-Path $destination 'resources\app\runtime\python\python.exe'
-        $integrator = Join-Path $destination 'resources\app\tools\integrate.py'
+        $python = Join-Path $destination 'python\python.exe'
+        $integrator = Join-Path $destination 'tools\integrate.py'
         if (!(Test-Path -LiteralPath $python) -or !(Test-Path -LiteralPath $integrator)) {
-            throw 'The installation is incomplete. Run install.cmd from a complete package, then try uninstalling again.'
+            throw '安装不完整：请先用完整的安装包运行 install.cmd，再卸载。'
         }
         $env:PYTHONUTF8 = '1'
-        foreach ($target in @('claude-hooks', 'codex', 'gemini', 'antigravity')) {
+        $env:CROSSPET_DATA_DIR = $data
+        foreach ($target in @('claude-hooks', 'codex', 'deepseek', 'gemini', 'antigravity')) {
             & $python $integrator uninstall $target
-            if ($LASTEXITCODE -ne 0) { throw "Failed to remove $target hooks. Application files retained." }
+            if ($LASTEXITCODE -ne 0) { throw "撤销 $target 的接入失败，程序文件已保留。" }
         }
-        # Terminate only this installation and its foreground helper, then wait for file handles.
+        # 只关掉这个位置的 CrossPet，等它释放文件
         $processes = @(Get-Process CrossPet -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
-        foreach ($process in $processes) {
-            Get-CimInstance Win32_Process -Filter "ParentProcessId=$($process.Id)" -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*app\windows\foreground.ps1*' } |
-                ForEach-Object { Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue }
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        }
+        foreach ($process in $processes) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
         if ($processes.Count -gt 0) {
             Wait-Process -Id $processes.Id -Timeout 10 -ErrorAction SilentlyContinue
         }
@@ -55,15 +51,15 @@ try {
             try { Remove-Item -LiteralPath $destination -Recurse -Force; break }
             catch { if ($attempt -eq 4) { throw }; Start-Sleep -Milliseconds 500 }
         }
-        Write-Host 'CrossPet uninstalled. Characters and settings were retained.' -ForegroundColor Green
+        Write-Host 'CrossPet 已卸载：各 AI 的接入都已撤销。角色和设置保留在 %LOCALAPPDATA%\CrossPet，不需要的话可以手动删除。' -ForegroundColor Green
     }
 } catch {
     $exitCode = 1
-    Write-Host "Uninstall failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Log: $log"
+    Write-Host "卸载失败：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "日志：$log"
 } finally {
     if ($transcribing) { Stop-Transcript | Out-Null }
     # Keep errors visible for double-click users. CLI/tests remain non-interactive.
-    if ($Interactive) { Read-Host 'Press Enter to close' | Out-Null }
+    if ($Interactive) { Read-Host '按回车关闭' | Out-Null }
 }
 exit $exitCode

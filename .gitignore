@@ -4,3 +4,5 @@ build/
 *.bak-crosspet-*
 __pycache__/
 node_modules/
+app/windows/bin/
+app/windows/obj/
