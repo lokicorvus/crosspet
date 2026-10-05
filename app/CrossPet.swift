@@ -106,7 +106,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
-        quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota() }
+        quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
         Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkForUpdate(manual: false) }
     }
@@ -189,6 +189,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         stamps = [:]
         pollStates()
         refreshGPTQuota()
+        refreshAntigravityQuota()
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, let id = appToCharacter[front] {
             switchTo(id)
         }
@@ -343,6 +344,117 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         return nil
     }
 
+    // MARK: Gemini 额度（可选，默认关）
+    // Antigravity 在本机跑着一个后台服务（language_server），它自己的界面就是向它要额度的。
+    // 这里做同样的事：从它的启动参数里取本机接口的防伪令牌（每次启动随机生成、只在本机有效，不是账号凭据），
+    // 只调「用户状态」接口、只取额度数字；令牌只在内存里用，不存盘、不外传。Antigravity 没开就不显示。
+    var agySession: URLSession?
+    var agyPort: (pid: Int32, port: Int)?
+
+    func refreshAntigravityQuota() {
+        guard ready, defaults.bool(forKey: "agyQuota") else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
+            guard let (pid, token) = self.antigravityServer() else {
+                DispatchQueue.main.async { self.js("setQuota('gemini', null)") }
+                return
+            }
+            let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : self.listeningPorts(pid)
+            self.askAntigravity(pid: pid, token: token, ports: ports)
+        }
+    }
+
+    /// 找到 Antigravity 的 language_server 进程，返回 (pid, 令牌)
+    func antigravityServer() -> (Int32, String)? {
+        guard let out = run("/bin/ps", ["-axo", "pid=,command="]) else { return nil }
+        for line in out.split(separator: "\n") where line.contains("Antigravity.app/Contents/Resources/bin/language_server") {
+            let parts = line.split(separator: " ").map(String.init)
+            guard let pid = Int32(parts.first ?? "") else { continue }
+            for (i, a) in parts.enumerated() {
+                if a.hasPrefix("--csrf_token=") { return (pid, String(a.dropFirst("--csrf_token=".count))) }
+                if a == "--csrf_token", i + 1 < parts.count { return (pid, parts[i + 1]) }
+            }
+        }
+        return nil
+    }
+
+    func listeningPorts(_ pid: Int32) -> [Int] {
+        guard let out = run("/usr/sbin/lsof", ["-nP", "-a", "-p", "\(pid)", "-iTCP", "-sTCP:LISTEN"]) else { return [] }
+        return out.split(separator: "\n").dropFirst().compactMap { line in
+            line.split(separator: " ").first { $0.contains("127.0.0.1:") }.flatMap { Int($0.split(separator: ":").last ?? "") }
+        }
+    }
+
+    func run(_ path: String, _ args: [String]) -> String? {
+        let p = Process(), pipe = Pipe()
+        p.executableURL = URL(fileURLWithPath: path); p.arguments = args
+        p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        p.waitUntilExit()
+        return String(data: data, encoding: .utf8)
+    }
+
+    func askAntigravity(pid: Int32, token: String, ports: [Int]) {
+        guard let port = ports.first else { return }
+        var req = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/exa.language_server_pb.LanguageServerService/GetUserStatus")!)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 5
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(token, forHTTPHeaderField: "X-Codeium-Csrf-Token")
+        req.httpBody = #"{"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en"}}"#.data(using: .utf8)
+        if agySession == nil { agySession = URLSession(configuration: .ephemeral, delegate: LocalhostTrust(), delegateQueue: nil) }
+        agySession!.dataTask(with: req) { [weak self] data, resp, _ in
+            guard let self else { return }
+            guard (resp as? HTTPURLResponse)?.statusCode == 200, let data,
+                  let obj = try? JSONSerialization.jsonObject(with: data), let q = Self.antigravityQuota(obj) else {
+                self.agyPort = nil
+                self.askAntigravity(pid: pid, token: token, ports: Array(ports.dropFirst()))  // 换下一个端口试
+                return
+            }
+            self.agyPort = (pid, port)
+            guard let json = try? JSONSerialization.data(withJSONObject: q), let arg = String(data: json, encoding: .utf8) else { return }
+            DispatchQueue.main.async { self.js("setQuota('gemini', \(arg))") }
+        }.resume()
+    }
+
+    /// 额度按「额度池」共享（比如所有 Gemini 模型一个池，Claude 和 GPT-OSS 一个池）：
+    /// 按 (剩余比例, 重置时间) 分组，每组用模型家族名命名，Gemini 池排前面。
+    /// 不写死「5 小时 / 每周」：24 小时内重置显示时刻，否则显示日期，免费版和会员都适用。
+    static func antigravityQuota(_ obj: Any) -> [String: Any]? {
+        guard let st = (obj as? [String: Any])?["userStatus"] as? [String: Any],
+              let cfg = st["cascadeModelConfigData"] as? [String: Any],
+              let models = cfg["clientModelConfigs"] as? [[String: Any]] else { return nil }
+        var pools: [(key: String, left: Double, reset: Date?, families: [String])] = []
+        let iso = ISO8601DateFormatter()
+        for m in models {
+            guard let qi = m["quotaInfo"] as? [String: Any] else { continue }
+            let left = (qi["remainingFraction"] as? NSNumber)?.doubleValue ?? 0  // 用完时这个字段会被省略
+            let resetText = qi["resetTime"] as? String ?? ""
+            let family = (m["label"] as? String ?? "").split(separator: " ").first.map(String.init) ?? "?"
+            let key = "\(left)|\(resetText)"
+            if let i = pools.firstIndex(where: { $0.key == key }) {
+                if !pools[i].families.contains(family) { pools[i].families.append(family) }
+            } else {
+                pools.append((key, left, iso.date(from: resetText), [family]))
+            }
+        }
+        guard !pools.isEmpty else { return nil }
+        pools.sort { ($0.families.contains("Gemini") ? 0 : 1, $0.left) < ($1.families.contains("Gemini") ? 0 : 1, $1.left) }
+        let minLeft = pools.map { $0.left }.min() ?? 1
+        let fmt = DateFormatter()
+        let parts = pools.enumerated().map { i, p -> String in
+            var piece = "\(p.families.joined(separator: "/")) 剩余 \(Int((p.left * 100).rounded()))%"
+            // 重置时间标在排第一的池（有 Gemini 时就是 Gemini 池）上；别的池快用完了也标
+            if i == 0 || p.left <= 0.1, let d = p.reset {
+                fmt.dateFormat = d.timeIntervalSinceNow < 86400 ? "HH:mm" : "M/d"
+                piece += " · \(fmt.string(from: d)) 重置"
+            }
+            return piece
+        }
+        return ["text": parts.joined(separator: " ｜ "), "low": minLeft <= 0.1]
+    }
+
     func findRateLimits(_ o: Any) -> [String: Any]? {
         if let d = o as? [String: Any] {
             if let rl = d["rate_limits"] as? [String: Any] { return rl }
@@ -378,6 +490,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         add(menu, "给当前角色改名…", #selector(rename))
         let gpt = add(menu, "显示 GPT 额度（读取 Codex 会话记录）", #selector(toggleGPTQuota))
         gpt.state = defaults.bool(forKey: "gptQuota") ? .on : .off
+        let agy = add(menu, "显示 Gemini 额度（询问本机 Antigravity）", #selector(toggleAntigravityQuota))
+        agy.state = defaults.bool(forKey: "agyQuota") ? .on : .off
         let login = add(menu, "登录时自动启动", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         add(menu, "打开角色文件夹", #selector(openCharacters))
@@ -424,6 +538,12 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         js("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
     }
 
+    @objc func toggleAntigravityQuota() {
+        let on = !defaults.bool(forKey: "agyQuota")
+        defaults.set(on, forKey: "agyQuota")
+        if on { refreshAntigravityQuota() } else { js("setQuota('gemini', null)") }
+    }
+
     @objc func toggleGPTQuota() {
         let on = !defaults.bool(forKey: "gptQuota")
         defaults.set(on, forKey: "gptQuota")
@@ -465,3 +585,14 @@ let delegate = App()
 app.delegate = delegate
 app.setActivationPolicy(.accessory)
 app.run()
+
+/// 只信任本机 127.0.0.1 的自签名证书（Antigravity 后台服务用的是自签名 HTTPS）
+final class LocalhostTrust: NSObject, URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge) async
+        -> (URLSession.AuthChallengeDisposition, URLCredential?) {
+        if challenge.protectionSpace.host == "127.0.0.1", let trust = challenge.protectionSpace.serverTrust {
+            return (.useCredential, URLCredential(trust: trust))
+        }
+        return (.performDefaultHandling, nil)
+    }
+}

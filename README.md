@@ -16,7 +16,7 @@
 ![思考、读文件、跑命令、吃饭、画画、大成功、查资料、游泳、派子任务等动作](docs/images/actions.webp)
 
 - **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上皇冠得意一下。
-- **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额。快用完时她会露出累了的样子。
+- **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。
 - **各有性格**：DeepSeek 闲着会扒白饭、摸鱼、游泳，被戳会生气，想得太久会揉太阳穴。
 
@@ -27,7 +27,7 @@
 | **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 |
 | **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读 Codex 会话记录 |
 | **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额 |
-| **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | — |
+| **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 
 Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。
 
@@ -72,7 +72,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 |---|---|
 | 单击 | 摸摸头 |
 | 拖动 | 换个位置（会记住） |
-| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT 额度、登录时自动启动、打开角色文件夹、检查更新…… |
+| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、登录时自动启动、打开角色文件夹、检查更新…… |
 
 ## 彩蛋
 
@@ -90,6 +90,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 - 钩子只拿到「哪个事件、用了哪个工具」，写到本机 `/tmp/crosspet/`，不保存任何对话内容。
 - GPT 额度默认关闭。打开后只从 Codex 会话记录里提取额度那几个数字。
+- Gemini 额度默认关闭。打开后向本机正在运行的 Antigravity 后台服务问一次额度（和它自己界面上显示额度的方式一样），用的是它每次启动随机生成、只在本机有效的令牌，不碰你的 Google 账号凭据。
 - DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处。
 - CrossPet 自己只联网做一件事：每天查一次 GitHub 上有没有新版本。
 
