@@ -30,7 +30,7 @@ function quotaOf(limits: Limit[]) {
   const pad = (n: number) => String(n).padStart(2, '0')
   const parts = shown.map(l => {
     const label = l.kind === 'five_hour' ? '5小时' : l.kind === 'seven_day' ? '本周' : '花费'
-    let piece = `${label}剩余 ${Math.max(0, 100 - Math.round(l.percentUsed))}%`
+    let piece = `${label} 剩余 ${Math.max(0, 100 - Math.round(l.percentUsed))}%`
     if (l === top && l.resetsAt) {
       const d = new Date(l.resetsAt)
       const soon = d.getTime() - Date.now() < 86_400_000

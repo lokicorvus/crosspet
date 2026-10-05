@@ -40,6 +40,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #caption:empty { visibility: hidden; }
 #quota { max-width: 236px; text-align: center; line-height: 1.35; margin-top: 2px; padding: 1px 8px; border-radius: 7px; background: rgba(255,255,255,.8); color: #6b4a3a; font-size: 10px; }
 #quota:empty { display: none; }
+#quota div { white-space: nowrap; }
 #quota.low { color: #c0392b; background: rgba(255,236,236,.92); }
 
 /* 身体动作：切换时用 animation 平滑接上 */
@@ -183,7 +184,10 @@ function say(line) {
 }
 function renderQuota() {
   const q = egg ? null : quota[charId], el = $('quota')
-  el.textContent = q?.text || ''
+  // 多个额度窗口 / 额度池用「｜」隔开，每个占一行，不在半中间折行
+  el.replaceChildren(...(q?.text || '').split(/\s*｜\s*/).filter(Boolean).map(t => {
+    const line = document.createElement('div'); line.textContent = t; return line
+  }))
   el.className = q?.low ? 'low' : ''
 }
 function restPose() { return quota[charId]?.low ? 'tired' : 'idle' }

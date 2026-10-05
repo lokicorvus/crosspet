@@ -329,7 +329,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let maxUsed = windows.map { $0.used }.max() ?? 0
             var marked = false
             let parts = windows.map { w -> String in
-                var piece = "\(w.label)剩余 \(max(0, 100 - Int(w.used.rounded())))%"
+                var piece = "\(w.label) 剩余 \(max(0, 100 - Int(w.used.rounded())))%"
                 if !marked, w.used == maxUsed, let reset = w.reset {
                     marked = true
                     let d = Date(timeIntervalSince1970: reset)

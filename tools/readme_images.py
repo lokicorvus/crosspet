@@ -22,10 +22,10 @@ FONT = "/System/Library/Fonts/Hiragino Sans GB.ttc"
 
 # (角色, 姿态, 气泡, 额度)
 HERO = [
-    ("claude", "idle", "我在这儿～", "5小时剩余 72% ｜ 本周剩余 58%"),
-    ("gpt", "idle", "……来了。今天写什么？", "本周剩余 63% · 10/10 重置"),
+    ("claude", "idle", "我在这儿～", "5小时 剩余 72% ｜ 本周 剩余 58% · 10/10 重置"),
+    ("gpt", "idle", "……来了。今天写什么？", "5小时 剩余 85% ｜ 本周 剩余 63% · 10/10 重置"),
     ("deepseek", "idle", "DeepSeek 来啦！", "余额 ¥6.29"),
-    ("gemini", "idle", "喵～Gemini 上线！", None),
+    ("gemini", "idle", "喵～Gemini 上线！", "Gemini 剩余 91% · 10/12 重置 ｜ Claude/GPT-OSS 剩余 100%"),
 ]
 ACTIONS = [
     ("claude", "reading", "我看看这里写了什么", None), ("gpt", "running", "跑一下测试。", None),
@@ -112,7 +112,7 @@ def tile(cid, pose, line, quota, fx_img, aura):
     accent = cfg.get("accent", "#e0b48a")
     W = WIN_W * S
     bubble_h = 40 * S
-    H = (bubble_h + STAGE_H * S + 50 * S)
+    H = (bubble_h + STAGE_H * S + 62 * S)
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     sx = (W - STAGE_W * S) // 2
     sy = bubble_h
@@ -166,8 +166,15 @@ def tile(cid, pose, line, quota, fx_img, aura):
         pill(d, W / 2, 4 * S, line, font(13), (255, 255, 255, 242), (74, 36, 24), border=hex_rgb(accent), pad=(11, 5), radius=12)
     y = sy + STAGE_H * S - 2 * S
     y = pill(d, W / 2, y, cfg.get("name", cid), font(11), (255, 255, 255, 217), (107, 74, 58))
-    if quota:
-        pill(d, W / 2, y + 2 * S, quota, font(10), (255, 255, 255, 204), (107, 74, 58), pad=(8, 1), radius=7)
+    if quota:  # 和 App 一样：「｜」隔开的每段占一行，放在同一块底板里
+        lines = [t.strip() for t in quota.split("｜") if t.strip()]
+        f = font(10)
+        lh = f.size * 1.35
+        w = max(d.textlength(t, font=f) for t in lines) + 16 * S
+        top = y + 2 * S
+        d.rounded_rectangle([W / 2 - w / 2, top, W / 2 + w / 2, top + lh * len(lines) + 2 * S], radius=7 * S, fill=(255, 255, 255, 204))
+        for i, t in enumerate(lines):
+            d.text((W / 2, top + S + lh * (i + .5)), t, font=f, fill=(107, 74, 58), anchor="mm")
     return im
 
 
