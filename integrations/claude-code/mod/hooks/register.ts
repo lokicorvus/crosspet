@@ -4,6 +4,7 @@ import type { Register } from 'claude-code'
 // 和标准钩子输出同一种状态（<状态目录>/claude-state.json），另外多两样：
 // - 额度：session.measure 推来的 5 小时 / 每周窗口 → claude-quota.json
 // - 被打断 / 出错：turn.complete 的 reason
+// - 压缩上下文：session.compact
 // 状态目录固定 /tmp/crosspet（和桌宠、其他接入一致）。
 
 const DIR = '/tmp/crosspet'
@@ -73,6 +74,15 @@ export const register: Register = on => {
       e.reason === 'answer' ? (tools >= BIG_JOB_TOOLS ? 'proud' : 'happy') : e.reason === 'aborted' ? 'surprised' : 'oops'
     tools = 0
     await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose, event: 'Stop', tool: '', ts: Date.now() / 1000 }))
+    return r
+  })
+
+  // 压缩上下文（/compact 或自动）：只管主对话，后台预先压缩（precompute）和子任务的不算
+  on('session.compact', async ($, e, next) => {
+    const shown = (e.trigger === 'manual' || e.trigger === 'auto') && !e.agentId
+    if (shown) await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 }))
+    const r = await next(e)
+    if (shown) await $.fs.write(`${DIR}/${ID}-state.json`, JSON.stringify({ pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 }))
     return r
   })
 

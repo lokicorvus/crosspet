@@ -67,6 +67,11 @@ export function apply(ctx, config = {}) {
     tools = 0;
   });
   ctx.on("subagent/start", () => state("delegating", "SubagentStart"));
+  // 压缩上下文：会话日志里的 compaction/start、compaction/end
+  ctx.on("session/event", (_session, event) => {
+    if (event?.type === "compaction/start") state("compact", "PreCompact");
+    else if (event?.type === "compaction/end") state("thinking", "PostCompact");
+  });
   ctx.on("subagent/end", () => state("thinking", "SubagentStop"));
 
   // ---- 余额：用官方凭据接口拿 Key（值只在内存里用，不写盘、不打日志）----

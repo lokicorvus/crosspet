@@ -1,1 +1,9 @@
-{ "name": "crosspet", "version": "1.0.0", "description": "CrossPet 桌宠：把 Claude 的工作状态和额度写给桌宠（增强版，替代标准钩子）" }
+{
+  "name": "crosspet",
+  "version": "1.0.0",
+  "description": "CrossPet 桌宠：把 Claude 的工作状态和额度写给桌宠（增强版，替代标准钩子）",
+  "author": {
+    "name": "lokicorvus",
+    "url": "https://github.com/lokicorvus/crosspet"
+  }
+}

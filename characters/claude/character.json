@@ -101,9 +101,27 @@
       "画一张～",
       "构图中……",
       "上色上色"
+    ],
+    "compact": [
+      "东西太多了……压一压",
+      "（坐在箱子上）合、合上了！"
+    ],
+    "sorry": [
+      "You're absolutely right!",
+      "你说得完全正确！我这就改。",
+      "……是我搞错了，抱歉。"
+    ],
+    "clawd": [
+      "（抱紧 Clawd）",
+      "Clawd 也在陪我～",
+      "嘿嘿，软软的"
     ]
   },
   "glyph": {
     "fill": "#b5651d"
-  }
+  },
+  "idleActions": [
+    "clawd"
+  ],
+  "correctedPose": "sorry"
 }

@@ -51,12 +51,14 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 .m-rock  { animation: rock 3s ease-in-out infinite; }
 .m-sway  { animation: rock 1.8s ease-in-out infinite; }
 .m-slow  { animation: bob-tiny 4.5s ease-in-out infinite; }
+.m-float { animation: float 4.2s ease-in-out infinite; }
 .m-shake { animation: shake 1.4s ease-in-out infinite; }
 .m-squish{ animation: squish 1.6s ease-in-out infinite; }
 .m-jolt  { animation: jolt .55s cubic-bezier(.3,1.6,.5,1) 1, bob 3.2s ease-in-out .55s infinite; }
 @keyframes bob { 50% { transform: translateY(-2.5%); } }
 @keyframes bob-big { 50% { transform: translateY(-5%); } }
 @keyframes bob-small { 50% { transform: translateY(-1.8%); } }
+@keyframes float { 0%,100% { transform: translateY(-4%) rotate(-1.5deg); } 50% { transform: translateY(-10%) rotate(1.5deg); } }
 @keyframes bob-tiny { 50% { transform: translateY(-.8%) scale(1.01, 1.015); } }
 @keyframes jump { 0%,100% { transform: translateY(0) scale(1.02,.98); } 50% { transform: translateY(-9%) scale(.98,1.02); } }
 @keyframes rock { 0%,100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
@@ -94,12 +96,14 @@ const MOTION = {
   pop: 'm-hop', pretend: 'm-bob', caught: 'm-shake', bye: 'm-dash',
   // 角色专属姿态（没列出的默认轻轻浮动）
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
-  reset: 'm-jump', feast: 'm-bob',
+  reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
 }
+// 新加的姿态还没画立绘时，先用哪张顶上
+const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
@@ -113,13 +117,13 @@ let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
-const charState = {}, quota = {}, seenTool = {}
+const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
 
 const char = () => manifest.characters[charId]
 const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
 function framesFor(p) {
   const c = char(); if (!c) return []
-  return c.poses[p] || c.poses.idle || c.poses.default || []
+  return c.poses[p] || c.poses[POSE_FALLBACK[p]] || c.poses.idle || c.poses.default || []
 }
 
 // ---- 画面 ----
@@ -269,6 +273,8 @@ function applyCharState(id, s) {
   lastActive = Date.now()
   clearTimeout(thinkTimer)
   const ev = s.event || ''
+  if (s.pose === 'oops' || (ev === 'Stop' && s.pose === 'surprised')) lastTrouble[id] = Date.now()
+  else if (ev === 'Stop' && (s.pose === 'happy' || s.pose === 'proud')) lastTrouble[id] = 0  // 最后顺利完成了，不算
   // 工具动作被紧跟着的「思考」盖掉时，状态里会捎带上它（after）：没演过的话先演，停够了再思考
   if (ev === 'PreToolUse' || ev === 'BeforeTool') seenTool[id] = s.ts
   if (s.after && s.afterTs !== seenTool[id]) {
@@ -281,6 +287,15 @@ function applyCharState(id, s) {
     if (s.pose === 'oops') show('oops')
     else thinkTimer = setTimeout(() => show('thinking'), BACK_TO_THINKING)
   } else if (ev === 'UserPromptSubmit' || ev === 'BeforeAgent') {
+    // 刚出错 / 被打断后你又发了消息（多半是在纠正她）：有 correctedPose 的角色先认个错
+    // （Claude 的「You're absolutely right!」）
+    const sorry = char()?.correctedPose
+    if (sorry && Date.now() - (lastTrouble[id] || 0) < 3 * 60 * 1000) {
+      lastTrouble[id] = 0
+      show(sorry, true)
+      thinkTimer = setTimeout(() => show('thinking'), DWELL + 500)
+      return
+    }
     show('listening', true)
     thinkTimer = setTimeout(() => show('thinking'), LISTEN_TO_THINKING)
   } else {

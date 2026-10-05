@@ -127,6 +127,10 @@ elif name in ("Stop", "AfterAgent"):
     else:
         pose = "proud" if turn_tools() >= BIG_JOB_TOOLS else "happy"
     set_turn_tools(0)
+elif name in ("PreCompact", "PreCompress"):
+    pose = "compact"  # 压缩上下文：把一大堆东西往小箱子里塞
+elif name in ("PostCompact",):
+    pose = "thinking"
 elif name in ("SubagentStart",):
     pose = "delegating"
 elif name in ("SubagentStop",):
