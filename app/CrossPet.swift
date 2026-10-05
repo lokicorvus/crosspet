@@ -511,7 +511,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let login = add(menu, "登录时自动启动", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         add(menu, "打开角色文件夹", #selector(openCharacters))
-        add(menu, "开发者控制台…", #selector(openDevConsole))
+        if NSEvent.modifierFlags.contains(.option) {  // 按住 ⌥ 右键才出现：给自己换立绘、加角色的人检查效果用
+            add(menu, "开发者控制台…", #selector(openDevConsole))
+        }
         add(menu, "重新载入", #selector(reload))
         add(menu, "回到右下角", #selector(resetPosition))
         add(menu, "检查更新（当前 \(currentVersion)）", #selector(manualCheck))
