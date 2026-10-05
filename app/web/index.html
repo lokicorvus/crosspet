@@ -366,9 +366,50 @@ function handleClick(kind) {
   show(kind === 'poke' ? pokePose : 'pat', true)
 }
 
+// ---- 开发者控制台用（右键「开发者控制台…」）----
+// devShow：演某个角色的某个姿态（可指定某一张图）并保持住，闲置动作、睡觉、自动彩蛋、换图都先停下
+let devHoldUntil = 0, devActive = false
+const devHeld = () => Date.now() < devHoldUntil
+function devShow(id, p, line, frameUrl, holdMs = 10 * 60 * 1000) {
+  devActive = true
+  if (egg) { clearEggTimers(); egg = null; charId = null }
+  if (charId !== id) {
+    const target = manifest.characters[id]
+    if (target?.egg) {  // 彩蛋角色不能直接切换，按彩蛋流程那样换上
+      charId = id; pose = null; currentUrl = ''
+      applyLook(target); $('caption').textContent = target.name
+      document.documentElement.style.setProperty('--aura', target.aura || '#bcd4ff')
+    } else {
+      setCharacter(id, true)
+      setTimeout(() => devShow(id, p, line, frameUrl, holdMs), 450)
+      return
+    }
+  }
+  clearTimeout(pending); clearTimeout(thinkTimer); clearTimeout(revertTimer)
+  devHoldUntil = Date.now() + holdMs
+  pose = null
+  setPose(p, true)
+  if (frameUrl) showImage(frameUrl, true)
+  say(line || '')
+}
+function devRelease() {
+  devHoldUntil = 0; devActive = false
+  if (egg) return
+  const c = manifest?.characters?.[charId]
+  if (c?.egg) { charId = null; setCharacter(c.host || Object.keys(manifest.characters).find(k => !manifest.characters[k].egg), true); return }
+  setPose(restPose()); say('')
+}
+function devStatus() {
+  const frames = framesFor(pose)
+  return { charId, pose, egg: egg ? { host: egg.host, waiting: egg.waiting } : null, held: devHeld(),
+    image: currentUrl.split('/').slice(-2).join('/'), usesFallback: !!(pose && !char()?.poses?.[pose]),
+    fx: (char()?.fx || {})[pose] || null, quota: quota, bubble: $('bubble').classList.contains('hide') ? '' : $('bubble').textContent,
+    frames: frames.length, fallback: POSE_FALLBACK, transient: TRANSIENT }
+}
+
 // ---- 闲着的时候：偶尔哼歌 / 伸懒腰 / 打哈欠，太久没动静就睡 ----
 setInterval(() => {
-  if (egg || (pose !== 'idle' && pose !== 'tired')) return
+  if (devHeld() || egg || (pose !== 'idle' && pose !== 'tired')) return
   const quiet = Date.now() - lastActive
   if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
   if (Math.random() > .42) return
@@ -383,7 +424,7 @@ setInterval(() => {
 // 想得久了换成专属的「深度思考」：character.json 里 longThink: { after: 秒, pose: 姿态 }
 setInterval(() => {
   const lt = char()?.longThink
-  if (!lt || egg || pose !== 'thinking' || !hasPose(lt.pose)) return
+  if (!lt || devHeld() || egg || pose !== 'thinking' || !hasPose(lt.pose)) return
   if (Date.now() - poseSince > (lt.after || 20) * 1000) show(lt.pose, true)
 }, 1000)
 
@@ -463,12 +504,12 @@ function endEgg() {
     renderQuota()
   })
 }
-setInterval(() => { if (!egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
+setInterval(() => { if (!devHeld() && !devActive && !egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
 
 // ---- 生动一点：同一状态有多张图时停留久了换一张；有眨眼帧就偶尔眨眼 ----
 setInterval(() => {
   const frames = framesFor(pose)
-  if (frames.length > 1 && Date.now() - poseSince > 8000) {
+  if (!devHeld() && frames.length > 1 && Date.now() - poseSince > 8000) {
     poseSince = Date.now()
     showImage(pick(frames.filter(u => u !== currentUrl)))
   }

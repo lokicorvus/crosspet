@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>CrossPet 开发者控制台</title>
+<style>
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f;
+  --ok: #2f9e5b; --bad: #d64545; --warn: #e0a100; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.5 -apple-system, "PingFang SC", sans-serif; color: var(--ink); background: var(--bg); display: flex; height: 100vh; }
+button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 4px 10px; cursor: pointer; color: var(--ink); }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.on { background: #fff3e4; border-color: var(--accent); }
+input[type=text], textarea { font: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; width: 100%; background: #fffdfa; color: var(--ink); }
+aside { width: 170px; background: var(--panel); border-right: 1px solid var(--line); padding: 12px 8px; overflow: auto; flex-shrink: 0; }
+aside h3 { font-size: 11px; color: var(--muted); margin: 10px 6px 4px; font-weight: 600; }
+.char { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px; cursor: pointer; }
+.char:hover { background: #faf5ee; }
+.char.sel { background: #fff0e0; }
+.char img { width: 34px; height: 34px; object-fit: contain; }
+.char .n { font-weight: 600; }
+.char .c { font-size: 11px; color: var(--muted); }
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 14px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.status b { color: var(--ink); font-weight: 600; }
+.pill { display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 11px; background: #f1ebe3; color: var(--muted); }
+.pill.fb { background: #fff4d6; color: #9a6b00; }
+.pill.bad { background: #fde8e8; color: var(--bad); }
+.pill.ok { background: #e3f5ea; color: var(--ok); }
+nav { display: flex; gap: 4px; margin-top: 10px; }
+nav button { border-radius: 7px 7px 0 0; border-bottom: none; }
+nav button.sel { background: var(--bg); border-color: var(--line); font-weight: 600; }
+section { flex: 1; overflow: auto; padding: 14px; display: none; }
+section.sel { display: block; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.tile.playing { outline: 2px solid var(--accent); }
+.tile.mark-ok { border-color: #9fd8b3; }
+.tile.mark-bad { border-color: #f0a3a3; background: #fffafa; }
+.thumb { height: 150px; border-radius: 7px; background: repeating-conic-gradient(#f3eee8 0 25%, #fbf8f4 0 50%) 0 0/16px 16px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; cursor: pointer; position: relative; }
+.thumb img { max-height: 100%; max-width: 100%; object-fit: contain; }
+.thumb .missing { align-self: center; color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
+.tname { font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+.tname code { font-size: 12px; }
+.when { font-size: 11px; color: var(--muted); min-height: 16px; }
+.line { font-size: 12px; color: #6b4a3a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.marks { display: flex; gap: 4px; align-items: center; }
+.marks button { padding: 1px 8px; }
+.marks button.ok.on { background: #e3f5ea; border-color: var(--ok); color: var(--ok); }
+.marks button.bad.on { background: #fde8e8; border-color: var(--bad); color: var(--bad); }
+.note { display: none; }
+.mark-bad .note, .note.show { display: block; }
+.scene { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr 230px; gap: 10px; }
+.scene.mark-ok { border-color: #9fd8b3; }
+.scene.mark-bad { border-color: #f0a3a3; background: #fffafa; }
+.scene h4 { margin: 0 0 3px; font-size: 14px; }
+.scene .exp { color: var(--muted); font-size: 12px; }
+.scene .exp b { color: var(--ink); font-weight: 500; }
+.scene .side { display: flex; flex-direction: column; gap: 6px; }
+.scene .prog { font-size: 11px; color: var(--accent); min-height: 16px; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+td, th { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; background: #fbf8f4; }
+td code { font-size: 11px; word-break: break-all; }
+.hint { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+textarea { min-height: 300px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
+.sum { display: flex; gap: 14px; margin-bottom: 10px; }
+.sum div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; }
+.sum b { font-size: 20px; display: block; }
+</style></head>
+<body>
+<aside>
+  <h3>角色</h3><div id="chars"></div>
+  <h3>彩蛋</h3><div id="eggs"></div>
+</aside>
+<main>
+  <header>
+    <div class="row">
+      <b style="font-size:15px">CrossPet 开发者控制台</b><span class="pill" id="ver"></span>
+      <span style="flex:1"></span>
+      <button id="pause" class="on" title="测试时先不把真实 AI 的状态交给桌宠（事件仍会记在「实时事件」里）">⏸ 暂停真实 AI 事件</button>
+      <button id="release" title="松开保持，桌宠回到正常运行">↩︎ 让桌宠恢复正常</button>
+      <button id="reloadPet">⟳ 重新载入桌宠</button>
+    </div>
+    <div class="status" id="status">桌宠状态读取中…</div>
+    <nav>
+      <button data-tab="poses" class="sel">姿态</button>
+      <button data-tab="scenes">场景演练</button>
+      <button data-tab="events">实时事件</button>
+      <button data-tab="feedback">反馈 <span class="pill" id="badCount">0</span></button>
+    </nav>
+  </header>
+
+  <section id="poses" class="sel">
+    <div class="row" style="margin-bottom:10px">
+      <button id="tour" class="primary">▶ 逐个轮播这个角色的全部姿态</button>
+      <span class="hint" style="margin:0">点缩略图 = 让桌宠演这一张并保持住。看完在卡片上点 ✓ 或 ✗，✗ 可以写一句哪里不对。键盘 ← → 切换上一张 / 下一张。</span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="scenes">
+    <p class="hint">用和真实 AI 一样的事件流程跑一遍，看衔接、时机、台词、特效对不对。场景只作用于左边选中的角色；运行期间建议保持「暂停真实 AI 事件」。</p>
+    <div id="sceneList"></div>
+  </section>
+
+  <section id="events">
+    <p class="hint">真实 AI 写给桌宠的状态（/tmp/crosspet/）。暂停时这里照常记录，但不会交给桌宠。用来排查「AI 在干活、桌宠却没反应」。</p>
+    <table><thead><tr><th style="width:70px">时间</th><th style="width:80px">角色</th><th style="width:50px">类型</th><th>内容</th><th style="width:60px"></th></tr></thead><tbody id="log"></tbody></table>
+  </section>
+
+  <section id="feedback">
+    <div class="sum"><div><b id="nBad">0</b>有问题</div><div><b id="nOk">0</b>正常</div><div><b id="nTodo">0</b>还没看</div></div>
+    <div class="row" style="margin-bottom:10px">
+      <button class="primary" id="save">💾 保存反馈（同时复制到剪贴板）</button>
+      <button id="reveal">在访达中显示</button>
+      <button id="clearMarks">清空所有标记</button>
+      <span class="hint" style="margin:0" id="savedTo"></span>
+    </div>
+    <p class="hint">保存后告诉 Claude「反馈存好了」，它会直接读这个文件。</p>
+    <textarea id="report" readonly></textarea>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id)
+const post = msg => window.webkit?.messageHandlers?.dev?.postMessage(msg)
+const pet = code => post({ cmd: 'pet', code })
+const wait = ms => new Promise(r => setTimeout(r, ms))
+const J = v => JSON.stringify(v)
+let manifest = { characters: {} }, appInfo = {}, sel = null, status = null, fallback = {}
+let statusWaiters = []
+
+// ---- 各姿态什么时候出现（和 docs/自定义角色.md 一致）----
+const BUILTIN = ['idle', 'listening', 'thinking', 'reading', 'writing', 'running', 'searching', 'delegating', 'drawing',
+  'happy', 'proud', 'oops', 'surprised', 'pat', 'sleeping', 'tired', 'hum', 'stretch', 'yawn', 'compact']
+const EGG_POSES = ['pop', 'pretend', 'caught', 'bye']
+const WHEN = {
+  idle: '平时', listening: '收到你的消息', thinking: '思考', reading: '读文件、搜代码', writing: '写文件、改代码', running: '跑命令',
+  searching: '上网查资料', delegating: '派子任务', drawing: '画图', happy: '一轮完成', proud: '一轮用了 8 次以上工具的大活完成',
+  oops: '出错', surprised: '被打断 / 被戳', pat: '被摸头', sleeping: '10 分钟没动静', tired: '额度快用完', hum: '闲着时哼歌',
+  stretch: '闲着时伸懒腰', yawn: '闲着时打哈欠', compact: '压缩上下文', reset: 'Codex 额度提前重置', feast: '余额增加（充值）',
+  sorry: '出错 / 被打断后你又发消息', pop: '彩蛋：跳出来', pretend: '彩蛋：装模作样（等你点她）', caught: '彩蛋：被识破', bye: '彩蛋：溜走',
+}
+
+function posesOf(id) {
+  const c = manifest.characters[id]
+  if (c.egg) return EGG_POSES
+  const list = [...BUILTIN]
+  const add = p => { if (p && !list.includes(p)) list.push(p) }
+  ;(c.idleActions || []).forEach(add)
+  add(c.pokePose); add(c.longThink?.pose); add(c.correctedPose)
+  if ((c.fx || {}).reset || c.poses.reset) add('reset')
+  if ((c.fx || {}).feast || c.poses.feast) add('feast')
+  Object.keys(c.poses).forEach(add)
+  return list
+}
+function whenOf(id, p) {
+  const c = manifest.characters[id]
+  if ((c.idleActions || []).includes(p)) return '闲着时的专属小动作'
+  if (c.pokePose === p) return '被戳时'
+  if (c.longThink?.pose === p) return `思考超过 ${c.longThink.after || 20} 秒`
+  if (c.correctedPose === p) return WHEN.sorry
+  return WHEN[p] || '专属姿态'
+}
+const fileOf = u => decodeURIComponent(u.split('/').pop())
+const lineOf = (c, p) => ((c.lines || {})[p] || [])[0] || ''
+
+// ---- 标记（存在本机）----
+let marks = {}
+try { marks = JSON.parse(localStorage.getItem('crosspet-dev-marks')) || {} } catch {}
+const saveMarks = () => { try { localStorage.setItem('crosspet-dev-marks', J(marks)) } catch {}; renderReport() }
+function markUI(key, el) {
+  const m = marks[key] || {}
+  const box = document.createElement('div')
+  box.innerHTML = `<div class="marks"><button class="ok">✓ 正常</button><button class="bad">✗ 有问题</button></div>
+    <input type="text" class="note" placeholder="哪里不对？（比如：特效压到头发 / 台词不合适）">`
+  const [ok, bad] = box.querySelectorAll('button'), note = box.querySelector('input')
+  const paint = () => {
+    const v = marks[key]?.ok
+    ok.classList.toggle('on', v === true); bad.classList.toggle('on', v === false)
+    el.classList.toggle('mark-ok', v === true); el.classList.toggle('mark-bad', v === false)
+    note.value = marks[key]?.note || ''
+  }
+  ok.onclick = () => { marks[key] = { ...marks[key], ok: marks[key]?.ok === true ? undefined : true }; saveMarks(); paint() }
+  bad.onclick = () => { marks[key] = { ...marks[key], ok: marks[key]?.ok === false ? undefined : false }; saveMarks(); paint(); if (marks[key].ok === false) note.focus() }
+  note.oninput = () => { marks[key] = { ...marks[key], note: note.value }; saveMarks() }
+  paint()
+  return box
+}
+
+// ---- 角色列表 ----
+function renderChars() {
+  const ids = Object.keys(manifest.characters)
+  for (const [boxId, eggs] of [['chars', false], ['eggs', true]]) {
+    const box = $(boxId); box.innerHTML = ''
+    for (const id of ids.filter(i => !!manifest.characters[i].egg === eggs)) {
+      const c = manifest.characters[id]
+      const items = posesOf(id), keys = items.flatMap(p => (c.poses[p] || [null]).map((_, i) => `pose:${id}:${p}:${i}`))
+      const bad = keys.filter(k => marks[k]?.ok === false).length, done = keys.filter(k => marks[k]?.ok !== undefined).length
+      const d = document.createElement('div')
+      d.className = 'char' + (id === sel ? ' sel' : '')
+      d.innerHTML = `<img src="${(c.poses.idle || c.poses.pop || [''])[0]}"><div><div class="n">${c.name}</div><div class="c">${done}/${keys.length} 已看${bad ? ` · <span style="color:var(--bad)">${bad} 个问题</span>` : ''}</div></div>`
+      d.onclick = () => { sel = id; renderChars(); renderGrid(); renderScenes() }
+      box.append(d)
+    }
+  }
+}
+
+// ---- 姿态 ----
+let tiles = [], playingIdx = -1
+function renderGrid() {
+  const c = manifest.characters[sel], grid = $('grid')
+  grid.innerHTML = ''; tiles = []
+  for (const p of posesOf(sel)) {
+    const frames = c.poses[p]
+    const list = frames ? frames.map((u, i) => ({ p, url: u, i })) : [{ p, url: null, i: 0 }]
+    for (const f of list) {
+      const key = `pose:${sel}:${p}:${f.i}`
+      const t = document.createElement('div'); t.className = 'tile'
+      const fbPose = fallback[p] && c.poses[fallback[p]] ? fallback[p] : null
+      const fx = (c.fx || {})[p]
+      const tag = !f.url ? `<span class="pill ${fbPose ? 'fb' : 'bad'}">${fbPose ? '缺图，用 ' + fbPose + ' 顶上' : '缺图'}</span>`
+        : list.length > 1 ? `<span class="pill">${f.i + 1}/${list.length}</span>` : ''
+      t.innerHTML = `<div class="thumb">${f.url ? `<img src="${f.url}" loading="lazy">` : `<div class="missing">还没有立绘<br>${fbPose ? '现在会用 ' + fbPose : (c.idleActions || []).includes(p) ? '画好之前不会出现' : '现在会用 idle'}</div>`}</div>
+        <div class="tname"><code>${f.url ? fileOf(f.url) : p}</code>${tag}</div>
+        <div class="when">${whenOf(sel, p)}${fx ? ` · 特效 <span class="pill">${fx}</span>` : ''}</div>
+        <div class="line">${lineOf(c, p) ? '「' + lineOf(c, p) + '」' : '<span style="color:var(--muted)">（没有台词）</span>'}</div>`
+      const idx = tiles.length
+      t.querySelector('.thumb').onclick = () => play(idx)
+      t.append(markUI(key, t))
+      grid.append(t)
+      tiles.push({ el: t, p, url: f.url })
+    }
+  }
+}
+function play(idx) {
+  if (idx < 0 || idx >= tiles.length) return
+  tiles[playingIdx]?.el.classList.remove('playing')
+  playingIdx = idx
+  const t = tiles[idx], c = manifest.characters[sel]
+  t.el.classList.add('playing'); t.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  pet(`devShow(${J(sel)}, ${J(t.p)}, ${J(lineOf(c, t.p))}, ${J(t.url)})`)
+}
+let touring = null
+$('tour').onclick = async () => {
+  if (touring) { touring.stop = true; return }
+  touring = { stop: false }; $('tour').textContent = '■ 停止轮播'
+  for (let i = 0; i < tiles.length && !touring.stop; i++) { play(i); await wait(3500) }
+  touring = null; $('tour').textContent = '▶ 逐个轮播这个角色的全部姿态'
+}
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || !$('poses').classList.contains('sel')) return
+  if (e.key === 'ArrowRight') { play(Math.min(tiles.length - 1, playingIdx + 1)); e.preventDefault() }
+  if (e.key === 'ArrowLeft') { play(Math.max(0, playingIdx - 1)); e.preventDefault() }
+})
+
+// ---- 场景 ----
+let tsSeq = 0
+const nextTs = () => Date.now() / 1000 + (tsSeq++) * 0.001
+const st = (id, pose, event, tool = '', extra = {}) => pet(`applyCharState(${J(id)}, ${J({ pose, event, tool, ts: nextTs(), ...extra })})`)
+function petStatus() { return new Promise(r => { statusWaiters.push(r); post({ cmd: 'status' }) }) }
+async function begin(id) {
+  pet(`devRelease(); devActive = true; setCharacter(${J(id)}, true)`)
+  await wait(700)
+}
+async function tools(id, list, gap = 2600) {
+  for (const [pose, tool] of list) { st(id, pose, 'PreToolUse', tool); await wait(gap); st(id, 'thinking', 'PostToolUse', tool); await wait(1800) }
+}
+const SCENES = [
+  { id: 'work', name: '一轮普通的工作', exp: '在听 → 思考 → 读读看 → 写写写 → 跑命令 → 查资料（中间会夹着思考；每个动作至少停 2.5 秒，太快的会合并）→ <b>开心</b>（打勾清单 + 彩纸）→ 约 5 秒后回到平时',
+    run: async (id, prog) => { st(id, 'listening', 'UserPromptSubmit'); await wait(2500)
+      prog('读 → 写 → 跑 → 查'); await tools(id, [['reading', 'Read'], ['writing', 'Edit'], ['running', 'Bash'], ['searching', 'WebSearch']])
+      prog('完成'); st(id, 'happy', 'Stop') } },
+  { id: 'bigjob', name: '大活完成（戴皇冠）', exp: '连续 9 次工具后结束 → <b>proud</b>：头上戴着自己的皇冠，左上奖杯 + 闪光，约 6 秒',
+    run: async (id, prog) => { st(id, 'listening', 'UserPromptSubmit'); await wait(1500)
+      for (let i = 1; i <= 9; i++) { prog(`工具 ${i}/9`); st(id, ['reading', 'writing', 'running'][i % 3], 'PreToolUse', 'Tool'); await wait(900); st(id, 'thinking', 'PostToolUse'); await wait(500) }
+      prog('完成'); st(id, 'proud', 'Stop') } },
+  { id: 'draw', name: '画图', exp: '生图工具 → <b>画画</b>（右上画板，彩色笔触一笔笔画出来）→ 思考 → 开心',
+    run: async (id) => { st(id, 'listening', 'UserPromptSubmit'); await wait(1500); await tools(id, [['drawing', 'image_gen']], 4500); st(id, 'happy', 'Stop') } },
+  { id: 'delegate', name: '派子任务', exp: '<b>交给分身</b>（任务清单 + 纸飞机）→ 子任务结束回到思考 → 开心',
+    run: async (id) => { st(id, 'delegating', 'SubagentStart'); await wait(4500); st(id, 'thinking', 'SubagentStop'); await wait(2500); st(id, 'happy', 'Stop') } },
+  { id: 'oops', name: '出错，然后被你纠正', exp: '跑命令 → <b>出错</b>（错误卡片）→ 3 秒后你发消息 → 有 correctedPose 的角色先<b>认错</b>（Claude：「You\'re absolutely right!」），其他角色是普通的「在听」→ 思考',
+    run: async (id, prog) => { st(id, 'running', 'PreToolUse', 'Bash'); await wait(2500); st(id, 'oops', 'PostToolUse', 'Bash'); await wait(2700); st(id, 'oops', 'Stop')
+      prog('3 秒后发消息…'); await wait(3000); st(id, 'listening', 'UserPromptSubmit'); await wait(3500); prog('') } },
+  { id: 'abort', name: '被打断', exp: '干活中途被你按停 → <b>surprised</b>（「诶？！」）约 3 秒',
+    run: async (id) => { st(id, 'writing', 'PreToolUse', 'Edit'); await wait(2500); st(id, 'surprised', 'Stop') } },
+  { id: 'compact', name: '压缩上下文', exp: '<b>compact</b>：往小箱子里硬塞东西（身体有挤压的动作）→ 压缩完回到思考 → 开心',
+    run: async (id, prog) => { st(id, 'compact', 'PreCompact'); prog('压缩中（6 秒）'); await wait(6000); st(id, 'thinking', 'PostCompact'); await wait(2500); st(id, 'happy', 'Stop'); prog('') } },
+  { id: 'piggy', name: '快速连发（Antigravity 那种）', exp: '工具结束后几毫秒就开始思考：桌宠只收到「思考 + 捎带的动作」，也应该先演<b>读读看 → 画画 → 写写写</b>，每个约 2.5 秒，再思考',
+    run: async (id) => { for (const p of ['reading', 'drawing', 'writing']) { const t = nextTs(); st(id, 'thinking', 'PreInvocation', '', { after: p, afterTs: t }); await wait(3200) } st(id, 'happy', 'Stop') } },
+  { id: 'longthink', name: '想了很久', only: c => c.longThink, exp: '思考超过设定的秒数 → 换成专属的<b>深度思考</b>（DeepSeek：揉太阳穴 + 深海泡泡）。要等 20 多秒',
+    run: async (id, prog) => { const c = manifest.characters[id]; st(id, 'listening', 'UserPromptSubmit'); await wait(1500); st(id, 'thinking', 'PostToolUse')
+      for (let s = (c.longThink.after || 20) + 4; s > 0; s--) { prog(`等 ${s} 秒`); await wait(1000) } prog('') } },
+  { id: 'tired', name: '额度快用完', exp: '名牌下额度变<b>红</b>，她换成<b>累了</b>（快没电的电池），说一句累了的台词；8 秒后恢复真实额度',
+    run: async (id, prog) => { const s = await petStatus(), saved = s.quota[id] ?? null
+      pet(`setQuota(${J(id)}, ${J({ text: '测试 剩余 3% ｜ 本周 剩余 40%', low: true })})`); prog('8 秒后恢复'); await wait(8000)
+      pet(`setQuota(${J(id)}, ${J(saved)})`); prog('') } },
+  { id: 'reset', name: 'Codex 额度提前 reset', only: (c, id) => id === 'gpt', exp: '额度在预定重置前突然恢复 → <b>reset</b>：举着重置卡难得地笑出来 + 彩纸，约 6.5 秒；之后恢复真实额度',
+    run: async (id) => { const s = await petStatus(), saved = s.quota[id] ?? null, now = Date.now() / 1000
+      const q = u => ({ text: `测试 本周 剩余 ${100 - u}%`, low: false, windows: [{ label: '本周', used: u, reset: now + 400000 }] })
+      pet(`setQuota('gpt', ${J(q(70))})`); await wait(500); pet(`setQuota('gpt', ${J(q(3))})`); await wait(8000); pet(`setQuota('gpt', ${J(saved)})`) } },
+  { id: 'feast', name: 'DeepSeek 充值', only: (c, id) => id === 'deepseek', exp: '余额变多 → <b>feast</b>：抱着比脑袋还大的饭碗开吃 + 彩纸；之后恢复真实余额',
+    run: async (id) => { const s = await petStatus(), saved = s.quota[id] ?? null
+      pet(`setQuota('deepseek', ${J({ text: '余额 ¥6.00', low: false, balance: 6 })})`); await wait(500)
+      pet(`setQuota('deepseek', ${J({ text: '余额 ¥26.00', low: false, balance: 26 })})`); await wait(8000); pet(`setQuota('deepseek', ${J(saved)})`) } },
+  { id: 'egg', name: '彩蛋', only: (c, id) => Object.values(manifest.characters).some(e => e.egg && e.host === id), exp: '「噗」一下变成 cos 她的 DeepSeek：跳出来 → 装模作样（一直等）→ <b>你单击桌宠</b> → 被识破 → 溜走 → 变回原角色。不点的话 40 秒后她自己溜走',
+    run: async (id, prog) => { pet('playEgg(true)'); prog('现在去单击桌宠试试') } },
+  { id: 'touch', name: '摸头 / 戳一下', exp: '<b>摸头</b>（爱心往上飘）→ 4 秒后<b>戳一下</b>（头边弹出「!」；DeepSeek 是生气）',
+    run: async (id) => { pet("handleClick('pat')"); await wait(4500); pet("handleClick('poke')") } },
+  { id: 'sleep', name: '睡着，再叫醒', exp: '<b>睡着</b>（月亮 + Zz）→ 4 秒后摸她 → <b>打哈欠</b>「唔…你回来啦」→ 平时',
+    run: async (id) => { pet("setPose('sleeping'); say(pick(linesOf('sleeping') || ['']))"); await wait(4500); pet("handleClick('pat')") } },
+  { id: 'idleacts', name: '闲置小动作', exp: '依次演她闲着时会做的动作（专属的 + 哼歌、伸懒腰、打哈欠），每个约 4.5 秒',
+    run: async (id, prog) => { const c = manifest.characters[id]
+      const acts = [...(c.idleActions || []).filter(a => c.poses[a]), 'hum', 'stretch', 'yawn']
+      for (const a of acts) { prog(a); pet(`if (!TRANSIENT[${J(a)}]) TRANSIENT[${J(a)}] = 4000; show(${J(a)}, true)`); await wait(4500) } prog('') } },
+  { id: 'blink', name: '眨眼', only: c => c.blink, exp: '平时姿态下眨 3 次眼：只有眼睛闭上，头发和身体<b>不能跳动</b>',
+    run: async (id) => { const c = manifest.characters[id]
+      pet(`devShow(${J(id)}, 'idle', '', ${J(c.blinkBase)}, 8000)`); await wait(1200)
+      for (let i = 0; i < 3; i++) { pet("$('blink').classList.add('on'); setTimeout(() => $('blink').classList.remove('on'), 140)"); await wait(1200) } } },
+  { id: 'switch', name: '切换角色', exp: '依次换成每个角色：「噗」的烟雾 + 淡入，不能闪、不能两个角色叠在一起，最后回到选中的角色',
+    run: async (id) => { for (const o of Object.keys(manifest.characters).filter(k => !manifest.characters[k].egg)) { pet(`setCharacter(${J(o)})`); await wait(2200) } pet(`setCharacter(${J(id)})`) } },
+]
+let running = null
+function renderScenes() {
+  const box = $('sceneList'); box.innerHTML = ''
+  const c = manifest.characters[sel]
+  if (c.egg) { box.innerHTML = '<p class="hint">彩蛋角色没有单独的场景，选她的本体角色，用「彩蛋」场景来测。</p>'; return }
+  for (const sc of SCENES.filter(s => !s.only || s.only(c, sel))) {
+    const key = `scene:${sel}:${sc.id}`
+    const el = document.createElement('div'); el.className = 'scene'
+    el.innerHTML = `<div><h4>${sc.name}</h4><div class="exp">预期：${sc.exp}</div></div><div class="side"><div class="row"><button class="primary go">▶ 运行</button><span class="prog"></span></div></div>`
+    const prog = t => { el.querySelector('.prog').textContent = t }
+    el.querySelector('.go').onclick = async () => {
+      if (running) return
+      running = sc.id; prog('运行中…')
+      try { await begin(sel); await sc.run(sel, prog) } finally { running = null; if (el.querySelector('.prog').textContent === '运行中…') prog('') }
+    }
+    el.querySelector('.side').append(markUI(key, el))
+    box.append(el)
+  }
+}
+
+// ---- 实时事件 ----
+function logEvent(id, kind, data, paused) {
+  const tr = document.createElement('tr')
+  const t = new Date(), pad = n => String(n).padStart(2, '0')
+  tr.innerHTML = `<td>${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}</td><td>${manifest.characters[id]?.name || id}</td><td>${kind === 'state' ? '状态' : '额度'}</td>
+    <td><code>${kind === 'state' ? `<b>${data.pose}</b> · ${data.event || ''}${data.tool ? ' · ' + data.tool : ''}${data.after ? ' · 捎带 ' + data.after : ''}` : (data?.text || J(data))}</code></td>
+    <td>${paused ? '<span class="pill fb">已暂停</span>' : '<span class="pill ok">已交给桌宠</span>'}</td>`
+  $('log').prepend(tr)
+  while ($('log').children.length > 300) $('log').lastChild.remove()
+}
+
+// ---- 桌宠状态 ----
+function onPetStatus(s) {
+  status = s; fallback = s.fallback || fallback
+  statusWaiters.splice(0).forEach(r => r(s))
+  const c = manifest.characters[s.charId]
+  $('status').innerHTML = `当前 <b>${c?.name || s.charId || '—'}</b> · 姿态 <b>${s.pose || '—'}</b> · 图 <code>${s.image || '—'}</code>`
+    + (s.usesFallback ? ' <span class="pill fb">缺图，正在用顶替图</span>' : '')
+    + (s.fx ? ` · 特效 <span class="pill">${s.fx}</span>` : '')
+    + (s.egg ? ` · <span class="pill fb">彩蛋中${s.egg.waiting ? '，等你点她' : ''}</span>` : '')
+    + (s.held ? ' · <span class="pill">保持中</span>' : '')
+    + (s.bubble ? ` · 气泡「${s.bubble}」` : '')
+}
+setInterval(() => post({ cmd: 'status' }), 700)
+
+// ---- 反馈 ----
+function allKeys() {
+  const keys = []
+  for (const [id, c] of Object.entries(manifest.characters)) {
+    for (const p of posesOf(id)) (c.poses[p] || [null]).forEach((u, i) => keys.push({ key: `pose:${id}:${p}:${i}`, label: `${c.name} · ${u ? fileOf(u) : p + '（缺图）'}` }))
+    if (!c.egg) for (const sc of SCENES.filter(s => !s.only || s.only(c, id))) keys.push({ key: `scene:${id}:${sc.id}`, label: `${c.name} · 场景「${sc.name}」` })
+  }
+  return keys
+}
+function renderReport() {
+  const keys = allKeys()
+  const bad = keys.filter(k => marks[k.key]?.ok === false), ok = keys.filter(k => marks[k.key]?.ok === true)
+  $('nBad').textContent = bad.length; $('nOk').textContent = ok.length; $('nTodo').textContent = keys.length - bad.length - ok.length
+  $('badCount').textContent = bad.length
+  const now = new Date()
+  $('report').value = [
+    `# CrossPet 开发者反馈`, ``, `- 版本：${appInfo.version || '?'}`, `- 时间：${now.toLocaleString('zh-CN')}`,
+    `- 统计：有问题 ${bad.length} · 正常 ${ok.length} · 还没看 ${keys.length - bad.length - ok.length}`, ``,
+    `## 有问题`, ``, ...(bad.length ? bad.map(k => `- **${k.label}**（\`${k.key}\`）：${marks[k.key].note || '（没写原因）'}`) : ['（无）']), ``,
+    `## 正常`, ``, ...(ok.length ? ok.map(k => `- ${k.label}${marks[k.key].note ? '：' + marks[k.key].note : ''}`) : ['（无）']), ``,
+  ].join('\n')
+  if (manifest && sel) renderChars()
+}
+$('save').onclick = () => post({ cmd: 'save', text: $('report').value })
+$('reveal').onclick = () => post({ cmd: 'reveal' })
+$('clearMarks').onclick = () => { if (confirm('清空所有 ✓ / ✗ 标记和备注？')) { marks = {}; saveMarks(); renderGrid(); renderScenes() } }
+function onSaved(path) { $('savedTo').textContent = '已保存到 ' + path + '，也复制到了剪贴板' }
+
+// ---- 顶部按钮 / 标签页 ----
+let paused = true
+$('pause').onclick = () => { paused = !paused; post({ cmd: 'pause', on: paused }); $('pause').classList.toggle('on', paused); $('pause').textContent = paused ? '⏸ 暂停真实 AI 事件' : '▶ 真实 AI 事件照常' }
+$('release').onclick = () => { tiles[playingIdx]?.el.classList.remove('playing'); playingIdx = -1; pet('devRelease()') }
+$('reloadPet').onclick = () => post({ cmd: 'reload' })
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('sel', x === b))
+  document.querySelectorAll('section').forEach(s => s.classList.toggle('sel', s.id === b.dataset.tab))
+})
+
+// ---- 由 App 调用 ----
+function setAppInfo(info) { appInfo = info; $('ver').textContent = 'v' + info.version }
+function boot(m) {
+  manifest = m
+  const ids = Object.keys(m.characters)
+  if (!sel || !m.characters[sel]) sel = ids.find(i => !m.characters[i].egg)
+  post({ cmd: 'pause', on: paused })
+  renderChars(); renderGrid(); renderScenes(); renderReport()
+}
+</script>
+</body></html>
