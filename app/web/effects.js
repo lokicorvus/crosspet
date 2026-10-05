@@ -124,9 +124,6 @@ const browser = (() => {
     `<rect x="${x + 26}" y="${y + 29}" width="0" height="4" rx="2" fill="#8a93a0"><animate attributeName="width" values="0;52;52" keyTimes="0;0.28;1" dur="3.2s" ${loop}/></rect>` +
     `${results}<animateTransform attributeName="transform" type="translate" values="0 0;0 -4;0 0" dur="2.4s" ${loop}/></g>`
 })()
-const plane = `<path d="M488 300 Q525 240 578 160" stroke="#9a8fd0" stroke-width="2.5" stroke-dasharray="6 8" fill="none" opacity="0.7"/>` +
-  `<g><path d="M0 0 L40 14 L0 28 L9 14Z" fill="#fff" stroke="${INK}" stroke-width="2.5"/><animateMotion path="M488 300 Q525 240 578 160" rotate="auto" dur="1.8s" ${loop}/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.8;1" dur="1.8s" ${loop}/></g>`
-
 const confetti = Array.from({ length: 10 }, (_, i) => {
   const x = i < 5 ? 14 + i * 18 : 486 + (i - 5) * 18
   const colors = ['#ff6b81', '#ffd54a', '#5b8def', '#7ed957', '#ff9f43']
@@ -339,8 +336,8 @@ const steam = [0, 1, 2].map(i =>
   `${fadeLoop('2.2s', `${i * 0.5}s`)}<animateTransform attributeName="transform" type="translate" values="0 0;0 -26" dur="2.2s" begin="${i * 0.5}s" ${loop} additive="sum"/></path>`).join('')
 // 庆祝：两侧彩纸 + 闪光（GPT reset、DeepSeek 吃大餐）
 const fxCelebrate = confetti + star(500, 170, 1, '0.5s', '#ffd54a') + star(80, 200, 0.9, '0.9s', '#ffd54a') + star(490, 380, 0.8, '0.3s')
-// 大成功但立绘里已经画了皇冠：只要奖杯和闪光，不再叠特效皇冠
-const fxVictory = trophy + star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a')
+// 大成功但立绘里已经画了皇冠：只留几颗金色闪光，不再叠特效皇冠和奖杯
+const fxVictory = star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a') + star(70, 200, 0.9, '0.8s', '#ffd54a') + star(60, 330, 0.7, '1.1s', '#ffd54a')
 const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory }
 
 // 每个姿态周围的细节
@@ -353,7 +350,7 @@ const surroundings = (p      )         => {
     case 'writing': return editorCard
     case 'running': return terminal
     case 'searching': return magnifier + browser
-    case 'delegating': return taskCard + plane
+    case 'delegating': return taskCard  // 子任务依次完成；「派出分身」交给立绘表现
     case 'happy': return checklist + confetti + star(500, 170, 1, '0.5s') + star(490, 380, 0.9, '0.3s')
     case 'proud': return trophy + crown + star(510, 140, 1.1, '0.4s', '#ffd54a') + star(500, 340, 0.8, '0.2s', '#ffd54a')
     case 'oops': return errorCard
