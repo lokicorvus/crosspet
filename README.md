@@ -1,41 +1,51 @@
 # CrossPet · 跨 AI 桌宠
 
-![四个角色](docs/images/characters.webp)
+[![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
+[![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
+[![立绘 CC BY-NC-SA 4.0](https://img.shields.io/badge/%E7%AB%8B%E7%BB%98-CC%20BY--NC--SA%204.0-orange)](characters/LICENSE.md)
 
-一只浮在桌面上的小桌宠，**跟着你正在用的 AI 换形象，跟着 AI 的工作状态做动作**。
+一只浮在桌面角落的小桌宠。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
-- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Gemini / Antigravity，桌宠自动换成对应的 AI 娘
-- AI 在思考、读文件、写代码、跑命令、查资料、画图、派子任务、完成、出错……桌宠都有对应的立绘和小动画
-- 名牌下显示额度：Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额；快用完时她会累
-- 单击摸摸头，右键戳一下；闲着会哼歌、伸懒腰，太久没理她会睡着
-- DeepSeek 有专属的吃饭、摸鱼、游泳、深度思考、生气小动作
-- 彩蛋：偶尔会有一条穿着别人衣服的 DeepSeek 混进来，等你揪出她
+![Claude、GPT、DeepSeek、Gemini 四个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
-> **非官方同人项目。** 与 Anthropic、OpenAI、DeepSeek、Google 无关。角色形象来自社区二创，详见 [致谢与授权](#致谢与授权)。
+> 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google 无关。角色形象来自社区二创，见 [致谢与授权](#致谢与授权)。
 
-## 支持情况
+## 她会做什么
 
-| AI | 换形象 | 跟随工作状态 | 额度 / 余额 |
-|---|---|---|---|
-| Claude（Claude Code / Claude 桌面版） | ✅ | ✅ 标准钩子或增强版 mod | ✅ 需增强版 mod |
-| GPT（Codex / ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读取 Codex 会话记录 |
-| DeepSeek（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查询余额 |
-| Gemini（Antigravity / Gemini 桌面版） | ✅ | ✅ Antigravity 钩子（Gemini 桌面 App 没有接口） | — |
+![思考、读文件、跑命令、吃饭、画画、大成功、查资料、游泳、派子任务等动作](docs/images/actions.webp)
 
-只支持 macOS 13 及以上（Apple 芯片和 Intel 都可以）。
+- **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上皇冠得意一下。
+- **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额。快用完时她会露出累了的样子。
+- **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。
+- **各有性格**：DeepSeek 闲着会扒白饭、摸鱼、游泳，被戳会生气，想得太久会揉太阳穴。
 
-## 安装
+## 支持的 AI
 
-### 方式一：下载安装（推荐）
+| AI | 自动换形象 | 跟着干活 | 额度 / 余额 |
+|---|:---:|---|---|
+| **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 |
+| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读 Codex 会话记录 |
+| **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额 |
+| **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | — |
 
-1. 到 [Releases](../../releases) 下载最新的 `CrossPet.zip`，解压，把 `CrossPet.app` 拖进「应用程序」文件夹。
-2. **第一次打开要这样做**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
-   （本项目没有付费的苹果开发者签名，macOS 第一次会提示「无法验证开发者」，这样操作一次就好，以后正常双击。）
-3. 桌宠出现在屏幕右下角。接下来按 [接入教程](docs/接入教程.md) 把你用的 AI 接上。
+Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。
 
-### 方式二：从源码安装
+## 快速开始
 
-需要苹果命令行工具（没有的话运行 `xcode-select --install`）。
+**要求**：macOS 13 及以上，Apple 芯片和 Intel 都行。
+
+### 1. 装 App
+
+到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
+
+第一次打开时，要在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。本项目没有付费的苹果开发者签名，macOS 第一次会拦一下，这样放行一次就好。
+
+桌宠会出现在屏幕右下角。现在切到 Claude、ChatGPT、DeepSeek Harness 或 Antigravity，她就会变身。
+
+### 2. 接上 AI，让她跟着干活
+
+接入要用仓库里的脚本，它会挨个问你要接哪些 AI：
 
 ```bash
 git clone https://github.com/lokicorvus/crosspet.git
@@ -43,48 +53,57 @@ cd crosspet
 ./install.sh
 ```
 
-脚本会编译、装到 `~/Applications`，然后逐个问你要接入哪些 AI。
+`install.sh` 会从源码编译一份 App 并装好，所以第 1 步也可以跳过，直接从这里开始（需要先装苹果命令行工具：`xcode-select --install`）。
 
-## 使用
+只想接某一个也行：
+
+```bash
+python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini
+python3 tools/integrate.py status            # 看看现在接了哪些
+```
+
+脚本只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
+
+> **Codex 用户注意**：新加的钩子要在 Codex 里输入 `/hooks` 亲自「信任」一次才会运行。
+
+## 和她互动
 
 | 操作 | 效果 |
 |---|---|
 | 单击 | 摸摸头 |
-| 拖动 | 移动位置（会记住） |
-| 右键 | 菜单：戳一下、召唤彩蛋、换角色、**改名**、显示 GPT 额度、登录时自动启动、打开角色文件夹…… |
+| 拖动 | 换个位置（会记住） |
+| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT 额度、登录时自动启动、打开角色文件夹、检查更新…… |
 
-- 想给角色起自己的名字：右键 →「给当前角色改名…」，留空恢复默认。
-- 想加新角色或替换立绘：看 [自定义角色](docs/自定义角色.md)。
+## 彩蛋
 
-## 文档
+用 Claude、GPT 或 Gemini 的时候，偶尔会「噗」地冒出一条穿着她们衣服的 DeepSeek，装模作样地学人说话。**单击她就能揪出来**，她会慌慌张张地溜走；没人理的话，她会得意地自己走掉。等不及的话，右键「召唤彩蛋」。
 
-- [接入教程](docs/接入教程.md)：每个 AI 怎么接、改了哪些文件、怎么撤销
-- [自定义角色](docs/自定义角色.md)：加角色、换立绘、改台词、用 AI 生图
-- [常见问题](docs/常见问题.md)
-- 生图提示词：[角色](docs/prompts/角色生图提示词.md) · [彩蛋](docs/prompts/彩蛋生图提示词.md)
+![DeepSeek 分别 cos 成 Claude、GPT、Gemini](docs/images/eggs.webp)
 
-## 更新
+## 自定义
 
-- **下载安装的**：有新版本时桌宠会在气泡里提醒你，右键菜单顶上会出现「⬆️ 有新版本」，点它打开下载页。下载新的 `CrossPet.zip`，替换「应用程序」里的旧 App 即可。
-  已经接入的 AI（钩子脚本、DeepSeek 插件、Claude mod）会在新版第一次启动时自动更新，不用重新接入。
-  也可以随时在右键菜单里点「检查更新」。
-- **从源码安装的**：
-  ```bash
-  cd crosspet && ./update.sh
-  ```
-  会拉取最新代码、重新编译安装，并把已接入的 AI 按新版刷新一遍。
+- **改名**：右键 →「给当前角色改名…」，留空就恢复默认。
+- **换立绘、改台词、加新角色**：看 [自定义角色](docs/自定义角色.md)。一个文件夹就是一个角色，放几张图、写个 `character.json` 就能用。
+- **用 AI 画新立绘**：[角色生图提示词](docs/prompts/角色生图提示词.md) · [彩蛋生图提示词](docs/prompts/彩蛋生图提示词.md)，配好了参考图。
 
-## 卸载
+## 隐私
 
-```bash
-./uninstall.sh
-```
+- 钩子只拿到「哪个事件、用了哪个工具」，写到本机 `/tmp/crosspet/`，不保存任何对话内容。
+- GPT 额度默认关闭。打开后只从 Codex 会话记录里提取额度那几个数字。
+- DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处。
+- CrossPet 自己只联网做一件事：每天查一次 GitHub 上有没有新版本。
 
-会撤销所有 AI 接入（只删 CrossPet 自己加的条目，改动前都会备份），并删除 App。
+## 更新与卸载
+
+- **下载安装的**：有新版本时她会在气泡里提醒你，右键菜单顶上会出现「⬆️ 有新版本」。下载新的 `CrossPet.zip` 替换旧 App 即可；已接入的钩子、插件、mod 会在新版第一次启动时自动更新。
+- **从源码装的**：`./update.sh`，拉代码、重新编译，并把已接入的 AI 按新版刷新一遍。
+- **卸载**：`./uninstall.sh`，撤销所有接入（只删 CrossPet 自己的条目）并删除 App。
+
+遇到问题先看 [常见问题](docs/常见问题.md)。
 
 ## 致谢与授权
 
-**角色形象**均为社区二创的再创作，CrossPet 只是把它们做成桌宠，所有立绘由 AI 生图工具按这些设定绘制：
+角色形象都是社区二创的再创作，CrossPet 只是把她们做成桌宠，立绘由 AI 生图工具按这些设定绘制：
 
 - **DeepSeek 娘**：原型「溟月」由 **上善无形** 创作（2025-06，CC BY-NC-SA 4.0）；深蓝女仆鲸鱼娘（社区昵称「大肥鱼」）由 B 站 **ZipZipPipe** 二创。
 - **GPT 娘（白龙）**：社区通称「御姐白龙」，出自 B 站 **ZipZipPipe**。
@@ -94,5 +113,8 @@ cd crosspet
 如果你是原作者并且对使用方式有异议，请提 Issue，我会第一时间修改或下架。
 
 **授权**
+
 - 代码：[MIT](LICENSE)
-- 角色立绘与设定（`characters/`、`docs/prompts/`、`docs/images/`）：[CC BY-NC-SA 4.0](characters/LICENSE.md)：可以转载和二创，须署名、**不得商用**、衍生作品用同样的协议。
+- 角色立绘与设定（`characters/`、`docs/prompts/`、`docs/images/`）：[CC BY-NC-SA 4.0](characters/LICENSE.md)。可以转载和二创，须署名、**不得商用**，衍生作品用同样的协议。
+
+README 里的配图由 `python3 tools/readme_images.py` 按 App 的真实布局生成。
