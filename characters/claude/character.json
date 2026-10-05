@@ -123,5 +123,8 @@
   "idleActions": [
     "clawd"
   ],
-  "correctedPose": "sorry"
+  "correctedPose": "sorry",
+  "fx": {
+    "proud": "victory"
+  }
 }

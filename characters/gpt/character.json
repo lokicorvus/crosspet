@@ -79,6 +79,7 @@
     "stroke": "#8f97a8"
   },
   "fx": {
-    "reset": "celebrate"
+    "reset": "celebrate",
+    "proud": "victory"
   }
 }

@@ -29,8 +29,10 @@ HERO = [
 ]
 ACTIONS = [
     ("claude", "reading", "我看看这里写了什么", None), ("gpt", "running", "跑一下测试。", None),
-    ("deepseek", "eat", "开饭啦！白饭最好吃～", None), ("gemini", "drawing", "画画喵～", None),
-    ("claude", "proud", "大活干完了！", None), ("gpt", "searching", "查一查。", None),
+    ("deepseek", "feast", "有钱啦！再来十碗！", None), ("gemini", "drawing", "Nano Banana，启动！", None),
+    ("claude", "proud", "大活干完了！", None), ("gpt", "reset", "reset 了。今天可以多写一点。", None),
+    ("deepseek", "compact", "塞、塞不下了！", None), ("gemini", "float", "反——重——力——喵～", None),
+    ("claude", "clawd", "Clawd 也在陪我～", None), ("gpt", "searching", "查一查。", None),
     ("deepseek", "swim", "咕噜咕噜～", None), ("gemini", "delegating", "交给分身喵", None),
 ]
 EGGS = [

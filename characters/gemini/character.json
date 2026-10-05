@@ -90,5 +90,8 @@
   },
   "idleActions": [
     "float"
-  ]
+  ],
+  "fx": {
+    "proud": "victory"
+  }
 }
