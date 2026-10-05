@@ -41,24 +41,35 @@ Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的�
 
 **要求**：macOS 13 及以上，Apple 芯片和 Intel 都行。
 
-### 1. 装 App
+### 方式一：一条命令（推荐）
 
-到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
+打开「终端」，粘贴这一行回车：
 
-第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
+```bash
+curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash
+```
 
-- **macOS 15 及以上**：双击 CrossPet，弹出「无法验证」时点「完成」；打开「系统设置 → 隐私与安全性」，拉到最下面，在「已阻止使用 CrossPet」旁边点「仍要打开」，输入开机密码，再点「打开」。
-- **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
-- **不想点来点去**：在终端运行一条命令，所有版本通用：
-  ```bash
-  xattr -dr com.apple.quarantine /Applications/CrossPet.app
-  ```
+它会下载最新版装进「应用程序」并打开，再挨个问你要接入哪些 AI（回答 `y` 或直接回车跳过）。不用 git，不用编译，**第一次打开也不用去系统设置里放行**。
 
-桌宠会出现在屏幕右下角。现在切到 Claude、ChatGPT、DeepSeek Harness 或 Antigravity，她就会变身。
+> 为什么不用放行：macOS 只拦带「从网上下载」标记的文件。浏览器下载的会带这个标记，终端里用 `curl` 下载的不会。脚本内容就在仓库里的 [get.sh](get.sh)，可以先看一眼再运行。
 
-### 2. 接上 AI，让她跟着干活
+以后**更新**：再运行一次同一行命令。**卸载**：
 
-接入要用仓库里的脚本，它会挨个问你要接哪些 AI：
+```bash
+curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash -s -- uninstall
+```
+
+### 方式二：手动下载
+
+1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
+2. 第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
+   - **macOS 15 及以上**：双击 CrossPet，弹出「无法验证」时点「完成」；打开「系统设置 → 隐私与安全性」，拉到最下面，在「已阻止使用 CrossPet」旁边点「仍要打开」，输入开机密码，再点「打开」。
+   - **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
+3. 这样装好后，切到各个 AI 的 App 时她会换形象；想让她**跟着 AI 干活**，还要接入 AI：运行一次方式一的命令（已经装好的 App 会直接替换成同一版），或者用方式三。
+
+### 方式三：从源码安装
+
+需要苹果命令行工具（没有的话运行 `xcode-select --install`）：
 
 ```bash
 git clone https://github.com/lokicorvus/crosspet.git
@@ -66,18 +77,19 @@ cd crosspet
 ./install.sh
 ```
 
-`install.sh` 会从源码编译一份 App 并装好，所以第 1 步也可以跳过，直接从这里开始（需要先装苹果命令行工具：`xcode-select --install`）。
-
-只想接某一个也行：
+会编译、装到 `~/Applications`，然后挨个问你要接哪些 AI。只想接某一个也行：
 
 ```bash
 python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini
 python3 tools/integrate.py status            # 看看现在接了哪些
 ```
 
-脚本只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
+### 接入 AI 改了什么
+
+不管用哪种方式，接入都只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份，撤销后恢复原样。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
 
 > **Codex 用户注意**：新加的钩子要在 Codex 里输入 `/hooks` 亲自「信任」一次才会运行。
+> **接入需要 python3**：macOS 自带。如果提示要安装「命令行开发者工具」，点安装就行。
 
 ## 和她互动
 
@@ -109,9 +121,10 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 ## 更新与卸载
 
-- **下载安装的**：有新版本时她会在气泡里提醒你，右键菜单顶上会出现「⬆️ 有新版本」。下载新的 `CrossPet.zip` 替换旧 App 即可；已接入的钩子、插件、mod 会在新版第一次启动时自动更新。
-- **从源码装的**：`./update.sh`，拉代码、重新编译，并把已接入的 AI 按新版刷新一遍。
-- **卸载**：`./uninstall.sh`，撤销所有接入（只删 CrossPet 自己的条目）并删除 App。
+- 有新版本时她会在气泡里提醒你，右键菜单顶上会出现「⬆️ 有新版本」。
+- **一条命令装的**：再运行一次安装命令就是更新；卸载命令见上面「方式一」。
+- **手动下载的**：下载新的 `CrossPet.zip` 替换旧 App 即可；已接入的钩子、插件、mod 会在新版第一次启动时自动更新。
+- **从源码装的**：`./update.sh` 更新，`./uninstall.sh` 卸载。
 
 遇到问题先看 [常见问题](docs/常见问题.md)。各版本改了什么见 [更新记录](CHANGELOG.md)。
 
