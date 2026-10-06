@@ -141,11 +141,20 @@ def remove_hooks(target: Path) -> None:
         print(f"  已从 {target} 移除 CrossPet 钩子")
 
 
-def found(path: Path, app: str) -> bool:
-    """接入前先确认这个 AI 装过（它的配置目录在）。没装就什么都不写，免得凭空建出配置、还显示「已接入」"""
-    if path.exists():
+def found(path: Path, app: str, ours: tuple = (), quiet: bool = False) -> bool:
+    """接入前先确认这个 AI 装过：它的配置目录在，而且里面有它自己的东西。
+    ours 是 CrossPet 自己会往这个目录里写的文件 / 文件夹（连同备份），只有这些的话不算装过——
+    旧版接入工具在没装的电脑上凭空建过这些，不能因为它们还在就显示「已接入」"""
+    if not ours and path.is_dir():
+        return True  # CrossPet 从来不会建的目录：在就说明装过
+    try:
+        own = [p for p in path.iterdir() if p.name not in ours and ".bak-crosspet-" not in p.name and p.name != ".DS_Store"]
+    except OSError:
+        own = []
+    if own:
         return True
-    print(f"  没找到 {path}，请先安装并打开一次 {app} 再接入")
+    if not quiet:
+        print(f"  没找到 {app} 的配置（{path}），请先安装并打开一次 {app} 再接入")
     return False
 
 
@@ -154,11 +163,12 @@ def found(path: Path, app: str) -> bool:
 CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or HOME / ".claude")
 CLAUDE_SETTINGS = CLAUDE_HOME / "settings.json"
 CLAUDE_MOD_DIR = CLAUDE_HOME / "mods/crosspet"
+CLAUDE_OURS = ("settings.json", "mods")
 
 
 def claude_hooks(install: bool) -> None:
     if install:
-        if not found(CLAUDE_HOME, "Claude Code"):
+        if not found(CLAUDE_HOME, "Claude Code", CLAUDE_OURS):
             return
         merge_hooks(CLAUDE_SETTINGS, REPO / "integrations/claude-code/hooks.json")
         print("  → 新开的 Claude Code 会话生效（已开的会话要重开）")
@@ -169,7 +179,7 @@ def claude_hooks(install: bool) -> None:
 def claude_mod(install: bool) -> None:
     if not install and not CLAUDE_MOD_DIR.exists() and not CLAUDE_SETTINGS.exists():
         return  # 从没装过：别凭空建出一个 settings.json
-    if install and not found(CLAUDE_HOME, "Claude Code"):
+    if install and not found(CLAUDE_HOME, "Claude Code", CLAUDE_OURS):
         return
     data = load_json(CLAUDE_SETTINGS)
     env = data.setdefault("env", {})
@@ -205,7 +215,7 @@ CODEX_HOOKS = Path(os.environ.get("CODEX_HOME", str(HOME / ".codex"))) / "hooks.
 
 def codex(install: bool) -> None:
     if install:
-        if not found(CODEX_HOOKS.parent, "Codex"):
+        if not found(CODEX_HOOKS.parent, "Codex", ("hooks.json",)):
             return
         merge_hooks(CODEX_HOOKS, REPO / "integrations/codex/hooks.json")
         print("  → 下次打开 Codex 时要审查并「信任」这些钩子（CLI 里用 /hooks），之后才会生效")
@@ -294,7 +304,7 @@ GEMINI_SETTINGS = HOME / ".gemini/settings.json"
 
 def gemini(install: bool) -> None:
     if install:
-        if not found(GEMINI_SETTINGS.parent, "Gemini CLI"):
+        if not found(GEMINI_SETTINGS.parent, "Gemini CLI", ("settings.json", "config")):
             return
         merge_hooks(GEMINI_SETTINGS, REPO / "integrations/gemini/hooks.json")
         print("  → 只对 Gemini CLI 有效；Gemini 桌面 App 没有钩子接口")
@@ -311,7 +321,7 @@ def antigravity(install: bool) -> None:
     if not install and not ANTIGRAVITY_HOOKS.exists():
         return
     # Antigravity 第一次打开时会建 ~/.gemini/antigravity；只有 Gemini CLI 时没有这个目录
-    if install and not ANTIGRAVITY_HOOKS.exists() and not found(ANTIGRAVITY_HOOKS.parent.parent / "antigravity", "Antigravity"):
+    if install and not found(ANTIGRAVITY_HOOKS.parent.parent / "antigravity", "Antigravity"):
         return
     data = load_json(ANTIGRAVITY_HOOKS) if ANTIGRAVITY_HOOKS.exists() else {}
     if install:
@@ -346,14 +356,16 @@ def has_hooks(p: Path) -> bool:
 
 def installed() -> list:
     dsh = DSH_PROFILE / "cordis.patch.yml"
-    found = []
-    if has_hooks(CLAUDE_SETTINGS): found.append("claude-hooks")
-    if CLAUDE_MOD_DIR.exists(): found.append("claude-mod")
-    if has_hooks(CODEX_HOOKS): found.append("codex")
-    if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): found.append("deepseek")
-    if has_hooks(GEMINI_SETTINGS): found.append("gemini")
-    if has_antigravity(): found.append("antigravity")
-    return found
+    # 只算这个 AI 真装过的：旧版接入工具在没装的电脑上凭空建过配置，那些不算「已接入」
+    claude = found(CLAUDE_HOME, "", CLAUDE_OURS, quiet=True)
+    result = []
+    if claude and has_hooks(CLAUDE_SETTINGS): result.append("claude-hooks")
+    if claude and CLAUDE_MOD_DIR.exists(): result.append("claude-mod")
+    if has_hooks(CODEX_HOOKS) and found(CODEX_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("codex")
+    if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): result.append("deepseek")
+    if has_hooks(GEMINI_SETTINGS) and found(GEMINI_SETTINGS.parent, "", ("settings.json", "config"), quiet=True): result.append("gemini")
+    if has_antigravity() and (ANTIGRAVITY_HOOKS.parent.parent / "antigravity").is_dir(): result.append("antigravity")
+    return result
 
 
 def status() -> None:
