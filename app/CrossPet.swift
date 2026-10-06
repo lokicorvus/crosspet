@@ -377,13 +377,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
         }
         // 从最新的会话往前找：刚开的会话可能还没有额度记录
-        for (file, modified) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
-            if let q = quotaIn(file, modified: modified) { return q }
+        for (file, _) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
+            if let q = quotaIn(file) { return q }
         }
         return nil
     }
 
-    func quotaIn(_ file: URL, modified: Date) -> [String: Any]? {
+    func quotaIn(_ file: URL) -> [String: Any]? {
         guard let h = try? FileHandle(forReadingFrom: file) else { return nil }
         defer { try? h.close() }
         let size = (try? h.seekToEnd()) ?? 0
@@ -402,16 +402,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 windows.append((label, used, (w["resets_at"] as? NSNumber)?.doubleValue))
             }
             guard !windows.isEmpty else { continue }
-            // 这条记录是什么时候的：只有用 Codex 时才会有新记录（比如在别的程序里用 ChatGPT 订阅就没有），旧数字要标出来
-            let iso = ISO8601DateFormatter()
-            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let at = ((obj as? [String: Any])?["timestamp"] as? String).flatMap { iso.date(from: $0) } ?? modified
             let now = Date().timeIntervalSince1970
             let live = windows.filter { ($0.reset ?? 0) == 0 || $0.reset! > now }
             let maxUsed = live.map { $0.used }.max() ?? 0
             var marked = false
             let parts = windows.map { w -> String in
-                if let r = w.reset, r > 0, r <= now { return "\(w.label) 已重置" }  // 记录之后过了重置时间，旧的用量不作数了
+                // 记录之后过了重置时间、又没有新记录（没再用 Codex）：这个窗口现在是满的
+                if let r = w.reset, r > 0, r <= now { return "\(w.label) 剩余 100%" }
                 var piece = "\(w.label) 剩余 \(max(0, 100 - Int(w.used.rounded())))%"
                 if !marked, w.used == maxUsed, let reset = w.reset {
                     marked = true
@@ -424,13 +421,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
             // windows 给桌宠比对用：某个窗口在预定重置时间前突然恢复一大截 → 播 reset 动画
             let raw = windows.map { w -> [String: Any] in ["label": w.label, "used": w.used, "reset": w.reset ?? 0] }
-            var text = parts.joined(separator: " ｜ ")
-            if Date().timeIntervalSince(at) > 1800 {
-                let fmt = DateFormatter()
-                fmt.dateFormat = Calendar.current.isDateInToday(at) ? "HH:mm" : "M/d HH:mm"
-                text += " · \(fmt.string(from: at)) 的数据"
-            }
-            return ["text": text, "low": maxUsed >= 90, "windows": raw]
+            return ["text": parts.joined(separator: " ｜ "), "low": maxUsed >= 90, "windows": raw]
         }
         return nil
     }
