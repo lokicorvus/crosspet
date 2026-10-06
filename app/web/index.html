@@ -169,16 +169,19 @@ setInterval(() => {
   }
 }, 2000)
 
-function setFx(p) {
+// instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入
+function setFx(p, instant) {
   const fx = $('fx')
-  fx.classList.add('hide')
-  setTimeout(() => {
+  const render = () => {
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
     const named = char()?.fx?.[p]
     const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
-  }, 220)
+  }
+  if (instant) { render(); return }
+  fx.classList.add('hide')
+  setTimeout(render, 220)
 }
 function setPose(p, instant) {
   if (p === pose) return
@@ -226,6 +229,7 @@ function applyLook(c) {
 
 // 换到某个状态：遵守最短停留；短暂状态过后回到常态（闲着 / 额度紧张时累了）
 function show(p, urgent) {
+  if (updatingNow) return   // 正在更新：一直举着礼物，AI 的工作事件先不打断
   const wait = shownAt + DWELL - Date.now()
   clearTimeout(pending)
   if (!urgent && wait > 0) { pending = setTimeout(() => show(p, true), wait); return }
@@ -280,6 +284,26 @@ function setCharacter(id, quiet) {
     const reveal = () => stage.classList.remove('swap')
     if (active.complete && spare.complete) setTimeout(reveal, 60); else setTimeout(reveal, 160)
   }, 330)
+}
+
+// 正在下载 / 安装新版本：一直举着礼物，右上角小窗按真实进度走，气泡显示百分比。由宿主调用；
+// 装好后新版会自己重新打开，所以不用收尾；更新失败时宿主调 endUpdate() 回到常态
+let updatingNow = false
+function setUpdateProgress(pct, line) {
+  updatingNow = true
+  if (egg) endEgg()
+  clearTimeout(pending); clearTimeout(revertTimer)
+  const shown = window.CrossFx?.updateProgress
+  if (window.CrossFx) CrossFx.updateProgress = pct
+  if (pose !== 'update') setPose('update', true)
+  else if (shown !== pct) setFx('update', true)
+  say(line)
+}
+function endUpdate() {
+  if (!updatingNow) return
+  updatingNow = false
+  if (window.CrossFx) CrossFx.updateProgress = null
+  setPose(restPose()); say('')
 }
 
 // 有新版本：演几秒「收到礼物」（没画 update 立绘时用 happy），气泡一直留着，等下次说别的话再换掉
@@ -400,7 +424,7 @@ function handleClick(kind) {
 // ---- 开发者控制台用（右键「开发者控制台…」）----
 // devShow：演某个角色的某个姿态（可指定某一张图）并保持住，闲置动作、睡觉、自动彩蛋、换图都先停下
 let devHoldUntil = 0, devActive = false
-const devHeld = () => Date.now() < devHoldUntil
+const devHeld = () => Date.now() < devHoldUntil || updatingNow
 function devShow(id, p, line, frameUrl, holdMs = 10 * 60 * 1000) {
   devActive = true
   if (egg) { clearEggTimers(); egg = null; charId = null }

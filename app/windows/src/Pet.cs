@@ -641,7 +641,7 @@ namespace CrossPet
             updating = true;
             try
             {
-                Js($"say({Q("正在下载新版本…")})");
+                Js($"setUpdateProgress(0, {Q("正在下载新版本…")})");
                 var dir = Path.Combine(Path.GetTempPath(), "CrossPet-update", tag);
                 if (Directory.Exists(dir)) Directory.Delete(dir, true);
                 Directory.CreateDirectory(dir);
@@ -660,11 +660,11 @@ namespace CrossPet
                             await f.WriteAsync(buf, 0, read);
                             got += read;
                             var pct = total > 0 ? (int)(got * 100 / total) : -1;
-                            if (pct >= 0 && pct != shown && (pct - shown >= 2 || pct == 100)) { shown = pct; Js($"say({Q($"正在下载新版本 {pct}%…")})"); }
+                            if (pct >= 0 && pct != shown && (pct - shown >= 2 || pct == 100)) { shown = pct; Js($"setUpdateProgress({pct}, {Q(pct >= 100 ? "下载好了，正在安装…" : $"正在下载新版本 {pct}%…")})"); }
                         }
                     }
                 }
-                Js($"say({Q("下载好了，正在安装…")})");
+                Js($"setUpdateProgress(100, {Q("下载好了，正在安装…")})");
                 await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zip, dir));
                 var root = Path.Combine(dir, "CrossPet");
                 var script = Path.Combine(root, "install.ps1");
@@ -680,6 +680,7 @@ namespace CrossPet
             {
                 updating = false;
                 Store.Log("一键更新失败: " + e);
+                Js("endUpdate()");
                 if (MessageBox.Show("自动更新没成功：" + e.Message + "\n\n要打开下载页手动更新吗？", "CrossPet 更新",
                         MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes) Open(page);
             }

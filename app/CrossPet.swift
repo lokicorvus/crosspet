@@ -178,7 +178,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         updating = true
-        js("say(\(quote("正在下载新版本…")))")
+        js("setUpdateProgress(0, \(quote("正在下载新版本…")))")
         let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CrossPet-update.log")
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let p = Process()
@@ -200,7 +200,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let digits = text[..<end].reversed().prefix { $0.isNumber || $0 == "." }
             guard let value = Double(String(digits.reversed())), case let p = Int(value), p != lastShown else { return }
             lastShown = p
-            self.js("say(\(self.quote(p >= 100 ? "下载好了，正在安装…" : "正在下载新版本 \(p)%…")))")
+            self.js("setUpdateProgress(\(p), \(self.quote(p >= 100 ? "下载好了，正在安装…" : "正在下载新版本 \(p)%…")))")
         }
         p.environment = env
         if let log = try? FileHandle(forWritingTo: logURL) { p.standardOutput = log; p.standardError = log }
@@ -211,6 +211,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 guard let self else { return }
                 self.updating = false
                 guard proc.terminationStatus != 0 else { return }
+                self.js("endUpdate()")
                 let fail = NSAlert()
                 fail.messageText = "自动更新没成功"
                 fail.informativeText = "详情在 ~/Library/Logs/CrossPet-update.log。要打开下载页手动更新吗？"
@@ -220,7 +221,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if fail.runModal() == .alertFirstButtonReturn { self.openRelease() }
             }
         }
-        do { try p.run() } catch { updating = false; openRelease() }
+        do { try p.run() } catch { progressTimer.invalidate(); updating = false; js("endUpdate()"); openRelease() }
     }
 
     @objc func openRelease() { if let url = latestRelease?.url { NSWorkspace.shared.open(url) } }

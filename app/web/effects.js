@@ -232,18 +232,25 @@ const choiceCard = (() => {
 })()
 
 // 有新版本：小窗口里一个往上跳的箭头、「NEW」标签和一条下载进度条，旁边几颗金色闪光
-const updateCard = (() => {
+// progress：正在下载 / 安装时的真实进度（0–100），这时标签显示百分比、进度条停在真实位置；
+// 到 100 是「正在安装」，进度条满格一闪一闪。没有 progress 时是发现新版本时的循环动画
+const updateCard = (progress = null) => {
   const x = 432, y = 30, D = '2.4s'
   const arrow = `<g><circle cx="${x + 40}" cy="${y + 60}" r="20" fill="#ffe9a8" stroke="#e0a526" stroke-width="2.5"/>` +
     `<path d="M${x + 40} ${y + 70} v-20 m-9 9 l9 -9 l9 9" fill="none" stroke="#c07f0e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
     `<animateTransform attributeName="transform" type="translate" values="0 0;0 -6;0 0" dur="1.1s" ${loop}/></g>`
+  const label = progress === null ? 'NEW' : progress >= 100 ? '安装' : `${Math.round(progress)}%`
   const badge = `<rect x="${x + 70}" y="${y + 36}" width="44" height="20" rx="10" fill="#ff7a59"/>` +
-    `<text x="${x + 92}" y="${y + 50.5}" text-anchor="middle" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="700" fill="#fff">NEW</text>`
-  const bar = `<rect x="${x + 70}" y="${y + 66}" width="44" height="8" rx="4" fill="#efe6d4"/>` +
-    `<rect x="${x + 70}" y="${y + 66}" width="0" height="8" rx="4" fill="#e0a526"><animate attributeName="width" values="0;44;44" keyTimes="0;0.8;1" dur="${D}" ${loop}/></rect>`
+    `<text x="${x + 92}" y="${y + 50.5}" text-anchor="middle" font-family="-apple-system, 'PingFang SC', 'Segoe UI', sans-serif" font-size="12" font-weight="700" fill="#fff">${label}</text>`
+  const fill = progress === null
+    ? `<rect x="${x + 70}" y="${y + 66}" width="0" height="8" rx="4" fill="#e0a526"><animate attributeName="width" values="0;44;44" keyTimes="0;0.8;1" dur="${D}" ${loop}/></rect>`
+    : progress >= 100
+      ? `<rect x="${x + 70}" y="${y + 66}" width="44" height="8" rx="4" fill="#e0a526"><animate attributeName="opacity" values="1;0.35;1" dur="1s" ${loop}/></rect>`
+      : `<rect x="${x + 70}" y="${y + 66}" width="${(44 * Math.max(0, progress) / 100).toFixed(1)}" height="8" rx="4" fill="#e0a526"/>`
+  const bar = `<rect x="${x + 70}" y="${y + 66}" width="44" height="8" rx="4" fill="#efe6d4"/>` + fill
   return `<g>${winFrame(x, y, 126, 100, false, '#fff6dc')}${arrow}${badge}${bar}${floatY('2.6s')}</g>` +
     star(80, 190, 0.9, '0.6s', '#ffd54a') + star(548, 360, 0.8, '0.2s', '#ffd54a') + star(60, 320, 0.7, '1s', '#ffd54a') + star(530, 220, 0.6, '0.9s')
-})()
+}
 
 // 读文件：代码查看器，一条高亮扫描线逐行往下扫
 const viewerCard = (() => {
@@ -380,7 +387,7 @@ const surroundings = (p      )         => {
     case 'idle': return star(80, 180, 0.6, '0s', '#ffc58a', '3s') + star(500, 260, 0.5, '1.5s', '#ffc58a', '3s')
     case 'listening': return chatCard
     case 'asking': return choiceCard
-    case 'update': return updateCard
+    case 'update': return updateCard(window.CrossFx?.updateProgress ?? null)
     case 'thinking': return thoughtCloud
     case 'reading': return viewerCard + floatingGlyphs
     case 'writing': return editorCard
