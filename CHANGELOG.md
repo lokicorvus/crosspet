@@ -22,6 +22,7 @@
 
 **修复**
 - macOS 安装 / 更新命令：已经接入过 AI 时，在第 3 步报 `unbound variable` 退出（系统自带的 bash 3.2 把紧跟在变量后的中文当成了变量名；感谢 @SkywingJam 报告，#3。这个修复已经先上线）
+- 接入 AI 时先确认这个 AI 装过：没装 Claude Code / Codex / Gemini CLI / Antigravity 时提示「没找到」，不再凭空建出配置文件、显示「已接入」
 - Claude Code 增强版 mod：「等你回答」只在真的弹出授权框时出现。之前在自动模式下，她每跑一条命令都会举着选项卡
 - Windows：`windows-apps.json` 里把某个程序的值留空，表示切到它时不换角色（写进了说明）
 

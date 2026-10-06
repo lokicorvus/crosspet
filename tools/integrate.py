@@ -141,6 +141,14 @@ def remove_hooks(target: Path) -> None:
         print(f"  已从 {target} 移除 CrossPet 钩子")
 
 
+def found(path: Path, app: str) -> bool:
+    """接入前先确认这个 AI 装过（它的配置目录在）。没装就什么都不写，免得凭空建出配置、还显示「已接入」"""
+    if path.exists():
+        return True
+    print(f"  没找到 {path}，请先安装并打开一次 {app} 再接入")
+    return False
+
+
 # ---- Claude Code ----
 # 各 AI 的配置目录都可以用环境变量挪走：CLAUDE_CONFIG_DIR、CODEX_HOME、DSH_HOME，没设就用用户目录下的默认位置
 CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or HOME / ".claude")
@@ -150,6 +158,8 @@ CLAUDE_MOD_DIR = CLAUDE_HOME / "mods/crosspet"
 
 def claude_hooks(install: bool) -> None:
     if install:
+        if not found(CLAUDE_HOME, "Claude Code"):
+            return
         merge_hooks(CLAUDE_SETTINGS, REPO / "integrations/claude-code/hooks.json")
         print("  → 新开的 Claude Code 会话生效（已开的会话要重开）")
     else:
@@ -159,6 +169,8 @@ def claude_hooks(install: bool) -> None:
 def claude_mod(install: bool) -> None:
     if not install and not CLAUDE_MOD_DIR.exists() and not CLAUDE_SETTINGS.exists():
         return  # 从没装过：别凭空建出一个 settings.json
+    if install and not found(CLAUDE_HOME, "Claude Code"):
+        return
     data = load_json(CLAUDE_SETTINGS)
     env = data.setdefault("env", {})
     # 多个目录用系统的路径分隔符连接：macOS 是冒号，Windows 是分号（Windows 路径里本身就有冒号）
@@ -193,6 +205,8 @@ CODEX_HOOKS = Path(os.environ.get("CODEX_HOME", str(HOME / ".codex"))) / "hooks.
 
 def codex(install: bool) -> None:
     if install:
+        if not found(CODEX_HOOKS.parent, "Codex"):
+            return
         merge_hooks(CODEX_HOOKS, REPO / "integrations/codex/hooks.json")
         print("  → 下次打开 Codex 时要审查并「信任」这些钩子（CLI 里用 /hooks），之后才会生效")
     else:
@@ -280,6 +294,8 @@ GEMINI_SETTINGS = HOME / ".gemini/settings.json"
 
 def gemini(install: bool) -> None:
     if install:
+        if not found(GEMINI_SETTINGS.parent, "Gemini CLI"):
+            return
         merge_hooks(GEMINI_SETTINGS, REPO / "integrations/gemini/hooks.json")
         print("  → 只对 Gemini CLI 有效；Gemini 桌面 App 没有钩子接口")
     else:
@@ -293,6 +309,9 @@ ANTIGRAVITY_HOOKS = HOME / ".gemini/config/hooks.json"
 
 def antigravity(install: bool) -> None:
     if not install and not ANTIGRAVITY_HOOKS.exists():
+        return
+    # Antigravity 第一次打开时会建 ~/.gemini/antigravity；只有 Gemini CLI 时没有这个目录
+    if install and not ANTIGRAVITY_HOOKS.exists() and not found(ANTIGRAVITY_HOOKS.parent.parent / "antigravity", "Antigravity"):
         return
     data = load_json(ANTIGRAVITY_HOOKS) if ANTIGRAVITY_HOOKS.exists() else {}
     if install:
