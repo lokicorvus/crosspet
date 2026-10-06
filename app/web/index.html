@@ -18,6 +18,10 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
   transition: --aura 0.8s, opacity .8s; animation: pulse 3s ease-in-out infinite; }
 @keyframes pulse { 50% { transform: scale(1.04); } }
+/* 背景光晕：浅色背景上是柔和的氛围，深色背景上会变成一圈发亮的圆盘（像佛光）。
+   html 上的 aura-on / aura-off 由宿主按右键菜单的选择设；都没有（自动）时跟着系统深浅色，深色模式下不显示 */
+html.aura-off #aura, html.aura-off .aura-rings { display: none; }
+@media (prefers-color-scheme: dark) { html:not(.aura-on) #aura, html:not(.aura-on) .aura-rings { display: none; } }
 #shadow { position: absolute; left: 50%; bottom: 7px; width: 110px; height: 10px; margin-left: -55px;
   border-radius: 50%; background: rgba(0,0,0,.13); }
 #body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; }
@@ -185,6 +189,12 @@ function setPose(p, instant) {
   document.documentElement.style.setProperty('--aura', aura[0])
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
   setFx(p)
+}
+// 背景光晕：'auto'（跟着系统深浅色）/ 'on' / 'off'，由宿主调用
+function setAuraMode(mode) {
+  const c = document.documentElement.classList
+  c.toggle('aura-on', mode === 'on')
+  c.toggle('aura-off', mode === 'off')
 }
 function say(line) {
   const b = $('bubble')

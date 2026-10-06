@@ -124,7 +124,7 @@ namespace CrossPet
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true)");
+                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)})");
                     ready = true;
                     stamps.Clear();
                     Poll();
@@ -348,6 +348,13 @@ namespace CrossPet
             foreach (var (id, name) in Characters()) { var cid = id; menu.Items.Add(Item("换成 " + name, () => SwitchTo(cid), cid == current)); }
             menu.Items.Add(Item("给当前角色改名…", Rename));
             Sep();
+            var aura = new Forms.ToolStripMenuItem("背景光晕");
+            foreach (var (mode, title) in new[] { ("auto", "自动（深色模式下关闭）"), ("on", "始终显示"), ("off", "关闭") })
+            {
+                var m = mode;
+                aura.DropDownItems.Add(Item(title, () => { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }, AuraMode == m));
+            }
+            menu.Items.Add(aura);
             menu.Items.Add(Item("跟随前台 AI 应用", () => Toggle("followApps"), Store.Flag("followApps")));
             menu.Items.Add(Item("跟随 AI 工作事件（含终端）", () => Toggle("followEvents"), Store.Flag("followEvents")));
             menu.Items.Add(Item("显示 GPT 额度（读取 Codex 会话记录）", () =>
@@ -380,6 +387,9 @@ namespace CrossPet
             Sep();
             menu.Items.Add(Item("退出 CrossPet", Quit));
         }
+
+        /// <summary>背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off</summary>
+        static string AuraMode => Store.Settings.TryGetValue("auraMode", out var v) && v is string s && (s == "on" || s == "off") ? s : "auto";
 
         static void Toggle(string key) { Store.Settings[key] = !Store.Flag(key); Store.SaveSettings(); }
         static void Open(string target) { try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch (Exception e) { Store.Log("打开失败: " + e.Message); } }

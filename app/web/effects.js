@@ -62,7 +62,7 @@ const AURA                                 = {
 const aura = (p      ) => {
   const [c, o] = AURA[p]
   const rings = [250, 215, 180, 145, 110].map(r => `<circle cx="${CW / 2}" cy="${AY + 210}" r="${r}" fill="${c}" fill-opacity="${(o * 0.16).toFixed(3)}"/>`).join('')
-  return `<g>${rings}<animate attributeName="opacity" values="0.7;1;0.7" dur="3s" ${loop}/></g>`
+  return `<g class="aura-rings">${rings}<animate attributeName="opacity" values="0.7;1;0.7" dur="3s" ${loop}/></g>`
 }
 
 // ---- 小部件（画布坐标） ----

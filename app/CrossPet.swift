@@ -244,6 +244,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         ready = true
         loadCharacters()
+        js("setAuraMode(\(quote(auraMode)))")
         stamps = [:]
         pollStates()
         refreshGPTQuota()
@@ -578,6 +579,17 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         gpt.state = defaults.bool(forKey: "gptQuota") ? .on : .off
         let agy = add(menu, "显示 Gemini 额度（询问本机 Antigravity）", #selector(toggleAntigravityQuota))
         agy.state = defaults.bool(forKey: "agyQuota") ? .on : .off
+        let auraItem = NSMenuItem(title: "背景光晕", action: nil, keyEquivalent: "")
+        let auraMenu = NSMenu()
+        for (mode, title) in [("auto", "自动（深色模式下关闭）"), ("on", "始终显示"), ("off", "关闭")] {
+            let item = NSMenuItem(title: title, action: #selector(setAura(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode
+            item.state = auraMode == mode ? .on : .off
+            auraMenu.addItem(item)
+        }
+        auraItem.submenu = auraMenu
+        menu.addItem(auraItem)
         let login = add(menu, "登录时自动启动", #selector(toggleLogin))
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         add(menu, "打开角色文件夹", #selector(openCharacters))
@@ -631,6 +643,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let on = !defaults.bool(forKey: "agyQuota")
         defaults.set(on, forKey: "agyQuota")
         if on { refreshAntigravityQuota() } else { js("setQuota('gemini', null)") }
+    }
+
+    /// 背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off
+    var auraMode: String { defaults.string(forKey: "auraMode") ?? "auto" }
+    @objc func setAura(_ sender: NSMenuItem) {
+        guard let mode = sender.representedObject as? String else { return }
+        defaults.set(mode, forKey: "auraMode")
+        js("setAuraMode(\(quote(mode)))")
     }
 
     @objc func toggleGPTQuota() {
