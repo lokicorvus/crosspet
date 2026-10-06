@@ -155,7 +155,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }.resume()
     }
 
-    // 一键更新：在后台跑一遍官方安装命令（get.sh：下载最新的 CrossPet.zip → 替换 App → 按新版刷新已接入的 AI → 重新打开），
+    // 一键更新：在后台跑一遍官方安装命令（get.sh：下载最新的 macOS 安装包 → 替换 App → 按新版刷新已接入的 AI → 重新打开），
     // 和用户自己在终端里运行那条命令完全一样，只是不再逐个问要接入哪些 AI。只在装在默认位置（应用程序文件夹）时提供
     var updating = false
     var canSelfUpdate: Bool {

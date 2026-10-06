@@ -4,7 +4,7 @@
 #   安装或更新：curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash
 #   卸载：      curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash -s -- uninstall
 #
-# 做的事：从 GitHub Releases 下载最新的 CrossPet.zip → 装进「应用程序」→ 打开 → 逐个问你要接入哪些 AI。
+# 做的事：从 GitHub Releases 下载最新的 macOS 安装包（CrossPet-macOS.zip，1.2.1 及以前叫 CrossPet.zip）→ 装进「应用程序」→ 打开 → 逐个问你要接入哪些 AI。
 # 为什么不用放行：macOS 只拦带「从网上下载」标记的文件，浏览器下载的会带，curl 下载的不会。
 # 接入 AI 用的是同一版本的源码里的 tools/integrate.py（下载到临时文件夹，用完就删），只添加 CrossPet 自己的条目，改动前都会备份。
 #
@@ -76,7 +76,9 @@ bold "1/3 下载最新版"
 TAG=$(latest_tag)
 [ -n "$TAG" ] || die "查不到最新版本，检查一下网络。"
 echo "最新版本：$TAG"
-curl -fL --progress-bar -o "$TMP/CrossPet.zip" "https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet.zip"
+# 1.2.2 起 macOS 包叫 CrossPet-macOS.zip（和 CrossPet-Windows.zip 区分开）；找不到就是旧版本，用原来的名字
+curl -fL --progress-bar -o "$TMP/CrossPet.zip" "https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet-macOS.zip" 2>/dev/null ||
+  curl -fL --progress-bar -o "$TMP/CrossPet.zip" "https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet.zip"
 ditto -x -k "$TMP/CrossPet.zip" "$TMP/app"
 [ -d "$TMP/app/CrossPet.app" ] || die "下载的安装包不完整，再试一次。"
 

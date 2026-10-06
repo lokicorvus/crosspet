@@ -1,7 +1,7 @@
 #!/bin/sh
 # 编译 CrossPet.app（Apple 芯片 + Intel 通用版）到 build/CrossPet.app
 # 用法：app/build.sh           只编译
-#       app/build.sh --zip     编译后再打一个发布用的 build/CrossPet.zip
+#       app/build.sh --zip     编译后再打一个发布用的 build/CrossPet-macOS.zip
 set -e
 cd "$(dirname "$0")/.."
 ROOT=$(pwd)
@@ -58,6 +58,6 @@ codesign --force --deep -s - "$APP"
 echo "已编译：$APP"
 
 if [ "$1" = "--zip" ]; then
-  (cd build && rm -f CrossPet.zip && ditto -c -k --keepParent CrossPet.app CrossPet.zip)
-  echo "发布包：$ROOT/build/CrossPet.zip"
+  (cd build && rm -f CrossPet-macOS.zip && ditto -c -k --keepParent CrossPet.app CrossPet-macOS.zip)
+  echo "发布包：$ROOT/build/CrossPet-macOS.zip"
 fi

@@ -64,7 +64,7 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
 
 #### 方式二：手动下载
 
-1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
+1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-macOS.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
 2. 第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
    - **macOS 15 及以上**：双击 CrossPet，弹出「无法验证」时点「完成」；打开「系统设置 → 隐私与安全性」，拉到最下面，在「已阻止使用 CrossPet」旁边点「仍要打开」，输入开机密码，再点「打开」。
    - **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
@@ -141,7 +141,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 - **一键更新（1.2.1 起）**：有新版本时她会举着礼物、在气泡里提醒你。右键点菜单顶上的「⬆️ 更新到 …」，会自动下载、安装、重新打开，设置、角色和已接入的 AI 都保留，接入也会按新版自动刷新。
 - **从 1.2.0 及更早的版本升级**：旧版还没有一键更新，这一次要手动更新一下：
-  - **macOS**：再运行一次「方式一」的安装命令（手动下载的，下载新的 `CrossPet.zip` 替换旧 App 也行）。
+  - **macOS**：再运行一次「方式一」的安装命令（手动下载的，下载新的 `CrossPet-macOS.zip` 替换旧 App 也行）。
   - **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `install.cmd` 覆盖安装。
 - **从源码装的**：`./update.sh` 更新，`./uninstall.sh` 卸载。
 - **卸载**：macOS 用「方式一」里的卸载命令；Windows 双击安装目录里的 `uninstall.cmd`。
