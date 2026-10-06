@@ -20,7 +20,7 @@
 
 - **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞；AI 停下来问你问题、让你选选项或者请求授权时，她会一直看着你等你回答（Claude Code、DeepSeek Harness）。
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。
-- **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。
+- **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。有新版本时，她会举着礼物来告诉你。
 - **各有性格，还懂社区梗**：
   - **Claude**：闲着会抱着 Clawd 发呆；刚出错就被你纠正时，会先来一句「You're absolutely right!」
   - **GPT**：Codex 额度在该重置之前突然满血（reset）时，平时冷静的她会难得地笑出来
@@ -36,7 +36,7 @@
 | **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额（填了 API Key 或登录了账号都行） |
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 
-Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前只认 Claude Code 和 DeepSeek Harness：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
+DeepSeek Harness 里也能用别家模型（比如 ChatGPT 订阅）：换成哪家的模型，她就换成哪家的角色。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前只认 Claude Code 和 DeepSeek Harness：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
 ## 快速开始
 
@@ -98,7 +98,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 更多说明见 [Windows 说明](docs/windows.md)。
 
 > **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
-> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台。
+> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台、一键更新。
 > **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、Windows 10、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
 
 ### 接入 AI 改了什么
@@ -114,7 +114,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 |---|---|
 | 单击 | 摸摸头 |
 | 拖动 | 换个位置（会记住） |
-| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、登录时自动启动、打开角色文件夹、检查更新……（按住 ⌥ 再右键，Windows 是按住 Shift 再右键，还有「开发者控制台」） |
+| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、背景光晕、登录时自动启动、打开角色文件夹、检查更新 / 一键更新……（按住 ⌥ 再右键，Windows 是按住 Shift 再右键，还有「开发者控制台」） |
 | 托盘图标（Windows） | 右键是同一个菜单，双击让她回到右下角 |
 
 ## 彩蛋
@@ -139,11 +139,12 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 ## 更新与卸载
 
-- 有新版本时她会在气泡里提醒你，右键菜单顶上会出现「⬆️ 有新版本」。
-- **一条命令装的**：再运行一次安装命令就是更新；卸载命令见上面「方式一」。
-- **手动下载的**：下载新的 `CrossPet.zip` 替换旧 App 即可；已接入的钩子、插件、mod 会在新版第一次启动时自动更新。
+- **一键更新（1.2.1 起）**：有新版本时她会举着礼物、在气泡里提醒你。右键点菜单顶上的「⬆️ 更新到 …」，会自动下载、安装、重新打开，设置、角色和已接入的 AI 都保留，接入也会按新版自动刷新。
+- **从 1.2.0 及更早的版本升级**：旧版还没有一键更新，这一次要手动更新一下：
+  - **macOS**：再运行一次「方式一」的安装命令（手动下载的，下载新的 `CrossPet.zip` 替换旧 App 也行）。
+  - **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `install.cmd` 覆盖安装。
 - **从源码装的**：`./update.sh` 更新，`./uninstall.sh` 卸载。
-- **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `install.cmd`，覆盖安装即可，设置和角色都保留；卸载双击 `uninstall.cmd`。
+- **卸载**：macOS 用「方式一」里的卸载命令；Windows 双击安装目录里的 `uninstall.cmd`。
 
 遇到问题先看 [常见问题](docs/常见问题.md)。各版本改了什么见 [更新记录](CHANGELOG.md)。
 
