@@ -76,9 +76,15 @@ bold "1/3 下载最新版"
 TAG=$(latest_tag)
 [ -n "$TAG" ] || die "查不到最新版本，检查一下网络。"
 echo "最新版本：$TAG"
-# 1.2.2 起 macOS 包叫 CrossPet-macOS.zip（和 CrossPet-Windows.zip 区分开）；找不到就是旧版本，用原来的名字
-curl -fL --progress-bar -o "$TMP/CrossPet.zip" "https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet-macOS.zip" 2>/dev/null ||
-  curl -fL --progress-bar -o "$TMP/CrossPet.zip" "https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet.zip"
+# 1.2.2 起 macOS 包叫 CrossPet-macOS.zip（和 CrossPet-Windows.zip 区分开）；没有就是旧版本，用原来的名字
+ASSET="https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet-macOS.zip"
+curl -fsIL -o /dev/null "$ASSET" || ASSET="https://github.com/$REPO_SLUG/releases/download/$TAG/CrossPet.zip"
+# App 里点「更新」时会给一个进度文件，下载进度写进去，桌宠读它在气泡里显示百分比
+if [ -n "${CROSSPET_PROGRESS_FILE:-}" ]; then
+  curl -fL --progress-bar -o "$TMP/CrossPet.zip" "$ASSET" 2>"$CROSSPET_PROGRESS_FILE" || die "下载失败，检查一下网络再试。"
+else
+  curl -fL --progress-bar -o "$TMP/CrossPet.zip" "$ASSET"
+fi
 ditto -x -k "$TMP/CrossPet.zip" "$TMP/app"
 [ -d "$TMP/app/CrossPet.app" ] || die "下载的安装包不完整，再试一次。"
 
@@ -91,7 +97,8 @@ elif [ -w /Applications ]; then DEST="/Applications"
 else DEST="$HOME/Applications"; fi
 mkdir -p "$DEST"
 if [ -z "${CROSSPET_APP_DIR:-}" ]; then   # 装在默认位置：先关掉正在运行的旧版
-  pkill -x CrossPet 2>/dev/null || true
+  # -a：App 里点「更新」时这个脚本是 CrossPet 启动的，pkill 默认会跳过自己的上级进程，那样旧版关不掉
+  pkill -a -x CrossPet 2>/dev/null || true
   sleep 0.5
 fi
 rm -rf "$DEST/CrossPet.app"
@@ -112,7 +119,13 @@ if ! have_python; then
   echo "不接也能用：切到各个 AI 的 App 时照样会换角色。"
   exit 0
 fi
-fetch_source "$TAG"
+# 1.2.3 起 App 里自带接入工具，直接用刚装好的那份；旧版本的包里没有，才下载同一版本的源码
+export PYTHONDONTWRITEBYTECODE=1   # 别往 App 包里写 __pycache__（会破坏签名）
+if [ -f "$DEST/CrossPet.app/Contents/Resources/tools/integrate.py" ]; then
+  SRC="$DEST/CrossPet.app/Contents/Resources"
+else
+  fetch_source "$TAG"
+fi
 INTEGRATE="$SRC/tools/integrate.py"
 already=$(cd "$SRC/tools" && python3 -c 'import integrate; print(" ".join(integrate.installed()))')
 if [ -n "$already" ]; then
