@@ -1,5 +1,7 @@
 // CrossPet × DeepSeek Harness
-// - 监听 DeepSeek 的工作事件（收到消息 / 调工具 / 子任务 / 一轮结束），写 <状态目录>/deepseek-state.json
+// - 监听 Harness 的工作事件（收到消息 / 调工具 / 子任务 / 一轮结束），写 <状态目录>/<角色>-state.json
+//   Harness 能接好几家模型：按会话实际在用的模型选角色（DeepSeek / GPT / Claude / Gemini），
+//   当前角色另外记在 deepseek-host.json，桌宠切到 Harness 窗口时按它换角色
 // - 每 10 分钟查一次余额（有 API Key 用 Key；没有就用 Harness 里登录的账号），写 <状态目录>/deepseek-quota.json
 // 状态目录默认 /tmp/crosspet，可在插件配置里改 stateDir。插件只观察，不改变 DeepSeek 的任何行为。
 import { mkdir, rename, writeFile } from "node:fs/promises";
@@ -10,7 +12,7 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
-const PLUGIN_VERSION = "1.2.0";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
+const PLUGIN_VERSION = "1.2.1";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 10 * 60 * 1000;
 
@@ -24,6 +26,21 @@ function poseForTool(name, args) {
   if (/web|fetch|browse|search|http/.test(t)) return "searching";
   if (/agent|task|subagent|delegate/.test(t)) return "delegating";
   return "running";
+}
+
+// 模型 → 角色：先看模型名，再看 provider 名（provider 是用户自己起的路由名，可能叫什么都有），都认不出算 DeepSeek。
+// 插件配置里的 characters 可以覆盖，比如 { "my-gateway": "gpt" }（键是 provider 或模型名）
+function characterFor(provider, model, custom = {}) {
+  const p = String(provider ?? ""), m = String(model ?? "");
+  if (custom[m]) return custom[m];
+  if (custom[p]) return custom[p];
+  for (const s of [m.toLowerCase(), p.toLowerCase()]) {
+    if (/deepseek/.test(s)) return "deepseek";
+    if (/claude|anthropic/.test(s)) return "claude";
+    if (/gemini|google|vertex/.test(s)) return "gemini";
+    if (/gpt|codex|openai|chatgpt|(^|[^a-z])o[1-9]/.test(s)) return "gpt";
+  }
+  return ID;
 }
 
 function failed(result) {
@@ -45,8 +62,22 @@ export function apply(ctx, config = {}) {
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, join(dir, file));
   }
+  // 当前在用的模型对应的角色：每条会话事件都看一眼会话的请求路由（和 Harness 自带插件一样用 requestContext）
+  const custom = config.characters && typeof config.characters === "object" ? config.characters : {};
+  let character = ID;
+  function noteRoute(session) {
+    let route;
+    try { route = session?.requestContext?.(); } catch { return; }
+    if (!route?.provider && !route?.model) return;
+    const next = characterFor(route.provider, route.model, custom);
+    if (next === character) return;
+    character = next;
+    writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
+      .catch(() => {});
+  }
+
   function state(pose, event, tool = "") {
-    writeJson(`${ID}-state.json`, { pose, event, tool, ts: Date.now() / 1000 }).catch((e) =>
+    writeJson(`${character}-state.json`, { pose, event, tool, ts: Date.now() / 1000 }).catch((e) =>
       ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`),
     );
   }
@@ -84,7 +115,8 @@ export function apply(ctx, config = {}) {
   });
   ctx.on("subagent/start", () => state("delegating", "SubagentStart"));
   // 压缩上下文：会话日志里的 compaction/start、compaction/end
-  ctx.on("session/event", (_session, event) => {
+  ctx.on("session/event", (session, event) => {
+    noteRoute(session);
     if (event?.type === "compaction/start") state("compact", "PreCompact");
     else if (event?.type === "compaction/end") state("thinking", "PostCompact");
   });

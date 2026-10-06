@@ -82,6 +82,9 @@ ditto -x -k "$TMP/CrossPet.zip" "$TMP/app"
 
 bold "2/3 安装"
 if [ -n "${CROSSPET_APP_DIR:-}" ]; then DEST="$CROSSPET_APP_DIR"
+# 更新时装回原来的位置：App 里点「更新」时会告诉我们它装在哪；只装在「我的应用程序」里的也留在那里
+elif [ "${CROSSPET_PREFER_DIR:-}" = "/Applications" ] || [ "${CROSSPET_PREFER_DIR:-}" = "$HOME/Applications" ]; then DEST="$CROSSPET_PREFER_DIR"
+elif [ -d "$HOME/Applications/CrossPet.app" ] && [ ! -d /Applications/CrossPet.app ]; then DEST="$HOME/Applications"
 elif [ -w /Applications ]; then DEST="/Applications"
 else DEST="$HOME/Applications"; fi
 mkdir -p "$DEST"

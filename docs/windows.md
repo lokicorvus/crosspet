@@ -25,7 +25,7 @@
 2. 双击里面的 `install.cmd`：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，然后自动打开。不需要管理员权限。
 3. 右键桌宠 →「接入 AI」，把你用的 AI 逐个「接入 / 更新」。
 
-**更新**：下载新包，解压后再双击一次 `install.cmd`，覆盖安装即可。设置、改的名字、自己加的角色都会保留。装好后建议把用到的 AI 再「接入 / 更新」一次。
+**更新**：有新版本时桌宠会说一声，右键点「⬆️ 更新到 …」就会自动下载、安装并重新打开（1.2.1 起）。也可以手动下载新包，解压后再双击一次 `install.cmd` 覆盖安装。两种方式都会保留设置、改的名字、自己加的角色，已经接入的 AI 也会自动按新版刷新。
 
 **卸载**：双击 `uninstall.cmd`。会撤销所有 AI 的接入（只删 CrossPet 自己加的条目），删除程序和开机启动；角色和设置留在 `%LOCALAPPDATA%\CrossPet`，不需要的话手动删掉。
 
@@ -33,7 +33,7 @@
 
 - 单击摸头；拖动换位置（会记住）；右键菜单；按住 **Shift** 再右键，菜单里多一项「开发者控制台」。
 - 任务栏右下角的托盘图标：右键是同一个菜单，双击让桌宠回到右下角。
-- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Antigravity 时自动换角色。按程序名识别，对照表在 `%LOCALAPPDATA%\CrossPet\windows-apps.json`，可以自己改。
+- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Antigravity 时自动换角色。按程序名识别，对照表在 `%LOCALAPPDATA%\CrossPet\windows-apps.json`，可以自己改：键是程序名（小写，带 `.exe`），值是角色 id；值留空（`""`）表示切到这个程序时不换角色。DeepSeek Harness 里用的是别家模型时，切过去会换成那个模型的角色。
 - 在终端里用 AI 时，没有对应的窗口：桌宠跟着最新一条工作事件换角色（右键可以关掉）。
 - 桌宠始终在最上层，切换窗口时会重新置顶。
 - 每天检查一次新版本，有新版时气泡提醒、右键菜单顶上出现下载入口。

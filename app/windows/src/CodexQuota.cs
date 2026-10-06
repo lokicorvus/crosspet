@@ -24,13 +24,13 @@ namespace CrossPet
             // 从最新的会话往前找：刚开的会话可能还没有额度记录
             foreach (var f in files.OrderByDescending(f => f.LastWriteTimeUtc).Take(8))
             {
-                var q = FromFile(f.FullName);
+                var q = FromFile(f.FullName, f.LastWriteTimeUtc);
                 if (q != null) return q;
             }
             return null;
         }
 
-        static Dictionary<string, object> FromFile(string path)
+        static Dictionary<string, object> FromFile(string path, DateTime fileTime)
         {
             string text;
             try
@@ -50,7 +50,8 @@ namespace CrossPet
             {
                 if (!line.Contains("\"rate_limits\"")) continue;
                 Dictionary<string, object> rl;
-                try { rl = Find(Store.Json.DeserializeObject(line)); } catch { continue; }
+                object obj;
+                try { obj = Store.Json.DeserializeObject(line); rl = Find(obj); } catch { continue; }
                 if (rl == null) continue;
                 var windows = new List<(string label, double used, double reset)>();
                 foreach (var key in new[] { "primary", "secondary" })
@@ -63,10 +64,16 @@ namespace CrossPet
                     windows.Add((label, Convert.ToDouble(u), reset));
                 }
                 if (windows.Count == 0) continue;
-                var maxUsed = windows.Max(w => w.used);
+                // 这条记录是什么时候的：只有用 Codex 时才会有新记录（比如在别的程序里用 ChatGPT 订阅就没有），旧数字要标出来
+                var at = (obj is Dictionary<string, object> top && top.TryGetValue("timestamp", out var ts) && ts is string tss &&
+                          DateTime.TryParse(tss, null, System.Globalization.DateTimeStyles.RoundtripKind, out var t) ? t.ToUniversalTime() : fileTime).ToLocalTime();
+                var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var live = windows.Where(w => w.reset == 0 || w.reset > now).ToList();
+                var maxUsed = live.Count > 0 ? live.Max(w => w.used) : 0;
                 var marked = false;
                 var parts = windows.Select(w =>
                 {
+                    if (w.reset > 0 && w.reset <= now) return $"{w.label} 已重置";   // 记录之后过了重置时间，旧的用量不作数了
                     var piece = $"{w.label} 剩余 {Math.Max(0, 100 - (int)Math.Round(w.used))}%";
                     if (!marked && w.used == maxUsed && w.reset > 0)
                     {
@@ -78,7 +85,8 @@ namespace CrossPet
                 });
                 return new Dictionary<string, object>
                 {
-                    ["text"] = string.Join(" ｜ ", parts),
+                    ["text"] = string.Join(" ｜ ", parts) + ((DateTime.Now - at).TotalMinutes > 30
+                        ? $" · {(at.Date == DateTime.Today ? at.ToString("HH:mm") : at.ToString("M/d HH:mm"))} 的数据" : ""),
                     ["low"] = maxUsed >= 90,
                     // 给桌宠比对用：某个窗口在预定重置时间前突然恢复一大截 → 播 reset 动画
                     ["windows"] = windows.Select(w => new Dictionary<string, object> { ["label"] = w.label, ["used"] = w.used, ["reset"] = w.reset }).ToList(),
