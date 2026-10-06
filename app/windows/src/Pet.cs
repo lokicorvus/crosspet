@@ -43,6 +43,8 @@ namespace CrossPet
         Native.ForegroundWatcher foreground;
         DispatcherTimer appSwitch;
         DevConsole dev;
+        SettingsWindow settings;
+        const double BaseWidth = 260, BaseHeight = 362;
 
         public Pet(CoreWebView2Environment env) { this.env = env; }
 
@@ -55,7 +57,7 @@ namespace CrossPet
             Window = new Window
             {
                 Title = "CrossPet", WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent,
-                Width = 260, Height = 362, Topmost = true, ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
+                Width = BaseWidth * Scale, Height = BaseHeight * Scale, Topmost = true, ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
                 Left = -10000, Top = -10000,   // 先放屏幕外，拿到窗口句柄后按像素摆到保存的位置
             };
             Window.SourceInitialized += (_, __) =>
@@ -119,12 +121,13 @@ namespace CrossPet
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
                 core.Settings.IsStatusBarEnabled = false;
+                web.ZoomFactor = Scale;
                 core.NavigationCompleted += async (_, a) =>
                 {
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)})");
+                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")})");
                     ready = true;
                     stamps.Clear();
                     Poll();
@@ -181,6 +184,7 @@ namespace CrossPet
             current = id;
             Store.Settings["character"] = id; Store.SaveSettings();
             Js($"setCharacter({Q(id)})");
+            settings?.Push();
         }
 
         /// <summary>读 AI 写来的状态 / 额度文件（state 目录），有变化就交给网页。和 macOS 版 pollStates 一样</summary>
@@ -345,47 +349,149 @@ namespace CrossPet
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
             Sep();
-            foreach (var (id, name) in Characters()) { var cid = id; menu.Items.Add(Item("换成 " + name, () => SwitchTo(cid), cid == current)); }
-            menu.Items.Add(Item("给当前角色改名…", Rename));
+            var switchTo = new Forms.ToolStripMenuItem("换角色");
+            foreach (var (id, name) in Characters()) { var cid = id; switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid), cid == current)); }
+            menu.Items.Add(switchTo);
             Sep();
-            var aura = new Forms.ToolStripMenuItem("背景光晕");
-            foreach (var (mode, title) in new[] { ("auto", "自动（深色模式下关闭）"), ("on", "始终显示"), ("off", "关闭") })
-            {
-                var m = mode;
-                aura.DropDownItems.Add(Item(title, () => { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }, AuraMode == m));
-            }
-            menu.Items.Add(aura);
-            menu.Items.Add(Item("跟随前台 AI 应用", () => Toggle("followApps"), Store.Flag("followApps")));
-            menu.Items.Add(Item("跟随 AI 工作事件（含终端）", () => Toggle("followEvents"), Store.Flag("followEvents")));
-            menu.Items.Add(Item("显示 GPT 额度（读取 Codex 会话记录）", () =>
-            {
-                Toggle("gptQuota");
-                if (Store.Flag("gptQuota")) RefreshQuota(); else Js("setQuota('gpt', null)");
-            }, Store.Flag("gptQuota")));
-            menu.Items.Add(Item("显示 Gemini 额度（询问本机 Antigravity）", () =>
-            {
-                Toggle("agyQuota");
-                if (Store.Flag("agyQuota")) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
-            }, Store.Flag("agyQuota")));
-            menu.Items.Add(Item("登录时自动启动", ToggleLogin, LoginEnabled));
-            var integrate = new Forms.ToolStripMenuItem("接入 AI");
-            foreach (var (target, label) in new[] { ("claude-hooks", "Claude Code（标准钩子）"), ("claude-mod", "Claude Code 增强版（多显示额度，需支持 mod 的版本）"), ("codex", "Codex"), ("deepseek", "DeepSeek Harness"), ("antigravity", "Antigravity"), ("gemini", "Gemini CLI") })
-            {
-                var sub = new Forms.ToolStripMenuItem(label);
-                var t = target;
-                sub.DropDownItems.Add(Item("接入 / 更新", () => Integrate("install", t, label)));
-                sub.DropDownItems.Add(Item("撤销接入", () => Integrate("uninstall", t, label)));
-                integrate.DropDownItems.Add(sub);
-            }
-            menu.Items.Add(integrate);
-            Sep();
-            menu.Items.Add(Item("打开角色文件夹", () => Open(Store.Characters)));
-            menu.Items.Add(Item("打开数据和状态目录", () => Open(Store.Data)));
-            menu.Items.Add(Item("回到右下角", Recenter));
+            menu.Items.Add(Item("设置…", OpenSettings));
             if (developer) menu.Items.Add(Item("开发者控制台…", OpenDev));
-            menu.Items.Add(Item($"检查更新（当前 {Store.Version}）", () => _ = CheckForUpdate(true)));
+            menu.Items.Add(Item("回到右下角", Recenter));
             Sep();
             menu.Items.Add(Item("退出 CrossPet", Quit));
+        }
+
+        // ---------------- 设置窗口（web/settings.html，和 macOS 版共用） ----------------
+        static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
+                               Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
+        static bool ShowName => !(Store.Settings.TryGetValue("showName", out var v) && v is bool b && !b);
+
+        /// <summary>改大小：窗口和网页一起按比例缩放，底边中点不动（脚下的位置不变）</summary>
+        void ApplyScale(double scale)
+        {
+            Native.GetWindowRect(hwnd, out var old);
+            Window.Width = BaseWidth * scale; Window.Height = BaseHeight * scale;
+            Window.UpdateLayout();
+            if (web != null) web.ZoomFactor = scale;
+            Native.GetWindowRect(hwnd, out var now);
+            int w = now.Right - now.Left, h = now.Bottom - now.Top;
+            var (x, y) = Clamp((old.Left + old.Right) / 2 - w / 2, old.Bottom - h, w, h);
+            Native.MoveTo(hwnd, x, y);
+            SavePosition();
+        }
+
+        void OpenSettings()
+        {
+            if (settings == null) { settings = new SettingsWindow(this, env); settings.Closed += () => settings = null; }
+            settings.Show();
+        }
+
+        List<string> integrated;   // 已接入的 AI（设置窗口打开时查一次，接入 / 撤销后再查）
+        public void RefreshIntegrated(Action done = null)
+        {
+            Task.Run(() =>
+            {
+                var r = RunIntegrate("installed").output;
+                List<string> list = null;
+                try { list = (Store.Json.DeserializeObject(r.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
+                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); settings?.Push(); done?.Invoke(); });
+            });
+        }
+
+        static readonly (string id, string label, string note)[] IntegrationTargets =
+        {
+            ("claude-hooks", "Claude Code（标准钩子）", "所有版本可用，不显示额度"),
+            ("claude-mod", "Claude Code 增强版 mod", "能显示额度，需要支持 mod 的版本"),
+            ("codex", "Codex", "接入后要在 Codex 里用 /hooks 信任一次"),
+            ("deepseek", "DeepSeek Harness", "工作状态 + 余额"),
+            ("antigravity", "Antigravity", "桌面版和命令行都有效"),
+            ("gemini", "Gemini CLI", null),
+        };
+
+        public Dictionary<string, object> SettingsState()
+        {
+            var state = new Dictionary<string, object>
+            {
+                ["version"] = Store.Version + " Windows", ["platform"] = "windows",
+                ["size"] = Scale, ["showName"] = ShowName, ["aura"] = AuraMode,
+                ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
+                ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
+                ["login"] = LoginEnabled, ["character"] = current, ["updating"] = updating,
+                ["characters"] = Characters().Select(c => new Dictionary<string, object>
+                {
+                    ["id"] = c.id, ["name"] = c.name,
+                    ["defaultName"] = Store.ReadJson(Path.Combine(Store.Characters, c.id, "character.json"))?["name"] as string ?? c.id,
+                    ["custom"] = Store.Names.TryGetValue(c.id, out var n) ? n as string ?? "" : "",
+                }).ToList(),
+                ["integrations"] = integrated == null ? null : IntegrationTargets.Select(t => new Dictionary<string, object>
+                    { ["id"] = t.id, ["label"] = t.label, ["note"] = t.note, ["installed"] = integrated.Contains(t.id) }).ToList(),
+            };
+            if (latestRelease is var (tag, _) && updateZip != null) state["update"] = tag;
+            return state;
+        }
+
+        public void HandleSettings(Dictionary<string, object> msg)
+        {
+            var cmd = msg.TryGetValue("cmd", out var c) ? c as string : null;
+            switch (cmd)
+            {
+                case "get":
+                    if (integrated == null) RefreshIntegrated();
+                    break;
+                case "set":
+                    var key = msg.TryGetValue("key", out var k) ? k as string : null;
+                    msg.TryGetValue("value", out var value);
+                    var on = value is bool b && b;
+                    switch (key)
+                    {
+                        case "size":
+                            var v = Math.Min(1.6, Math.Max(0.6, Math.Round(Convert.ToDouble(value) * 10) / 10));
+                            Store.Settings["size"] = v; Store.SaveSettings(); ApplyScale(v);
+                            break;
+                        case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
+                        case "aura":
+                            if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
+                            break;
+                        case "followApps": case "followEvents": Store.Settings[key] = on; Store.SaveSettings(); break;
+                        case "gptQuota":
+                            Store.Settings[key] = on; Store.SaveSettings();
+                            if (on) RefreshQuota(); else Js("setQuota('gpt', null)");
+                            break;
+                        case "agyQuota":
+                            Store.Settings[key] = on; Store.SaveSettings();
+                            if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
+                            break;
+                        case "login": if (on != LoginEnabled) ToggleLogin(); break;
+                        case "character": if (value is string id) SwitchTo(id); break;
+                    }
+                    break;
+                case "rename":
+                    if (msg.TryGetValue("id", out var rid) && rid is string cid && Characters().Any(x => x.id == cid))
+                    {
+                        var name = (msg.TryGetValue("name", out var nm) ? nm as string ?? "" : "").Trim();
+                        if (name == "") Store.Names.Remove(cid); else Store.Names[cid] = name;
+                        Store.SaveSettings();
+                        LoadCharacters();
+                        Js($"setName({Q(cid)}, {Q(Characters().First(x => x.id == cid).name)})");
+                        dev?.Boot();
+                    }
+                    break;
+                case "integrate":
+                    if (msg.TryGetValue("target", out var t) && t is string target && msg.TryGetValue("action", out var a) && a is string action &&
+                        IntegrationTargets.Any(x => x.id == target) && (action == "install" || action == "uninstall"))
+                        Integrate(action, target, IntegrationTargets.First(x => x.id == target).label);
+                    break;
+                case "action":
+                    switch (msg.TryGetValue("name", out var an) ? an as string : null)
+                    {
+                        case "update": _ = SelfUpdate(); break;
+                        case "checkUpdate": _ = CheckForUpdate(true); break;
+                        case "openCharacters": Open(Store.Characters); break;
+                        case "openData": Open(Store.Data); break;
+                        case "devConsole": OpenDev(); break;
+                    }
+                    break;
+            }
+            settings?.Push();
         }
 
         /// <summary>背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off</summary>
@@ -401,20 +507,7 @@ namespace CrossPet
             Application.Current.Shutdown();
         }
 
-        // ---------------- 改名 / 开发者控制台 ----------------
-        void Rename()
-        {
-            var name = Characters().FirstOrDefault(c => c.id == current).name ?? current;
-            var result = RenameDialog.Ask(name);
-            if (result == null) return;
-            if (result == "") Store.Names.Remove(current); else Store.Names[current] = result;
-            Store.SaveSettings();
-            LoadCharacters();
-            var shown = Characters().FirstOrDefault(c => c.id == current).name ?? current;
-            Js($"setName({Q(current)}, {Q(shown)})");
-            dev?.Boot();
-        }
-
+        // ---------------- 开发者控制台 ----------------
         void OpenDev()
         {
             if (dev == null) { dev = new DevConsole(this, env); dev.Closed += () => { dev = null; Paused = false; Js("devRelease()"); }; }
@@ -440,27 +533,7 @@ namespace CrossPet
             if (!File.Exists(Store.Python)) { MessageBox.Show("没找到随包的 Python，请用完整的安装包重新安装。", "CrossPet AI 接入"); return; }
             Task.Run(() =>
             {
-                var psi = new ProcessStartInfo(Store.Python, $"\"{Path.Combine(Store.Install, "tools", "integrate.py")}\" {action} {target}")
-                {
-                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                    StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = Store.Install,
-                };
-                psi.EnvironmentVariables["PYTHONUTF8"] = "1";
-                psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
-                psi.EnvironmentVariables["CROSSPET_DATA_DIR"] = Store.Data;
-                psi.EnvironmentVariables["CROSSPET_STATE_DIR"] = Store.State;
-                string output; int code;
-                try
-                {
-                    using (var p = Process.Start(psi))
-                    {
-                        var err = p.StandardError.ReadToEndAsync();
-                        output = p.StandardOutput.ReadToEnd() + err.Result;
-                        if (!p.WaitForExit(30000)) { p.Kill(); output += "\n（超时）"; }
-                        code = p.ExitCode;
-                    }
-                }
-                catch (Exception e) { output = e.Message; code = -1; }
+                var (output, code) = RunIntegrate($"{action} {target}");
                 Store.Log($"接入 {action} {target} → {code}\n{output}");
                 Window.Dispatcher.Invoke(() =>
                 {
@@ -469,8 +542,36 @@ namespace CrossPet
                     var title = code != 0 ? "没有完成" : missing ? "没有接入：没找到这个 AI 的配置" : action == "install" ? "已接入" : "已撤销";
                     MessageBox.Show($"{label}：{title}\n\n{output.Trim()}", "CrossPet AI 接入", MessageBoxButton.OK,
                         code != 0 ? MessageBoxImage.Error : missing ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                    RefreshIntegrated();
                 });
             });
+        }
+
+        /// <summary>用随包 Python 跑一次 tools/integrate.py，返回输出和退出码</summary>
+        (string output, int code) RunIntegrate(string args)
+        {
+            var psi = new ProcessStartInfo(Store.Python, $"\"{Path.Combine(Store.Install, "tools", "integrate.py")}\" {args}")
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8, WorkingDirectory = Store.Install,
+            };
+            psi.EnvironmentVariables["PYTHONUTF8"] = "1";
+            psi.EnvironmentVariables["PYTHONIOENCODING"] = "utf-8";
+            psi.EnvironmentVariables["CROSSPET_DATA_DIR"] = Store.Data;
+            psi.EnvironmentVariables["CROSSPET_STATE_DIR"] = Store.State;
+            string output; int code;
+            try
+            {
+                using (var p = Process.Start(psi))
+                {
+                    var err = p.StandardError.ReadToEndAsync();
+                    output = p.StandardOutput.ReadToEnd() + err.Result;
+                    if (!p.WaitForExit(30000)) { p.Kill(); output += "\n（超时）"; }
+                    code = p.ExitCode;
+                }
+            }
+            catch (Exception e) { output = e.Message; code = -1; }
+            return (output, code);
         }
 
         // ---------------- 检查更新：每天一次，只读 GitHub 上公开的版本号，不发送任何数据 ----------------
@@ -497,6 +598,7 @@ namespace CrossPet
                                 asset.TryGetValue("browser_download_url", out var d) && d is string dl &&
                                 dl.StartsWith($"https://github.com/{Repo}/releases/download/{tag}/")) updateZip = dl;
                     if (first) Js($"notifyUpdate({Q(tag)})");
+                    settings?.Push();
                     if (manual) Open(url);
                 }
                 else if (manual) MessageBox.Show($"已经是最新版本（{Store.Version}）。", "CrossPet");

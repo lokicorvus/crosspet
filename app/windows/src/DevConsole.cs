@@ -77,25 +77,41 @@ namespace CrossPet
         }
     }
 
-    /// <summary>「给当前角色改名…」：留空恢复默认。返回 null 表示取消</summary>
-    static class RenameDialog
+    /// <summary>
+    /// 设置窗口（右键「设置…」）：加载和 macOS 共用的 app/web/settings.html，
+    /// 页面通过 chrome.webview.postMessage 发 {cmd, ...}，Pet.HandleSettings 改完设置后用 Push 把最新状态推回页面
+    /// </summary>
+    sealed class SettingsWindow
     {
-        public static string Ask(string current)
+        readonly Pet pet;
+        readonly Window window;
+        readonly WebView2 web;
+        public event Action Closed;
+
+        public SettingsWindow(Pet pet, CoreWebView2Environment env)
         {
-            var box = new TextBox { Text = current, Margin = new Thickness(0, 8, 0, 12), MaxLength = 40 };
-            var ok = new Button { Content = "确定", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
-            var cancel = new Button { Content = "取消", Width = 80, IsCancel = true };
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            buttons.Children.Add(ok); buttons.Children.Add(cancel);
-            var panel = new StackPanel { Margin = new Thickness(16) };
-            panel.Children.Add(new TextBlock { Text = "给当前角色起个名字（留空恢复默认）：" });
-            panel.Children.Add(box);
-            panel.Children.Add(buttons);
-            var w = new Window { Title = "CrossPet 改名", Content = panel, SizeToContent = SizeToContent.WidthAndHeight, MinWidth = 340,
-                ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
-            ok.Click += (_, __) => w.DialogResult = true;
-            w.Loaded += (_, __) => { box.Focus(); box.SelectAll(); };
-            return w.ShowDialog() == true ? box.Text.Trim() : null;
+            this.pet = pet;
+            web = new WebView2();
+            window = new Window { Title = "CrossPet 设置", Width = 540, Height = 720, Content = web, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            window.Closed += (_, __) => Closed?.Invoke();
+            window.Loaded += async (_, __) =>
+            {
+                await web.EnsureCoreWebView2Async(env);
+                Pet.Map(web.CoreWebView2);
+                web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                web.CoreWebView2.WebMessageReceived += (_, e) =>
+                {
+                    if (Store.Json.DeserializeObject(e.WebMessageAsJson) is Dictionary<string, object> msg)
+                        try { pet.HandleSettings(msg); } catch (Exception ex) { Store.Log("设置出错: " + ex); }
+                };
+                web.CoreWebView2.Navigate($"https://{Store.AppHost}/settings.html");
+            };
+        }
+
+        public void Show() { window.Show(); window.Activate(); }
+        public void Push()
+        {
+            try { web.CoreWebView2?.ExecuteScriptAsync($"setState({Store.Json.Serialize(pet.SettingsState())})"); } catch { }
         }
     }
 }

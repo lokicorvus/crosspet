@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrossPet 设置</title>
+<style>
+/* 和开发者控制台同一套配色；跟着系统深浅色 */
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); }
+body { font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif; color: var(--ink); padding: 14px 16px 20px; }
+h1 { font-size: 15px; margin: 0 0 2px; }
+.sub { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+.card h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 0; padding: 8px 14px 4px; letter-spacing: .04em; }
+.item { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-top: 1px solid var(--line); min-height: 42px; }
+.card h2 + .item { border-top: none; }
+.item .label { flex: 1; min-width: 0; }
+.item .label small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.item .ctl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+button { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 7px; padding: 4px 11px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], select { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+input[type=text] { width: 150px; }
+input[type=range] { width: 150px; accent-color: var(--accent); }
+.val { width: 40px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 开关 */
+.switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; border-radius: 11px; background: var(--line); transition: background .15s; cursor: pointer; }
+.switch span::after { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+/* 三选一 */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: none; border-radius: 0; padding: 3px 10px; background: var(--field); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { background: var(--accent); color: #fff; }
+.tag { font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--hover); color: var(--muted); white-space: nowrap; }
+.tag.ok { color: var(--ok); }
+.hidden { display: none !important; }
+#toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
+#toast.show { opacity: .92; }
+</style></head>
+<body>
+<h1>CrossPet 设置</h1>
+<div class="sub" id="version"></div>
+
+<div class="card hidden" id="updateCard">
+  <div class="item"><div class="label"><b id="updateText"></b><small>自动下载、安装并重新打开，设置、角色和 AI 接入都保留。</small></div>
+    <div class="ctl"><button class="primary" data-action="update">更新</button></div></div>
+</div>
+
+<div class="card">
+  <h2>外观</h2>
+  <div class="item"><div class="label">大小</div>
+    <div class="ctl"><input type="range" id="size" min="0.6" max="1.6" step="0.1"><span class="val" id="sizeVal"></span><button data-reset-size>还原</button></div></div>
+  <div class="item"><div class="label">显示名字<small>名牌下面的额度不受影响</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="showName"><span></span></label></div></div>
+  <div class="item"><div class="label">背景光晕<small>深色背景上会变成一圈亮光，「自动」时深色模式下不显示</small></div>
+    <div class="ctl"><div class="seg" id="aura"><button data-v="auto">自动</button><button data-v="on">始终显示</button><button data-v="off">关闭</button></div></div></div>
+</div>
+
+<div class="card">
+  <h2>角色</h2>
+  <div class="item"><div class="label">当前角色</div>
+    <div class="ctl"><select id="character"></select></div></div>
+  <div class="item"><div class="label">名字<small>留空恢复默认</small></div>
+    <div class="ctl"><input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div></div>
+  <div class="item"><div class="label">跟随前台 AI 应用<small>切到哪个 AI 的 App，就换成哪个角色</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="followApps"><span></span></label></div></div>
+  <div class="item" data-only="followEvents"><div class="label">跟随 AI 工作事件<small>在终端里用 AI 时，按最近在干活的 AI 换角色</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="followEvents"><span></span></label></div></div>
+</div>
+
+<div class="card">
+  <h2>额度</h2>
+  <div class="item"><div class="label">显示 GPT 额度<small>只从 Codex 会话记录里读额度数字</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="gptQuota"><span></span></label></div></div>
+  <div class="item"><div class="label">显示 Gemini 额度<small>询问本机正在运行的 Antigravity</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="agyQuota"><span></span></label></div></div>
+</div>
+
+<div class="card hidden" id="integrateCard">
+  <h2>接入 AI</h2>
+  <div id="integrations"></div>
+</div>
+
+<div class="card">
+  <h2>其他</h2>
+  <div class="item"><div class="label" id="loginLabel">登录时自动启动</div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="login"><span></span></label></div></div>
+  <div class="item"><div class="label">检查更新</div>
+    <div class="ctl"><button data-action="checkUpdate">检查</button></div></div>
+  <div class="item"><div class="label">文件夹<small>换立绘、加角色看「自定义角色」文档</small></div>
+    <div class="ctl"><button data-action="openCharacters">角色</button><button data-action="openData">数据和状态</button></div></div>
+  <div class="item"><div class="label">开发者控制台<small>逐个检查姿态、跑场景演练</small></div>
+    <div class="ctl"><button data-action="devConsole">打开</button></div></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：页面发 {cmd, ...}，宿主改完设置后调 setState(state) 把最新状态推回来
+const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.settings?.postMessage(msg)
+const $ = id => document.getElementById(id)
+let state = null
+
+function toast(text) {
+  const t = $('toast'); t.textContent = text; t.classList.add('show')
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2200)
+}
+
+function setState(s) {
+  state = s
+  $('version').textContent = `版本 ${s.version}`
+  $('updateCard').classList.toggle('hidden', !s.update)
+  if (s.update) $('updateText').textContent = s.updating ? `正在更新到 ${s.update}…` : `有新版本 ${s.update}`
+  document.querySelector('[data-action=update]').disabled = !!s.updating
+  if (document.activeElement !== $('size')) $('size').value = s.size
+  $('sizeVal').textContent = Math.round(s.size * 100) + '%'
+  for (const el of document.querySelectorAll('[data-key]')) el.checked = !!s[el.dataset.key]
+  for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
+  for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
+  const sel = $('character')
+  sel.replaceChildren(...s.characters.map(c => new Option(c.name, c.id, false, c.id === s.character)))
+  const cur = s.characters.find(c => c.id === s.character)
+  if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
+  if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
+  renderIntegrations(s.integrations)
+}
+
+function renderIntegrations(list) {
+  $('integrateCard').classList.toggle('hidden', !list)
+  if (!list) return
+  $('integrations').replaceChildren(...list.map(i => {
+    const row = document.createElement('div'); row.className = 'item'
+    row.innerHTML = `<div class="label"></div><div class="ctl"><span class="tag"></span><button data-i="install"></button><button data-i="uninstall">撤销</button></div>`
+    row.querySelector('.label').textContent = i.label
+    if (i.note) { const n = document.createElement('small'); n.textContent = i.note; row.querySelector('.label').appendChild(n) }
+    const tag = row.querySelector('.tag'); tag.textContent = i.installed ? '已接入' : '未接入'; tag.classList.toggle('ok', i.installed)
+    const install = row.querySelector('[data-i=install]'); install.textContent = i.installed ? '更新' : '接入'
+    const uninstall = row.querySelector('[data-i=uninstall]'); uninstall.disabled = !i.installed
+    for (const b of [install, uninstall]) b.onclick = () => {
+      b.disabled = true; toast(`正在${b.dataset.i === 'install' ? '接入' : '撤销'} ${i.label}…`)
+      post({ cmd: 'integrate', target: i.id, action: b.dataset.i })
+    }
+    return row
+  }))
+}
+
+// 宿主做完一件事后的提示（接入结果、检查更新结果等）
+function notice(text) { toast(text) }
+
+for (const el of document.querySelectorAll('[data-key]')) el.onchange = () => post({ cmd: 'set', key: el.dataset.key, value: el.checked })
+for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
+for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
+$('size').oninput = () => { $('sizeVal').textContent = Math.round($('size').value * 100) + '%'; post({ cmd: 'set', key: 'size', value: +$('size').value }) }
+document.querySelector('[data-reset-size]').onclick = () => post({ cmd: 'set', key: 'size', value: 1 })
+$('character').onchange = () => post({ cmd: 'set', key: 'character', value: $('character').value })
+const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
+$('saveName').onclick = saveName
+$('name').onkeydown = e => { if (e.key === 'Enter') saveName() }
+
+post({ cmd: 'get' })
+</script>
+</body></html>

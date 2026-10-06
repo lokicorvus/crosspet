@@ -44,6 +44,7 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #caption { margin-top: -2px; padding: 2px 9px; border-radius: 8px; background: rgba(255,255,255,.85);
   color: #6b4a3a; font-size: 11px; min-height: 14px; }
 #caption:empty { visibility: hidden; }
+html.no-name #caption { display: none; }
 #quota { max-width: 236px; text-align: center; line-height: 1.35; margin-top: 2px; padding: 1px 8px; border-radius: 7px; background: rgba(255,255,255,.8); color: #6b4a3a; font-size: 10px; }
 #quota:empty { display: none; }
 #quota div { white-space: nowrap; }
@@ -190,6 +191,8 @@ function setPose(p, instant) {
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
   setFx(p)
 }
+// 名牌上的名字：设置里可以关掉（额度照常显示）
+function setShowName(on) { document.documentElement.classList.toggle('no-name', !on) }
 // 背景光晕：'auto'（跟着系统深浅色）/ 'on' / 'off'，由宿主调用
 function setAuraMode(mode) {
   const c = document.documentElement.classList

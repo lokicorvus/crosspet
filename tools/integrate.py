@@ -367,7 +367,9 @@ def status() -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == "status":
+    if len(sys.argv) == 2 and sys.argv[1] == "installed":  # 给设置窗口用：已接入的目标，JSON 数组
+        print(json.dumps(installed()))
+    elif len(sys.argv) == 2 and sys.argv[1] == "status":
         status()
     elif len(sys.argv) == 2 and sys.argv[1] == "refresh":
         for t in installed():

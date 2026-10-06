@@ -66,6 +66,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var manifestJSON = "{}"                    // 最近一次发给桌宠的角色清单，开发者控制台也要用
     var devWindow: NSWindow?
     var devWeb: WKWebView?
+    var settingsWindow: NSWindow?
+    var settingsWeb: WKWebView?
+    var defaultNames: [String: String] = [:]   // id → character.json 里的原名（设置页显示占位用）
     var pauseRealEvents = false                // 控制台里测试时，先不让真实 AI 的状态打扰桌宠
 
     // MARK: 启动
@@ -73,7 +76,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func applicationDidFinishLaunching(_ note: Notification) {
         syncBundledResources()
 
-        let size = NSSize(width: 260, height: 362)
+        let size = NSSize(width: Self.baseSize.width * petScale, height: Self.baseSize.height * petScale)
         var origin = NSPoint.zero
         if let saved = defaults.array(forKey: "origin") as? [Double], saved.count == 2 {
             origin = NSPoint(x: saved[0], y: saved[1])
@@ -94,6 +97,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         web.setValue(false, forKey: "drawsBackground")
         web.autoresizingMask = [.width, .height]
         web.navigationDelegate = self
+        web.pageZoom = petScale
         web.loadFileURL(root.appendingPathComponent("web/index.html"), allowingReadAccessTo: root)
         container.addSubview(web)
 
@@ -145,6 +149,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                     let isFresh = self.latestRelease?.tag != tag
                     self.latestRelease = (tag, page)
                     if isFresh || manual { self.js("notifyUpdate(\(self.quote(tag)))") }
+                    self.pushSettings()
                 } else if manual {
                     let alert = NSAlert()
                     alert.messageText = tag.isEmpty ? "暂时连不上 GitHub" : "已经是最新版（\(self.currentVersion)）"
@@ -236,6 +241,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if webView === settingsWeb { pushSettings(); return }
         if webView === devWeb {
             let info = ["version": currentVersion, "feedbackPath": feedbackURL.path]
             let data = (try? JSONSerialization.data(withJSONObject: info)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -244,12 +250,12 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         ready = true
         loadCharacters()
-        js("setAuraMode(\(quote(auraMode)))")
+        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName))")
         stamps = [:]
         pollStates()
         refreshGPTQuota()
         refreshAntigravityQuota()
-        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, let id = appToCharacter[front] {
+        if followApps, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, let id = appToCharacter[front] {
             switchTo(hostCharacter(id))
         }
     }
@@ -284,6 +290,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let id = dir.lastPathComponent
             let isEgg = info["egg"] as? Bool == true  // 彩蛋角色：不进菜单、不绑应用
             guard isEgg ? poses["pop"] != nil : (poses["idle"] != nil || poses["default"] != nil) else { continue }
+            if !isEgg { defaultNames[id] = info["name"] as? String ?? id }
             if !isEgg, let custom = renamed[id], !custom.isEmpty { info["name"] = custom }
             info["poses"] = poses
             info["blink"] = blink ?? NSNull()
@@ -304,6 +311,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func switchTo(_ id: String) {
         currentId = id
         js("setCharacter(\(quote(id)))")
+        pushSettings()
     }
 
     /// 一个 App 里能用好几家模型（比如 DeepSeek Harness）：它的接入插件把当前角色写在 <角色>-host.json，
@@ -323,7 +331,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func appActivated(_ note: Notification) {
         guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
         pendingSwitch?.cancel()
-        guard let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] else { return }
+        guard followApps, let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] else { return }
         let id = hostCharacter(mapped)
         guard id != currentId else { return }
         let work = DispatchWorkItem { [weak self] in
@@ -565,40 +573,24 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         add(menu, "召唤彩蛋", #selector(egg))
         if characterIds.count > 1 {
             menu.addItem(.separator())
+            let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
             for id in characterIds {
-                let item = NSMenuItem(title: "换成 \(displayNames[id] ?? id)", action: #selector(switchCharacter(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: displayNames[id] ?? id, action: #selector(switchCharacter(_:)), keyEquivalent: "")
                 item.representedObject = id
                 item.target = self
                 item.state = id == currentId ? .on : .off
-                menu.addItem(item)
+                sub.addItem(item)
             }
+            switchItem.submenu = sub
+            menu.addItem(switchItem)
         }
         menu.addItem(.separator())
-        add(menu, "给当前角色改名…", #selector(rename))
-        let gpt = add(menu, "显示 GPT 额度（读取 Codex 会话记录）", #selector(toggleGPTQuota))
-        gpt.state = defaults.bool(forKey: "gptQuota") ? .on : .off
-        let agy = add(menu, "显示 Gemini 额度（询问本机 Antigravity）", #selector(toggleAntigravityQuota))
-        agy.state = defaults.bool(forKey: "agyQuota") ? .on : .off
-        let auraItem = NSMenuItem(title: "背景光晕", action: nil, keyEquivalent: "")
-        let auraMenu = NSMenu()
-        for (mode, title) in [("auto", "自动（深色模式下关闭）"), ("on", "始终显示"), ("off", "关闭")] {
-            let item = NSMenuItem(title: title, action: #selector(setAura(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = mode
-            item.state = auraMode == mode ? .on : .off
-            auraMenu.addItem(item)
-        }
-        auraItem.submenu = auraMenu
-        menu.addItem(auraItem)
-        let login = add(menu, "登录时自动启动", #selector(toggleLogin))
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        add(menu, "打开角色文件夹", #selector(openCharacters))
+        add(menu, "设置…", #selector(openSettings))
         if NSEvent.modifierFlags.contains(.option) {  // 按住 ⌥ 右键才出现：给自己换立绘、加角色的人检查效果用
             add(menu, "开发者控制台…", #selector(openDevConsole))
         }
-        add(menu, "重新载入", #selector(reload))
         add(menu, "回到右下角", #selector(resetPosition))
-        add(menu, "检查更新（当前 \(currentVersion)）", #selector(manualCheck))
         menu.addItem(.separator())
         add(menu, "退出 CrossPet", #selector(quit))
         NSMenu.popUpContextMenu(menu, with: event, for: view)
@@ -679,6 +671,131 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         defaults.removeObject(forKey: "origin")
     }
     @objc func quit() { NSApp.terminate(nil) }
+
+    // MARK: 设置
+    // 一个独立窗口（web/settings.html，和 Windows 版共用），右键菜单只留常用的几项，其余都在这里
+    static let baseSize = NSSize(width: 260, height: 362)
+    var petScale: CGFloat {
+        let v = defaults.double(forKey: "size")
+        return v >= 0.6 && v <= 1.6 ? CGFloat(v) : 1
+    }
+    var showName: Bool { defaults.object(forKey: "showName") as? Bool ?? true }
+    var followApps: Bool { defaults.object(forKey: "followApps") as? Bool ?? true }
+
+    /// 改大小：窗口和网页一起按比例缩放，底边中点不动（脚下的位置不变）
+    func applyScale(_ scale: CGFloat) {
+        let old = panel.frame
+        let size = NSSize(width: Self.baseSize.width * scale, height: Self.baseSize.height * scale)
+        let origin = NSPoint(x: old.midX - size.width / 2, y: old.minY)
+        panel.setFrame(NSRect(origin: origin, size: size), display: true)
+        web.pageZoom = scale
+        defaults.set([origin.x, origin.y], forKey: "origin")
+    }
+
+    @objc func openSettings() {
+        if let w = settingsWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(DevBridge(app: self, settings: true), name: "settings")
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 680),
+                         styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        w.title = "CrossPet 设置"
+        w.isReleasedWhenClosed = false
+        w.center()
+        let v = WKWebView(frame: w.contentView!.bounds, configuration: config)
+        v.autoresizingMask = [.width, .height]
+        v.navigationDelegate = self
+        v.loadFileURL(root.appendingPathComponent("web/settings.html"), allowingReadAccessTo: root)
+        w.contentView!.addSubview(v)
+        settingsWindow = w
+        settingsWeb = v
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            self?.settingsWeb = nil
+            self?.settingsWindow = nil
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+    }
+
+    func settingsState() -> [String: Any] {
+        let names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
+        var state: [String: Any] = [
+            "version": currentVersion, "platform": "mac",
+            "size": Double(petScale), "showName": showName, "aura": auraMode, "followApps": followApps,
+            "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
+            "login": SMAppService.mainApp.status == .enabled,
+            "character": currentId ?? characterIds.first ?? "",
+            "characters": characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0, "defaultName": defaultNames[$0] ?? $0, "custom": names[$0] ?? ""] },
+            "updating": updating,
+        ]
+        if let r = latestRelease, canSelfUpdate { state["update"] = r.tag }
+        return state
+    }
+
+    func pushSettings() {
+        guard settingsWeb != nil else { return }
+        // 当前角色以桌宠页面里正在演的为准（启动时由页面自己恢复上次的角色）
+        web.evaluateJavaScript("charId") { [weak self] r, _ in
+            guard let self, let v = self.settingsWeb else { return }
+            if let id = r as? String, self.characterIds.contains(id) { self.currentId = id }
+            guard let data = try? JSONSerialization.data(withJSONObject: self.settingsState()),
+                  let text = String(data: data, encoding: .utf8) else { return }
+            v.evaluateJavaScript("setState(\(text))", completionHandler: nil)
+        }
+    }
+
+    func handleSettings(_ body: Any) {
+        guard let msg = body as? [String: Any], let cmd = msg["cmd"] as? String else { return }
+        switch cmd {
+        case "set":
+            guard let key = msg["key"] as? String else { return }
+            let value = msg["value"]
+            switch key {
+            case "size":
+                if let n = value as? Double { let v = min(1.6, max(0.6, (n * 10).rounded() / 10)); defaults.set(v, forKey: "size"); applyScale(CGFloat(v)) }
+            case "showName":
+                let on = value as? Bool ?? true; defaults.set(on, forKey: "showName"); js("setShowName(\(on))")
+            case "aura":
+                if let mode = value as? String, ["auto", "on", "off"].contains(mode) { defaults.set(mode, forKey: "auraMode"); js("setAuraMode(\(quote(mode)))") }
+            case "followApps":
+                defaults.set(value as? Bool ?? true, forKey: "followApps")
+            case "gptQuota":
+                if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
+            case "agyQuota":
+                if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
+            case "login":
+                if (value as? Bool ?? false) != (SMAppService.mainApp.status == .enabled) { toggleLogin() }
+            case "character":
+                if let id = value as? String, characterIds.contains(id) { switchTo(id) }
+            default: break
+            }
+            pushSettings()
+        case "rename":
+            guard let id = msg["id"] as? String, characterIds.contains(id) else { return }
+            var names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
+            let value = (msg["name"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+            if value.isEmpty { names.removeValue(forKey: id) } else { names[id] = value }
+            defaults.set(names, forKey: "names")
+            loadCharacters()
+            js("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
+            pushSettings()
+        case "action":
+            switch msg["name"] as? String {
+            case "update": selfUpdate()
+            case "checkUpdate": checkForUpdate(manual: true)
+            case "openCharacters": openCharacters()
+            case "openData": NSWorkspace.shared.open(root)
+            case "devConsole": openDevConsole()
+            default: break
+            }
+            pushSettings()
+        default:
+            pushSettings()
+        }
+    }
 
     // MARK: 工具
 
@@ -772,8 +889,9 @@ final class LocalhostTrust: NSObject, URLSessionDelegate {
 /// 控制台页面 → App 的消息通道（单独一个对象，避免 WKUserContentController 强引用 App 造成循环）
 final class DevBridge: NSObject, WKScriptMessageHandler {
     weak var app: App?
-    init(app: App) { self.app = app }
+    let settings: Bool   // true：设置页的消息；false：开发者控制台的消息
+    init(app: App, settings: Bool = false) { self.app = app; self.settings = settings }
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
-        app?.handleDev(message.body)
+        if settings { app?.handleSettings(message.body) } else { app?.handleDev(message.body) }
     }
 }
