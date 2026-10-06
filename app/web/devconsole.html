@@ -135,13 +135,13 @@ let statusWaiters = []
 
 // ---- 各姿态什么时候出现（和 docs/自定义角色.md 一致）----
 const BUILTIN = ['idle', 'listening', 'thinking', 'reading', 'writing', 'running', 'searching', 'delegating', 'drawing',
-  'happy', 'proud', 'oops', 'surprised', 'pat', 'sleeping', 'tired', 'hum', 'stretch', 'yawn', 'compact', 'asking']
+  'happy', 'proud', 'oops', 'surprised', 'pat', 'sleeping', 'tired', 'hum', 'stretch', 'yawn', 'compact', 'asking', 'update']
 const EGG_POSES = ['pop', 'pretend', 'caught', 'bye']
 const WHEN = {
   idle: '平时', listening: '收到你的消息', thinking: '思考', reading: '读文件、搜代码', writing: '写文件、改代码', running: '跑命令',
   searching: '上网查资料', delegating: '派子任务', drawing: '画图', happy: '一轮完成', proud: '一轮用了 8 次以上工具的大活完成',
   oops: '出错', surprised: '被打断 / 被戳', pat: '被摸头', sleeping: '10 分钟没动静', tired: '额度快用完', hum: '闲着时哼歌',
-  stretch: '闲着时伸懒腰', yawn: '闲着时打哈欠', compact: '压缩上下文', asking: 'AI 问你问题 / 等你授权', reset: 'Codex 额度提前重置', feast: '余额增加（充值）',
+  stretch: '闲着时伸懒腰', yawn: '闲着时打哈欠', compact: '压缩上下文', asking: 'AI 问你问题 / 等你授权', update: '有新版本', reset: 'Codex 额度提前重置', feast: '余额增加（充值）',
   sorry: '出错 / 被打断后你又发消息', pop: '彩蛋：跳出来', pretend: '彩蛋：装模作样（等你点她）', caught: '彩蛋：被识破', bye: '彩蛋：溜走',
 }
 
@@ -297,6 +297,8 @@ const SCENES = [
   { id: 'longthink', name: '想了很久', only: c => c.longThink, exp: '思考超过设定的秒数 → 换成专属的<b>深度思考</b>（DeepSeek：揉太阳穴 + 深海泡泡）。要等 20 多秒',
     run: async (id, prog) => { const c = manifest.characters[id]; st(id, 'listening', 'UserPromptSubmit'); await wait(1500); st(id, 'thinking', 'PostToolUse')
       for (let s = (c.longThink.after || 20) + 4; s > 0; s--) { prog(`等 ${s} 秒`); await wait(1000) } prog('') } },
+  { id: 'update', name: '有新版本', exp: '发现新版本 → <b>收到礼物</b>（NEW 小窗 + 往上跳的箭头 + 进度条）约 6.5 秒，气泡「有新版本…右键菜单里点更新」一直留着',
+    run: async (id, prog) => { pet(`notifyUpdate('v9.9.9')`); prog('6.5 秒后回到常态'); await wait(7000); prog('') } },
   { id: 'tired', name: '额度快用完', exp: '名牌下额度变<b>红</b>，她换成<b>累了</b>（快没电的电池），说一句累了的台词；8 秒后恢复真实额度',
     run: async (id, prog) => { const s = await petStatus(), saved = s.quota[id] ?? null
       pet(`setQuota(${J(id)}, ${J({ text: '测试 剩余 3% ｜ 本周 剩余 40%', low: true })})`); prog('8 秒后恢复'); await wait(8000)

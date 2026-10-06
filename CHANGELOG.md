@@ -7,6 +7,9 @@
 - macOS：用的是和终端里同一条安装命令；更新时装回原来的位置（「应用程序」或「我的应用程序」）
 - Windows：手动双击 `install.cmd` 覆盖安装时，也会自动刷新已经接入的 AI
 
+**新动作**
+- 有新版本：她举着礼物演几秒（NEW 小窗 + 往上跳的箭头），再冒气泡提醒去右键菜单更新
+
 **DeepSeek Harness**
 - 在 Harness 里切到别家模型（比如 ChatGPT 订阅、Claude、Gemini）时，桌宠换成那个模型的角色；切到 Harness 窗口时也按当前模型换，不再一律变成 DeepSeek（感谢 @zlysd55 报告，#2）
 

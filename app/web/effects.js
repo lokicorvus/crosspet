@@ -56,7 +56,7 @@ const AURA                                 = {
   happy: ['#fff08a', 0.6], proud: ['#ffd54a', 0.6], oops: ['#ff9b9b', 0.5], surprised: ['#e8e2f0', 0.3],
   pat: ['#ffb6c8', 0.6], sleeping: ['#7f8fd1', 0.45], tired: ['#c9c2b8', 0.45], hum: ['#ffd0e6', 0.45],
   stretch: ['#ffe0b8', 0.35], yawn: ['#d8d0f0', 0.4], drawing: ['#ffd6e8', 0.45],
-  asking: ['#c9d4ff', 0.5],
+  asking: ['#c9d4ff', 0.5], update: ['#ffe7a3', 0.55],
 }
 // 叠几层半透明圆当柔光（渐变的 stop-opacity 有的渲染器不认，这样最稳）
 const aura = (p      ) => {
@@ -231,6 +231,20 @@ const choiceCard = (() => {
     `${option(y + 48, 58)}${option(y + 74, 46)}${highlight}${floatY('2.6s')}</g>`
 })()
 
+// 有新版本：小窗口里一个往上跳的箭头、「NEW」标签和一条下载进度条，旁边几颗金色闪光
+const updateCard = (() => {
+  const x = 432, y = 30, D = '2.4s'
+  const arrow = `<g><circle cx="${x + 40}" cy="${y + 60}" r="20" fill="#ffe9a8" stroke="#e0a526" stroke-width="2.5"/>` +
+    `<path d="M${x + 40} ${y + 70} v-20 m-9 9 l9 -9 l9 9" fill="none" stroke="#c07f0e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<animateTransform attributeName="transform" type="translate" values="0 0;0 -6;0 0" dur="1.1s" ${loop}/></g>`
+  const badge = `<rect x="${x + 70}" y="${y + 36}" width="44" height="20" rx="10" fill="#ff7a59"/>` +
+    `<text x="${x + 92}" y="${y + 50.5}" text-anchor="middle" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="700" fill="#fff">NEW</text>`
+  const bar = `<rect x="${x + 70}" y="${y + 66}" width="44" height="8" rx="4" fill="#efe6d4"/>` +
+    `<rect x="${x + 70}" y="${y + 66}" width="0" height="8" rx="4" fill="#e0a526"><animate attributeName="width" values="0;44;44" keyTimes="0;0.8;1" dur="${D}" ${loop}/></rect>`
+  return `<g>${winFrame(x, y, 126, 100, false, '#fff6dc')}${arrow}${badge}${bar}${floatY('2.6s')}</g>` +
+    star(80, 190, 0.9, '0.6s', '#ffd54a') + star(548, 360, 0.8, '0.2s', '#ffd54a')
+})()
+
 // 读文件：代码查看器，一条高亮扫描线逐行往下扫
 const viewerCard = (() => {
   const x = 432, y = 36
@@ -366,6 +380,7 @@ const surroundings = (p      )         => {
     case 'idle': return star(80, 180, 0.6, '0s', '#ffc58a', '3s') + star(500, 260, 0.5, '1.5s', '#ffc58a', '3s')
     case 'listening': return chatCard
     case 'asking': return choiceCard
+    case 'update': return updateCard
     case 'thinking': return thoughtCloud
     case 'reading': return viewerCard + floatingGlyphs
     case 'writing': return editorCard
