@@ -245,6 +245,15 @@ function init(m) {
   else { $('caption').textContent = char().name }
 }
 
+// 登场台词冷却：同一个角色 30 分钟内只打一次招呼，在几个 AI 的 App 之间来回切时不用每次都听「XX 来了」
+const GREET_COOLDOWN = 30 * 60 * 1000
+const greetedAt = {}
+function greetDue(id) {
+  if (Date.now() - (greetedAt[id] || 0) < GREET_COOLDOWN) return false
+  greetedAt[id] = Date.now()
+  return true
+}
+
 function setCharacter(id, quiet) {
   if (egg) { clearEggTimers(); egg = null; charId = null }
   if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
@@ -260,7 +269,7 @@ function setCharacter(id, quiet) {
     const s = charState[id]
     const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
     setPose(busy ? s.pose : restPose(), true)
-    say(quiet ? '' : (c.greeting || `${c.name} 在这儿～`))
+    say(quiet || !greetDue(id) ? '' : (c.greeting || `${c.name} 在这儿～`))
     renderQuota()
     const pend = pendingCelebration[id]
     if (pend && Date.now() - pend.at < 10 * 60 * 1000) setTimeout(() => celebrate(id, pend.ev), 1200)
