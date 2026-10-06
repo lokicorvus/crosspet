@@ -70,7 +70,7 @@ if [ "$ACTION" = "uninstall" ]; then
   exit 0
 fi
 
-[ "$ACTION" = "install" ] || die "不认识的参数：$ACTION（可以用 install 或 uninstall）"
+[ "$ACTION" = "install" ] || die "不认识的参数：${ACTION}（可以用 install 或 uninstall）"
 
 bold "1/3 下载最新版"
 TAG=$(latest_tag)
@@ -111,7 +111,7 @@ fetch_source "$TAG"
 INTEGRATE="$SRC/tools/integrate.py"
 already=$(cd "$SRC/tools" && python3 -c 'import integrate; print(" ".join(integrate.installed()))')
 if [ -n "$already" ]; then
-  echo "已经接入：$already（按新版刷新一遍）"
+  echo "已经接入：${already}（按新版刷新一遍）"
   python3 "$INTEGRATE" refresh >/dev/null
 fi
 want() {  # 要不要接入 $1（问题是 $2）
