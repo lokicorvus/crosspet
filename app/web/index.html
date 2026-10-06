@@ -56,6 +56,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 .m-float { animation: float 4.2s ease-in-out infinite; }
 .m-shake { animation: shake 1.4s ease-in-out infinite; }
 .m-squish{ animation: squish 1.6s ease-in-out infinite; }
+.m-gift  { animation: gift .65s cubic-bezier(.3,1.6,.5,1) 1, bob-big 1.1s ease-in-out .65s infinite; }
 .m-jolt  { animation: jolt .55s cubic-bezier(.3,1.6,.5,1) 1, bob 3.2s ease-in-out .55s infinite; }
 @keyframes bob { 50% { transform: translateY(-2.5%); } }
 @keyframes bob-big { 50% { transform: translateY(-5%); } }
@@ -67,6 +68,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 @keyframes shake { 0%,50%,100% { transform: translateX(0); } 10% { transform: translateX(-3%); } 20% { transform: translateX(3%); }
   30% { transform: translateX(-2%); } 40% { transform: translateX(2%); } }
 @keyframes squish { 50% { transform: scale(.96, 1.05); } }
+@keyframes gift { 0% { transform: translateY(3%) scale(1.05,.93); } 45% { transform: translateY(-9%) scale(.97,1.04); } 100% { transform: none; } }
 @keyframes jolt { 0% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-3%, -4%) rotate(-4deg) scale(.97,1.04); } 60% { transform: translate(1%, 0) rotate(1.5deg); } 100% { transform: none; } }
 </style></head>
 <body>
@@ -99,7 +101,7 @@ const MOTION = {
   // 角色专属姿态（没列出的默认轻轻浮动）
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
-  asking: 'm-hop', update: 'm-hop',
+  asking: 'm-hop', update: 'm-gift',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],

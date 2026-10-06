@@ -242,7 +242,7 @@ const updateCard = (() => {
   const bar = `<rect x="${x + 70}" y="${y + 66}" width="44" height="8" rx="4" fill="#efe6d4"/>` +
     `<rect x="${x + 70}" y="${y + 66}" width="0" height="8" rx="4" fill="#e0a526"><animate attributeName="width" values="0;44;44" keyTimes="0;0.8;1" dur="${D}" ${loop}/></rect>`
   return `<g>${winFrame(x, y, 126, 100, false, '#fff6dc')}${arrow}${badge}${bar}${floatY('2.6s')}</g>` +
-    star(80, 190, 0.9, '0.6s', '#ffd54a') + star(548, 360, 0.8, '0.2s', '#ffd54a')
+    star(80, 190, 0.9, '0.6s', '#ffd54a') + star(548, 360, 0.8, '0.2s', '#ffd54a') + star(60, 320, 0.7, '1s', '#ffd54a') + star(530, 220, 0.6, '0.9s')
 })()
 
 // 读文件：代码查看器，一条高亮扫描线逐行往下扫
