@@ -379,6 +379,26 @@ namespace CrossPet
             SavePosition();
         }
 
+        /// <summary>拖滑块时每次只变一点，直接跟手；一下子变很多（点「还原」）时用 0.2 秒过渡过去</summary>
+        DispatcherTimer scaleTimer;
+        double shownScale;
+        void AnimateScale(double target)
+        {
+            scaleTimer?.Stop();
+            var from = shownScale > 0 ? shownScale : Window.Width / BaseWidth;
+            if (Math.Abs(target - from) <= 0.06) { shownScale = target; ApplyScale(target); return; }
+            var start = DateTime.Now;
+            scaleTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+            scaleTimer.Tick += (_, __) =>
+            {
+                var k = Math.Min(1, (DateTime.Now - start).TotalSeconds / 0.2);
+                shownScale = from + (target - from) * (1 - Math.Pow(1 - k, 3));
+                ApplyScale(shownScale);
+                if (k >= 1) scaleTimer.Stop();
+            };
+            scaleTimer.Start();
+        }
+
         void OpenSettings()
         {
             if (settings == null) { settings = new SettingsWindow(this, env); settings.Closed += () => settings = null; }
@@ -444,8 +464,8 @@ namespace CrossPet
                     switch (key)
                     {
                         case "size":
-                            var v = Math.Min(1.6, Math.Max(0.6, Math.Round(Convert.ToDouble(value) * 10) / 10));
-                            Store.Settings["size"] = v; Store.SaveSettings(); ApplyScale(v);
+                            var v = Math.Min(1.6, Math.Max(0.6, Math.Round(Convert.ToDouble(value) * 100) / 100));
+                            Store.Settings["size"] = v; Store.SaveSettings(); AnimateScale(v);
                             break;
                         case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
                         case "aura":

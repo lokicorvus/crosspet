@@ -692,6 +692,24 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         defaults.set([origin.x, origin.y], forKey: "origin")
     }
 
+    /// 拖滑块时每次只变一点，直接跟手；一下子变很多（点「还原」）时用 0.2 秒过渡过去
+    var scaleTimer: Timer?
+    var shownScale: CGFloat = 0
+    func animateScale(to target: CGFloat) {
+        scaleTimer?.invalidate()
+        let from = shownScale > 0 ? shownScale : petScale
+        guard abs(target - from) > 0.06 else { shownScale = target; applyScale(target); return }
+        let start = Date()
+        scaleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] t in
+            guard let self else { t.invalidate(); return }
+            let k = min(1, Date().timeIntervalSince(start) / 0.2)
+            let eased = 1 - pow(1 - k, 3)
+            self.shownScale = from + (target - from) * CGFloat(eased)
+            self.applyScale(self.shownScale)
+            if k >= 1 { t.invalidate() }
+        }
+    }
+
     @objc func openSettings() {
         if let w = settingsWindow {
             NSApp.activate(ignoringOtherApps: true)
@@ -740,7 +758,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // 当前角色以桌宠页面里正在演的为准（启动时由页面自己恢复上次的角色）
         web.evaluateJavaScript("charId") { [weak self] r, _ in
             guard let self, let v = self.settingsWeb else { return }
-            if let id = r as? String, self.characterIds.contains(id) { self.currentId = id }
+            // 只在还不知道当前角色时（刚启动、页面自己恢复了上次的角色）问页面；换角色有 0.33 秒过渡，过渡中页面里还是旧角色
+            if self.currentId == nil, let id = r as? String, self.characterIds.contains(id) { self.currentId = id }
             guard let data = try? JSONSerialization.data(withJSONObject: self.settingsState()),
                   let text = String(data: data, encoding: .utf8) else { return }
             v.evaluateJavaScript("setState(\(text))", completionHandler: nil)
@@ -755,7 +774,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let value = msg["value"]
             switch key {
             case "size":
-                if let n = value as? Double { let v = min(1.6, max(0.6, (n * 10).rounded() / 10)); defaults.set(v, forKey: "size"); applyScale(CGFloat(v)) }
+                if let n = value as? Double { let v = min(1.6, max(0.6, (n * 100).rounded() / 100)); defaults.set(v, forKey: "size"); animateScale(to: CGFloat(v)) }
             case "showName":
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showName"); js("setShowName(\(on))")
             case "aura":
