@@ -84,7 +84,8 @@ if character in MULTI_MODEL_HOSTS:
     model = remember_session_model(host)
     mapped = character_for_model(model)
     # 对应的角色还没装（比如还没画立绘的新角色）：当成认不出的模型，由当前角色来演
-    if mapped and not (characters_dir / mapped / "character.json").exists():
+    if mapped and not ((characters_dir / mapped / "character.json").exists()
+                       and any((characters_dir / mapped / f"idle.{ext}").exists() for ext in ("webp", "png"))):
         mapped = None
     character = mapped or "current"
     event["model"] = model
