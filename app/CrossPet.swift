@@ -155,6 +155,54 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }.resume()
     }
 
+    // 一键更新：在后台跑一遍官方安装命令（get.sh：下载最新的 CrossPet.zip → 替换 App → 按新版刷新已接入的 AI → 重新打开），
+    // 和用户自己在终端里运行那条命令完全一样，只是不再逐个问要接入哪些 AI。只在装在默认位置（应用程序文件夹）时提供
+    var updating = false
+    var canSelfUpdate: Bool {
+        let dir = Bundle.main.bundleURL.deletingLastPathComponent().standardizedFileURL.path
+        return dir == "/Applications" || dir == FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").standardizedFileURL.path
+    }
+
+    @objc func selfUpdate() {
+        guard !updating, let r = latestRelease else { return }
+        let alert = NSAlert()
+        alert.messageText = "更新到 \(r.tag)？"
+        alert.informativeText = "会自动下载、安装并重新打开，设置、角色和 AI 接入都保留。"
+        alert.addButton(withTitle: "更新")
+        alert.addButton(withTitle: "取消")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        updating = true
+        js("say(\(quote("正在下载新版本…")))")
+        let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CrossPet-update.log")
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = ["-c", "curl -fsSL https://raw.githubusercontent.com/\(repoSlug)/main/get.sh | bash"]
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
+        env["CROSSPET_CONNECT"] = "none"   // 只刷新已经接入的，不问新的
+        env["CROSSPET_PREFER_DIR"] = Bundle.main.bundleURL.deletingLastPathComponent().standardizedFileURL.path  // 装回原来的位置
+        p.environment = env
+        if let log = try? FileHandle(forWritingTo: logURL) { p.standardOutput = log; p.standardError = log }
+        // 正常情况下安装命令会关掉这个旧版、装好后打开新版，走不到这里；还活着说明没成功
+        p.terminationHandler = { [weak self] proc in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.updating = false
+                guard proc.terminationStatus != 0 else { return }
+                let fail = NSAlert()
+                fail.messageText = "自动更新没成功"
+                fail.informativeText = "详情在 ~/Library/Logs/CrossPet-update.log。要打开下载页手动更新吗？"
+                fail.addButton(withTitle: "打开下载页")
+                fail.addButton(withTitle: "取消")
+                NSApp.activate(ignoringOtherApps: true)
+                if fail.runModal() == .alertFirstButtonReturn { self.openRelease() }
+            }
+        }
+        do { try p.run() } catch { updating = false; openRelease() }
+    }
+
     @objc func openRelease() { if let url = latestRelease?.url { NSWorkspace.shared.open(url) } }
     @objc func manualCheck() { checkForUpdate(manual: true) }
 
@@ -201,7 +249,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         refreshGPTQuota()
         refreshAntigravityQuota()
         if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, let id = appToCharacter[front] {
-            switchTo(id)
+            switchTo(hostCharacter(id))
         }
     }
 
@@ -257,12 +305,26 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         js("setCharacter(\(quote(id)))")
     }
 
+    /// 一个 App 里能用好几家模型（比如 DeepSeek Harness）：它的接入插件把当前角色写在 <角色>-host.json，
+    /// 切到这个 App 时换成那个角色。一天内写的才算，角色不存在就还用 character.json 里绑定的
+    func hostCharacter(_ id: String) -> String {
+        let url = stateDir.appendingPathComponent("\(id)-host.json")
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let stamp = attrs[.modificationDate] as? Date, Date().timeIntervalSince(stamp) < 86400,
+              let data = try? Data(contentsOf: url),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let c = obj["character"] as? String, characterIds.contains(c) else { return id }
+        return c
+    }
+
     /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
     /// App 启动时窗口会短暂地抢焦点、让焦点，立即响应会来回闪。
     @objc func appActivated(_ note: Notification) {
         guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
         pendingSwitch?.cancel()
-        guard let bundle = app.bundleIdentifier, let id = appToCharacter[bundle], id != currentId else { return }
+        guard let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] else { return }
+        let id = hostCharacter(mapped)
+        guard id != currentId else { return }
         let work = DispatchWorkItem { [weak self] in
             guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
             self?.switchTo(id)
@@ -315,13 +377,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
         }
         // 从最新的会话往前找：刚开的会话可能还没有额度记录
-        for (file, _) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
-            if let q = quotaIn(file) { return q }
+        for (file, modified) in files.sorted(by: { $0.1 > $1.1 }).prefix(8) {
+            if let q = quotaIn(file, modified: modified) { return q }
         }
         return nil
     }
 
-    func quotaIn(_ file: URL) -> [String: Any]? {
+    func quotaIn(_ file: URL, modified: Date) -> [String: Any]? {
         guard let h = try? FileHandle(forReadingFrom: file) else { return nil }
         defer { try? h.close() }
         let size = (try? h.seekToEnd()) ?? 0
@@ -340,9 +402,16 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 windows.append((label, used, (w["resets_at"] as? NSNumber)?.doubleValue))
             }
             guard !windows.isEmpty else { continue }
-            let maxUsed = windows.map { $0.used }.max() ?? 0
+            // 这条记录是什么时候的：只有用 Codex 时才会有新记录（比如在别的程序里用 ChatGPT 订阅就没有），旧数字要标出来
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let at = ((obj as? [String: Any])?["timestamp"] as? String).flatMap { iso.date(from: $0) } ?? modified
+            let now = Date().timeIntervalSince1970
+            let live = windows.filter { ($0.reset ?? 0) == 0 || $0.reset! > now }
+            let maxUsed = live.map { $0.used }.max() ?? 0
             var marked = false
             let parts = windows.map { w -> String in
+                if let r = w.reset, r > 0, r <= now { return "\(w.label) 已重置" }  // 记录之后过了重置时间，旧的用量不作数了
                 var piece = "\(w.label) 剩余 \(max(0, 100 - Int(w.used.rounded())))%"
                 if !marked, w.used == maxUsed, let reset = w.reset {
                     marked = true
@@ -355,7 +424,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
             // windows 给桌宠比对用：某个窗口在预定重置时间前突然恢复一大截 → 播 reset 动画
             let raw = windows.map { w -> [String: Any] in ["label": w.label, "used": w.used, "reset": w.reset ?? 0] }
-            return ["text": parts.joined(separator: " ｜ "), "low": maxUsed >= 90, "windows": raw]
+            var text = parts.joined(separator: " ｜ ")
+            if Date().timeIntervalSince(at) > 1800 {
+                let fmt = DateFormatter()
+                fmt.dateFormat = Calendar.current.isDateInToday(at) ? "HH:mm" : "M/d HH:mm"
+                text += " · \(fmt.string(from: at)) 的数据"
+            }
+            return ["text": text, "low": maxUsed >= 90, "windows": raw]
         }
         return nil
     }
@@ -486,7 +561,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func showMenu(_ event: NSEvent, in view: NSView) {
         let menu = NSMenu()
         if let r = latestRelease {
-            add(menu, "⬆️ 有新版本 \(r.tag)，点这里下载", #selector(openRelease))
+            if canSelfUpdate {
+                add(menu, updating ? "⬆️ 正在更新到 \(r.tag)…" : "⬆️ 更新到 \(r.tag)", #selector(selfUpdate))
+            } else {
+                add(menu, "⬆️ 有新版本 \(r.tag)，点这里下载", #selector(openRelease))
+            }
             menu.addItem(.separator())
         }
         add(menu, "摸摸头", #selector(pat))

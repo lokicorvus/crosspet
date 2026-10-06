@@ -37,6 +37,8 @@ namespace CrossPet
         public string ManifestJson { get; private set; } = "{}";
         readonly Dictionary<string, string> stamps = new Dictionary<string, string>();
         (string tag, string url)? latestRelease;
+        string updateZip;    // 新版本的 Windows 安装包下载地址（只认本仓库 Releases 里的）
+        bool updating;
         Forms.NotifyIcon tray;
         Native.ForegroundWatcher foreground;
         DispatcherTimer appSwitch;
@@ -222,7 +224,22 @@ namespace CrossPet
             if (exe == "") return;
             var map = Store.ReadJson(Store.AppMap);
             var match = map?.FirstOrDefault(kv => string.Equals(kv.Key, exe, StringComparison.OrdinalIgnoreCase)).Value as string;
-            if (match != null && match != current) SwitchTo(match);
+            if (string.IsNullOrWhiteSpace(match)) return;   // 对照表里没有，或者值留空：这个程序不跟随
+            match = HostCharacter(match);
+            if (match != current) SwitchTo(match);
+        }
+
+        /// <summary>
+        /// 一个程序里能用好几家模型（比如 DeepSeek Harness）：它的接入插件把当前角色写在 &lt;角色&gt;-host.json，
+        /// 切到这个程序时换成那个角色。一天内写的才算，角色不存在就还用对照表里的
+        /// </summary>
+        string HostCharacter(string id)
+        {
+            var file = Path.Combine(Store.State, id + "-host.json");
+            try { if (!File.Exists(file) || (DateTime.UtcNow - File.GetLastWriteTimeUtc(file)).TotalHours > 24) return id; } catch { return id; }
+            var host = Store.ReadJson(file);
+            var c = host != null && host.TryGetValue("character", out var v) ? v as string : null;
+            return c != null && Characters().Any(x => x.id == c) ? c : id;
         }
 
         void RefreshQuota()
@@ -318,7 +335,12 @@ namespace CrossPet
             }
             void Sep() => menu.Items.Add(new Forms.ToolStripSeparator());
 
-            if (latestRelease is var (tag, url)) { menu.Items.Add(Item($"⬆️ 有新版本 {tag}，点这里下载", () => Open(url))); Sep(); }
+            if (latestRelease is var (tag, url))
+            {
+                if (updateZip != null) menu.Items.Add(Item(updating ? $"⬆️ 正在更新到 {tag}…" : $"⬆️ 更新到 {tag}", () => _ = SelfUpdate()));
+                else menu.Items.Add(Item($"⬆️ 有新版本 {tag}，点这里下载", () => Open(url)));
+                Sep();
+            }
             menu.Items.Add(Item("摸摸头", () => Js("handleClick('pat')")));
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
@@ -443,6 +465,7 @@ namespace CrossPet
 
         // ---------------- 检查更新：每天一次，只读 GitHub 上公开的版本号，不发送任何数据 ----------------
         static readonly HttpClient http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        static readonly HttpClient download = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         async Task CheckForUpdate(bool manual = false)
         {
             try
@@ -457,6 +480,12 @@ namespace CrossPet
                     var url = body.TryGetValue("html_url", out var u) && u is string s && s.StartsWith("https://github.com/") ? s : $"https://github.com/{Repo}/releases/latest";
                     var first = latestRelease?.tag != tag;
                     latestRelease = (tag, url);
+                    updateZip = null;
+                    if (body.TryGetValue("assets", out var a) && a is object[] assets)
+                        foreach (var asset in assets.OfType<Dictionary<string, object>>())
+                            if (asset.TryGetValue("name", out var n) && n as string == "CrossPet-Windows.zip" &&
+                                asset.TryGetValue("browser_download_url", out var d) && d is string dl &&
+                                dl.StartsWith($"https://github.com/{Repo}/releases/download/{tag}/")) updateZip = dl;
                     if (first) Js($"notifyUpdate({Q(tag)})");
                     if (manual) Open(url);
                 }
@@ -468,6 +497,48 @@ namespace CrossPet
                 if (manual) MessageBox.Show("检查更新失败：" + e.Message, "CrossPet");
             }
         }
+        /// <summary>
+        /// 一键更新：下载新版安装包 → 解压到临时文件夹 → 运行新包里的 install.ps1（覆盖安装、按新版刷新已接入的 AI、重新打开）。
+        /// 设置、角色、接入都在数据目录里，不受影响。失败了就打开下载页，旧版照常能用
+        /// </summary>
+        async Task SelfUpdate()
+        {
+            if (updating || !(latestRelease is var (tag, page)) || updateZip == null) return;
+            if (MessageBox.Show($"更新到 {tag}？\n\n会自动下载（约 20 MB）、安装并重新打开，设置、角色和 AI 接入都保留。",
+                    "CrossPet 更新", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+            updating = true;
+            try
+            {
+                Js($"say({Q("正在下载新版本…")})");
+                var dir = Path.Combine(Path.GetTempPath(), "CrossPet-update", tag);
+                if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                Directory.CreateDirectory(dir);
+                var zip = Path.Combine(dir, "CrossPet-Windows.zip");
+                using (var res = await download.GetAsync(updateZip, HttpCompletionOption.ResponseHeadersRead))
+                {
+                    res.EnsureSuccessStatusCode();
+                    using (var f = File.Create(zip)) await res.Content.CopyToAsync(f);
+                }
+                await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zip, dir));
+                var root = Path.Combine(dir, "CrossPet");
+                var script = Path.Combine(root, "install.ps1");
+                var version = Store.ReadText(Path.Combine(root, "VERSION"))?.Trim();
+                if (!File.Exists(Path.Combine(root, "CrossPet.exe")) || !File.Exists(script) || version != tag.TrimStart('v', 'V'))
+                    throw new Exception("下载的安装包不完整");
+                Store.Log($"更新：{Store.Version} → {version}");
+                Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{script}\" -Update")
+                    { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root });
+                Quit();   // install.ps1 等这边退出后再覆盖文件
+            }
+            catch (Exception e)
+            {
+                updating = false;
+                Store.Log("一键更新失败: " + e);
+                if (MessageBox.Show("自动更新没成功：" + e.Message + "\n\n要打开下载页手动更新吗？", "CrossPet 更新",
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes) Open(page);
+            }
+        }
+
         static bool Newer(string tag, string cur)
         {
             int[] P(string v) => v.TrimStart('v', 'V').Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
