@@ -188,11 +188,26 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
         env["CROSSPET_CONNECT"] = "none"   // 只刷新已经接入的，不问新的
         env["CROSSPET_PREFER_DIR"] = Bundle.main.bundleURL.deletingLastPathComponent().standardizedFileURL.path  // 装回原来的位置
+        // 下载进度：安装命令把 curl 的进度条写进这个文件，这边每半秒读一次，在气泡里显示百分比
+        let progressURL = FileManager.default.temporaryDirectory.appendingPathComponent("crosspet-update-progress.txt")
+        try? FileManager.default.removeItem(at: progressURL)
+        env["CROSSPET_PROGRESS_FILE"] = progressURL.path
+        var lastShown = -1
+        let progressTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self, let text = try? String(contentsOf: progressURL, encoding: .utf8) else { return }
+            // curl 的进度条形如「####    45.3%」，取最后一个百分号前面的数字
+            guard let end = text.lastIndex(of: "%") else { return }
+            let digits = text[..<end].reversed().prefix { $0.isNumber || $0 == "." }
+            guard let value = Double(String(digits.reversed())), case let p = Int(value), p != lastShown else { return }
+            lastShown = p
+            self.js("say(\(self.quote(p >= 100 ? "下载好了，正在安装…" : "正在下载新版本 \(p)%…")))")
+        }
         p.environment = env
         if let log = try? FileHandle(forWritingTo: logURL) { p.standardOutput = log; p.standardError = log }
         // 正常情况下安装命令会关掉这个旧版、装好后打开新版，走不到这里；还活着说明没成功
         p.terminationHandler = { [weak self] proc in
             DispatchQueue.main.async {
+                progressTimer.invalidate()
                 guard let self else { return }
                 self.updating = false
                 guard proc.terminationStatus != 0 else { return }

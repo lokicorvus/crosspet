@@ -649,8 +649,22 @@ namespace CrossPet
                 using (var res = await download.GetAsync(updateZip, HttpCompletionOption.ResponseHeadersRead))
                 {
                     res.EnsureSuccessStatusCode();
-                    using (var f = File.Create(zip)) await res.Content.CopyToAsync(f);
+                    // 边下边在气泡里报进度（GitHub 在有些网络下很慢，没有进度看起来像卡住了）
+                    var total = res.Content.Headers.ContentLength ?? 0;
+                    using (var src = await res.Content.ReadAsStreamAsync())
+                    using (var f = File.Create(zip))
+                    {
+                        var buf = new byte[81920]; long got = 0; int read, shown = -1;
+                        while ((read = await src.ReadAsync(buf, 0, buf.Length)) > 0)
+                        {
+                            await f.WriteAsync(buf, 0, read);
+                            got += read;
+                            var pct = total > 0 ? (int)(got * 100 / total) : -1;
+                            if (pct >= 0 && pct != shown && (pct - shown >= 2 || pct == 100)) { shown = pct; Js($"say({Q($"正在下载新版本 {pct}%…")})"); }
+                        }
+                    }
                 }
+                Js($"say({Q("下载好了，正在安装…")})");
                 await Task.Run(() => System.IO.Compression.ZipFile.ExtractToDirectory(zip, dir));
                 var root = Path.Combine(dir, "CrossPet");
                 var script = Path.Combine(root, "install.ps1");
