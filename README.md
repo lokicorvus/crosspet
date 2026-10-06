@@ -93,12 +93,12 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
 2. 双击里面的 `install.cmd`：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，然后自动打开。不需要管理员权限。
-3. 右键桌宠 →「接入 AI」，把你用的 AI 逐个「接入 / 更新」。
+3. 右键桌宠 →「设置…」→「接入 AI」，把你用的 AI 逐个「接入」。
 
 更多说明见 [Windows 说明](docs/windows.md)。
 
 > **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
-> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台、一键更新。
+> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、设置窗口、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台、一键更新。
 > **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、Windows 10、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
 
 ### 接入 AI 改了什么
@@ -114,7 +114,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 |---|---|
 | 单击 | 摸摸头 |
 | 拖动 | 换个位置（会记住） |
-| 右键 | 菜单：戳一下、召唤彩蛋、换角色、给角色改名、显示 GPT / Gemini 额度、背景光晕、登录时自动启动、打开角色文件夹、检查更新 / 一键更新……（按住 ⌥ 再右键，Windows 是按住 Shift 再右键，还有「开发者控制台」） |
+| 右键 | 菜单：摸摸头、戳一下、召唤彩蛋、换角色、**设置…**（大小、名字显示、背景光晕、改名、额度、接入 AI、登录时启动、检查更新……）、有新版本时的「更新到 …」（按住 ⌥ 再右键，Windows 是按住 Shift 再右键，还有「开发者控制台」） |
 | 托盘图标（Windows） | 右键是同一个菜单，双击让她回到右下角 |
 
 ## 彩蛋
@@ -125,7 +125,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 ## 自定义
 
-- **改名**：右键 →「给当前角色改名…」，留空就恢复默认。
+- **改名、调大小、关掉名字**：右键 →「设置…」。名字留空就恢复默认；大小可以在 60%–160% 之间调。
 - **换立绘、改台词、加新角色**：看 [自定义角色](docs/自定义角色.md)。改完可以**按住 ⌥（Windows 是 Shift）再右键**打开「开发者控制台」，把每个姿态和场景挨个过一遍。一个文件夹就是一个角色，放几张图、写个 `character.json` 就能用。
 - **用 AI 画新立绘**：[角色生图提示词](docs/prompts/角色生图提示词.md) · [彩蛋生图提示词](docs/prompts/彩蛋生图提示词.md)，配好了参考图。
 
