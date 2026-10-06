@@ -89,6 +89,18 @@ namespace CrossPet
             var hook = Path.Combine(Install, "integrations", "crosspet-hook.py");
             if (File.Exists(hook)) File.Copy(hook, Path.Combine(Data, "crosspet-hook.py"), true);
             if (!File.Exists(AppMap)) File.Copy(Path.Combine(Install, "apps.json"), AppMap);
+            else
+            {
+                // 新版本加的程序补进用户的对照表；用户改过、删成空值的不动
+                var mine = ReadJson(AppMap);
+                var bundled = ReadJson(Path.Combine(Install, "apps.json"));
+                if (mine != null && bundled != null)
+                {
+                    var added = bundled.Keys.Where(k => !mine.Keys.Any(m => string.Equals(m, k, StringComparison.OrdinalIgnoreCase))).ToList();
+                    foreach (var k in added) mine[k] = bundled[k];
+                    if (added.Count > 0) try { WriteJson(AppMap, mine); } catch (Exception e) { Log("更新程序对照表失败: " + e.Message); }
+                }
+            }
         }
 
         static void CopyDir(string from, string to)

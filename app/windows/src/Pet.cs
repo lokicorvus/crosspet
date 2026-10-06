@@ -192,9 +192,11 @@ namespace CrossPet
         {
             if (!ready) return;
             var latestActive = (id: (string)null, ts: 0.0);
-            foreach (var (id, _) in Characters())
+            // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
+            foreach (var id in Characters().Select(c => c.id).Concat(new[] { "current" }))
                 foreach (var kind in new[] { "state", "quota" })
                 {
+                    if (id == "current" && kind == "quota") continue;
                     var file = Path.Combine(Store.State, $"{id}-{kind}.json");
                     FileInfo fi;
                     try { fi = new FileInfo(file); if (!fi.Exists || fi.Length > 1_000_000) continue; } catch { continue; }
@@ -213,7 +215,7 @@ namespace CrossPet
                         // 在终端里用 AI 时没有对应的前台程序：跟着最新一条工作事件换角色
                         var pose = value.TryGetValue("pose", out var p) ? p as string : null;
                         var ts = value.TryGetValue("ts", out var t) ? Convert.ToDouble(t) : 0;
-                        if (pose != "idle" && pose != "sleeping" && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts < 30 && ts > latestActive.ts) latestActive = (id, ts);
+                        if (id != "current" && pose != "idle" && pose != "sleeping" && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts < 30 && ts > latestActive.ts) latestActive = (id, ts);
                         Js($"applyCharState({Q(id)}, {json})");
                     }
                     else Js($"setQuota({Q(id)}, {json})");
@@ -425,6 +427,8 @@ namespace CrossPet
             ("deepseek", "DeepSeek Harness", "工作状态 + 余额"),
             ("antigravity", "Antigravity", "桌面版和命令行都有效"),
             ("gemini", "Gemini CLI", null),
+            ("workbuddy", "WorkBuddy", "按当前模型换角色，没有对应角色的模型由当前角色来演"),
+            ("zcode", "ZCode（智谱）", "按会话的模型换角色，GLM 角色没装时由当前角色来演"),
         };
 
         public Dictionary<string, object> SettingsState()

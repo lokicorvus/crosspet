@@ -4,6 +4,7 @@
 用法（在各 AI 的钩子配置里）：
     python3 crosspet-hook.py <角色id>          # 角色id：claude / gpt / deepseek / gemini
     python3 crosspet-hook.py <角色id> <事件名>  # 事件 JSON 里不带事件名的（Antigravity）
+    python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode）：按模型选角色
 钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
 
 只写状态目录（默认 /tmp/crosspet，可用环境变量 CROSSPET_STATE_DIR 改）里的两个小文件：
@@ -29,6 +30,72 @@ try:
     event = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
 except Exception:
     sys.exit(0)
+
+# 多模型宿主（WorkBuddy）：每条事件都带当前模型名，按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
+# 桌宠切到这个程序的窗口时按它换角色
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode")
+# ZCode 默认用智谱的 GLM；它只在会话开始时告诉模型名，之后的事件按会话 id 查当时记下的模型
+HOST_DEFAULT_MODEL = {"zcode": "glm"}
+characters_dir = (default_data if os.name == "nt" else Path.home() / "Library/Application Support/CrossPet") / "characters"
+
+
+def character_for_model(model: str):
+    m = model.lower()
+    if "glm" in m or "zhipu" in m or "chatglm" in m or "z.ai" in m or "zai-" in m:
+        return "glm"
+    if "kimi" in m or "moonshot" in m:
+        return "kimi"
+    if "deepseek" in m:
+        return "deepseek"
+    if "claude" in m or "anthropic" in m:
+        return "claude"
+    if "gemini" in m:
+        return "gemini"
+    if m.startswith(("gpt", "o1", "o3", "o4", "codex", "chatgpt")) or "openai" in m:
+        return "gpt"
+    return None
+
+
+def remember_session_model(host: str) -> str:
+    """有的宿主只在会话开始时给模型名：记下来（按会话 id），之后的事件查它"""
+    sid = str(event.get("session_id") or event.get("sessionId") or "")
+    path = state_dir / f"{host}-sessions.json"
+    try:
+        known = json.loads(path.read_text())
+    except Exception:
+        known = {}
+    model = str(event.get("model") or "")
+    if model and sid:
+        known[sid] = model
+        known = dict(list(known.items())[-50:])  # 只留最近的会话
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            tmp = state_dir / f".{host}-sessions.json"
+            tmp.write_text(json.dumps(known))
+            tmp.replace(path)
+        except Exception:
+            pass
+    return model or known.get(sid, "") or HOST_DEFAULT_MODEL.get(host, "")
+
+
+if character in MULTI_MODEL_HOSTS:
+    host = character
+    model = remember_session_model(host)
+    mapped = character_for_model(model)
+    # 对应的角色还没装（比如还没画立绘的新角色）：当成认不出的模型，由当前角色来演
+    if mapped and not (characters_dir / mapped / "character.json").exists():
+        mapped = None
+    character = mapped or "current"
+    event["model"] = model
+    if model:
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            hp = state_dir / f".{host}-host.json"
+            hp.write_text(json.dumps({"character": mapped, "model": str(event.get("model")), "ts": time.time()}))
+            hp.replace(state_dir / f"{host}-host.json")
+        except Exception:
+            pass
 
 arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
 name = event.get("hook_event_name") or arg_event
@@ -56,8 +123,8 @@ ANTIGRAVITY_IGNORE = ("task_boundary", "notify_user", "planner_response", "ask_q
 # AI 停下来问你问题、让你选选项的工具：Claude Code 的 AskUserQuestion、Codex 的 request_user_input、
 # DeepSeek Harness 的 ask_user_question 等
 ASKING_TOOLS = ("askuserquestion", "request_user_input", "ask_user_question", "ask_user", "ask_question")
-# Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI）；idle_prompt 是一轮做完后闲着，不算
-ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission")
+# Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI、WorkBuddy）；idle_prompt 是一轮做完后闲着，不算
+ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission", "agent_needs_input")
 
 
 def pose_for_tool(t: str) -> str:
@@ -139,6 +206,8 @@ elif name in ("PreToolUse", "BeforeTool"):
     pose = pose_for_tool(tool)
 elif name in ("PostToolUse", "AfterTool"):
     pose = "oops" if tool_failed() else "thinking"
+elif name in ("PostToolUseFailure",):
+    pose = "oops"
 elif name in ("Stop", "AfterAgent"):
     if event.get("error"):  # Antigravity：出错停下
         pose = "oops"

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode
     python3 tools/integrate.py status
 
 原则：
@@ -298,6 +298,95 @@ def deepseek(install: bool) -> None:
         print("  → 完全退出（⌘Q）再打开 DeepSeek Harness 生效")
 
 
+# ---- WorkBuddy（腾讯）----
+# 桌面版里跑的是 CodeBuddy 的智能体，钩子格式和 Claude Code 一样，配置目录由安装包决定：
+# 国际版 ~/.workbuddy-ai，国内版 ~/.workbuddy（专享版另有名字，可用 WORKBUDDY_CONFIG_DIR 指定）。
+# 每条事件都带当前模型名，钩子脚本按它选角色（crosspet-hook.py workbuddy）
+def workbuddy_dirs() -> list:
+    env = os.environ.get("WORKBUDDY_CONFIG_DIR")
+    dirs = [Path(env)] if env else [HOME / ".workbuddy-ai", HOME / ".workbuddy"]
+    # 智能体真正用的目录里会有它自己的东西（下载的组件、记忆、人设文件）；只有 device-id、logs 的不算
+    return [d for d in dirs if any((d / n).exists() for n in ("binaries", "memory", "SOUL.md"))]
+
+
+def workbuddy(install: bool) -> None:
+    dirs = workbuddy_dirs()
+    if install:
+        if not dirs:
+            print("  没找到 WorkBuddy 的配置（~/.workbuddy-ai 或 ~/.workbuddy），请先安装并打开一次 WorkBuddy 再接入")
+            return
+        for d in dirs:
+            merge_hooks(d / "settings.json", REPO / "integrations/workbuddy/hooks.json")
+        print("  → 完全退出再打开 WorkBuddy 生效；用 GPT / Claude / Gemini / DeepSeek 时换成对应角色，其他模型由当前角色来演")
+    else:
+        for d in dirs:
+            remove_hooks(d / "settings.json")
+
+
+# ---- ZCode（智谱）----
+# 钩子写在 ~/.zcode/cli/config.json 的 hooks 里，格式和 Claude Code 不同：要打开 hooks.enabled，
+# 事件放在 hooks.events 下，命令和参数分开写（直接启动进程，不经过 shell，所以路径要写成绝对路径）。
+# 模型名只在会话开始时给，钩子脚本按会话记住（crosspet-hook.py zcode）
+ZCODE_HOME = HOME / ".zcode"
+ZCODE_CONFIG = ZCODE_HOME / "cli/config.json"
+ZCODE_FLAG = SUPPORT / "zcode-hooks-enabled-by-crosspet"   # 钩子总开关是 CrossPet 打开的：撤销时关回去
+ZCODE_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "PostToolUseFailure", "Stop")
+
+
+def zcode_ours(group: dict) -> bool:
+    return any(MARK in " ".join(map(str, [h.get("command", "")] + list(h.get("args", [])))) for h in group.get("hooks", []))
+
+
+def zcode(install: bool) -> None:
+    if install and not found(ZCODE_HOME, "ZCode", ("cli",)):
+        return
+    if not install and not ZCODE_CONFIG.exists():
+        return
+    data = load_json(ZCODE_CONFIG) if ZCODE_CONFIG.exists() else {}
+    hooks = data.setdefault("hooks", {})
+    events = hooks.setdefault("events", {})
+    for ev in list(events):
+        kept = [g for g in events[ev] if not zcode_ours(g)]
+        if kept:
+            events[ev] = kept
+        else:
+            del events[ev]
+    if install:
+        if os.name == "nt":
+            SUPPORT.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+            command = sys.executable
+        else:
+            command = "python3"
+        hook = {"type": "process", "command": command, "args": [str(SUPPORT / MARK), "zcode"]}
+        for ev in ZCODE_EVENTS:
+            events.setdefault(ev, []).append({"hooks": [dict(hook)]})
+        if hooks.get("enabled") is not True:
+            SUPPORT.mkdir(parents=True, exist_ok=True)
+            ZCODE_FLAG.write_text("1")
+            hooks["enabled"] = True
+    else:
+        if ZCODE_FLAG.exists():   # 开关原本是关着的（或者没有）：还原
+            hooks["enabled"] = False
+            ZCODE_FLAG.unlink()
+        if not events:
+            data.pop("hooks", None)   # 只剩 CrossPet 加的东西：整段拿掉
+    if ZCODE_CONFIG.exists():
+        backup(ZCODE_CONFIG)
+    ZCODE_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    save_json(ZCODE_CONFIG, data)
+    print(f"  已更新 {ZCODE_CONFIG}")
+    if install:
+        print("  → 新开的 ZCode 会话生效；用 GLM 时换成 GLM 角色（还没装这个角色时由当前角色来演），用别家模型时换成对应角色")
+
+
+def has_zcode() -> bool:
+    try:
+        return any(zcode_ours(g) for gs in load_json(ZCODE_CONFIG).get("hooks", {}).get("events", {}).values() for g in gs)
+    except Exception:
+        return False
+
+
 # ---- Gemini CLI ----
 GEMINI_SETTINGS = HOME / ".gemini/settings.json"
 
@@ -344,7 +433,7 @@ def has_antigravity() -> bool:
         return False
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity}
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode}
 
 
 def has_hooks(p: Path) -> bool:
@@ -365,6 +454,8 @@ def installed() -> list:
     if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): result.append("deepseek")
     if has_hooks(GEMINI_SETTINGS) and found(GEMINI_SETTINGS.parent, "", ("settings.json", "config"), quiet=True): result.append("gemini")
     if has_antigravity() and (ANTIGRAVITY_HOOKS.parent.parent / "antigravity").is_dir(): result.append("antigravity")
+    if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()): result.append("workbuddy")
+    if has_zcode() and found(ZCODE_HOME, "", ("cli",), quiet=True): result.append("zcode")
     return result
 
 
@@ -376,6 +467,8 @@ def status() -> None:
     print("DeepSeek Harness    :", "已接入" if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8") else "未接入")
     print("Gemini CLI          :", "已接入" if has_hooks(GEMINI_SETTINGS) else "未接入")
     print("Antigravity         :", "已接入" if has_antigravity() else "未接入")
+    print("WorkBuddy           :", "已接入" if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()) else "未接入")
+    print("ZCode               :", "已接入" if has_zcode() else "未接入")
 
 
 if __name__ == "__main__":

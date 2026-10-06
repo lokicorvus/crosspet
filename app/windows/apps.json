@@ -3,5 +3,8 @@
   "codex.exe": "gpt",
   "chatgpt.exe": "gpt",
   "deepseek harness.exe": "deepseek",
-  "antigravity.exe": "gemini"
+  "antigravity.exe": "gemini",
+  "workbuddy ai.exe": "workbuddy",
+  "workbuddy.exe": "workbuddy",
+  "zcode.exe": "zcode"
 }

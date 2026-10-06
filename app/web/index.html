@@ -322,6 +322,7 @@ function setName(id, name) {
 }
 
 function applyCharState(id, s) {
+  if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
   charState[id] = s
   if (egg) { if (egg.host === id && s.pose && s.pose !== 'idle') endEgg(); return }
   if (id !== charId || !s.pose) return

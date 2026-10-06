@@ -16,7 +16,7 @@ set -euo pipefail
 
 REPO_SLUG="lokicorvus/crosspet"
 ACTION="${1:-install}"
-TARGETS="claude-mod claude-hooks codex deepseek antigravity gemini"
+TARGETS="claude-mod claude-hooks codex deepseek antigravity gemini workbuddy zcode"
 
 bold() { printf "\n\033[1m%s\033[0m\n" "$1"; }
 die() { printf "\n\033[31m%s\033[0m\n" "$1" >&2; exit 1; }
@@ -153,6 +153,8 @@ want codex "接入 Codex（之后要在 Codex 里用 /hooks 信任一次）？" 
 want deepseek "接入 DeepSeek Harness 桌面版（装插件，能显示余额）？" && python3 "$INTEGRATE" install deepseek || true
 want antigravity "接入 Antigravity（Gemini 角色跟着它干活）？" && python3 "$INTEGRATE" install antigravity || true
 want gemini "接入 Gemini CLI？" && python3 "$INTEGRATE" install gemini || true
+want workbuddy "接入 WorkBuddy（腾讯，按当前模型换角色）？" && python3 "$INTEGRATE" install workbuddy || true
+want zcode "接入 ZCode（智谱）？" && python3 "$INTEGRATE" install zcode || true
 
 bold "装好了！桌宠在屏幕右下角。"
 echo "· 单击摸摸头，拖动换位置，右键打开菜单（改名、换角色、开机自启……）"

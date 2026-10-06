@@ -271,7 +271,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         pollStates()
         refreshGPTQuota()
         refreshAntigravityQuota()
-        if followApps, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier, let id = appToCharacter[front] {
+        if followApps, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+           let id = appToCharacter[front] ?? hostApp(front), characterIds.contains(hostCharacter(id)) {
             switchTo(hostCharacter(id))
         }
     }
@@ -332,6 +333,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     /// 一个 App 里能用好几家模型（比如 DeepSeek Harness）：它的接入插件把当前角色写在 <角色>-host.json，
     /// 切到这个 App 时换成那个角色。一天内写的才算，角色不存在就还用 character.json 里绑定的
+    /// 本身不对应角色、而是能用好几家模型的 App：切过去时按它的接入写的 <宿主>-host.json 换角色，
+    /// 当前模型没有对应角色时不换（hostCharacter 返回宿主名，不是角色）
+    func hostApp(_ bundle: String) -> String? {
+        if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
+        if bundle == "dev.zcode.app" { return "zcode" }
+        return nil
+    }
+
     func hostCharacter(_ id: String) -> String {
         let url = stateDir.appendingPathComponent("\(id)-host.json")
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -347,9 +356,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func appActivated(_ note: Notification) {
         guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
         pendingSwitch?.cancel()
-        guard followApps, let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] else { return }
+        guard followApps, let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] ?? hostApp(bundle) else { return }
         let id = hostCharacter(mapped)
-        guard id != currentId else { return }
+        guard id != currentId, characterIds.contains(id) else { return }
         let work = DispatchWorkItem { [weak self] in
             guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
             self?.switchTo(id)
@@ -363,8 +372,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     /// 读 /tmp/crosspet/<id>-state.json 和 <id>-quota.json，有变化就交给画面。
     func pollStates() {
         guard ready else { return }
-        for id in characterIds {
-            for kind in ["state", "quota"] {
+        // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
+        for id in characterIds + ["current"] {
+            for kind in ["state", "quota"] where !(id == "current" && kind == "quota") {
                 let url = stateDir.appendingPathComponent("\(id)-\(kind).json")
                 let key = "\(id)-\(kind)"
                 guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -377,6 +387,17 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if pauseRealEvents { continue }
                 js(kind == "state" ? "applyCharState(\(quote(id)), \(text))" : "setQuota(\(quote(id)), \(text))")
             }
+        }
+        // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode）正在前台、里面换了模型：马上换成那个模型的角色
+        for host in ["deepseek", "workbuddy", "zcode"] {
+            let url = stateDir.appendingPathComponent("\(host)-host.json")
+            guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
+                  stamp != stamps["\(host)-host"] else { continue }
+            stamps["\(host)-host"] = stamp
+            guard followApps, !pauseRealEvents, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                  (appToCharacter[front] ?? hostApp(front)) == host else { continue }
+            let id = hostCharacter(host)
+            if id != currentId, characterIds.contains(id) { switchTo(id) }
         }
     }
 
