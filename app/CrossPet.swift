@@ -88,9 +88,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = .floating
+        panel.level = layerMode == "normal" ? .normal : .floating
         panel.hidesOnDeactivate = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        applyFullscreenBehavior()
 
         let container = NSView(frame: NSRect(origin: .zero, size: size))
         web = WKWebView(frame: container.bounds, configuration: WKWebViewConfiguration())
@@ -109,18 +109,23 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
         panel.contentView = container
         panel.orderFrontRegardless()
+        setupStatusItem()
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
-        Timer.scheduledTimer(withTimeInterval: 24 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
+        // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
+        Timer.scheduledTimer(withTimeInterval: 3 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { self?.checkForUpdate(manual: false) }   // 等网络连上
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkForUpdate(manual: false) }
     }
 
     // MARK: 更新
-    // 每天查一次 GitHub 上最新的 Release（只读公开的版本号，不发送任何数据）。
+    // 每 3 小时（和电脑醒来时）查一次 GitHub 上最新的 Release（只读公开的版本号，不发送任何数据）。
     // 自己 fork 的话改这里的仓库名。
     let repoSlug = "lokicorvus/crosspet"
     var currentVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0" }
@@ -388,11 +393,15 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 // 状态只认 10 分钟内的，免得开机读到旧状态
                 if kind == "state", Date().timeIntervalSince(stamp) > 600 { continue }
                 guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { continue }
+                if kind == "state", let pose = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["pose"] as? String {
+                    lastPose[id] = (pose, stamp)
+                }
                 devJS("logEvent(\(quote(id)), \(quote(kind)), \(text), \(pauseRealEvents))")
                 if pauseRealEvents { continue }
                 js(kind == "state" ? "applyCharState(\(quote(id)), \(text))" : "setQuota(\(quote(id)), \(text))")
             }
         }
+        applyLayer()
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode）正在前台、里面换了模型：马上换成那个模型的角色
         for host in ["deepseek", "workbuddy", "zcode"] {
             let url = stateDir.appendingPathComponent("\(host)-host.json")
@@ -601,6 +610,10 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // MARK: 菜单
 
     func showMenu(_ event: NSEvent, in view: NSView) {
+        NSMenu.popUpContextMenu(buildMenu(), with: event, for: view)
+    }
+
+    func buildMenu() -> NSMenu {
         let menu = NSMenu()
         if let r = latestRelease {
             if canSelfUpdate {
@@ -628,6 +641,17 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             menu.addItem(switchItem)
         }
         menu.addItem(.separator())
+        let layerItem = NSMenuItem(title: "显示层级", action: nil, keyEquivalent: "")
+        let layerMenu = NSMenu()
+        for (mode, title) in [("always", "始终在最上层"), ("ai", "跟着 AI（用 AI 时才浮在最上层）"), ("normal", "普通窗口（不置顶）")] {
+            let item = NSMenuItem(title: title, action: #selector(setLayer(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode
+            item.state = layerMode == mode ? .on : .off
+            layerMenu.addItem(item)
+        }
+        layerItem.submenu = layerMenu
+        menu.addItem(layerItem)
         add(menu, "设置…", #selector(openSettings))
         if NSEvent.modifierFlags.contains(.option) {  // 按住 ⌥ 右键才出现：给自己换立绘、加角色的人检查效果用
             add(menu, "开发者控制台…", #selector(openDevConsole))
@@ -635,7 +659,47 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         add(menu, "回到右下角", #selector(resetPosition))
         menu.addItem(.separator())
         add(menu, "退出 CrossPet", #selector(quit))
-        NSMenu.popUpContextMenu(menu, with: event, for: view)
+        return menu
+    }
+
+    // MARK: 菜单栏图标
+    // Mac 版不在程序坞和 ⌘Tab 里：她被别的窗口挡住（显示层级选了「普通窗口」或「跟着 AI」）、
+    // 被拖到看不见的地方时，从这里找她。左键：叫到最前面；右键：和桌宠右键一样的菜单（和 Windows 的托盘图标对应）
+    var statusItem: NSStatusItem?
+
+    func setupStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.autosaveName = "CrossPetStatusItem"   // 记住用户按住 ⌘ 拖到的位置
+        if let button = item.button {
+            let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "CrossPet")
+            image?.isTemplate = true
+            button.image = image
+            button.toolTip = "CrossPet：单击把她叫到最前面，右键打开菜单"
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+        statusItem = item
+    }
+
+    @objc func statusItemClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            // 临时挂上菜单再「点一下」：菜单从图标正下方弹出，关掉后摘下，免得左键也变成弹菜单
+            statusItem?.menu = buildMenu()
+            sender.performClick(nil)
+            statusItem?.menu = nil
+        } else {
+            bringToFront()
+        }
+    }
+
+    /// 叫到最前面：在当前屏幕看不见（被拖出屏幕、换了显示器）就先回到右下角
+    @objc func bringToFront() {
+        let visible = NSScreen.screens.contains { $0.visibleFrame.intersects(panel.frame.insetBy(dx: 40, dy: 40)) }
+        if !visible { resetPosition() }
+        panel.orderFrontRegardless()
+        js("handleClick('pat')")
     }
 
     @discardableResult
@@ -714,6 +778,42 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
     @objc func quit() { NSApp.terminate(nil) }
 
+    // MARK: 显示层级
+    // always：始终在最上层；ai：前台是 AI 应用、或者 AI 正在干活 / 等你回答时在最上层，其他时候是普通窗口（会被挡住）；
+    // normal：普通窗口。全屏时隐藏用 macOS 自己的机制：不允许出现在全屏程序的空间里
+    var layerMode: String { defaults.string(forKey: "layer") ?? "always" }
+    var hideInFullscreen: Bool { defaults.object(forKey: "hideFullscreen") as? Bool ?? true }
+    var lastPose: [String: (pose: String, at: Date)] = [:]   // 各角色最近一次状态（判断 AI 在不在干活）
+
+    var aiActive: Bool {
+        if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+           appToCharacter[front] != nil || hostApp(front) != nil { return true }
+        let now = Date()
+        return lastPose.values.contains { p in
+            let age = now.timeIntervalSince(p.at)
+            if p.pose == "asking" { return age < 600 }                        // 等你回答：一直等到你回答
+            return age < 45 && !["idle", "sleeping", "happy", "proud"].contains(p.pose)   // 正在干活
+        }
+    }
+
+    func applyLayer() {
+        let top = layerMode == "always" || (layerMode == "ai" && aiActive)
+        let level: NSWindow.Level = top ? .floating : .normal
+        guard panel.level != level else { return }
+        panel.level = level
+        if top { panel.orderFrontRegardless() }
+    }
+
+    @objc func setLayer(_ sender: NSMenuItem) {
+        guard let mode = sender.representedObject as? String else { return }
+        defaults.set(mode, forKey: "layer")
+        applyLayer()
+    }
+
+    func applyFullscreenBehavior() {
+        panel.collectionBehavior = hideInFullscreen ? [.canJoinAllSpaces, .stationary] : [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+    }
+
     // MARK: 设置
     // 一个独立窗口（web/settings.html，和 Windows 版共用），右键菜单只留常用的几项，其余都在这里
     static let baseSize = NSSize(width: 260, height: 362)
@@ -785,7 +885,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
         var state: [String: Any] = [
             "version": currentVersion, "platform": "mac",
-            "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "aura": auraMode, "followApps": followApps,
+            "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
             "character": currentId ?? characterIds.first ?? "",
@@ -896,6 +996,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if let mode = value as? String, ["auto", "on", "off"].contains(mode) { defaults.set(mode, forKey: "auraMode"); js("setAuraMode(\(quote(mode)))") }
             case "followApps":
                 defaults.set(value as? Bool ?? true, forKey: "followApps")
+            case "hideFullscreen":
+                defaults.set(value as? Bool ?? true, forKey: "hideFullscreen"); applyFullscreenBehavior()
             case "eggs":
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "eggs"); js("setEggsEnabled(\(on))")
             case "gptQuota":

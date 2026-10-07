@@ -10,7 +10,7 @@ namespace CrossPet
     {
         public const int GWL_EXSTYLE = -20;
         public const int WS_EX_NOACTIVATE = 0x08000000, WS_EX_TOOLWINDOW = 0x00000080;
-        public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+        public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1), HWND_NOTOPMOST = new IntPtr(-2);
         public const uint SWP_NOSIZE = 0x1, SWP_NOMOVE = 0x2, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
         const uint EVENT_SYSTEM_FOREGROUND = 0x0003, WINEVENT_OUTOFCONTEXT = 0, WINEVENT_SKIPOWNPROCESS = 0x2;
         const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
@@ -38,6 +38,18 @@ namespace CrossPet
         /// <summary>重新放到最顶层（不抢焦点、不挪位置）。别的置顶窗口激活后会盖过来，每次前台切换都调一次</summary>
         public static void BringToTop(IntPtr hwnd) =>
             SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        /// <summary>取消置顶（变成普通窗口，会被别的窗口挡住）</summary>
+        public static void DropFromTop(IntPtr hwnd) =>
+            SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        // 用户现在是不是在全屏程序里（全屏视频 / 游戏 / 演示）：系统自己判断「这时候别打扰」用的就是它
+        [DllImport("shell32.dll")] static extern int SHQueryUserNotificationState(out int state);
+        public static bool InFullscreen()
+        {
+            try { return SHQueryUserNotificationState(out var s) == 0 && (s == 2 || s == 3 || s == 4); }   // BUSY / D3D 全屏 / 演示模式
+            catch { return false; }
+        }
 
         public static void MoveTo(IntPtr hwnd, int x, int y) =>
             SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);

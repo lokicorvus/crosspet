@@ -57,7 +57,7 @@ namespace CrossPet
             Window = new Window
             {
                 Title = "CrossPet", WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent,
-                Width = BaseWidth * Scale, Height = BaseHeight * Scale, Topmost = true, ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
+                Width = BaseWidth * Scale, Height = BaseHeight * Scale, Topmost = LayerMode != "normal", ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
                 Left = -10000, Top = -10000,   // 先放屏幕外，拿到窗口句柄后按像素摆到保存的位置
             };
             Window.SourceInitialized += (_, __) =>
@@ -91,13 +91,21 @@ namespace CrossPet
             appSwitch.Tick += (_, __) => { appSwitch.Stop(); FollowForeground(); };
             foreground = new Native.ForegroundWatcher(() =>
             {
-                if (hwnd != IntPtr.Zero) Native.BringToTop(hwnd);
+                if (hwnd != IntPtr.Zero && Window.Topmost) Native.BringToTop(hwnd);
                 appSwitch.Stop(); appSwitch.Start();
             });
 
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), RefreshQuota);
-            Every(TimeSpan.FromHours(24), () => _ = CheckForUpdate());
+            // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
+            Every(TimeSpan.FromHours(3), () => _ = CheckForUpdate());
+            Microsoft.Win32.SystemEvents.PowerModeChanged += (_, e) =>
+            {
+                if (e.Mode != Microsoft.Win32.PowerModes.Resume) return;
+                var wake = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };   // 等网络连上
+                wake.Tick += (__, ___) => { wake.Stop(); _ = CheckForUpdate(); };
+                wake.Start();
+            };
             var first = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
             first.Tick += (_, __) => { first.Stop(); _ = CheckForUpdate(); };
             first.Start();
@@ -215,21 +223,56 @@ namespace CrossPet
                         // 在终端里用 AI 时没有对应的前台程序：跟着最新一条工作事件换角色
                         var pose = value.TryGetValue("pose", out var p) ? p as string : null;
                         var ts = value.TryGetValue("ts", out var t) ? Convert.ToDouble(t) : 0;
+                        lastPose[id] = (pose ?? "", DateTime.UtcNow);
                         if (id != "current" && pose != "idle" && pose != "sleeping" && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts < 30 && ts > latestActive.ts) latestActive = (id, ts);
                         Js($"applyCharState({Q(id)}, {json})");
                     }
                     else Js($"setQuota({Q(id)}, {json})");
                 }
             if (latestActive.id != null && latestActive.id != current && Store.Flag("followEvents")) SwitchTo(latestActive.id);
+            ApplyLayer();
+        }
+
+        // ---------------- 显示层级 ----------------
+        // always：始终在最上层；ai：前台是 AI 应用、或者 AI 正在干活 / 等你回答时在最上层，其他时候是普通窗口（会被挡住）；
+        // normal：普通窗口。另外全屏程序（视频 / 游戏 / 演示）在前台时整个隐藏
+        static string LayerMode => Store.Settings.TryGetValue("layer", out var v) && v is string s && (s == "ai" || s == "normal") ? s : "always";
+        static bool HideFullscreen => !(Store.Settings.TryGetValue("hideFullscreen", out var v) && v is bool b && !b);
+        readonly Dictionary<string, (string pose, DateTime at)> lastPose = new Dictionary<string, (string, DateTime)>();
+        bool frontIsAI, hiddenForFullscreen;
+
+        bool AIActive()
+        {
+            if (frontIsAI) return true;
+            var now = DateTime.UtcNow;
+            return lastPose.Values.Any(p => p.pose == "asking" ? (now - p.at).TotalMinutes < 10
+                : (now - p.at).TotalSeconds < 45 && !new[] { "idle", "sleeping", "happy", "proud" }.Contains(p.pose));
+        }
+
+        void ApplyLayer()
+        {
+            if (Window == null || hwnd == IntPtr.Zero) return;
+            // 全屏时隐藏
+            var hide = HideFullscreen && Native.InFullscreen();
+            if (hide != hiddenForFullscreen)
+            {
+                hiddenForFullscreen = hide;
+                if (hide) Window.Hide(); else { Window.Show(); if (Window.Topmost) Native.BringToTop(hwnd); }
+            }
+            var top = LayerMode == "always" || (LayerMode == "ai" && AIActive());
+            if (Window.Topmost == top) return;
+            Window.Topmost = top;
+            if (top) Native.BringToTop(hwnd); else Native.DropFromTop(hwnd);
         }
 
         void FollowForeground()
         {
-            if (!ready || Paused || !Store.Flag("followApps")) return;
             var exe = Native.ForegroundExe();
-            if (exe == "") return;
             var map = Store.ReadJson(Store.AppMap);
-            var match = map?.FirstOrDefault(kv => string.Equals(kv.Key, exe, StringComparison.OrdinalIgnoreCase)).Value as string;
+            var match = exe == "" ? null : map?.FirstOrDefault(kv => string.Equals(kv.Key, exe, StringComparison.OrdinalIgnoreCase)).Value as string;
+            frontIsAI = !string.IsNullOrWhiteSpace(match);
+            ApplyLayer();
+            if (!ready || Paused || !Store.Flag("followApps") || exe == "") return;
             if (string.IsNullOrWhiteSpace(match)) return;   // 对照表里没有，或者值留空：这个程序不跟随
             match = HostCharacter(match);
             if (match != current) SwitchTo(match);
@@ -314,7 +357,7 @@ namespace CrossPet
             else { var wa = Forms.Screen.PrimaryScreen.WorkingArea; x = wa.Right - w - 40; y = wa.Bottom - h - 100; }
             var (cx, cy) = Clamp(x, y, w, h);
             Native.MoveTo(hwnd, cx, cy);
-            Native.BringToTop(hwnd);
+            if (Window.Topmost) Native.BringToTop(hwnd);
         }
         static (int, int) Clamp(int x, int y, int w, int h)
         {
@@ -362,6 +405,13 @@ namespace CrossPet
             foreach (var (id, name) in Characters()) { var cid = id; switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid), cid == current)); }
             menu.Items.Add(switchTo);
             Sep();
+            var layer = new Forms.ToolStripMenuItem("显示层级");
+            foreach (var (mode, title) in new[] { ("always", "始终在最上层"), ("ai", "跟着 AI（用 AI 时才浮在最上层）"), ("normal", "普通窗口（不置顶）") })
+            {
+                var m = mode;
+                layer.DropDownItems.Add(Item(title, () => { Store.Settings["layer"] = m; Store.SaveSettings(); ApplyLayer(); }, LayerMode == m));
+            }
+            menu.Items.Add(layer);
             menu.Items.Add(Item("设置…", OpenSettings));
             if (developer) menu.Items.Add(Item("开发者控制台…", OpenDev));
             menu.Items.Add(Item("回到右下角", Recenter));
@@ -444,7 +494,7 @@ namespace CrossPet
             var state = new Dictionary<string, object>
             {
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
-                ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["aura"] = AuraMode,
+                ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
                 ["login"] = LoginEnabled, ["character"] = current, ["updating"] = updating,
@@ -480,6 +530,7 @@ namespace CrossPet
                             Store.Settings["size"] = v; Store.SaveSettings(); AnimateScale(v);
                             break;
                         case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
+                        case "hideFullscreen": Store.Settings["hideFullscreen"] = on; Store.SaveSettings(); ApplyLayer(); break;
                         case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
@@ -607,7 +658,7 @@ namespace CrossPet
             return (output, code);
         }
 
-        // ---------------- 检查更新：每天一次，只读 GitHub 上公开的版本号，不发送任何数据 ----------------
+        // ---------------- 检查更新：每 3 小时和电脑醒来时，只读 GitHub 上公开的版本号，不发送任何数据 ----------------
         static readonly HttpClient http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         static readonly HttpClient download = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         async Task CheckForUpdate(bool manual = false)

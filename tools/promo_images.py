@@ -18,7 +18,7 @@ OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else REPO.parent / "crosspet-promo"
 FONT = "/System/Library/Fonts/Hiragino Sans GB.ttc"
 W, H = 1242, 1656
 INK, MUTED = (59, 42, 34), (138, 122, 112)
-ACCENT = {"claude": (232, 163, 61), "gpt": (122, 143, 168), "deepseek": (59, 91, 181), "gemini": (123, 92, 214)}
+ACCENT = {"claude": (232, 163, 61), "gpt": (122, 143, 168), "deepseek": (59, 91, 181), "gemini": (123, 92, 214), "glm": (75, 90, 138)}
 CREDIT = "非官方同人 · 角色原型：溟月（上善无形）、大肥鱼 / 白龙（B站 ZipZipPipe）· 立绘 CC BY-NC-SA 4.0 · 不商用"
 REPO_URL = "github.com/lokicorvus/crosspet"
 
@@ -120,7 +120,7 @@ def readme_cover():
     d.text((x + 4, 390), "AI 干什么活，她就跟着做什么动作。", font=font(34), fill=INK)
     f = font(28, True)
     xx = x + 4
-    for t in ["Claude", "GPT", "DeepSeek", "Gemini"]:
+    for t in ["Claude", "GPT", "DeepSeek", "Gemini", "GLM"]:
         tw = d.textlength(t, font=f) + 48
         color = ACCENT[t.lower()]
         d.rounded_rectangle([xx, 470, xx + tw, 522], 26, fill=(255, 255, 255, 235), outline=color, width=3)
