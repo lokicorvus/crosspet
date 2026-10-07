@@ -11,7 +11,7 @@ PY_VERSION=3.13.13
 PY_SHA256=8766a8775746235e23cf5aee5027ab1060bb981d93110577adcf3508aa0cbd55
 PY_ZIP="build/downloads/python-$PY_VERSION-embed-amd64.zip"
 
-"$DOTNET" build app/windows/CrossPet.csproj -c Release -nologo -v quiet -p:Version="$(cat VERSION)"
+"$DOTNET" build app/windows/CrossPet.csproj -c Release -nologo -v quiet -p:Version="$(cut -d- -f1 VERSION)" -p:InformationalVersion="$(cat VERSION)"
 BIN=app/windows/bin/Release/net48
 
 rm -rf "$OUT"

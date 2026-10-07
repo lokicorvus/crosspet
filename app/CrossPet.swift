@@ -130,14 +130,35 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // 每 3 小时（和电脑醒来时）查一次 GitHub 上最新的 Release（只读公开的版本号，不发送任何数据）。
     // 自己 fork 的话改这里的仓库名。
     let repoSlug = "lokicorvus/crosspet"
-    var currentVersion: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0" }
+    // 完整版本号（测试版带后缀，如 1.2.5-beta.1）存在自定义字段里；CFBundleShortVersionString 按苹果要求只放数字部分
+    var currentVersion: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CrossPetVersion") ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString")) as? String ?? "0"
+    }
 
+    /// 语义化版本比较：先比 主.次.补丁；一样时正式版比测试版新（1.2.4 < 1.2.5-beta.1 < 1.2.5-beta.2 < 1.2.5）
     func isNewer(_ tag: String, than current: String) -> Bool {
-        let a = tag.trimmingCharacters(in: CharacterSet(charactersIn: "vV")).split(separator: ".").map { Int($0) ?? 0 }
-        let b = current.split(separator: ".").map { Int($0) ?? 0 }
-        for i in 0..<max(a.count, b.count) {
-            let x = i < a.count ? a[i] : 0, y = i < b.count ? b[i] : 0
+        func parse(_ v: String) -> (core: [Int], pre: [String]) {
+            let s = v.trimmingCharacters(in: CharacterSet(charactersIn: "vV "))
+            let parts = s.split(separator: "-", maxSplits: 1).map(String.init)
+            let core = (parts.first ?? "").split(separator: ".").map { Int($0) ?? 0 }
+            let pre = parts.count > 1 ? parts[1].split(separator: ".").map(String.init) : []
+            return (core, pre)
+        }
+        let a = parse(tag), b = parse(current)
+        for i in 0..<max(a.core.count, b.core.count, 3) {
+            let x = i < a.core.count ? a.core[i] : 0, y = i < b.core.count ? b.core[i] : 0
             if x != y { return x > y }
+        }
+        if a.pre.isEmpty || b.pre.isEmpty { return a.pre.isEmpty && !b.pre.isEmpty }   // 正式版 > 同号测试版
+        for i in 0..<max(a.pre.count, b.pre.count) {
+            guard i < a.pre.count else { return false }
+            guard i < b.pre.count else { return true }
+            let x = a.pre[i], y = b.pre[i]
+            if x == y { continue }
+            if let nx = Int(x), let ny = Int(y) { return nx > ny }
+            if Int(x) != nil { return false }   // 数字段比文字段小（semver 规则）
+            if Int(y) != nil { return true }
+            return x > y
         }
         return false
     }

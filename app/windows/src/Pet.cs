@@ -851,14 +851,33 @@ namespace CrossPet
             }
         }
 
-        static bool Newer(string tag, string cur)
+        /// <summary>语义化版本比较：先比 主.次.补丁；一样时正式版比测试版新（1.2.4 &lt; 1.2.5-beta.1 &lt; 1.2.5-beta.2 &lt; 1.2.5）</summary>
+        public static bool Newer(string tag, string cur)
         {
-            int[] P(string v) => v.TrimStart('v', 'V').Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
-            var a = P(tag); var b = P(cur);
-            for (int i = 0; i < Math.Max(a.Length, b.Length); i++)
+            (int[] core, string[] pre) P(string v)
             {
-                var x = i < a.Length ? a[i] : 0; var y = i < b.Length ? b[i] : 0;
+                var parts = v.Trim().TrimStart('v', 'V').Split(new[] { '-' }, 2);
+                return (parts[0].Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray(),
+                        parts.Length > 1 ? parts[1].Split('.') : new string[0]);
+            }
+            var a = P(tag); var b = P(cur);
+            for (int i = 0; i < Math.Max(3, Math.Max(a.core.Length, b.core.Length)); i++)
+            {
+                var x = i < a.core.Length ? a.core[i] : 0; var y = i < b.core.Length ? b.core[i] : 0;
                 if (x != y) return x > y;
+            }
+            if (a.pre.Length == 0 || b.pre.Length == 0) return a.pre.Length == 0 && b.pre.Length > 0;   // 正式版 > 同号测试版
+            for (int i = 0; i < Math.Max(a.pre.Length, b.pre.Length); i++)
+            {
+                if (i >= a.pre.Length) return false;
+                if (i >= b.pre.Length) return true;
+                string x = a.pre[i], y = b.pre[i];
+                if (x == y) continue;
+                bool xn = int.TryParse(x, out var nx), yn = int.TryParse(y, out var ny);
+                if (xn && yn) return nx > ny;
+                if (xn) return false;   // 数字段比文字段小（semver 规则）
+                if (yn) return true;
+                return string.CompareOrdinal(x, y) > 0;
             }
             return false;
         }
