@@ -379,7 +379,21 @@ const steam = [0, 1, 2].map(i =>
 const fxCelebrate = confetti + star(500, 170, 1, '0.5s', '#ffd54a') + star(80, 200, 0.9, '0.9s', '#ffd54a') + star(548, 392, 0.8, '0.3s')
 // 大成功但立绘里已经画了皇冠：只留几颗金色闪光，不再叠特效皇冠和奖杯
 const fxVictory = star(510, 140, 1.1, '0.4s', '#ffd54a') + star(548, 330, 0.8, '0.2s', '#ffd54a') + star(70, 200, 0.9, '0.8s', '#ffd54a') + star(60, 330, 0.7, '1.1s', '#ffd54a')
-const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory }
+// 股价 K 线（DeepSeek × GLM 互相狙击的彩蛋）：右上角小窗里一排蜡烛图往一个方向走，旁边一个大箭头一跳一跳。
+// 按 A 股习惯涨红跌绿，箭头方向让不熟悉这个习惯的人也看得懂
+const stockCard = (up) => {
+  const x = 430, y = 30, color = up ? '#e5484d' : '#2f9e5b'
+  const candles = [0, 1, 2, 3, 4, 5].map(i => {
+    const level = up ? i : 5 - i
+    const cy = y + 84 - level * 9, h = 14 + (i % 2) * 6
+    return `<line x1="${x + 18 + i * 13}" y1="${cy - h / 2 - 5}" x2="${x + 18 + i * 13}" y2="${cy + h / 2 + 5}" stroke="${color}" stroke-width="1.5"/>` +
+      `<rect x="${x + 14 + i * 13}" y="${cy - h / 2}" width="8" height="${h}" rx="1.5" fill="${color}"/>`
+  }).join('')
+  const arrow = `<g><path d="${up ? `M${x + 108} ${y + 76} v-34 m-9 9 l9 -9 l9 9` : `M${x + 108} ${y + 42} v34 m-9 -9 l9 9 l9 -9`}" fill="none" stroke="${color}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<animateTransform attributeName="transform" type="translate" values="0 0;0 ${up ? -5 : 5};0 0" dur="0.9s" ${loop}/></g>`
+  return `<g>${winFrame(x, y, 126, 104, false, up ? '#fde8e8' : '#e3f5ea')}${candles}${arrow}${floatY('2.4s')}</g>`
+}
+const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory, stockDown: stockCard(false), stockUp: stockCard(true) }
 
 // 每个姿态周围的细节
 const surroundings = (p      )         => {

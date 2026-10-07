@@ -519,7 +519,8 @@ function playEgg(force) {
     charId = eggId; pose = null; currentUrl = ''
     const c = char()
     document.documentElement.style.setProperty('--accent', c.accent || '#e0b48a')
-    $('caption').textContent = `${manifest.characters[host].name}？`
+    // cos 彩蛋装成别人（「Claude？」）；对手直接上门的彩蛋（DeepSeek × GLM）用自己的名字
+    $('caption').textContent = c.caption || `${manifest.characters[host].name}？`
     renderQuota()
     setPose('pop', true); document.documentElement.style.setProperty('--aura', c.aura || '#bcd4ff'); say(eggLine('pop'))
     egg.timers.push(setTimeout(() => {
