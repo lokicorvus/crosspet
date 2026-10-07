@@ -346,10 +346,15 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let stamp = attrs[.modificationDate] as? Date, Date().timeIntervalSince(stamp) < 86400,
               let data = try? Data(contentsOf: url),
-              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let c = obj["character"] as? String, characterIds.contains(c) else { return id }
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            // 还不知道它在用哪个模型（刚装好、还没对话过）：先按它默认的模型换，比如 ZCode 默认是 GLM
+            if let d = Self.hostDefaults[id], characterIds.contains(d) { return d }
+            return id
+        }
+        guard let c = obj["character"] as? String, characterIds.contains(c) else { return id }
         return c
     }
+    static let hostDefaults = ["zcode": "glm"]
 
     /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
     /// App 启动时窗口会短暂地抢焦点、让焦点，立即响应会来回闪。
