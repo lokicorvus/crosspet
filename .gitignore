@@ -6,3 +6,5 @@ __pycache__/
 node_modules/
 app/windows/bin/
 app/windows/obj/
+docs/prompts/时段与节日/*/
+docs/prompts/多会话/*/

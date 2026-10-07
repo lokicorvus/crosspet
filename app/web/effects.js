@@ -397,6 +397,145 @@ const priceTag = (up) => {
 }
 const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory, priceDown: priceTag(false), priceUp: priceTag(true) }
 
+// ---- 按时段 / 节日打招呼的环境特效 ----
+// 和角色有关的东西（茶杯、装扮、道具）都画在立绘里；这里只做氛围，放在两侧（x<95 或 x>485）和头顶上方（y<105），不压人物
+const fxOnce = (dur, begin = '0s') => `dur="${dur}" begin="${begin}" fill="freeze"`
+// 入场：从透明淡入并轻轻落位
+const fxEnter = (dy = 12, dur = '0.7s') =>
+  `<animate attributeName="opacity" values="0;1" ${fxOnce(dur)}/><animateTransform attributeName="transform" type="translate" values="0 ${dy};0 0" ${fxOnce(dur)} additive="sum"/>`
+// 从上往下飘落的小东西：shape(i) 返回以 (0,0) 为中心的图形
+const fall = (xs, shape, { dur = 4, dy = 300, sway = 14, y0 = -10, spin = 0 } = {}) => xs.map((x, i) => {
+  const d = `${(dur + (i % 3) * 0.6).toFixed(1)}s`, b = `${(i * 0.53).toFixed(2)}s`
+  return `<g transform="translate(${x} ${y0 + (i % 4) * 18})" opacity="0"><g>${shape(i)}` +
+    (spin ? `<animateTransform attributeName="transform" type="rotate" values="0;${spin * (i % 2 ? 1 : -1)}" dur="${d}" begin="${b}" ${loop}/>` : '') +
+    `</g>${fadeLoop(d, b)}<animateTransform attributeName="transform" type="translate" values="0 0;${sway} ${dy * 0.5};${-sway / 2} ${dy}" dur="${d}" begin="${b}" ${loop} additive="sum"/></g>`
+}).join('')
+// 从下往上升起
+const ascend = (pts, shape, { dur = 5, dy = -220 } = {}) => pts.map(([x, y], i) => {
+  const d = `${(dur + (i % 3) * 0.7).toFixed(1)}s`, b = `${(i * 0.9).toFixed(2)}s`
+  return `<g transform="translate(${x} ${y})" opacity="0">${shape(i)}${fadeLoop(d, b)}${rise(d, b, dy, i % 2 ? 10 : -10)}</g>`
+}).join('')
+const SIDES = [22, 48, 74, 506, 532, 558]
+
+const sunDefs = `<defs><radialGradient id="fxSun" cx="40%" cy="38%" r="65%"><stop offset="0" stop-color="#fff6c8"/><stop offset="0.55" stop-color="#ffd25e"/><stop offset="1" stop-color="#f5a623"/></radialGradient></defs>`
+const sun = (x, y, r, raysDur = '14s') => {
+  const rays = Array.from({ length: 10 }, (_, i) => {
+    const a = i * 36, long = i % 2 === 0
+    return `<path d="M0 ${-(r + 8)} L${long ? 5 : 4} ${-(r + (long ? 22 : 16))} L${long ? -5 : -4} ${-(r + (long ? 22 : 16))}Z" transform="rotate(${a})" fill="#ffc94a" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round"/>`
+  }).join('')
+  return `<g transform="translate(${x} ${y})"><g>${rays}<animateTransform attributeName="transform" type="rotate" values="0;360" dur="${raysDur}" ${loop}/></g>` +
+    `<circle r="${r}" fill="url(#fxSun)" stroke="${INK}" stroke-width="2.5"/><ellipse cx="${-r * 0.35}" cy="${-r * 0.4}" rx="${r * 0.28}" ry="${r * 0.18}" fill="#fff" opacity="0.7"/></g>`
+}
+const fxCloud = (x, y, s, dur, dx) =>
+  `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-34 10 a14 14 0 0 1 4 -27 a20 20 0 0 1 36 -6 a16 16 0 0 1 26 13 a12 12 0 0 1 -2 20z" fill="#fff" stroke="${INK}" stroke-width="2.2"/>` +
+  `<path d="M-24 4 a10 10 0 0 1 10 -10" stroke="#dfe8f5" stroke-width="3" fill="none" stroke-linecap="round"/>` +
+  `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} 0;0 0" dur="${dur}" ${loop} additive="sum"/></g>`
+
+// 早上：右上角太阳升起，光芒慢慢转
+const fxMorning = `${sunDefs}<g>${sun(520, 72, 26)}${fxEnter(40, '1.4s')}</g>` +
+  star(60, 150, 0.7, '0.4s', '#ffd98a', '2.6s') + star(40, 260, 0.5, '1.3s', '#ffd98a', '2.6s')
+// 中午：头顶高处的太阳 + 两朵飘过的云
+const fxNoon = `${sunDefs}<g>${sun(70, 64, 24, '10s')}${fxEnter(-20, '0.9s')}</g>` +
+  `<g>${fxCloud(512, 70, 0.9, '6s', -14)}${fxEnter(0, '1s')}</g><g>${fxCloud(530, 170, 0.6, '7s', 10)}${fxEnter(0, '1.4s')}</g>`
+// 下午：两侧飘落的暖色花瓣
+const petal = i => `<path d="M0 -9 C7 -6 7 5 0 9 C-7 5 -7 -6 0 -9Z" fill="${['#ffc1a8', '#ffd7a0', '#f9a98b'][i % 3]}" stroke="${INK}" stroke-width="1.4"/><path d="M0 -6 V6" stroke="#e98e6f" stroke-width="1"/>`
+const fxAfternoon = fall(SIDES, petal, { dur: 4.4, dy: 360, sway: 18, spin: 220 })
+// 晚上：两侧一闪一闪、慢慢飘的萤火虫
+const firefly = i => `<circle r="9" fill="#fff3b0" opacity="0.35"/><circle r="4" fill="#ffe066" stroke="#d9a21b" stroke-width="1.2"/>`
+const fxEvening = ascend([[40, 300], [70, 380], [30, 200], [520, 320], [548, 240], [505, 400]], firefly, { dur: 4.2, dy: -90 })
+// 深夜：弯月 + 闪烁的星星 + 偶尔一颗流星
+const moonDefs = `<defs><linearGradient id="fxMoon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff8d6"/><stop offset="1" stop-color="#f2cf6b"/></linearGradient></defs>`
+const crescent = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -30 a30 30 0 1 0 26 45 a24 24 0 1 1 -26 -45z" fill="url(#fxMoon)" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/>` +
+  `<circle cx="-12" cy="6" r="3" fill="#e8c35a" opacity="0.7"/><circle cx="-6" cy="18" r="2" fill="#e8c35a" opacity="0.7"/></g>`
+// 流星：头沿斜线划过，尾巴晚一点出发跟着走，所以先拖出一道光、再收短消失（不是一整根线平移）
+const shootingStar = (() => {
+  const [x0, y0, x1, y1] = [570, 12, 380, 88], t = 'dur="6s" ' + loop
+  const kt = 'keyTimes="0;0.6;0.72;1"', ktTail = 'keyTimes="0;0.63;0.76;1"'
+  return `<defs><linearGradient id="fxTail" gradientUnits="userSpaceOnUse" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"><stop offset="0" stop-color="#fff3c4" stop-opacity="0"/><stop offset="1" stop-color="#fffbe6"/></linearGradient></defs>` +
+    `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y0}" stroke="url(#fxTail)" stroke-width="3" stroke-linecap="round">` +
+    `<animate attributeName="x2" values="${x0};${x0};${x1};${x1}" ${kt} ${t}/><animate attributeName="y2" values="${y0};${y0};${y1};${y1}" ${kt} ${t}/>` +
+    `<animate attributeName="x1" values="${x0};${x0};${x1};${x1}" ${ktTail} ${t}/><animate attributeName="y1" values="${y0};${y0};${y1};${y1}" ${ktTail} ${t}/></line>` +
+    `<circle r="3.2" fill="#fff" opacity="0"><animate attributeName="cx" values="${x0};${x0};${x1};${x1}" ${kt} ${t}/><animate attributeName="cy" values="${y0};${y0};${y1};${y1}" ${kt} ${t}/>` +
+    `<animate attributeName="opacity" values="0;0;1;0;0" keyTimes="0;0.6;0.62;0.72;1" ${t}/></circle>`
+})()
+const fxNight = `${moonDefs}<g>${crescent(66, 76, 1)}${fxEnter(16, '1.2s')}</g>` +
+  star(140, 36, 0.6, '0s', '#fff3c4', '2.2s') + star(500, 90, 0.8, '0.7s', '#fff3c4', '2.4s') + star(548, 190, 0.5, '1.4s', '#fff3c4', '2s') +
+  star(30, 220, 0.5, '1.1s', '#fff3c4', '2.6s') + shootingStar
+// 凌晨：淡淡的月亮和稀疏的星星
+const fxDawn = `${moonDefs}<g opacity="0.85">${crescent(520, 66, 0.7)}${fxEnter(0, '1.5s')}</g>` +
+  star(60, 70, 0.5, '0s', '#e8ecff', '3.4s') + star(36, 180, 0.4, '1.2s', '#e8ecff', '3.4s') + star(470, 40, 0.4, '2.1s', '#e8ecff', '3.4s')
+
+// 万圣节：两侧扑扇翅膀的小蝙蝠
+const bat = (path, dur, begin) => `<g opacity="0"><g><path d="M0 0 C-6 -10 -14 -12 -22 -6 C-18 -4 -16 0 -18 4 C-12 0 -6 2 0 6 C6 2 12 0 18 4 C16 0 18 -4 22 -6 C14 -12 6 -10 0 0Z" fill="#3b2a3f" stroke="${INK}" stroke-width="1.6" stroke-linejoin="round"/>` +
+  `<circle cx="-3" cy="-1" r="1.4" fill="#ffd34d"/><circle cx="3" cy="-1" r="1.4" fill="#ffd34d"/>` +
+  `<animateTransform attributeName="transform" type="scale" values="1 1;1 0.35;1 1" dur="0.32s" ${loop}/></g>` +
+  `<animate attributeName="opacity" values="0;1" ${fxOnce('0.6s', begin)}/><animateMotion path="${path}" dur="${dur}" begin="${begin}" ${loop}/></g>`
+const fxHalloween = bat('M60 120 C20 90 90 60 50 30 C10 0 100 10 70 60 C40 110 100 140 60 120', '5s', '0s') +
+  bat('M520 90 C560 60 490 40 530 20 C570 0 480 10 510 60 C540 110 480 120 520 90', '6s', '0.6s') +
+  bat('M540 260 C570 230 500 220 530 200 C560 180 500 170 520 230 C540 290 510 290 540 260', '5.5s', '1.2s')
+// 圣诞：雪花飘落
+const flake = i => `<g transform="scale(${[1, 0.75, 0.9][i % 3]})"><circle r="7" fill="#fff" stroke="#9fb6d6" stroke-width="1.6"/>` +
+  `<path d="M0 -5 V5 M-4.3 -2.5 L4.3 2.5 M-4.3 2.5 L4.3 -2.5" stroke="#9fb6d6" stroke-width="1.3" stroke-linecap="round"/></g>`
+const fxChristmas = fall([...SIDES, 140, 440, 200, 380], flake, { dur: 5.2, dy: 420, sway: 16, spin: 120 })
+// 元旦：两侧烟花一朵朵绽放
+const firework = (x, y, color, begin) => {
+  const rays = Array.from({ length: 12 }, (_, i) => {
+    const a = (i * 30) * Math.PI / 180, x2 = (Math.cos(a) * 34).toFixed(1), y2 = (Math.sin(a) * 34).toFixed(1)
+    return `<line x1="${(x2 * 0.35).toFixed(1)}" y1="${(y2 * 0.35).toFixed(1)}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="3.2" stroke-linecap="round"/>` +
+      `<circle cx="${x2}" cy="${y2}" r="2.6" fill="#fff6c8"/>`
+  }).join('')
+  return `<g transform="translate(${x} ${y})"><g opacity="0">${rays}<circle r="5" fill="#fff6c8"/>` +
+    `<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.5;1" dur="2.4s" begin="${begin}" ${loop}/>` +
+    `<animateTransform attributeName="transform" type="scale" values="0.2;1;1.15" keyTimes="0;0.35;1" dur="2.4s" begin="${begin}" ${loop}/></g></g>`
+}
+const fxNewYear = firework(70, 90, '#ff6b81', '0s') + firework(512, 70, '#ffd54a', '0.8s') + firework(530, 210, '#5b8def', '1.6s') + firework(50, 230, '#7ed957', '1.2s')
+// 春节：两角挂着摇晃的红灯笼 + 金色闪光
+const lanternDefs = `<defs><radialGradient id="fxLantern" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ff8a6b"/><stop offset="0.6" stop-color="#e5352b"/><stop offset="1" stop-color="#b81f1a"/></radialGradient></defs>`
+const redLantern = (x, s, begin) => `<g transform="translate(${x} 0) scale(${s})"><g>` +
+  `<line x1="0" y1="0" x2="0" y2="34" stroke="${INK}" stroke-width="2"/>` +
+  `<rect x="-10" y="32" width="20" height="7" rx="2" fill="#f2c14e" stroke="${INK}" stroke-width="1.6"/>` +
+  `<ellipse cx="0" cy="64" rx="30" ry="26" fill="url(#fxLantern)" stroke="${INK}" stroke-width="2.4"/>` +
+  `<path d="M-14 42 Q-22 64 -14 86 M0 38 V90 M14 42 Q22 64 14 86" stroke="#9e1915" stroke-width="1.4" fill="none" opacity="0.7"/>` +
+  `<ellipse cx="-10" cy="54" rx="6" ry="9" fill="#ffb59e" opacity="0.6"/>` +
+  `<rect x="-10" y="88" width="20" height="7" rx="2" fill="#f2c14e" stroke="${INK}" stroke-width="1.6"/>` +
+  `<path d="M-5 95 V114 M0 95 V118 M5 95 V114" stroke="#f2c14e" stroke-width="2.4" stroke-linecap="round"/>` +
+  `<animateTransform attributeName="transform" type="rotate" values="-6;6;-6" dur="2.6s" begin="${begin}" ${loop}/></g></g>`
+const fxSpring = `${lanternDefs}<g>${redLantern(52, 0.95, '0s')}${fxEnter(-30, '0.9s')}</g><g>${redLantern(528, 0.95, '0.6s')}${fxEnter(-30, '1.1s')}</g>` +
+  star(60, 230, 0.9, '0.3s', '#ffd54a') + star(520, 250, 1, '0.9s', '#ffd54a') + star(40, 330, 0.6, '1.4s', '#ffd54a') + star(548, 350, 0.7, '0.5s', '#ffd54a')
+// 元宵：孔明灯慢慢升起
+const skyLantern = i => `<g transform="scale(${[1, 0.8, 0.9][i % 3]})"><ellipse cx="0" cy="4" rx="20" ry="8" fill="#ffd27a" opacity="0.35"/>` +
+  `<path d="M-13 -20 Q0 -26 13 -20 L10 12 Q0 15 -10 12Z" fill="#ffb347" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
+  `<path d="M-5 -18 Q-7 -4 -5 10" stroke="#fff1c9" stroke-width="2.4" fill="none" opacity="0.8"/>` +
+  `<ellipse cx="0" cy="12" rx="10" ry="2.6" fill="#ffe066" stroke="${INK}" stroke-width="1.4"/></g>`
+const fxLantern = ascend([[46, 440], [80, 360], [30, 300], [520, 430], [550, 350], [500, 280]], skyLantern, { dur: 6, dy: -300 })
+// 端午：竹叶飘落
+const leaf = i => `<path d="M0 -14 C8 -8 8 8 0 14 C-8 8 -8 -8 0 -14Z" fill="${i % 2 ? '#7fbf6a' : '#5ea85a'}" stroke="${INK}" stroke-width="1.5"/><path d="M0 -12 V12" stroke="#3f7d43" stroke-width="1.2"/>`
+const fxDragonBoat = fall(SIDES, leaf, { dur: 4.6, dy: 330, sway: 20, spin: 160 })
+// 中秋：右上角一轮圆月 + 桂花飘落
+const fullMoon = `<defs><radialGradient id="fxFull" cx="42%" cy="40%" r="62%"><stop offset="0" stop-color="#fffbe6"/><stop offset="0.7" stop-color="#ffe49a"/><stop offset="1" stop-color="#f3c85c"/></radialGradient></defs>` +
+  `<g transform="translate(512 74)"><circle r="46" fill="#fff3c4" opacity="0.35"/><circle r="34" fill="url(#fxFull)" stroke="${INK}" stroke-width="2.5"/>` +
+  `<circle cx="10" cy="-8" r="5" fill="#ecc96b" opacity="0.6"/><circle cx="-10" cy="10" r="3.5" fill="#ecc96b" opacity="0.6"/><circle cx="14" cy="14" r="2.5" fill="#ecc96b" opacity="0.6"/>` +
+  `<animate attributeName="opacity" values="0;1" ${fxOnce('1.4s')}/></g>`
+const osmanthus = i => `<g fill="#ffb627" stroke="${INK}" stroke-width="1">${[0, 90, 180, 270].map(a => `<ellipse cx="0" cy="-3.6" rx="2.4" ry="3.4" transform="rotate(${a})"/>`).join('')}<circle r="1.6" fill="#fff1b0" stroke="none"/></g>`
+const fxMidAutumn = fullMoon + fall([22, 52, 82, 470, 540, 560], osmanthus, { dur: 4.8, dy: 320, sway: 14, spin: 180, y0: 140 })
+// 国庆（出游主题）：白云飘过 + 一架纸飞机
+const plane = `<g opacity="0"><path d="M0 0 L36 -12 L14 6Z" fill="#fff" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/><path d="M14 6 L36 -12 L18 14Z" fill="#dfe8f5" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` +
+  `<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.85;1" dur="5s" ${loop}/>` +
+  `<animateMotion path="M10 140 C60 60 140 40 200 60 S330 30 380 50 S500 90 560 40" dur="5s" ${loop}/></g>`
+const fxNational = `<g>${fxCloud(70, 70, 0.8, '7s', 12)}${fxEnter(0, '1s')}</g><g>${fxCloud(520, 120, 0.7, '6s', -12)}${fxEnter(0, '1.3s')}</g>` + plane
+
+const GREET_FX = {
+  greet_morning: fxMorning, greet_noon: fxNoon, greet_afternoon: fxAfternoon, greet_evening: fxEvening, greet_night: fxNight, greet_dawn: fxDawn,
+  fest_halloween: fxHalloween, fest_christmas: fxChristmas, fest_newyear: fxNewYear, fest_spring: fxSpring, fest_lantern: fxLantern,
+  fest_dragonboat: fxDragonBoat, fest_midautumn: fxMidAutumn, fest_national: fxNational,
+}
+Object.assign(AURA, {
+  greet_morning: ['#ffe2a8', 0.5], greet_noon: ['#fff0a8', 0.5], greet_afternoon: ['#ffd2b8', 0.45], greet_evening: ['#ffc98a', 0.5],
+  greet_night: ['#9fb0e8', 0.45], greet_dawn: ['#c9bff0', 0.45],
+  fest_halloween: ['#ffb36b', 0.5], fest_christmas: ['#cfe6ff', 0.5], fest_newyear: ['#ffe08a', 0.6], fest_spring: ['#ff9b8a', 0.55],
+  fest_lantern: ['#ffcf8a', 0.55], fest_dragonboat: ['#a8e0b8', 0.5], fest_midautumn: ['#ffe7a3', 0.55], fest_national: ['#bfe0ff', 0.5],
+})
+
 // 每个姿态周围的细节
 const surroundings = (p      )         => {
   switch (p) {
@@ -422,6 +561,7 @@ const surroundings = (p      )         => {
     case 'yawn': return yawnBubble
     case 'drawing': return easelCard
   }
+  return GREET_FX[p]
 }
 
 const sceneSvg = (art     , p      )         => {

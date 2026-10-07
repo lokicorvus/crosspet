@@ -107,6 +107,10 @@ const MOTION = {
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
+  // 按时段 / 节日打招呼
+  greet_morning: 'm-hop', greet_noon: 'm-bob', greet_afternoon: 'm-sway', greet_evening: 'm-sway', greet_night: 'm-slow', greet_dawn: 'm-slow',
+  fest_halloween: 'm-gift', fest_christmas: 'm-gift', fest_newyear: 'm-jump', fest_spring: 'm-gift', fest_lantern: 'm-gift',
+  fest_dragonboat: 'm-gift', fest_midautumn: 'm-gift', fest_national: 'm-hop',
 }
 const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
@@ -115,6 +119,7 @@ const LOCAL_LINES = {
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
+for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
 const LISTEN_TO_THINKING = 1800 // 收到消息先「听」，稍后自动转「思考」
@@ -230,6 +235,7 @@ function applyLook(c) {
 // 换到某个状态：遵守最短停留；短暂状态过后回到常态（闲着 / 额度紧张时累了）
 function show(p, urgent) {
   if (updatingNow) return   // 正在更新：一直举着礼物，AI 的工作事件先不打断
+  if (p === 'idle') p = restPose()   // AI 发来「闲着」（比如 DSH 新会话）时也要看额度：快用完了就是累 / 饿的样子
   const wait = shownAt + DWELL - Date.now()
   clearTimeout(pending)
   if (!urgent && wait > 0) { pending = setTimeout(() => show(p, true), wait); return }
@@ -276,7 +282,9 @@ function setCharacter(id, quiet) {
     const s = charState[id]
     const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
     setPose(busy ? s.pose : restPose(), true)
-    say(quiet || !greetDue(id) ? '' : (c.greeting || `${c.name} 在这儿～`))
+    // 这个时段 / 节日还没打过招呼：演专属的登场动作；打过了就用平常那句（30 分钟冷却）
+    if (quiet) say('')
+    else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
     renderQuota()
     const pend = pendingCelebration[id]
     if (pend && Date.now() - pend.at < 10 * 60 * 1000) setTimeout(() => celebrate(id, pend.ev), 1200)
@@ -285,6 +293,71 @@ function setCharacter(id, quiet) {
     if (active.complete && spare.complete) setTimeout(reveal, 60); else setTimeout(reveal, 160)
   }, 330)
 }
+
+// ---- 按时段 / 节日打招呼 ----
+// 每个角色在每个时段（早上、中午、下午、晚上、深夜、凌晨）第一次见面时演一次专属动作；节日当天第一次见面换成节日装扮。
+// 打过招呼的记在本机（localStorage），重启 App 不会重复。没画立绘的角色只说台词；连台词都没有就用平常那句。
+// 农历节日的公历日期（春节、元宵、端午、中秋），用 lunardate 算好写死，2036 年之后需要补
+const LUNAR = {
+  2026: ['02-17', '03-03', '06-19', '09-25'], 2027: ['02-06', '02-20', '06-09', '09-15'], 2028: ['01-26', '02-09', '05-28', '10-03'],
+  2029: ['02-13', '02-27', '06-16', '09-22'], 2030: ['02-03', '02-17', '06-05', '09-12'], 2031: ['01-23', '02-06', '06-24', '10-01'],
+  2032: ['02-11', '02-25', '06-12', '09-19'], 2033: ['01-31', '02-14', '06-01', '09-08'], 2034: ['02-19', '03-05', '06-20', '09-27'],
+  2035: ['02-08', '02-22', '06-10', '09-16'], 2036: ['01-28', '02-11', '05-30', '10-04'],
+}
+const pad2 = n => String(n).padStart(2, '0')
+const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+function timeSlot(d) {
+  const h = d.getHours()
+  return h >= 23 || h < 2 ? 'night' : h < 5 ? 'dawn' : h < 11 ? 'morning' : h < 14 ? 'noon' : h < 18 ? 'afternoon' : 'evening'
+}
+function festivalOf(d) {
+  const y = d.getFullYear(), md = ymd(d).slice(5), [spring, lantern, dragonboat, midautumn] = LUNAR[y] || []
+  // 单日的节日优先（中秋偶尔落在国庆假期里）
+  if (md === lantern) return 'lantern'
+  if (md === dragonboat) return 'dragonboat'
+  if (md === midautumn) return 'midautumn'
+  if (md === '10-31') return 'halloween'
+  if (md === '12-24' || md === '12-25') return 'christmas'
+  if (md === '01-01') return 'newyear'
+  if (spring) {
+    const days = (d - new Date(`${y}-${spring}T00:00:00`)) / 86400000
+    if (days >= 0 && days < 7) return 'spring'   // 初一到初七
+  }
+  if (md >= '10-01' && md <= '10-07') return 'national'
+  return null
+}
+function greetMemory(update) {
+  let m = {}
+  try { m = JSON.parse(localStorage.getItem('crosspet-greeted')) || {} } catch {}
+  if (update) { update(m); try { localStorage.setItem('crosspet-greeted', JSON.stringify(m)) } catch {} }
+  return m
+}
+// 返回 true = 打过招呼了（演了专属动作或说了专属台词）
+function timeGreet(id, busy) {
+  const c = manifest.characters[id]
+  if (!c || c.egg) return false
+  const now = new Date(), fest = festivalOf(now), slot = timeSlot(now)
+  const day = ymd(new Date(now - 5 * 3600000))   // 凌晨 5 点前还算前一天：深夜 23–2 点是同一个时段
+  const slotKey = `slot:${day}:${slot}`, festKey = `fest:${ymd(now)}:${fest}`
+  const done = greetMemory()[id] || []
+  const has = p => !!(c.poses?.[p] || c.lines?.[p])
+  let p = null
+  if (fest && !done.includes(festKey) && has('fest_' + fest)) p = 'fest_' + fest
+  else if (!done.includes(slotKey) && has('greet_' + slot)) p = 'greet_' + slot
+  if (!p) return false
+  greetMemory(m => { m[id] = [...(m[id] || []).filter(k => k.includes(day) || k.includes(ymd(now))), slotKey, ...(fest ? [festKey] : [])] })
+  greetedAt[id] = Date.now()
+  const line = pick(c.lines?.[p] || [c.greeting || ''])
+  if (!busy && c.poses?.[p]) { show(p, true); say(line) }   // 正在干活时不打断，只说一句
+  else say(line)
+  return true
+}
+// 一直开着的时候，进入新的时段 / 节日也打个招呼：只在闲着、最近有人在（没睡着）的时候
+setInterval(() => {
+  if (!charId || egg || devHeld() || devActive || updatingNow || char()?.egg) return
+  if ((pose !== 'idle' && pose !== 'tired') || Date.now() - lastActive > SLEEP_AFTER) return
+  timeGreet(charId, false)
+}, 60000)
 
 // 正在下载 / 安装新版本：一直举着礼物，右上角小窗按真实进度走，气泡显示百分比。由宿主调用；
 // 装好后新版会自己重新打开，所以不用收尾；更新失败时宿主调 endUpdate() 回到常态

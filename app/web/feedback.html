@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>反馈问题</title>
+<style>
+/* 和设置窗口同一套配色；跟着系统深浅色 */
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); }
+body { font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif; color: var(--ink); padding: 14px 16px 16px; }
+h1 { font-size: 15px; margin: 0 0 2px; }
+.sub { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.chip { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 16px; padding: 5px 12px; cursor: pointer; transition: background .12s, border-color .12s; }
+.chip:hover { border-color: var(--accent); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ask { font-size: 12px; font-weight: 600; margin: 0 0 5px; }
+.ask em { font-style: normal; font-weight: 400; color: var(--warn); margin-left: 4px; font-size: 11px; }
+.ask.optional em { color: var(--muted); }
+input[type=text] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; }
+input[type=text]:focus { outline: none; border-color: var(--accent); }
+.attach { display: flex; align-items: flex-start; gap: 7px; margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+.attach input { margin: 2px 0 0; accent-color: var(--accent); }
+.attach a { color: var(--accent); cursor: pointer; text-decoration: none; white-space: nowrap; }
+pre { background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); max-height: 150px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 6px 0 0; }
+.bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.bar .msg { flex: 1; font-size: 12px; color: var(--muted); }
+.bar .msg.err { color: var(--warn); }
+button.send { font: inherit; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 7px; padding: 5px 18px; cursor: pointer; }
+button.send:disabled { opacity: .45; cursor: default; }
+.done { display: none; text-align: center; padding: 40px 0 20px; }
+.done b { display: block; font-size: 16px; margin-bottom: 4px; }
+.done span { color: var(--muted); font-size: 12px; }
+body.sent .form { display: none; }
+body.sent .done { display: block; }
+.hidden { display: none !important; }
+</style></head>
+<body>
+<div class="form">
+  <h1>反馈问题</h1>
+  <div class="sub">先点是哪方面的问题（可以多选），再用一句话说清楚具体是哪里。</div>
+  <div class="chips" id="chips"></div>
+  <div class="ask" id="ask">具体是哪里？<em>必填</em></div>
+  <input type="text" id="text" maxlength="200" placeholder="先在上面选一个">
+  <label class="attach"><input type="checkbox" id="attach" checked>
+    <span>附上版本、系统、接入了哪些 AI 和最近的运行日志，帮我查问题（路径里的用户名会被隐去）
+      <a id="peek">看看会发什么</a></span></label>
+  <pre id="preview" class="hidden"></pre>
+  <div class="bar"><span class="msg" id="msg"></span><button class="send" id="send" disabled>发送</button></div>
+</div>
+<div class="done"><b>收到啦，谢谢！</b><span>每一条我都会看。窗口可以关掉了。</span></div>
+
+<script>
+// 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：页面发 {cmd, ...}；
+// 宿主用 setInfo(info) 告诉页面会附带什么；页面拼好飞书卡片发 {cmd: 'send', body}，宿主发到飞书群机器人后用 onSent(ok, message) 回报
+const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.feedback?.postMessage(msg)
+const $ = id => document.getElementById(id)
+
+const TAGS = [
+  ['action', '动作 / 表情不对'], ['art', '立绘不好看'], ['integrate', '接入 AI 不生效'], ['quota', '额度显示不对'],
+  ['perf', '卡顿 / 耗电'], ['crash', '崩溃 / 打不开'], ['update', '更新失败'], ['want', '想要新角色 / 新 AI'],
+  ['like', '就是想夸夸'], ['other', '其他'],
+]
+// 每个选项的输入提示：告诉用户怎样算「说清楚」
+const HINTS = {
+  action: '哪个角色、在干什么的时候？例：Claude 读文件时没翻书',
+  art: '哪个角色的哪张图？例：GPT 睡觉那张脸糊了',
+  integrate: '哪个 AI、怎么不生效？例：Codex 接入后桌宠一动不动',
+  quota: '哪个额度、显示成了什么？例：DeepSeek 余额一直显示 0',
+  perf: '什么时候卡、卡成什么样？例：开着 Antigravity 时风扇狂转',
+  crash: '什么时候崩、提示了什么？例：一打开就闪退',
+  update: '更新到哪一步出的问题？例：进度到 100% 后没反应',
+  want: '想要谁？例：Kimi、通义千问',
+  like: '想夸点什么（可以不填）',
+  other: '具体是哪里？',
+}
+const picked = new Set()
+let lastPicked = null
+let info = null
+
+$('chips').replaceChildren(...TAGS.map(([id, label]) => {
+  const b = document.createElement('button'); b.className = 'chip'; b.textContent = label
+  b.onclick = () => {
+    if (picked.has(id)) picked.delete(id); else { picked.add(id); lastPicked = id }
+    if (!picked.has(lastPicked)) lastPicked = [...picked].pop() || null
+    b.classList.toggle('on', picked.has(id)); refresh()
+  }
+  return b
+}))
+
+// 只夸夸的时候可以不写；其他情况必须说清楚具体是哪里，不然没法改
+const onlyLike = () => picked.size === 1 && picked.has('like')
+function refresh() {
+  const text = $('text').value.trim()
+  $('text').placeholder = lastPicked ? HINTS[lastPicked] : '先在上面选一个'
+  $('ask').classList.toggle('optional', onlyLike())
+  $('ask').querySelector('em').textContent = onlyLike() ? '可以不填' : '必填'
+  const ready = picked.size > 0 && (onlyLike() || text.length >= 2)
+  $('send').disabled = sending || !ready
+}
+
+// 飞书卡片里附带的日志：只留最后 3000 字，整条消息要在 20 KB 以内
+const logTail = () => (info?.log || '').slice(-3000)
+
+// 拼飞书群机器人的卡片消息。用户写的话和日志一律用 plain_text，不让里面的内容变成格式、链接或 @
+function card(tags, text, attach) {
+  const pt = content => ({ tag: 'plain_text', content })
+  const i = info || {}
+  const color = tags.includes('crash') || tags.includes('update') ? 'red' : tags.length === 1 && tags[0] === 'like' ? 'green' : 'orange'
+  const elements = [{ tag: 'div', text: pt(text || '（没写）') }, { tag: 'hr' }]
+  const meta = [`版本 ${i.version || '?'}（${i.platform || '?'}）`, `角色 ${i.character || '—'}`]
+  if (attach) meta.push(`系统 ${i.os || '?'}`, `已接入 ${(i.integrations || []).join(', ') || '—'}`)
+  elements.push({ tag: 'div', fields: meta.map(m => ({ is_short: true, text: pt(m) })) })
+  if (attach && logTail()) elements.push({ tag: 'note', elements: [pt('最近日志：\n' + logTail())] })
+  elements.push({ tag: 'note', elements: [pt(`机器 ${(i.install || '').slice(0, 8)}`)] })
+  return {
+    msg_type: 'interactive',
+    card: {
+      header: { template: color, title: { tag: 'plain_text', content: 'CrossPet 反馈 · ' + tags.map(t => TAGS.find(x => x[0] === t)[1]).join('、') } },
+      elements,
+    },
+  }
+}
+
+function setInfo(i) {
+  info = i
+  const lines = [
+    `版本：${i.version}（${i.platform}）`, `系统：${i.os}`, `当前角色：${i.character || '—'}`,
+    `已接入：${(i.integrations || []).join(', ') || '—'}`, '', '最近的运行日志：', logTail() || '（没有）',
+  ]
+  $('preview').textContent = lines.join('\n')
+}
+
+let sending = false
+function onSent(ok, message) {
+  sending = false
+  if (ok) { document.body.classList.add('sent'); return }
+  $('msg').textContent = message || '没发出去，稍后再试试'
+  $('msg').classList.add('err')
+  refresh()
+}
+
+$('text').oninput = () => { $('msg').classList.remove('err'); refresh() }
+$('text').onkeydown = e => { if (e.key === 'Enter' && !$('send').disabled) $('send').click() }
+$('peek').onclick = () => $('preview').classList.toggle('hidden')
+$('send').onclick = () => {
+  sending = true; refresh()
+  $('msg').textContent = '正在发送…'; $('msg').classList.remove('err')
+  const tags = TAGS.map(t => t[0]).filter(t => picked.has(t))
+  post({ cmd: 'send', body: JSON.stringify(card(tags, $('text').value.trim(), $('attach').checked)) })
+}
+
+refresh()
+post({ cmd: 'get' })
+</script>
+</body></html>

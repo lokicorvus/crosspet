@@ -44,6 +44,7 @@ namespace CrossPet
         DispatcherTimer appSwitch;
         DevConsole dev;
         SettingsWindow settings;
+        FeedbackWindow feedback;
         const double BaseWidth = 260, BaseHeight = 362;
 
         public Pet(CoreWebView2Environment env) { this.env = env; }
@@ -413,6 +414,7 @@ namespace CrossPet
             }
             menu.Items.Add(layer);
             menu.Items.Add(Item("设置…", OpenSettings));
+            menu.Items.Add(Item("反馈问题…", OpenFeedback));
             if (developer) menu.Items.Add(Item("开发者控制台…", OpenDev));
             menu.Items.Add(Item("回到右下角", Recenter));
             Sep();
@@ -572,6 +574,7 @@ namespace CrossPet
                         case "openCharacters": Open(Store.Characters); break;
                         case "openData": Open(Store.Data); break;
                         case "devConsole": OpenDev(); break;
+                        case "feedback": OpenFeedback(); break;
                     }
                     break;
             }
@@ -589,6 +592,104 @@ namespace CrossPet
             foreground?.Dispose();
             tray.Visible = false; tray.Dispose();
             Application.Current.Shutdown();
+        }
+
+        // ---------------- 反馈问题 ----------------
+        // 点选「哪方面」+ 必填一句「具体是哪里」，附上版本、系统、接入情况、最近日志，
+        // 由页面拼成卡片，发到飞书群机器人。地址可在 settings.json 里用 "feedbackURL" 改（测试用）
+        const string FeedbackEndpoint = "https://open.feishu.cn/open-apis/bot/v2/hook/854f8a9a-d3f4-4705-b6f8-15cc007f714b";
+
+        void OpenFeedback()
+        {
+            if (feedback == null) { feedback = new FeedbackWindow(this, env); feedback.Closed += () => feedback = null; }
+            feedback.Show();
+        }
+
+        /// <summary>每台机器一个随机 id，只用来让服务端限流、合并同一个人的多条反馈</summary>
+        static string InstallId
+        {
+            get
+            {
+                if (Store.Settings.TryGetValue("installId", out var v) && v is string s && s != "") return s;
+                var id = Guid.NewGuid().ToString();
+                Store.Settings["installId"] = id; Store.SaveSettings();
+                return id;
+            }
+        }
+
+        /// <summary>去掉日志里的隐私：用户目录换成 ~，路径里的用户名、像 API Key 的字符串打码，顺便去掉终端颜色控制符</summary>
+        static string Redact(string text)
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var s = string.IsNullOrEmpty(home) ? text : text.Replace(home, "~");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"\x1B\[[0-9;]*[A-Za-z]", "");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(\\Users\\|/Users/)[^\\/\s]+", "$1<user>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"sk-[A-Za-z0-9_\-]{8,}", "sk-***");
+            s = System.Text.RegularExpressions.Regex.Replace(s, @"(?i)(bearer|token|key|secret|password)([\s""':=]+)[A-Za-z0-9_\-\.]{8,}", "$1$2***");
+            return s;
+        }
+
+        Dictionary<string, object> FeedbackInfo()
+        {
+            var lines = (Store.ReadText(Path.Combine(Store.Data, "windows.log")) ?? "").Replace("\r\n", "\n").Split('\n');
+            var tail = Redact(string.Join("\n", lines.Skip(Math.Max(0, lines.Length - 60))).Trim());
+            if (tail.Length > 6000) tail = tail.Substring(tail.Length - 6000);
+            return new Dictionary<string, object>
+            {
+                ["version"] = Store.Version, ["platform"] = "windows",
+                ["os"] = $"{Environment.OSVersion.VersionString} {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture}",
+                ["character"] = current ?? "", ["integrations"] = integrated ?? new List<string>(), ["log"] = tail, ["install"] = InstallId,
+            };
+        }
+
+        public void HandleFeedback(Dictionary<string, object> msg)
+        {
+            var cmd = msg.TryGetValue("cmd", out var c) ? c as string : null;
+            if (cmd != "send")
+            {
+                feedback?.Run($"setInfo({Store.Json.Serialize(FeedbackInfo())})");
+                if (integrated == null) RefreshIntegrated(() => feedback?.Run($"setInfo({Store.Json.Serialize(FeedbackInfo())})"));
+                return;
+            }
+            var endpoint = Store.Settings.TryGetValue("feedbackURL", out var u) && u is string us && us != "" ? us : FeedbackEndpoint;
+            void Done(bool ok, string text)
+            {
+                Window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    feedback?.Run($"onSent({(ok ? "true" : "false")}, {Q(text)})");
+                    if (ok) Js("show('happy', true); say('收到反馈啦，谢谢你！')");
+                }));
+            }
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var url)) { Done(false, "反馈暂时关闭了"); return; }
+            var body = msg.TryGetValue("body", out var b) ? b as string : null;
+            if (body == null || Encoding.UTF8.GetByteCount(body) > 20000) { Done(false, "内容太长了，删短一点再发"); return; }
+            // 本机限流：一小时最多 5 条（飞书群机器人的地址是公开的，不能让一台机器刷屏）
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var recent = ((Store.Settings.TryGetValue("feedbackTimes", out var ft) ? ft as object[] : null) ?? new object[0])
+                .Select(x => { try { return (long)Convert.ToDouble(x, System.Globalization.CultureInfo.InvariantCulture); } catch { return 0L; } }).Where(x => now - x < 3600).ToList();
+            if (recent.Count >= 5) { Done(false, "发得有点多啦，过一会儿再发"); return; }
+            Task.Run(async () =>
+            {
+                try
+                {
+                    var res = await http.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
+                    // 飞书不论成败都回 HTTP 200，看返回里的 code：0 才是发到了群里
+                    var reply = Store.Json.DeserializeObject(await res.Content.ReadAsStringAsync()) as Dictionary<string, object>;
+                    var code = reply != null && reply.TryGetValue("code", out var c2) ? Convert.ToInt32(c2) : -1;
+                    if (code == 0)
+                    {
+                        await Window.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            recent.Add(now);
+                            Store.Settings["feedbackTimes"] = recent.Cast<object>().ToArray(); Store.SaveSettings();
+                        }));
+                        Done(true, "");
+                    }
+                    else if (code == 11232) Done(false, "反馈的人有点多，过一会儿再发");
+                    else { Store.Log("发送反馈失败: " + code); Done(false, $"没发出去（{code}），稍后再试试"); }
+                }
+                catch (Exception e) { Store.Log("发送反馈失败: " + e.Message); Done(false, "连不上网络，稍后再试试"); }
+            });
         }
 
         // ---------------- 开发者控制台 ----------------

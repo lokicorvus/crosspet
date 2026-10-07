@@ -68,6 +68,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var devWeb: WKWebView?
     var settingsWindow: NSWindow?
     var settingsWeb: WKWebView?
+    var feedbackWindow: NSWindow?
+    var feedbackWeb: WKWebView?
     var defaultNames: [String: String] = [:]   // id → character.json 里的原名（设置页显示占位用）
     var pauseRealEvents = false                // 控制台里测试时，先不让真实 AI 的状态打扰桌宠
 
@@ -263,6 +265,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         if webView === settingsWeb { pushSettings(); return }
+        if webView === feedbackWeb { return }   // 反馈页面自己发 get 来要信息
         if webView === devWeb {
             let info = ["version": currentVersion, "feedbackPath": feedbackURL.path]
             let data = (try? JSONSerialization.data(withJSONObject: info)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
@@ -653,6 +656,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         layerItem.submenu = layerMenu
         menu.addItem(layerItem)
         add(menu, "设置…", #selector(openSettings))
+        add(menu, "反馈问题…", #selector(openFeedback))
         if NSEvent.modifierFlags.contains(.option) {  // 按住 ⌥ 右键才出现：给自己换立绘、加角色的人检查效果用
             add(menu, "开发者控制台…", #selector(openDevConsole))
         }
@@ -860,7 +864,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             return
         }
         let config = WKWebViewConfiguration()
-        config.userContentController.add(DevBridge(app: self, settings: true), name: "settings")
+        config.userContentController.add(DevBridge(app: self, kind: .settings), name: "settings")
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 680),
                          styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         w.title = "CrossPet 设置"
@@ -1029,12 +1033,140 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             case "openCharacters": openCharacters()
             case "openData": NSWorkspace.shared.open(root)
             case "devConsole": openDevConsole()
+            case "feedback": openFeedback()
             default: break
             }
             pushSettings()
         default:   // get：设置窗口刚打开
             if integrated == nil { refreshIntegrated() }
             pushSettings()
+        }
+    }
+
+    // MARK: 反馈问题
+    // 右键「反馈问题…」：web/feedback.html 里点选「哪方面」+ 必填一句「具体是哪里」，App 附上版本、系统、接入情况、最近日志，
+    // 由页面拼成卡片，发到飞书群机器人。地址可用 `defaults write io.github.crosspet feedbackURL <地址>` 改（测试用）
+    static let feedbackEndpoint = "https://open.feishu.cn/open-apis/bot/v2/hook/854f8a9a-d3f4-4705-b6f8-15cc007f714b"
+
+    @objc func openFeedback() {
+        if let w = feedbackWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(DevBridge(app: self, kind: .feedback), name: "feedback")
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 400),
+                         styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        w.title = "CrossPet 反馈问题"
+        w.isReleasedWhenClosed = false
+        w.center()
+        let v = WKWebView(frame: w.contentView!.bounds, configuration: config)
+        v.autoresizingMask = [.width, .height]
+        v.navigationDelegate = self
+        v.loadFileURL(root.appendingPathComponent("web/feedback.html"), allowingReadAccessTo: root)
+        w.contentView!.addSubview(v)
+        feedbackWindow = w
+        feedbackWeb = v
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            self?.feedbackWeb = nil
+            self?.feedbackWindow = nil
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+    }
+
+    /// 每台机器一个随机 id，只用来让服务端限流、合并同一个人的多条反馈
+    var installId: String {
+        if let id = defaults.string(forKey: "installId") { return id }
+        let id = UUID().uuidString
+        defaults.set(id, forKey: "installId")
+        return id
+    }
+
+    /// 去掉日志里的隐私：家目录换成 ~，路径里的用户名、像 API Key 的字符串打码，顺便去掉终端颜色控制符
+    static func redact(_ text: String) -> String {
+        var s = text.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        let rules: [(String, String)] = [
+            (#"\x{1B}\[[0-9;]*[A-Za-z]"#, ""),                       // 终端颜色控制符
+            (#"(/Users/|\\Users\\)[^/\\\s]+"#, "$1<user>"),        // 别的用户目录里的用户名
+            (#"sk-[A-Za-z0-9_\-]{8,}"#, "sk-***"),
+            (#"(?i)(bearer|token|key|secret|password)([\s\"':=]+)[A-Za-z0-9_\-\.]{8,}"#, "$1$2***"),
+        ]
+        for (pattern, tmpl) in rules {
+            if let re = try? NSRegularExpression(pattern: pattern) {
+                s = re.stringByReplacingMatches(in: s, range: NSRange(s.startIndex..., in: s), withTemplate: tmpl)
+            }
+        }
+        return s
+    }
+
+    func feedbackInfo() -> [String: Any] {
+        let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CrossPet-update.log")
+        let lines = ((try? String(contentsOf: logURL, encoding: .utf8)) ?? "").split(separator: "\n", omittingEmptySubsequences: false)
+        let tail = lines.suffix(40).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        var arch = "arm64"
+        #if arch(x86_64)
+        arch = "x86_64"
+        #endif
+        return [
+            "version": currentVersion, "platform": "mac",
+            "os": "macOS \(ProcessInfo.processInfo.operatingSystemVersionString) \(arch)",
+            "character": currentId ?? characterIds.first ?? "",
+            "integrations": integrated ?? [],
+            "log": String(Self.redact(tail).suffix(6000)),
+            "install": installId,
+        ]
+    }
+
+    func pushFeedbackInfo() {
+        guard let v = feedbackWeb, let data = try? JSONSerialization.data(withJSONObject: feedbackInfo()),
+              let text = String(data: data, encoding: .utf8) else { return }
+        v.evaluateJavaScript("setInfo(\(text))", completionHandler: nil)
+    }
+
+    func handleFeedback(_ body: Any) {
+        guard let msg = body as? [String: Any], let cmd = msg["cmd"] as? String else { return }
+        let done = { [weak self] (ok: Bool, text: String) in
+            DispatchQueue.main.async {
+                self?.feedbackWeb?.evaluateJavaScript("onSent(\(ok), \(self?.quote(text) ?? "''"))", completionHandler: nil)
+                if ok { self?.js("show('happy', true); say('收到反馈啦，谢谢你！')") }
+            }
+        }
+        switch cmd {
+        case "send":
+            let endpoint = defaults.string(forKey: "feedbackURL") ?? Self.feedbackEndpoint
+            guard let url = URL(string: endpoint), url.scheme != nil else { done(false, "反馈暂时关闭了"); return }
+            guard let body = msg["body"] as? String, body.utf8.count <= 20_000 else { done(false, "内容太长了，删短一点再发"); return }
+            // 本机限流：一小时最多 5 条（飞书群机器人的地址是公开的，不能让一台机器刷屏）
+            let now = Date().timeIntervalSince1970
+            let recent = (defaults.array(forKey: "feedbackTimes") ?? [])
+                .compactMap { ($0 as? NSNumber)?.doubleValue ?? Double("\($0)") }.filter { now - $0 < 3600 }
+            guard recent.count < 5 else { done(false, "发得有点多啦，过一会儿再发"); return }
+            var req = URLRequest(url: url, timeoutInterval: 15)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = Data(body.utf8)
+            URLSession.shared.dataTask(with: req) { data, _, err in
+                // 飞书不论成败都回 HTTP 200，看返回里的 code：0 才是发到了群里
+                let reply = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                let code = (reply?["code"] as? NSNumber)?.intValue ?? -1
+                if code == 0 {
+                    DispatchQueue.main.async { defaults.set(recent + [now], forKey: "feedbackTimes") }
+                    done(true, "")
+                } else if err != nil { done(false, "连不上网络，稍后再试试") }
+                else if code == 11232 { done(false, "反馈的人有点多，过一会儿再发") }
+                else { done(false, "没发出去（\(code)），稍后再试试") }
+            }.resume()
+        default:   // get：反馈窗口刚打开
+            pushFeedbackInfo()
+            if integrated == nil, integrateScript != nil {
+                runIntegrate(["installed"]) { [weak self] out, _ in
+                    let last = out.split(separator: "\n").last.map(String.init) ?? "[]"
+                    self?.integrated = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String] ?? []
+                    self?.pushFeedbackInfo()
+                }
+            }
         }
     }
 
@@ -1055,7 +1187,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             return
         }
         let config = WKWebViewConfiguration()
-        config.userContentController.add(DevBridge(app: self), name: "dev")
+        config.userContentController.add(DevBridge(app: self, kind: .dev), name: "dev")
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 760),
                          styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         w.title = "CrossPet 开发者控制台"
@@ -1129,10 +1261,15 @@ final class LocalhostTrust: NSObject, URLSessionDelegate {
 
 /// 控制台页面 → App 的消息通道（单独一个对象，避免 WKUserContentController 强引用 App 造成循环）
 final class DevBridge: NSObject, WKScriptMessageHandler {
+    enum Kind { case dev, settings, feedback }
     weak var app: App?
-    let settings: Bool   // true：设置页的消息；false：开发者控制台的消息
-    init(app: App, settings: Bool = false) { self.app = app; self.settings = settings }
+    let kind: Kind
+    init(app: App, kind: Kind) { self.app = app; self.kind = kind }
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
-        if settings { app?.handleSettings(message.body) } else { app?.handleDev(message.body) }
+        switch kind {
+        case .dev: app?.handleDev(message.body)
+        case .settings: app?.handleSettings(message.body)
+        case .feedback: app?.handleFeedback(message.body)
+        }
     }
 }
