@@ -266,7 +266,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         ready = true
         loadCharacters()
-        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName))")
+        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled))")
         stamps = [:]
         pollStates()
         refreshGPTQuota()
@@ -723,6 +723,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
     var showName: Bool { defaults.object(forKey: "showName") as? Bool ?? true }
     var followApps: Bool { defaults.object(forKey: "followApps") as? Bool ?? true }
+    var eggsEnabled: Bool { defaults.object(forKey: "eggs") as? Bool ?? true }
 
     /// 改大小：窗口和网页一起按比例缩放，底边中点不动（脚下的位置不变）
     func applyScale(_ scale: CGFloat) {
@@ -784,7 +785,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
         var state: [String: Any] = [
             "version": currentVersion, "platform": "mac",
-            "size": Double(petScale), "showName": showName, "aura": auraMode, "followApps": followApps,
+            "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
             "character": currentId ?? characterIds.first ?? "",
@@ -895,6 +896,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if let mode = value as? String, ["auto", "on", "off"].contains(mode) { defaults.set(mode, forKey: "auraMode"); js("setAuraMode(\(quote(mode)))") }
             case "followApps":
                 defaults.set(value as? Bool ?? true, forKey: "followApps")
+            case "eggs":
+                let on = value as? Bool ?? true; defaults.set(on, forKey: "eggs"); js("setEggsEnabled(\(on))")
             case "gptQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
             case "agyQuota":

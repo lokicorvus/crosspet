@@ -561,7 +561,10 @@ function endEgg() {
     renderQuota()
   })
 }
-setInterval(() => { if (!devHeld() && !devActive && !egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
+// 设置里可以关掉随机彩蛋；右键「召唤彩蛋」不受影响
+let eggsEnabled = true
+function setEggsEnabled(on) { eggsEnabled = !!on }
+setInterval(() => { if (eggsEnabled && !devHeld() && !devActive && !egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
 
 // ---- 生动一点：同一状态有多张图时停留久了换一张；有眨眼帧就偶尔眨眼 ----
 setInterval(() => {

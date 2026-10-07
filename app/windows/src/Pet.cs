@@ -127,7 +127,7 @@ namespace CrossPet
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")})");
+                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")})");
                     ready = true;
                     stamps.Clear();
                     Poll();
@@ -373,6 +373,7 @@ namespace CrossPet
         static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
                                Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
         static bool ShowName => !(Store.Settings.TryGetValue("showName", out var v) && v is bool b && !b);
+        static bool EggsEnabled => !(Store.Settings.TryGetValue("eggs", out var v) && v is bool b && !b);
 
         /// <summary>改大小：窗口和网页一起按比例缩放，底边中点不动（脚下的位置不变）</summary>
         void ApplyScale(double scale)
@@ -443,7 +444,7 @@ namespace CrossPet
             var state = new Dictionary<string, object>
             {
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
-                ["size"] = Scale, ["showName"] = ShowName, ["aura"] = AuraMode,
+                ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
                 ["login"] = LoginEnabled, ["character"] = current, ["updating"] = updating,
@@ -479,6 +480,7 @@ namespace CrossPet
                             Store.Settings["size"] = v; Store.SaveSettings(); AnimateScale(v);
                             break;
                         case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
+                        case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
                             break;
