@@ -13,6 +13,8 @@
 | 透明显示、拖动、置顶、托盘、右键菜单、设置窗口、改名、开机启动 | ✅ 已测 |
 | 跟随前台程序换角色 | ✅ 已测 |
 | Codex 接入、DeepSeek Harness 接入、DeepSeek 余额（API Key 和账号登录两种） | ✅ 已测 |
+| WorkBuddy、ZCode 接入（按模型换角色） | ✅ 已测 |
+| 一键更新 | ✅ 已测 |
 | 开发者控制台 | ✅ 已测 |
 | Claude Code 标准钩子 / 增强版 mod（额度）、Gemini（Antigravity）额度、Antigravity / Gemini CLI 钩子 | ⚠️ 没测过（虚拟机里没装） |
 | 实体 x64 电脑、多显示器、Windows 10 | ⚠️ 没测过 |
@@ -33,7 +35,7 @@
 
 - 单击摸头；拖动换位置（会记住）；右键菜单；按住 **Shift** 再右键，菜单里多一项「开发者控制台」。
 - 任务栏右下角的托盘图标：右键是同一个菜单，双击让桌宠回到右下角。
-- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Antigravity 时自动换角色。按程序名识别，对照表在 `%LOCALAPPDATA%\CrossPet\windows-apps.json`，可以自己改：键是程序名（小写，带 `.exe`），值是角色 id；值留空（`""`）表示切到这个程序时不换角色。DeepSeek Harness 里用的是别家模型时，切过去会换成那个模型的角色。
+- 切到 Claude、ChatGPT / Codex、DeepSeek Harness、Antigravity、WorkBuddy、ZCode 时自动换角色（后三个按它们当前用的模型）。按程序名识别，对照表在 `%LOCALAPPDATA%\CrossPet\windows-apps.json`，可以自己改：键是程序名（小写，带 `.exe`），值是角色 id；值留空（`""`）表示切到这个程序时不换角色。DeepSeek Harness 里用的是别家模型时，切过去会换成那个模型的角色。
 - 在终端里用 AI 时，没有对应的窗口：桌宠跟着最新一条工作事件换角色（右键可以关掉）。
 - 桌宠始终在最上层，切换窗口时会重新置顶。
 - 每天检查一次新版本，有新版时气泡提醒、右键菜单顶上出现下载入口。

@@ -10,9 +10,9 @@
 
 一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
-![Claude、GPT、DeepSeek、Gemini 四个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
+![Claude、GPT、DeepSeek、Gemini、GLM 五个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
-> 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google 无关。角色形象来自社区二创，见 [致谢与授权](#致谢与授权)。
+> 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google、智谱、腾讯无关。角色形象来自社区二创，见 [致谢与授权](#致谢与授权)。
 
 ## 她会做什么
 
@@ -26,6 +26,7 @@
   - **GPT**：Codex 额度在该重置之前突然满血（reset）时，平时冷静的她会难得地笑出来
   - **DeepSeek**：闲着会扒白饭、摸鱼、游泳，被戳会生气，想得太久会揉太阳穴；余额变多时抱着比脑袋还大的饭碗开吃
   - **Gemini**：生图时拿香蕉当画笔（Nano Banana）；闲着会反重力飘起来
+  - **GLM**：笑眯眯的「心机涨价狐」，戳她会被抓到偷偷改价签；闲着会拉下眼罩假装自己是「神秘新模型」，或者抱着一摞售罄的会员卡得意；大活干完时掀开眼罩揭晓真身
 
 ## 支持的 AI
 
@@ -35,8 +36,10 @@
 | **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，读 Codex 会话记录 |
 | **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额（填了 API Key 或登录了账号都行） |
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
+| **GLM**（智谱 ZCode） | ✅ | ✅ ZCode 钩子 | — |
+| **WorkBuddy**（腾讯，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
 
-DeepSeek Harness 里也能用别家模型（比如 ChatGPT 订阅）：换成哪家的模型，她就换成哪家的角色。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前只认 Claude Code 和 DeepSeek Harness：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
+DeepSeek Harness、WorkBuddy、ZCode 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；没有对应角色的模型（混元、Kimi……）由当前角色来演。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness 和 ZCode：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
 ## 快速开始
 
@@ -100,7 +103,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 更多说明见 [Windows 说明](docs/windows.md)。
 
 > **测试情况**：作者手边没有 Windows 电脑，Windows 版是在 Apple 芯片 Mac 上的 Parallels 虚拟机（Windows 11 ARM64）里测试的。
-> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、设置窗口、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台、一键更新。
+> 已测通过：透明显示、拖动、置顶、托盘、右键菜单、设置窗口、WorkBuddy 和 ZCode 接入、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、DeepSeek 余额、开发者控制台、一键更新。
 > **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度——虚拟机里没装这两个 AI。实体 x64 电脑、Windows 10、多显示器也还没验证。遇到问题欢迎提 Issue，附上 `%LOCALAPPDATA%\CrossPet\windows.log`。
 
 ### 接入 AI 改了什么
@@ -121,9 +124,13 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 ## 彩蛋
 
-用 Claude、GPT 或 Gemini 的时候，偶尔会「噗」地冒出一条穿着她们衣服的 DeepSeek，装模作样地学人说话。**单击她就能揪出来**，她会慌慌张张地溜走；没人理的话，她会得意地自己走掉。等不及的话，右键「召唤彩蛋」。
+用 Claude、GPT 或 Gemini 的时候，偶尔会「噗」地冒出一条穿着她们衣服的 DeepSeek，装模作样地学人说话。**单击她就能揪出来**，她会慌慌张张地溜走；没人理的话，她会得意地自己走掉。
 
-![DeepSeek 分别 cos 成 Claude、GPT、Gemini](docs/images/eggs.webp)
+DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，DeepSeek 溜进来把价签全改成打折、坐下扒饭，被抓到就被 GLM 拽尾巴；用 DeepSeek 时，GLM 拿着全是对勾的成绩单来炫耀、偷看 DeepSeek 的设计图纸，被抓到就说「只是参考一下！」。
+
+等不及的话，右键「召唤彩蛋」。不想被打扰，可以在「设置…」里关掉「随机彩蛋」。
+
+![DeepSeek 分别 cos 成 Claude、GPT、Gemini；DeepSeek 和 GLM 互相上门捣乱](docs/images/eggs.webp)
 
 ## 自定义
 
@@ -137,7 +144,8 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 - GPT 额度默认关闭。打开后只从 Codex 会话记录里提取额度那几个数字。
 - Gemini 额度默认关闭。打开后向本机正在运行的 Antigravity 后台服务问一次额度（和它自己界面上显示额度的方式一样），用的是它每次启动随机生成、只在本机有效的令牌，不碰你的 Google 账号凭据。
 - DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处；没填 Key 时调 Harness 自己的账号服务查，登录凭据始终留在 Harness 里，插件只拿到余额数字。
-- CrossPet 自己只联网做一件事：每天查一次 GitHub 上有没有新版本。
+- WorkBuddy、ZCode：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它们的登录凭据，所以也不显示它们的额度 / 积分。
+- CrossPet 自己只联网做一件事：每天查一次 GitHub 上有没有新版本（点「更新」时才下载安装包）。
 
 ## 更新与卸载
 
@@ -156,8 +164,9 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 - **DeepSeek 娘**：原型「溟月」由 **上善无形** 创作（2025-06，CC BY-NC-SA 4.0）；深蓝女仆鲸鱼娘（社区昵称「大肥鱼」）由 B 站 **ZipZipPipe** 二创。
 - **GPT 娘（白龙）**：社区通称「御姐白龙」，出自 B 站 **ZipZipPipe**。
+- **GLM 娘（黑狐狸女仆）**：CrossPet 的原创设定，「心机涨价狐」的性格取自社区对智谱的印象。
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
-- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」是各自公司的商标，本项目仅用于指代对应产品。
+- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」是各自公司的商标，本项目仅用于指代对应产品。
 
 如果你是原作者并且对使用方式有异议，请提 Issue，我会第一时间修改或下架。
 

@@ -26,6 +26,7 @@ HERO = [
     ("gpt", "idle", "……来了。今天写什么？", "5小时 剩余 85% ｜ 本周 剩余 63% · 10/10 重置"),
     ("deepseek", "idle", "DeepSeek 来啦！", "余额 ¥6.29"),
     ("gemini", "idle", "喵～Gemini 上线！", "Gemini 剩余 91% · 10/12 重置 ｜ Claude/GPT-OSS 剩余 100%"),
+    ("glm", "idle", "GLM 来啦～今天也请多多关照（笑）", None),
 ]
 ACTIONS = [
     ("claude", "reading", "我看看这里写了什么", None), ("gpt", "running", "跑一下测试。", None),
@@ -36,11 +37,16 @@ ACTIONS = [
     ("deepseek", "swim", "咕噜咕噜～", None), ("gemini", "delegating", "交给分身喵", None),
     ("claude", "asking", "能帮我选一下吗？", None), ("gpt", "compact", "整理一下记忆。", None),
     ("deepseek", "asking", "快来快来！要你选！", None), ("gemini", "compact", "压缩压缩喵～", None),
+    ("glm", "pricetag", "嘘…你什么都没看到", None), ("glm", "masked", "我只是一个神秘的新模型～", None),
+    ("glm", "soldout", "又卖光啦～", None), ("glm", "proud", "其实一直是我哦～", None),
 ]
 EGGS = [
     ("egg-claude", "pretend", "（翻书）嗯……这个问题很有意思呢。", None),
     ("egg-gpt", "pretend", "……哼，交给我吧。（憋笑）", None),
     ("egg-gemini", "pop", "喵～Gemini 来啦！", None),
+    ("egg-glm", "pretend", "（吧唧）把这里的价签全改成打折～", None),
+    ("egg-deepseek", "pretend", "这个设计……借我参考一下～", None),
+    ("egg-deepseek", "caught", "只、只是参考一下！", None),
 ]
 
 # 从 effects.js 取出某个特效的静态 SVG：去掉动画，隐藏的元素显出来，笔画画完整
@@ -203,8 +209,9 @@ def render_tiles(shots):
     jobs = []
     for cid, pose, _, _ in shots:
         cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
-        if not cfg.get("egg"):
-            jobs.append([pose, (cfg.get("fx") or {}).get(pose) or ""])
+        named = (cfg.get("fx") or {}).get(pose) or ""
+        if not cfg.get("egg") or named:   # 彩蛋只画它自己点名的特效（比如 DeepSeek 上门时的价签）
+            jobs.append([pose, named])
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
         (tmp / "fx.js").write_text(FX_JS)
@@ -214,7 +221,7 @@ def render_tiles(shots):
         for cid, pose, line, quota in shots:
             cfg = json.loads((CHARS / cid / "character.json").read_text(encoding="utf-8"))
             named = (cfg.get("fx") or {}).get(pose) or ""
-            svg = "" if cfg.get("egg") else res["fx"].get(f"{pose}|{named}", "")
+            svg = "" if cfg.get("egg") and not named else res["fx"].get(f"{pose}|{named}", "")
             svgs.append(glyph_color(svg, cfg))
             metas.append((cid, pose, line, quota, res["aura"].get(pose, ["#ffd9b0", .35])))
         fxs = render_fx(svgs, tmp)
@@ -224,7 +231,7 @@ def render_tiles(shots):
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, shots, cols in [("characters", HERO, 4), ("actions", ACTIONS, 4), ("eggs", EGGS, 3)]:
+    for name, shots, cols in [("characters", HERO, 5), ("actions", ACTIONS, 4), ("eggs", EGGS, 3)]:
         img = sheet(render_tiles(shots), cols)
         img.convert("RGB").save(OUT / f"{name}.webp", quality=88, method=6)
         print(f"docs/images/{name}.webp  {img.width}x{img.height}")
