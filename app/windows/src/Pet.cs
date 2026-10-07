@@ -429,7 +429,7 @@ namespace CrossPet
         static readonly (string id, string label, string note)[] IntegrationTargets =
         {
             ("claude-hooks", "Claude Code（标准钩子）", "所有版本可用，不显示额度"),
-            ("claude-mod", "Claude Code 增强版 mod", "能显示额度，需要支持 mod 的版本"),
+            ("claude-mod", "Claude Code 增强版 mod", "能显示额度；终端里要 2.1.287 以上，桌面 App 2.1.286 以上"),
             ("codex", "Codex", "接入后要在 Codex 里用 /hooks 信任一次"),
             ("deepseek", "DeepSeek Harness", "工作状态 + 余额"),
             ("antigravity", "Antigravity", "桌面版和命令行都有效"),

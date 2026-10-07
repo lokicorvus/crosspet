@@ -11,6 +11,7 @@
 - 识别 CrossPet 条目的标记：命令里含 crosspet-hook.py，或插件 id 为 crosspet
 """
 import json
+import re
 import os
 import shutil
 import sys
@@ -176,6 +177,24 @@ def claude_hooks(install: bool) -> None:
         remove_hooks(CLAUDE_SETTINGS)
 
 
+MOD_MIN_CLI = (2, 1, 287)   # 终端里的 Claude Code 从这一版起默认加载 mod（桌面 App 自带的那份从 2.1.286 起）
+
+
+def claude_cli_version():
+    """终端里 claude --version 的版本号；找不到 claude 时返回 None"""
+    import subprocess
+    candidates = [shutil.which("claude"), str(HOME / ".local/bin/claude"), str(HOME / ".claude/local/claude")]
+    for exe in [c for c in candidates if c and Path(c).exists()]:
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            continue
+        m = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
+        if m:
+            return tuple(int(x) for x in m.groups())
+    return None
+
+
 def claude_mod(install: bool) -> None:
     if not install and not CLAUDE_MOD_DIR.exists() and not CLAUDE_SETTINGS.exists():
         return  # 从没装过：别凭空建出一个 settings.json
@@ -206,7 +225,12 @@ def claude_mod(install: bool) -> None:
     save_json(CLAUDE_SETTINGS, data)
     print(f"  已更新 {CLAUDE_SETTINGS} 的 env.CLAUDE_CODE_PLUGIN_DIRS")
     if install:
-        print("  → 需要 Claude Code 2.1.28x 以上（支持 mod）；新开的会话生效")
+        print("  → 新开的会话生效。需要终端里的 Claude Code 2.1.287 以上（桌面 App 2.1.286 以上）")
+        v = claude_cli_version()
+        if v and v < MOD_MIN_CLI:
+            print(f"  ！终端里的 Claude Code 是 {'.'.join(map(str, v))}，还不会加载 mod：请先更新 Claude Code，"
+                  "或者改用标准钩子（claude-hooks，所有版本可用，只是不显示额度）")
+        print("  → 公司 / 组织账号如果被管理员禁了自己装的 mod，或者在 WSL 里用，mod 不会运行，请改用标准钩子")
 
 
 # ---- Codex ----

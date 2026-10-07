@@ -792,7 +792,79 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "updating": updating,
         ]
         if let r = latestRelease, canSelfUpdate { state["update"] = r.tag }
+        if let list = integrated, integrateScript != nil {
+            state["integrations"] = Self.integrationTargets.map {
+                ["id": $0.id, "label": $0.label, "note": $0.note, "installed": list.contains($0.id)] as [String: Any]
+            }
+        }
         return state
+    }
+
+    // MARK: 接入 AI（设置窗口里）
+    // App 里自带接入工具（Resources/tools/integrate.py），用系统的 python3 跑；和终端里的安装命令做的是同一件事
+    static let integrationTargets: [(id: String, label: String, note: String)] = [
+        ("claude-mod", "Claude Code 增强版 mod", "能显示额度；终端里要 2.1.287 以上，桌面 App 2.1.286 以上"),
+        ("claude-hooks", "Claude Code 标准钩子", "所有版本可用，不显示额度；和增强版二选一"),
+        ("codex", "Codex", "接入后要在 Codex 里用 /hooks 信任一次"),
+        ("deepseek", "DeepSeek Harness", "工作状态 + 余额；完全退出再打开 Harness 生效"),
+        ("antigravity", "Antigravity", "桌面版和命令行都有效"),
+        ("gemini", "Gemini CLI", "Gemini 桌面 App 没有接口"),
+        ("workbuddy", "WorkBuddy", "按当前模型换角色"),
+        ("zcode", "ZCode（智谱）", "按会话的模型换角色"),
+    ]
+    var integrated: [String]?
+    var integrateScript: URL? {
+        let url = Bundle.main.resourceURL!.appendingPathComponent("tools/integrate.py")
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// 后台跑一次接入工具，回调里拿到输出和退出码
+    func runIntegrate(_ args: [String], done: @escaping (String, Int32) -> Void) {
+        guard let script = integrateScript else { done("App 里没有接入工具", -1); return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+            p.arguments = [script.path] + args
+            var env = ProcessInfo.processInfo.environment
+            env["PYTHONDONTWRITEBYTECODE"] = "1"   // 别往 App 包里写缓存（会破坏签名）
+            env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin:" + (env["PATH"] ?? "")
+            p.environment = env
+            let pipe = Pipe()
+            p.standardOutput = pipe; p.standardError = pipe
+            var output = ""
+            do {
+                try p.run()
+                output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                p.waitUntilExit()
+            } catch { output = error.localizedDescription }
+            let code = p.isRunning ? -1 : p.terminationStatus
+            DispatchQueue.main.async { done(output, code) }
+        }
+    }
+
+    func refreshIntegrated() {
+        runIntegrate(["installed"]) { [weak self] out, code in
+            guard let self else { return }
+            let last = out.split(separator: "\n").last.map(String.init) ?? "[]"
+            self.integrated = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String] ?? []
+            self.pushSettings()
+        }
+    }
+
+    func integrate(_ action: String, _ target: String) {
+        guard let t = Self.integrationTargets.first(where: { $0.id == target }), ["install", "uninstall"].contains(action) else { return }
+        runIntegrate([action, target]) { [weak self] out, code in
+            // 没找到 AI 的配置目录时脚本正常退出但什么都没改，不能显示成「已接入」
+            let missing = out.contains("没找到")
+            let alert = NSAlert()
+            alert.messageText = "\(t.label)：" + (code != 0 ? "没有完成" : missing ? "没有接入：没找到这个 AI 的配置" : action == "install" ? "已接入" : "已撤销")
+            alert.informativeText = out.trimmingCharacters(in: .whitespacesAndNewlines)
+                .split(separator: "\n").filter { !$0.contains("已备份") }.joined(separator: "\n")
+            alert.alertStyle = code != 0 || missing ? .warning : .informational
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            self?.refreshIntegrated()
+        }
     }
 
     func pushSettings() {
@@ -834,6 +906,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             default: break
             }
             pushSettings()
+        case "integrate":
+            if let target = msg["target"] as? String, let action = msg["action"] as? String { integrate(action, target) }
         case "rename":
             guard let id = msg["id"] as? String, characterIds.contains(id) else { return }
             var names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
@@ -853,7 +927,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             default: break
             }
             pushSettings()
-        default:
+        default:   // get：设置窗口刚打开
+            if integrated == nil { refreshIntegrated() }
             pushSettings()
         }
     }

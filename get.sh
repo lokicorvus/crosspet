@@ -143,7 +143,7 @@ want() {  # 要不要接入 $1（问题是 $2）
 case " $already " in
   *" claude-mod "*|*" claude-hooks "*) ;;
   *)
-    if want claude-mod "接入 Claude Code 增强版 mod（能显示额度，需要 Claude Code 2.1.28x 以上）？"; then
+    if want claude-mod "接入 Claude Code 增强版 mod（能显示额度，需要终端里的 Claude Code 2.1.287 以上）？"; then
       python3 "$INTEGRATE" install claude-mod
     elif want claude-hooks "  或者接入 Claude Code 标准钩子（所有版本可用，不显示额度）？"; then
       python3 "$INTEGRATE" install claude-hooks

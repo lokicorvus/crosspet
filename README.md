@@ -56,6 +56,8 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
 
 > 为什么不用放行：macOS 只拦带「从网上下载」标记的文件。浏览器下载的会带这个标记，终端里用 `curl` 下载的不会。脚本内容就在仓库里的 [get.sh](get.sh)，可以先看一眼再运行。
 
+以后想加接或撤销某个 AI：右键桌宠 →「设置…」→「接入 AI」（1.2.3 起，Mac 和 Windows 都有）。
+
 以后**更新**：再运行一次同一行命令。**卸载**：
 
 ```bash
