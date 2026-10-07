@@ -56,10 +56,11 @@ mkdir -p "$APP/Contents/Resources/tools"
 cp tools/integrate.py "$APP/Contents/Resources/tools/integrate.py"
 find "$APP/Contents/Resources/characters" -name raw -type d -prune -exec rm -rf {} +
 
+xattr -cr "$APP" 2>/dev/null || true   # 去掉文件来源标记之类的扩展属性，免得打进发布包（zip 里会多出一堆 ._ 文件）
 codesign --force --deep -s - "$APP"
 echo "已编译：$APP"
 
 if [ "$1" = "--zip" ]; then
-  (cd build && rm -f CrossPet-macOS.zip && ditto -c -k --keepParent CrossPet.app CrossPet-macOS.zip)
+  (cd build && rm -f CrossPet-macOS.zip && ditto -c -k --norsrc --noextattr --keepParent CrossPet.app CrossPet-macOS.zip)
   echo "发布包：$ROOT/build/CrossPet-macOS.zip"
 fi
