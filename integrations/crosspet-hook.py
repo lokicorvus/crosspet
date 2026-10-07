@@ -229,9 +229,10 @@ elif name in ("SessionEnd",):
     pose = "sleeping"
 
 state = {"pose": pose, "event": name, "tool": tool, "ts": time.time()}
-if pose and name == "PreInvocation":
-    # Antigravity 工具一结束就（几毫秒内）开始下一轮思考，桌宠每 0.3 秒才读一次，
-    # 刚写的工具动作会被直接盖掉。所以把它捎带上：桌宠先演完那个动作再进入思考。
+if pose == "thinking" and name in ("PreInvocation", "PostToolUse", "AfterTool"):
+    # 快的工具（ls、读文件、grep）从开始到结束常常不到 0.3 秒，桌宠每 0.3 秒才读一次，
+    # 刚写的工具动作会被「回去思考」直接盖掉（Antigravity 甚至几毫秒内就开始下一轮思考）。
+    # 所以把它捎带上：桌宠先演完那个动作再进入思考；已经演过的（同一个 afterTs）桌宠会跳过。
     try:
         prev = json.loads((state_dir / f"{character}-state.json").read_text())
         if prev.get("event") == "PreToolUse" and time.time() - float(prev.get("ts", 0)) < 3:
