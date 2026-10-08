@@ -213,7 +213,7 @@ namespace CrossPet
             var latestActive = (id: (string)null, ts: 0.0);
             // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
             foreach (var id in Characters().Select(c => c.id).Concat(new[] { "current" }))
-                foreach (var kind in new[] { "state", "quota" })
+                foreach (var kind in new[] { "state", "quota", "sessions" })   // sessions：好几个对话同时干活时各自的状态
                 {
                     if (id == "current" && kind == "quota") continue;
                     var file = Path.Combine(Store.State, $"{id}-{kind}.json");
@@ -227,6 +227,7 @@ namespace CrossPet
                     if (value == null) continue;   // 可能正被另一边写一半，下次再读
                     stamps[key] = stamp;
                     var json = Store.Json.Serialize(value);
+                    if (kind == "sessions") { if (!Paused) Js($"setSessions({Q(id)}, {json})"); continue; }
                     dev?.Js($"logEvent({Q(id)}, {Q(kind)}, {json}, {(Paused ? "true" : "false")})");
                     if (Paused) continue;
                     if (kind == "state")

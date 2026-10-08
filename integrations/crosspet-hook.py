@@ -428,9 +428,57 @@ if pose == "thinking" and name in ("PreInvocation", "PostToolUse", "AfterTool"):
         pass
 
 if pose:
-    tmp = state_dir / f".{character}-state.json"
+    # 临时文件名带进程号：同一个角色的几个钩子同时写（好几个对话一起干活）时不会抢同一个临时文件
+    tmp = state_dir / f".{character}-state.{os.getpid()}.json"
     tmp.write_text(json.dumps(state))
     tmp.replace(state_dir / f"{character}-state.json")
+
+
+# 同一个 AI 同时开着好几个对话在干活：按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
+# 桌宠看到两个以上同时在干活时演「手忙脚乱」，每个对话一张小卡片。几个钩子可能同时写，用文件锁排队
+SESSION_KEEP = 10 * 60   # 多久没动静的会话不再记
+
+
+def update_sessions(sid: str, entry) -> None:
+    path = state_dir / f"{character}-sessions.json"
+    with open(state_dir / f".{character}-sessions.lock", "a+") as lock:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(lock, fcntl.LOCK_EX)
+        except Exception:
+            pass
+        try:
+            known = json.loads(path.read_text())
+        except Exception:
+            known = {}
+        now = time.time()
+        if entry is None:
+            known.pop(sid, None)
+        else:
+            known[sid] = entry
+        known = {k: v for k, v in known.items() if now - float(v.get("ts", 0)) < SESSION_KEEP}
+        tmp = state_dir / f".{character}-sessions.json"
+        tmp.write_text(json.dumps(known))
+        tmp.replace(path)
+        if os.name == "nt":
+            try:
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            except Exception:
+                pass
+
+
+session_id = str(event.get("session_id") or event.get("sessionId") or event.get("conversationId") or "")
+if session_id and (pose or name == "SessionEnd"):
+    try:
+        update_sessions(session_id, None if name == "SessionEnd" else
+                        {"pose": state.get("after") or pose if pose == "thinking" else pose, "event": name, "ts": time.time()})
+    except Exception:
+        pass
 
 
 if name in LAUNCH_EVENTS:

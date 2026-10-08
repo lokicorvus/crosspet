@@ -32,6 +32,22 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #body img.on { opacity: 1; }
 #body img#blink { transition: none; }
 #fx { position: absolute; inset: 0; transition: opacity .3s; pointer-events: none; }
+/* 多会话：每个正在干活的对话一张小卡片，放在桌宠两侧 / 四个角 */
+#cards { position: absolute; inset: 0; pointer-events: none; }
+.scard { position: absolute; width: 66px; height: 56px; transition: left .35s ease, top .35s ease, opacity .35s ease, transform .35s ease; opacity: 0; transform: scale(.6); }
+.scard.on { opacity: .72; transform: scale(.92); }
+.scard.on.focus { opacity: 1; transform: scale(1.06); }
+.scard svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,.18)); }
+.scard .badge { position: absolute; right: -4px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%; color: #fff; font: bold 13px/20px sans-serif; text-align: center; opacity: 0; transform: scale(.4); transition: opacity .25s, transform .25s; }
+.scard.done .badge { background: #3dbb6a; opacity: 1; transform: none; }
+.scard.error svg { filter: drop-shadow(0 0 3px #ff5a5a); }
+.scard.error { animation: cardShake .45s ease 2; }
+.scard.ask { animation: cardBounce .9s ease-in-out infinite; }
+@keyframes cardShake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+@keyframes cardBounce { 50% { translate: 0 -5px; } }
+#more { position: absolute; right: 2px; bottom: 6px; padding: 1px 7px; border-radius: 9px; background: rgba(255,255,255,.9); color: #4a2418;
+  font: bold 11px/16px sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.15); opacity: 0; transition: opacity .3s; }
+#more.on { opacity: 1; }
 #fx.hide { opacity: 0; }
 #fx svg { width: 100%; height: 100%; overflow: visible; }
 #poof { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; }
@@ -89,6 +105,7 @@ html.no-name #caption { display: none; }
     <div id="aura"></div><div id="shadow"></div>
     <div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div>
     <div id="fx"></div>
+    <div id="cards"><div id="more"></div></div>
     <div id="poof"><i style="--dx:-60px;--dy:-30px"></i><i style="--dx:55px;--dy:-35px"></i><i style="--dx:-45px;--dy:40px"></i><i style="--dx:50px;--dy:35px"></i><i style="--dx:0;--dy:-60px"></i></div>
   </div>
   <div id="caption"></div>
@@ -123,7 +140,8 @@ const LOCAL_LINES = {
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
-const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy' }
+const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
+  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
@@ -144,7 +162,8 @@ const char = () => manifest.characters[charId]
 const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
 function framesFor(p) {
   const c = char(); if (!c) return []
-  return c.poses[p] || c.poses[POSE_FALLBACK[p]] || c.poses.idle || c.poses.default || []
+  for (let q = p, i = 0; q && i < 4; q = POSE_FALLBACK[q], i++) if (c.poses[q]) return c.poses[q]   // 没画的顺着替补往下找
+  return c.poses.idle || c.poses.default || []
 }
 
 // ---- 画面 ----
@@ -239,6 +258,7 @@ let farewellLine = null
 // 从菜单退出：挥手道别（没画 bye 立绘的先用 happy），最后一秒转身走开。
 // line 为空时说一句她自己的道别台词；ms 是外壳多久之后退出
 function farewell(line, ms = 2000) {
+  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
   if (!egg) {
     clearTimeout(thinkTimer); clearTimeout(stuckTimer); updatingNow = false
     show('bye', true)
@@ -312,6 +332,8 @@ function greetDue(id) {
 function setCharacter(id, quiet) {
   if (egg) { clearEggTimers(); egg = null; charId = null }
   if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
+  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
+  setTimeout(refreshMulti, 700)   // 换过去的角色如果也有好几个对话在干活，接着演
   const stage = $('stage')
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   stage.classList.add('swap')
@@ -454,11 +476,117 @@ let stuckTimer = null
 function watchStuck() {
   clearTimeout(stuckTimer)
   stuckTimer = setTimeout(() => {
-    if (egg || updatingNow || !pose || NOT_WORKING.has(pose) || pose.startsWith('greet_') || pose.startsWith('fest_')) return
+    if (egg || multi || updatingNow || !pose || NOT_WORKING.has(pose) || pose.startsWith('greet_') || pose.startsWith('fest_')) return
     clearTimeout(thinkTimer)
     show('idle', true)
     say('')
   }, STUCK_AFTER)
+}
+
+// ---- 多会话：同一个 AI 好几个对话同时在干活 ----
+// 外壳把 <角色>-sessions.json（{会话id: {pose, event, ts}}）交过来。两个以上同时在干活时她「手忙脚乱」：
+// 左右两帧来回切（busy_left / busy_right；三个以上换更崩溃的 swamped_*），每个对话一张小卡片演它正在做的事，
+// 她转向哪边，哪边的卡片就亮。干完的卡片打绿勾、出错的变红抖一下，停几秒后消失；有对话在等你回答时她换成「等你回答」
+const sessions = {}         // 角色 → {会话id: {pose, event, ts}}
+const SESSION_DONE_SHOW = 4  // 干完 / 出错的卡片停几秒
+const SESSION_FLIP = 1500    // 左右两帧多久换一次
+let multi = null             // 正在演：{ side, flipTimer, cards: Map(会话id → {el, pose, shownAt, pending}), order: [会话id] }
+
+function setSessions(id, map) {
+  if (id === 'current') id = charId
+  sessions[id] = map || {}
+  refreshMulti()
+}
+function sessionKind(e, now) {
+  const age = now - Number(e.ts || 0)
+  if (e.pose === 'asking') return age < 600 ? 'ask' : null
+  if (e.pose === 'happy' || e.pose === 'proud') return age < SESSION_DONE_SHOW ? 'done' : null
+  if ((e.pose === 'oops' || e.pose === 'surprised') && e.event === 'Stop') return age < SESSION_DONE_SHOW ? 'error' : null
+  if (e.pose === 'idle' || e.pose === 'sleeping') return null
+  return age < STUCK_AFTER / 1000 ? (e.pose === 'oops' ? 'error' : 'work') : null
+}
+function refreshMulti() {
+  const map = sessions[charId] || {}, now = Date.now() / 1000
+  const live = Object.entries(map).map(([sid, e]) => [sid, e, sessionKind(e, now)]).filter(x => x[2])
+  const busy = live.filter(x => x[2] === 'work' || x[2] === 'ask').length
+  if (!multi && (busy < 2 || egg || farewellLine !== null || updatingNow)) return
+  // 只剩一个（或没有）对话在干活：等干完 / 出错的卡片演完（几秒），她就恢复成平常一个对话的样子
+  if (multi && busy < 2 && !live.some(x => x[2] === 'done' || x[2] === 'error')) return endMulti()
+  if (!multi) startMulti()
+  lastActive = Date.now()
+  // 卡片顺序固定（先来的在前），不会跳来跳去；最多 4 张，多的显示「+N」
+  for (const [sid] of live) if (!multi.order.includes(sid)) multi.order.push(sid)
+  multi.order = multi.order.filter(sid => live.some(x => x[0] === sid))
+  const shown = multi.order.slice(0, 4)
+  const slots = shown.length <= 2 ? [[-6, 92], [190, 92]] : [[-6, 34], [190, 34], [-6, 152], [190, 152]]
+  for (const [sid, c] of multi.cards) if (!shown.includes(sid)) { c.el.classList.remove('on'); setTimeout(() => c.el.remove(), 400); multi.cards.delete(sid) }
+  shown.forEach((sid, i) => {
+    const [, e, kind] = live.find(x => x[0] === sid)
+    let c = multi.cards.get(sid)
+    if (!c) {
+      c = { el: document.createElement('div'), pose: null, shownAt: 0 }
+      c.el.className = 'scard'; c.el.innerHTML = '<svg></svg><div class="badge">✓</div>'
+      $('cards').appendChild(c.el); multi.cards.set(sid, c)
+      requestAnimationFrame(() => c.el.classList.add('on'))
+    }
+    c.el.style.left = slots[i][0] + 'px'; c.el.style.top = slots[i][1] + 'px'
+    c.side = i % 2 ? 'right' : 'left'
+    c.el.classList.toggle('done', kind === 'done')
+    c.el.classList.toggle('ask', kind === 'ask')
+    if (kind === 'error' && !c.el.classList.contains('error')) c.el.classList.add('error')
+    if (kind !== 'error') c.el.classList.remove('error')
+    setCardPose(c, kind === 'done' ? 'happy' : e.pose)
+  })
+  const extra = multi.order.length - shown.length
+  $('more').textContent = extra > 0 ? `+${extra}` : ''
+  $('more').classList.toggle('on', extra > 0)
+  multi.busy = busy
+  multi.asking = live.some(x => x[2] === 'ask')
+  multiPose()
+  // 干完的卡片过几秒自己消失：到时候再看一遍
+  clearTimeout(multi.recheck); multi.recheck = setTimeout(refreshMulti, 1000)
+}
+// 卡片换内容：同一张卡片至少停 1.2 秒，快的工具不会闪
+function setCardPose(c, p) {
+  if (c.pose === p) return
+  clearTimeout(c.pending)
+  const wait = c.shownAt + 1200 - Date.now()
+  if (wait > 0) { c.pending = setTimeout(() => setCardPose(c, p), wait); return }
+  c.pose = p; c.shownAt = Date.now()
+  const svg = c.el.querySelector('svg')
+  svg.setAttribute('viewBox', `0 0 ${CrossFx.CW} ${CrossFx.CH}`)
+  svg.innerHTML = CrossFx.cardProp(p)
+  try {   // 只留道具本身：按它实际占的范围裁
+    const b = svg.getBBox(), pad = 8
+    if (b.width > 0) svg.setAttribute('viewBox', `${b.x - pad} ${b.y - pad} ${b.width + pad * 2} ${b.height + pad * 2}`)
+  } catch {}
+}
+function startMulti() {
+  clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(stuckTimer)
+  multi = { side: 'left', cards: new Map(), order: [], busy: 0, asking: false }
+  $('fx').classList.add('hide')
+  multi.flipTimer = setInterval(() => { if (multi && !multi.asking) { multi.side = multi.side === 'left' ? 'right' : 'left'; multiPose() } }, SESSION_FLIP)
+}
+function multiPose() {
+  if (!multi) return
+  if (multi.asking) { if (pose !== 'asking') { setPose('asking'); $('fx').classList.add('hide') } }
+  else {
+    const p = `${multi.busy >= 3 ? 'swamped' : 'busy'}_${multi.side}`
+    if (pose !== p) { setPose(p, true); $('fx').classList.add('hide') }
+  }
+  for (const c of multi.cards.values()) c.el.classList.toggle('focus', !multi.asking ? c.side === multi.side : c.el.classList.contains('ask'))
+}
+function endMulti() {
+  if (!multi) return
+  clearInterval(multi.flipTimer); clearTimeout(multi.recheck)
+  for (const c of multi.cards.values()) { c.el.classList.remove('on'); setTimeout(() => c.el.remove(), 400) }
+  $('more').classList.remove('on')
+  multi = null
+  shownAt = 0
+  // 回到只剩的那一个对话的样子（没有就是待机）
+  const left = Object.values(sessions[charId] || {}).filter(e => sessionKind(e, Date.now() / 1000) === 'work' || sessionKind(e, Date.now() / 1000) === 'ask')
+  show(left.length ? left[0].pose : 'idle', true)
+  watchStuck()
 }
 
 function applyCharState(id, s) {
@@ -467,6 +595,7 @@ function applyCharState(id, s) {
   if (egg) { if (egg.host === id && s.pose && s.pose !== 'idle') endEgg(); return }
   if (id !== charId || !s.pose) return
   lastActive = Date.now()
+  if (multi) return   // 正在演多会话：她的样子由各对话的状态决定（refreshMulti），这里不动
   clearTimeout(thinkTimer)
   watchStuck()
   const ev = s.event || ''

@@ -20,6 +20,23 @@ async function write($: EngineInterface, file: string, data: unknown): Promise<v
   await $.fs.write(`${await stateDir($)}/${file}`, JSON.stringify(data))
 }
 const ID = 'claude'
+
+// 写状态；同时按会话另外记一份 claude-sessions.json（{会话id: {pose, event, ts}}），
+// 同时开着好几个 Claude 会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
+type State = { pose: string; event: string; tool: string; ts: number }
+async function setState($: EngineInterface, state: State): Promise<void> {
+  await write($, `${ID}-state.json`, state)
+  try {
+    const sid = await $.session.id()
+    const file = `${await stateDir($)}/${ID}-sessions.json`
+    let known: Record<string, { pose: string; event: string; ts: number }> = {}
+    try { known = JSON.parse(await $.fs.read(file)) } catch {}
+    known[sid] = { pose: state.pose, event: state.event, ts: state.ts }
+    const now = Date.now() / 1000
+    for (const k of Object.keys(known)) if (now - known[k].ts > 600) delete known[k]
+    await $.fs.write(file, JSON.stringify(known))
+  } catch {}
+}
 const BIG_JOB_TOOLS = 8
 
 // 跟着 AI 出现：会话开始 / 发消息时看一眼，桌宠没开着就打开。用户从菜单手动退出过（user-quit）就先不管，
@@ -98,7 +115,7 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     void ensurePet($).catch(() => {})
-    await write($, `${ID}-state.json`, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
+    await setState($, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
     const usage = await $.session.usage()
     const q = quotaOf(usage.rateLimits)
     if (q) await write($, `${ID}-quota.json`, q)
@@ -108,16 +125,16 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     void ensurePet($).catch(() => {})
     tools = 0
-    await write($, `${ID}-state.json`, { pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 })
+    await setState($, { pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 })
     return next(e)
   })
 
   on('tool.call', async ($, e, next) => {
     tools += 1
-    await write($, `${ID}-state.json`, { pose: poseForTool(e.tool), event: 'PreToolUse', tool: e.tool, ts: Date.now() / 1000 })
+    await setState($, { pose: poseForTool(e.tool), event: 'PreToolUse', tool: e.tool, ts: Date.now() / 1000 })
     const r = await next(e)
     const failed = 'deny' in r && r.deny !== undefined ? true : r.isError === true
-    await write($, `${ID}-state.json`, { pose: failed ? 'oops' : 'thinking', event: 'PostToolUse', tool: e.tool, ts: Date.now() / 1000 })
+    await setState($, { pose: failed ? 'oops' : 'thinking', event: 'PostToolUse', tool: e.tool, ts: Date.now() / 1000 })
     return r
   })
 
@@ -126,7 +143,7 @@ export const register: Register = on => {
     const pose =
       e.reason === 'answer' ? (tools >= BIG_JOB_TOOLS ? 'proud' : 'happy') : e.reason === 'aborted' ? 'surprised' : 'oops'
     tools = 0
-    await write($, `${ID}-state.json`, { pose, event: 'Stop', tool: '', ts: Date.now() / 1000 })
+    await setState($, { pose, event: 'Stop', tool: '', ts: Date.now() / 1000 })
     return r
   })
 
@@ -135,16 +152,16 @@ export const register: Register = on => {
   on('classic.Notification', async ($, e, next) => {
     const kind = String(e.notification_type ?? '').toLowerCase()
     if (kind === 'permission_prompt' || kind === 'elicitation_dialog')
-      await write($, `${ID}-state.json`, { pose: 'asking', event: 'Notification', tool: '', ts: Date.now() / 1000 })
+      await setState($, { pose: 'asking', event: 'Notification', tool: '', ts: Date.now() / 1000 })
     return next(e)
   })
 
   // 压缩上下文（/compact 或自动）：只管主对话，后台预先压缩（precompute）和子任务的不算
   on('session.compact', async ($, e, next) => {
     const shown = (e.trigger === 'manual' || e.trigger === 'auto') && !e.agentId
-    if (shown) await write($, `${ID}-state.json`, { pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 })
+    if (shown) await setState($, { pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 })
     const r = await next(e)
-    if (shown) await write($, `${ID}-state.json`, { pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 })
+    if (shown) await setState($, { pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 })
     return r
   })
 

@@ -572,4 +572,21 @@ const sceneSvg = (art     , p      )         => {
     `${surroundings(p)}</svg>`
 }
 
-window.CrossFx = { surroundings, named, AURA, CW, CH, AX, AY, AW, AH }
+// 多会话的小卡片：每个对话正在做的事只取主要的那个道具（不带星星、彩带这些散在四周的点缀），网页裁好放进桌宠两侧
+const cardProp = (p      )         => {
+  switch (p) {
+    case 'listening': return chatCard
+    case 'asking': return choiceCard
+    case 'reading': return viewerCard
+    case 'writing': case 'compact': return editorCard
+    case 'running': return terminal
+    case 'searching': return browser
+    case 'delegating': return taskCard
+    case 'drawing': return easelCard
+    case 'oops': case 'surprised': return errorCard
+    case 'happy': case 'proud': return checklist
+  }
+  return thoughtCloud
+}
+
+window.CrossFx = { surroundings, named, cardProp, AURA, CW, CH, AX, AY, AW, AH }

@@ -4,6 +4,7 @@
 做的事：抠掉和图片边缘连通的白底（衣服里的白色不会被抠）→ 去掉飘在空中的小碎片（生图 AI 常画的汗滴、速度线、闪光）
 和贴地的扁平影子 → 比主角站得低的小帮手挪到同一条地面上 → 裁掉空白 → 统一缩放到 640 高（所有姿态同尺度）→ 存 WebP。
 """
+import os
 import sys
 from collections import deque
 from pathlib import Path
@@ -14,6 +15,8 @@ from scipy import ndimage
 
 CHARACTERS = Path(__file__).resolve().parent.parent / "characters"
 TARGET_H = 640
+BG_MIN = int(os.environ.get("BG_MIN", 215))
+BG_SPREAD = int(os.environ.get("BG_SPREAD", 28))
 
 
 def background_mask(im: Image.Image) -> Image.Image:
@@ -36,8 +39,9 @@ def background_mask(im: Image.Image) -> Image.Image:
             continue
         seen[i] = 1
         r, g, b, _ = px[x, y]
-        # 接近白色、几乎不带颜色的才算背景（生图 AI 常在脚下画一片极淡的地面光晕，也一起去掉）
-        if not (min(r, g, b) > 215 and max(r, g, b) - min(r, g, b) < 28):
+        # 接近白色、几乎不带颜色的才算背景（生图 AI 常在脚下画一片极淡的地面光晕，也一起去掉）。
+        # 白头发、白衣服的角色（GPT）描边有缺口时会被一起抠掉：用 BG_MIN=250 BG_SPREAD=6 只认更白的
+        if not (min(r, g, b) > BG_MIN and max(r, g, b) - min(r, g, b) < BG_SPREAD):
             continue
         mp[x, y] = 0
         for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):

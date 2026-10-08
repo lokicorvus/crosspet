@@ -416,7 +416,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         guard ready else { return }
         // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
         for id in characterIds + ["current"] {
-            for kind in ["state", "quota"] where !(id == "current" && kind == "quota") {
+            // sessions：同一个 AI 好几个对话同时干活时，每个对话各自的状态（演「手忙脚乱」用）
+            for kind in ["state", "quota", "sessions"] where !(id == "current" && kind == "quota") {
                 let url = stateDir.appendingPathComponent("\(id)-\(kind).json")
                 let key = "\(id)-\(kind)"
                 guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -428,6 +429,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if kind == "state", let pose = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["pose"] as? String {
                     lastPose[id] = (pose, stamp)
                 }
+                if kind == "sessions" { if !pauseRealEvents { js("setSessions(\(quote(id)), \(text))") }; continue }
                 devJS("logEvent(\(quote(id)), \(quote(kind)), \(text), \(pauseRealEvents))")
                 if pauseRealEvents { continue }
                 js(kind == "state" ? "applyCharState(\(quote(id)), \(text))" : "setQuota(\(quote(id)), \(text))")

@@ -2,7 +2,7 @@
 
 同一个 AI 同时开着好几个对话在干活时用。App 会在左右两帧之间快速来回切换，看起来就是左边忙一下、右边忙一下。
 每个文件全文复制发给 GPT，附件附上文件开头写的参考图。**先画 `-left`，再让它在 `-left` 的基础上改出 `-right`**，两帧才不会跳。
-画好放到 `characters/<角色>/raw/`，文件名用清单里的：`busy-left`、`busy-right`（两个对话）、`swamped-left`、`swamped-right`（三个及以上）。
+画好后导入成 `characters/<角色>/busy_left.webp`、`busy_right`（两个对话）、`swamped_left`、`swamped_right`（三个及以上）——**存成下划线**（文件名里的「-」表示同一姿态的第几张，左右两帧就混成一个姿态随机挑了）。left / right 指她在画面左边 / 右边忙（举着东西、眼睛看着的那边），导入后在预览里核对，反了就对调文件名。白头发的 GPT 抠图时用 `BG_MIN=250 BG_SPREAD=6 python3 tools/prepare.py …`，不然头发会被当成白底抠掉。
 
 | # | 批次文件 | 张数 |
 |---|---|---|
