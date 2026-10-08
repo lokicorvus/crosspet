@@ -171,8 +171,53 @@ export function apply(ctx, config = {}) {
   });
   ctx.on("subagent/start", () => state("delegating", "SubagentStart"));
   // 压缩上下文：会话日志里的 compaction/start、compaction/end
+  // ---- 多会话：按对话另记 <角色>-sessions.json（{会话id: {pose, event, ts}}）----
+  // 好几个对话同时在干活时桌宠演「手忙脚乱」，每个对话一张小卡片。全靠 session/event：每条都带着是哪个对话，
+  // 一轮开始 / 调工具 / 工具结果 / 请求授权 / 一轮结束都有。子任务（subagent）的会话不算单独的对话
+  const perChar = {};      // 角色 → {会话id: 状态}
+  const turnTools = {};    // 会话id → 这一轮用了几次工具
+  let sessionsDirty = new Set(), sessionsTimer = null;
+  function noteSession(session, pose, ev) {
+    const header = session?.header;
+    if (!session?.id || header?.origin === "subagent" || header?.parentSession !== undefined) return;
+    let who = ID;
+    try { const r = session.requestContext?.(); if (r?.provider || r?.model) who = characterFor(r.provider, r.model, custom); } catch {}
+    const now = Date.now() / 1000;
+    for (const [c, map] of Object.entries(perChar)) if (c !== who && map[session.id]) { delete map[session.id]; sessionsDirty.add(c); }   // 中途换了模型
+    const map = (perChar[who] ??= {});
+    map[session.id] = { pose, event: ev, ts: now };
+    for (const [k, v] of Object.entries(map)) if (now - v.ts > 600) delete map[k];
+    sessionsDirty.add(who);
+    // 合并 0.2 秒内的连续事件再写盘
+    sessionsTimer ??= setTimeout(() => {
+      sessionsTimer = null;
+      for (const c of sessionsDirty) writeJson(`${c}-sessions.json`, perChar[c] || {}).catch(() => {});
+      sessionsDirty = new Set();
+    }, 200);
+  }
+  function sessionPose(session, event) {
+    const sid = session?.id, d = event?.data ?? {};
+    switch (event?.type) {
+      case "turn/start": turnTools[sid] = 0; return noteSession(session, "listening", "UserPromptSubmit");
+      case "step/start": return noteSession(session, "thinking", "PreInvocation");
+      case "tool/call":
+        turnTools[sid] = (turnTools[sid] || 0) + 1;
+        return noteSession(session, poseForTool(d.name, d.arguments), "PreToolUse");
+      case "tool/result": return noteSession(session, d.message?.isError || d.error ? "oops" : "thinking", "PostToolUse");
+      case "approval/asked": return noteSession(session, "asking", "PermissionRequest");
+      case "approval/decided": return noteSession(session, "thinking", "PostToolUse");
+      case "compaction/start": return noteSession(session, "compact", "PreCompact");
+      case "turn/end": {
+        const kind = d.reason?.kind, n = turnTools[sid] || 0;
+        delete turnTools[sid];
+        return noteSession(session, kind === "aborted" ? "surprised" : kind === "error" ? "oops" : kind === "completed" ? (n >= BIG_JOB_TOOLS ? "proud" : "happy") : "idle", "Stop");
+      }
+    }
+  }
+
   ctx.on("session/event", (session, event) => {
     noteRoute(session);
+    try { sessionPose(session, event); } catch {}
     // 一轮结束都会记 turn/end（reason.kind：completed / aborted / error / blocked）；
     // 正常完成由 agent/turn-stopping 处理，这里补上被你打断、出错停下的情况，不然会一直停在思考
     if (event?.type === "turn/end") {

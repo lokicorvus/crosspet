@@ -503,7 +503,7 @@ function sessionKind(e, now) {
   if (e.pose === 'happy' || e.pose === 'proud') return age < SESSION_DONE_SHOW ? 'done' : null
   if ((e.pose === 'oops' || e.pose === 'surprised') && e.event === 'Stop') return age < SESSION_DONE_SHOW ? 'error' : null
   if (e.pose === 'idle' || e.pose === 'sleeping') return null
-  return age < STUCK_AFTER / 1000 ? (e.pose === 'oops' ? 'error' : 'work') : null
+  return age < STUCK_AFTER / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
 }
 function refreshMulti() {
   const map = sessions[charId] || {}, now = Date.now() / 1000
@@ -533,8 +533,9 @@ function refreshMulti() {
     c.side = i % 2 ? 'right' : 'left'
     c.el.classList.toggle('done', kind === 'done')
     c.el.classList.toggle('ask', kind === 'ask')
-    if (kind === 'error' && !c.el.classList.contains('error')) c.el.classList.add('error')
-    if (kind !== 'error') c.el.classList.remove('error')
+    const bad = kind === 'error' || e.pose === 'oops'
+    if (bad && !c.el.classList.contains('error')) c.el.classList.add('error')
+    if (!bad) c.el.classList.remove('error')
     setCardPose(c, kind === 'done' ? 'happy' : e.pose)
   })
   const extra = multi.order.length - shown.length
