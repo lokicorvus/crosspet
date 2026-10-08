@@ -430,6 +430,15 @@ function notifyUpdate(tag) {
   revertTimer = setTimeout(() => setPose(restPose()), 6500)
 }
 
+// 刚更新完重新打开：开心一下告诉你现在是新版本（等登场招呼演完再说）
+function justUpdated(version) {
+  setTimeout(() => {
+    if (egg || farewellLine !== null) return
+    show('happy', true)
+    say(`更新好啦～现在是 ${version}`)
+  }, 6000)
+}
+
 function setName(id, name) {
   if (!manifest.characters[id]) return
   manifest.characters[id].name = name

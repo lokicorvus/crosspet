@@ -354,6 +354,12 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         manifestJSON = arg
         js("init(\(arg))")
         devJS("boot(\(arg))")
+        // 刚更新完（上次打开的是别的版本）：让她说一声
+        let last = defaults.string(forKey: "lastVersion")
+        if last != currentVersion {
+            defaults.set(currentVersion, forKey: "lastVersion")
+            if last != nil, isNewer(currentVersion, than: last!) { js("justUpdated(\(quote("v" + currentVersion)))") }
+        }
     }
 
     func switchTo(_ id: String) {

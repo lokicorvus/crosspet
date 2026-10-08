@@ -140,6 +140,13 @@ namespace CrossPet
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
                     await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")})");
+                    // 刚更新完（上次打开的是别的版本）：让她说一声
+                    var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
+                    if (last != Store.Version)
+                    {
+                        Store.Settings["lastVersion"] = Store.Version; Store.SaveSettings();
+                        if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)})");
+                    }
                     ready = true;
                     stamps.Clear();
                     Poll();
@@ -860,9 +867,11 @@ namespace CrossPet
                             if (asset.TryGetValue("name", out var n) && n as string == "CrossPet-Windows.zip" &&
                                 asset.TryGetValue("browser_download_url", out var d) && d is string dl &&
                                 dl.StartsWith($"https://github.com/{Repo}/releases/download/{tag}/")) updateZip = dl;
-                    if (first) Js($"notifyUpdate({Q(tag)})");
+                    // 手动检查时也让她在气泡里说、设置里出现「更新」按钮（和 macOS 一样），不跳到网页；
+                    // 只有新版本没有 Windows 安装包、没法一键更新时才打开下载页
+                    if (first || manual) Js($"notifyUpdate({Q(tag)})");
                     settings?.Push();
-                    if (manual) Open(url);
+                    if (manual && updateZip == null) Open(url);
                 }
                 else if (manual) MessageBox.Show($"已经是最新版本（{Store.Version}）。", "CrossPet");
             }
