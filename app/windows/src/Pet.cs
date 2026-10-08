@@ -79,6 +79,7 @@ namespace CrossPet
             Window.Content = grid;
             WireMouse(hit);
             Every(TimeSpan.FromMilliseconds(250), () => { _ = UpdateHitRects(); });
+            Every(TimeSpan.FromMilliseconds(80), UpdateDockHover);
 
             Window.Loaded += async (_, __) => await InitWeb();
             Window.Show();
@@ -140,6 +141,7 @@ namespace CrossPet
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
                     await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")})");
+                    if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
                     if (last != Store.Version)
@@ -201,6 +203,7 @@ namespace CrossPet
         {
             if (!Characters().Any(c => c.id == id)) return;
             current = id;
+            if (dock != null && !dockOut) After(800, ApplyDock);   // 换了角色，切口位置跟着变
             Store.Settings["character"] = id; Store.SaveSettings();
             Js($"setCharacter({Q(id)})");
             settings?.Push();
@@ -243,6 +246,7 @@ namespace CrossPet
                 }
             if (latestActive.id != null && latestActive.id != current && Store.Flag("followEvents")) SwitchTo(latestActive.id);
             ApplyLayer();
+            UpdateDock();
         }
 
         // ---------------- 显示层级 ----------------
@@ -392,8 +396,10 @@ namespace CrossPet
                 if (Math.Abs(p.X - down.X) + Math.Abs(p.Y - down.Y) <= 4) return;
                 pressed = false;
                 hit.ReleaseMouseCapture();
+                Undock();
                 try { Window.DragMove(); } catch { }
                 SavePosition();
+                CheckDock();
             };
             hit.MouseLeftButtonUp += (_, __) => { hit.ReleaseMouseCapture(); if (pressed) { pressed = false; Js("handleClick('pat')"); } };
             hit.MouseRightButtonUp += (_, __) =>
@@ -404,6 +410,127 @@ namespace CrossPet
                 menu.Closed += (_, ___) => Window.Dispatcher.BeginInvoke(new Action(menu.Dispose));
                 menu.Show(Forms.Cursor.Position);
             };
+        }
+
+        // ---------------- 贴边 ----------------
+        // 拖到屏幕左 / 右边缘松手：她缩到屏幕外，只露半个身子扒着边缘（额度、名牌、气泡都藏起来）。
+        // AI 干活时（或在等你回答）自己跑出来，干完过约 10 秒缩回去；鼠标移到露出来的那截上她会探出来一点。
+        // 拖离边缘就不贴了。另一块屏幕接在这边时不算边缘。坐标都是物理像素
+        string dock;                 // "left" / "right"
+        bool dockOut, dockHover;
+        DateTime? dockLeaveAt;
+        readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
+        static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
+        static void After(int ms, Action a)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+            t.Tick += (_, __) => { t.Stop(); a(); };
+            t.Start();
+        }
+
+        void Undock()
+        {
+            if (dock == null) return;
+            dock = null; dockOut = dockHover = false;
+            Store.Settings.Remove("dock"); Store.SaveSettings();
+            Js("setTucked(null)");
+        }
+        void CheckDock()
+        {
+            if (!EdgeDockEnabled || hwnd == IntPtr.Zero) return;
+            Native.GetWindowRect(hwnd, out var r);
+            int w = r.Right - r.Left, mid = r.Left + w / 2;
+            var scr = Forms.Screen.FromHandle(hwnd);
+            var wa = scr.WorkingArea;
+            double reach = w * 0.3;
+            bool Neighbor(bool left) => Forms.Screen.AllScreens.Any(o => !o.Equals(scr) && o.Bounds.Top < r.Bottom && o.Bounds.Bottom > r.Top &&
+                (left ? Math.Abs(o.Bounds.Right - scr.Bounds.Left) < 2 : Math.Abs(o.Bounds.Left - scr.Bounds.Right) < 2));
+            if (mid - wa.Left < reach && !Neighbor(true)) SetDock("left");
+            else if (wa.Right - mid < reach && !Neighbor(false)) SetDock("right");
+        }
+        void SetDock(string side)
+        {
+            dock = side;
+            Store.Settings["dock"] = side; Store.SaveSettings();
+            dockOut = DockBusy();
+            ApplyDock();
+        }
+        /// <summary>AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来</summary>
+        bool DockBusy()
+        {
+            var now = DateTime.UtcNow;
+            return lastPose.Values.Any(p =>
+            {
+                var age = (now - p.at).TotalSeconds;
+                switch (p.pose)
+                {
+                    case "asking": return age < 600;
+                    case "happy": case "proud": case "oops": case "surprised": return age < 10;
+                    case "idle": case "sleeping": case "tired": return false;
+                    default: return age < 180;
+                }
+            });
+        }
+        void UpdateDock()
+        {
+            if (dock == null) return;
+            var busy = DockBusy();
+            if (busy != dockOut) { dockOut = busy; dockHover = false; ApplyDock(); }
+        }
+        async void ApplyDock()
+        {
+            var side = dock;
+            if (side == null || hwnd == IntPtr.Zero) return;
+            Native.GetWindowRect(hwnd, out var r);
+            int w = r.Right - r.Left, h = r.Bottom - r.Top;
+            var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
+            int y = Math.Max(wa.Top, Math.Min(r.Top, wa.Bottom - (int)(h * 0.85)));
+            if (dockOut) { Js("setTucked(null)"); Slide(side == "left" ? wa.Left : wa.Right - w, y); return; }
+            Js($"setTucked({Q(side)})");
+            var key = side + current;
+            if (!dockCut.TryGetValue(key, out var cut))
+            {
+                await Task.Delay(450);   // 换成贴边立绘后再量切口（图要先载入），量过的记下来
+                if (dock != side || dockOut) return;
+                var res = await Eval($"dockCut({Q(side)})");
+                if (!double.TryParse(res, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out cut)) return;
+                dockCut[key] = cut;
+            }
+            if (dock != side || dockOut) return;
+            double zoom = (double)w / BaseWidth;   // 网页像素 → 物理像素
+            int peek = dockHover ? (int)(30 * zoom) : 0;   // 鼠标移上来：再探出来一点
+            Slide(side == "left" ? wa.Left - (int)(cut * zoom) + peek : wa.Right - (int)(cut * zoom) - peek, y);
+        }
+        DispatcherTimer slideTimer;
+        void Slide(int x, int y)
+        {
+            Native.GetWindowRect(hwnd, out var r);
+            int x0 = r.Left, y0 = r.Top;
+            var start = DateTime.UtcNow;
+            slideTimer?.Stop();
+            slideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+            slideTimer.Tick += (_, __) =>
+            {
+                var k = Math.Min(1, (DateTime.UtcNow - start).TotalSeconds / 0.35);
+                var e = k < 0.5 ? 2 * k * k : 1 - Math.Pow(-2 * k + 2, 2) / 2;
+                Native.MoveTo(hwnd, (int)(x0 + (x - x0) * e), (int)(y0 + (y - y0) * e));
+                if (k >= 1) slideTimer.Stop();
+            };
+            slideTimer.Start();
+        }
+        /// <summary>缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去</summary>
+        void UpdateDockHover()
+        {
+            if (dock == null || dockOut || hwnd == IntPtr.Zero) return;
+            Native.GetWindowRect(hwnd, out var r);
+            var p = Forms.Cursor.Position;
+            bool inside = p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom;
+            if (inside) { dockLeaveAt = null; if (!dockHover) { dockHover = true; ApplyDock(); } }
+            else if (dockHover)
+            {
+                if (dockLeaveAt == null) dockLeaveAt = DateTime.UtcNow;
+                else if ((DateTime.UtcNow - dockLeaveAt.Value).TotalSeconds > 0.6) { dockHover = false; dockLeaveAt = null; ApplyDock(); }
+            }
         }
 
         // ---------------- 位置（按物理像素存，多显示器、不同缩放都对） ----------------
@@ -432,6 +559,7 @@ namespace CrossPet
         }
         public void Recenter()
         {
+            Undock();
             Store.Settings.Remove("position"); Store.SaveSettings();
             RestorePosition();
             Window.Show();
@@ -514,7 +642,7 @@ namespace CrossPet
                 var k = Math.Min(1, (DateTime.Now - start).TotalSeconds / 0.2);
                 shownScale = from + (target - from) * (1 - Math.Pow(1 - k, 3));
                 ApplyScale(shownScale);
-                if (k >= 1) scaleTimer.Stop();
+                if (k >= 1) { scaleTimer.Stop(); if (dock != null) ApplyDock(); }   // 贴着边时调完大小重新对齐边缘
             };
             scaleTimer.Start();
         }
@@ -557,7 +685,7 @@ namespace CrossPet
                 ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
-                ["login"] = LoginEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c => new Dictionary<string, object>
                 {
                     ["id"] = c.id, ["name"] = c.name,
@@ -605,6 +733,7 @@ namespace CrossPet
                             if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
+                        case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id); break;
                     }

@@ -19,6 +19,8 @@ let stateDir = URL(fileURLWithPath: "/tmp/crosspet", isDirectory: true)
 final class DragView: NSView {
     var onClick: (() -> Void)?
     var onMenu: ((NSEvent) -> Void)?
+    var onDragStart: (() -> Void)?
+    var onDragEnd: (() -> Void)?
     private var downAt: NSPoint = .zero
     private var originAt: NSPoint = .zero
     private var dragged = false
@@ -32,12 +34,14 @@ final class DragView: NSView {
     override func mouseDragged(with event: NSEvent) {
         let p = NSEvent.mouseLocation
         let dx = p.x - downAt.x, dy = p.y - downAt.y
-        if abs(dx) + abs(dy) > 3 { dragged = true }
-        window?.setFrameOrigin(NSPoint(x: originAt.x + dx, y: originAt.y + dy))
+        if !dragged, abs(dx) + abs(dy) > 3 { dragged = true; onDragStart?(); originAt = window?.frame.origin ?? originAt; downAt = p }
+        guard dragged else { return }
+        window?.setFrameOrigin(NSPoint(x: originAt.x + p.x - downAt.x, y: originAt.y + p.y - downAt.y))
     }
     override func mouseUp(with event: NSEvent) {
         if dragged {
             if let o = window?.frame.origin { defaults.set([o.x, o.y], forKey: "origin") }
+            onDragEnd?()
         } else {
             onClick?()
         }
@@ -108,6 +112,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         drag.autoresizingMask = [.width, .height]
         drag.onClick = { [weak self] in self?.js("handleClick('pat')") }
         drag.onMenu = { [weak self] e in self?.showMenu(e, in: drag) }
+        drag.onDragStart = { [weak self] in self?.undock() }
+        drag.onDragEnd = { [weak self] in self?.checkDock() }
         container.addSubview(drag)
 
         panel.contentView = container
@@ -297,6 +303,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         ready = true
         loadCharacters()
+        if let side = defaults.string(forKey: "dock"), edgeDockEnabled {   // 上次是贴着边的
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.setDock(side) }
+        }
         js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled))")
         stamps = [:]
         pollStates()
@@ -364,6 +373,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func switchTo(_ id: String) {
         currentId = id
+        if dock != nil, !dockOut { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.applyDock() } }   // 换了角色，切口位置跟着变
         js("setCharacter(\(quote(id)))")
         pushSettings()
     }
@@ -436,6 +446,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             }
         }
         applyLayer()
+        updateDock()
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode）正在前台、里面换了模型：马上换成那个模型的角色
         for host in ["deepseek", "workbuddy", "zcode"] {
             let url = stateDir.appendingPathComponent("\(host)-host.json")
@@ -807,6 +818,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func openCharacters() { NSWorkspace.shared.open(charactersDir) }
     @objc func reload() { web.reload() }
     @objc func resetPosition() {
+        undock()
         guard let screen = NSScreen.main?.visibleFrame else { return }
         panel.setFrameOrigin(NSPoint(x: screen.maxX - panel.frame.width - 40, y: screen.minY + 100))
         defaults.removeObject(forKey: "origin")
@@ -881,6 +893,107 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
     }
 
+    // MARK: 贴边
+    // 拖到屏幕左 / 右边缘松手：她缩到屏幕外，只露半个身子扒着边缘（额度、名牌、气泡都藏起来）。
+    // AI 干活时（或在等你回答）自己跑出来，干完过约 10 秒缩回去；鼠标移到露出来的那截上她会探出来一点。
+    // 拖离边缘就不贴了。另一块屏幕接在这边时不算边缘
+    var dock: String?            // "left" / "right"
+    var dockOut = false          // 跑出来了
+    var dockHover = false
+    var dockLeaveAt: Date?
+    var edgeDockEnabled: Bool { defaults.object(forKey: "edgeDock") as? Bool ?? true }
+
+    func undock() {
+        guard dock != nil else { return }
+        dock = nil; dockOut = false; dockHover = false
+        defaults.removeObject(forKey: "dock")
+        js("setTucked(null)")
+    }
+    func checkDock() {
+        guard edgeDockEnabled, let screen = panel.screen ?? NSScreen.main else { return }
+        let f = panel.frame, vf = screen.visibleFrame, reach = f.width * 0.3
+        func neighbor(_ left: Bool) -> Bool {
+            NSScreen.screens.contains { s in s != screen && s.frame.minY < f.maxY && s.frame.maxY > f.minY &&
+                (left ? abs(s.frame.maxX - screen.frame.minX) < 2 : abs(s.frame.minX - screen.frame.maxX) < 2) }
+        }
+        if f.midX - vf.minX < reach, !neighbor(true) { setDock("left") }
+        else if vf.maxX - f.midX < reach, !neighbor(false) { setDock("right") }
+    }
+    func setDock(_ side: String) {
+        dock = side
+        defaults.set(side, forKey: "dock")
+        dockOut = dockBusy
+        applyDock()
+    }
+    /// AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来
+    var dockBusy: Bool {
+        let now = Date()
+        return lastPose.values.contains { p in
+            let age = now.timeIntervalSince(p.at)
+            switch p.pose {
+            case "asking": return age < 600
+            case "happy", "proud", "oops", "surprised": return age < 10
+            case "idle", "sleeping", "tired": return false
+            default: return age < 180
+            }
+        }
+    }
+    func updateDock() {
+        guard dock != nil else { return }
+        let busy = dockBusy
+        if busy != dockOut { dockOut = busy; dockHover = false; applyDock() }
+    }
+    func applyDock() {
+        guard let side = dock, let screen = panel.screen ?? NSScreen.main else { return }
+        let vf = screen.visibleFrame
+        var f = panel.frame
+        f.origin.y = min(max(f.origin.y, vf.minY - f.height * 0.15), vf.maxY - f.height)
+        if dockOut {
+            js("setTucked(null)")
+            f.origin.x = side == "left" ? vf.minX : vf.maxX - f.width
+            slide(to: f)
+            return
+        }
+        js("setTucked(\(quote(side)))")
+        let place = { [weak self] (cut: Double) in
+            guard let self, self.dock == side, !self.dockOut else { return }
+            let zoom = f.width / Self.baseSize.width
+            let peek = self.dockHover ? 30 * zoom : 0   // 鼠标移上来：再探出来一点
+            f.origin.x = side == "left" ? vf.minX - CGFloat(cut) * zoom + peek : vf.maxX - CGFloat(cut) * zoom - peek
+            self.slide(to: f)
+        }
+        if let cut = dockCut[side + currentIdKey] { place(cut); return }
+        // 换成贴边立绘后再量切口（图要先载入），量过的记下来
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            guard let self, self.dock == side, !self.dockOut else { return }
+            let key = side + self.currentIdKey
+            self.web.evaluateJavaScript("dockCut(\(self.quote(side)))") { [weak self] r, _ in
+                guard let cut = (r as? NSNumber)?.doubleValue else { return }
+                self?.dockCut[key] = cut
+                place(cut)
+            }
+        }
+    }
+    var dockCut: [String: Double] = [:]   // 切口位置（网页像素），按 边 + 角色 记
+    var currentIdKey: String { currentId ?? "" }
+    func slide(to frame: NSRect) {
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.35
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(frame, display: true)
+        }
+    }
+    /// 缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去
+    func updateDockHover(_ mouse: NSPoint) {
+        guard dock != nil, !dockOut else { return }
+        let inside = panel.frame.contains(mouse)
+        if inside { dockLeaveAt = nil; if !dockHover { dockHover = true; applyDock() } }
+        else if dockHover {
+            if dockLeaveAt == nil { dockLeaveAt = Date() }
+            else if Date().timeIntervalSince(dockLeaveAt!) > 0.6 { dockHover = false; dockLeaveAt = nil; applyDock() }
+        }
+    }
+
     // MARK: 点击穿透
     // 窗口比桌宠大（给动作、气泡留的空间）：鼠标不在桌宠本体、气泡、名牌、额度上时让窗口不接鼠标，点击落到后面的窗口
     var hitRects: [CGRect] = []
@@ -888,6 +1001,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func updateClickThrough() {
         let p = NSEvent.mouseLocation, f = panel.frame
+        updateDockHover(p)
         guard f.contains(p) else { return }
         if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
         if Date().timeIntervalSince(hitRectsAt) > 0.25 {
@@ -973,7 +1087,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let eased = 1 - pow(1 - k, 3)
             self.shownScale = from + (target - from) * CGFloat(eased)
             self.applyScale(self.shownScale)
-            if k >= 1 { t.invalidate() }
+            if k >= 1 { t.invalidate(); if self.dock != nil { self.applyDock() } }   // 贴着边时调完大小重新对齐边缘
         }
     }
 
@@ -1012,6 +1126,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
+            "edgeDock": edgeDockEnabled,
             "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0, "defaultName": defaultNames[$0] ?? $0, "custom": names[$0] ?? ""] },
@@ -1129,6 +1244,10 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
             case "agyQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
+            case "edgeDock":
+                let on = value as? Bool ?? true
+                defaults.set(on, forKey: "edgeDock")
+                if !on { undock() }
             case "aiAutostart":
                 setAIAutostart(value as? Bool ?? true)
             case "login":

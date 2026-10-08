@@ -48,6 +48,8 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #more { position: absolute; right: 2px; bottom: 6px; padding: 1px 7px; border-radius: 9px; background: rgba(255,255,255,.9); color: #4a2418;
   font: bold 11px/16px sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.15); opacity: 0; transition: opacity .3s; }
 #more.on { opacity: 1; }
+/* 贴边：缩在屏幕边上时只露半个身子（扒着边缘的立绘，没画时用平常的），额度、名牌、气泡、特效都藏起来 */
+html.tucked #bubble, html.tucked #caption, html.tucked #quota, html.tucked #fx, html.tucked #cards, html.tucked #aura, html.tucked #shadow { visibility: hidden; }
 #fx.hide { opacity: 0; }
 #fx svg { width: 100%; height: 100%; overflow: visible; }
 #poof { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; }
@@ -141,7 +143,7 @@ const LOCAL_LINES = {
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
-  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right' }
+  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
@@ -154,6 +156,7 @@ const pick = list => list[Math.floor(Math.random() * list.length)]
 let manifest = { characters: {} }
 let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
+let tucked = null   // 贴边缩着：'left' / 'right'（见「贴边」）
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
 const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
@@ -214,6 +217,7 @@ function setFx(p, instant) {
   setTimeout(render, 220)
 }
 function setPose(p, instant) {
+  if (tucked) p = `edge_${tucked}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
   const frames = framesFor(p)
@@ -450,6 +454,27 @@ function notifyUpdate(tag) {
   say(`有新版本 ${tag} 啦～右键菜单里点「更新」就好`)
   clearTimeout(revertTimer)
   revertTimer = setTimeout(() => setPose(restPose()), 6500)
+}
+
+// ---- 贴边 ----
+// 外壳把她拖到屏幕左 / 右边缘时调 setTucked('left' / 'right')，跑出来时 setTucked(null)。
+// dockCut 告诉外壳「切口」在窗口里的横坐标（网页像素）：贴边立绘是画面边框从她身上切过去，切口就是立绘那条边；
+// 没画贴边立绘时用平常的立绘，切口在她身体正中，屏幕边缘挡住一半
+function setTucked(side) {
+  if (side === tucked) return
+  const was = tucked
+  tucked = side
+  document.documentElement.classList.toggle('tucked', !!side)
+  clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer)
+  if (side) { say(''); setPose(`edge_${side}`, true) }
+  else if (was) { pose = null; show(restPose(), true) }
+}
+function dockCut(side) {
+  const img = active, r = img.getBoundingClientRect(), nw = img.naturalWidth, nh = img.naturalHeight
+  if (!nw || !nh) return null
+  const scale = Math.min(r.width / nw, r.height / nh), w = nw * scale, left = r.left + (r.width - w) / 2
+  if (!char()?.poses?.[`edge_${side}`]) return Math.round(left + w / 2)
+  return Math.round(side === 'left' ? left : left + w)
 }
 
 // 刚更新完重新打开：开心一下告诉你现在是新版本（等登场招呼演完再说）
