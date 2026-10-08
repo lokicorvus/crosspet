@@ -827,10 +827,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     /// 菜单里的「退出」：用户主动退出。第一次退出时说一句，让人知道什么时候会再出来
     @objc func quit() {
         try? Data().write(to: userQuitFlag)
-        guard aiAutostart, !defaults.bool(forKey: "quitHinted") else { NSApp.terminate(nil); return }
-        defaults.set(true, forKey: "quitHinted")
-        js("farewell('我先走啦～下次重新打开 AI 我再出来')")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { NSApp.terminate(nil) }
+        // 挥手道别再走；第一次退出时说明什么时候会再出来，多停一会儿让人看清
+        let hint = aiAutostart && !defaults.bool(forKey: "quitHinted")
+        if hint { defaults.set(true, forKey: "quitHinted") }
+        js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来')" : "farewell()")
+        DispatchQueue.main.asyncAfter(deadline: .now() + (hint ? 5 : 2)) { NSApp.terminate(nil) }
     }
 
     // MARK: 显示层级

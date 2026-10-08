@@ -656,10 +656,11 @@ namespace CrossPet
         void UserQuit()
         {
             try { File.WriteAllText(UserQuitFlag, ""); } catch { }
-            if (!AIAutostart || Store.Flag("quitHinted")) { Quit(); return; }
-            Store.Settings["quitHinted"] = true; Store.SaveSettings();
-            Js("farewell('我先走啦～下次重新打开 AI 我再出来')");
-            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            // 挥手道别再走；第一次退出时说明什么时候会再出来，多停一会儿让人看清
+            var hint = AIAutostart && !Store.Flag("quitHinted");
+            if (hint) { Store.Settings["quitHinted"] = true; Store.SaveSettings(); }
+            Js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来')" : "farewell()");
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(hint ? 5 : 2) };
             t.Tick += (_, __) => { t.Stop(); Quit(); };
             t.Start();
         }

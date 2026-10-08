@@ -392,6 +392,11 @@ elif name in ("Stop", "AfterAgent"):
     else:
         pose = "proud" if turn_tools() >= BIG_JOB_TOOLS else "happy"
     set_turn_tools(0)
+elif name in ("StopFailure",):
+    # 这一轮因为出错停下（接口报错、超限……；Claude Code、WorkBuddy）
+    pose = "oops"
+    name = "Stop"
+    set_turn_tools(0)
 elif name in ("Interrupt",):
     # 被你打断（Codex 的 Interrupt）：吓一跳，然后回去待机；网页把 Stop + surprised 当成「被打断」
     pose = "surprised"

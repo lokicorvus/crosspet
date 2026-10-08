@@ -121,7 +121,7 @@ const LOCAL_LINES = {
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
-const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy' }
+const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
@@ -234,7 +234,12 @@ function surface() {
 }
 // 手动退出前的告别：这句话钉住，退出前不让别的台词或清空盖掉
 let farewellLine = null
-function farewell(line) { farewellLine = line; say(line) }
+// 从菜单退出：挥手道别（没画 bye 立绘的先用 happy）。line 为空时说一句她自己的道别台词
+function farewell(line) {
+  if (!egg) { clearTimeout(thinkTimer); clearTimeout(stuckTimer); updatingNow = false; show('bye', true) }
+  farewellLine = line || pick(linesOf('bye') || ['']) || ''
+  say(farewellLine)
+}
 function say(line) {
   if (farewellLine !== null && line !== farewellLine) return
   const b = $('bubble')
@@ -263,7 +268,7 @@ function applyLook(c) {
 
 // 换到某个状态：遵守最短停留；短暂状态过后回到常态（闲着 / 额度紧张时累了）
 function show(p, urgent) {
-  if (updatingNow) return   // 正在更新：一直举着礼物，AI 的工作事件先不打断
+  if (updatingNow || farewellLine !== null) return   // 正在更新（一直举着礼物）/ 正在道别：AI 的工作事件先不打断
   if (p === 'idle') p = restPose()   // AI 发来「闲着」（比如 DSH 新会话）时也要看额度：快用完了就是累 / 饿的样子
   const wait = shownAt + DWELL - Date.now()
   clearTimeout(pending)
@@ -423,6 +428,22 @@ function setName(id, name) {
   if (id === charId) $('caption').textContent = name
 }
 
+// 兜底：干活的样子（思考、读写、跑命令……）停了这么久没有任何新事件，就当这一轮已经停了，回去待机。
+// 有的 AI 被你中途打断时不发「结束」（Claude Code 标准钩子、Gemini CLI……），不然她会一直停在思考。
+// 「等你回答」不算：那是在等你，本来就可能很久
+const STUCK_AFTER = 3 * 60 * 1000
+const NOT_WORKING = new Set(['idle', 'sleeping', 'asking', 'tired', 'hungry', 'happy', 'proud', 'oops', 'surprised'])
+let stuckTimer = null
+function watchStuck() {
+  clearTimeout(stuckTimer)
+  stuckTimer = setTimeout(() => {
+    if (egg || updatingNow || !pose || NOT_WORKING.has(pose) || pose.startsWith('greet_') || pose.startsWith('fest_')) return
+    clearTimeout(thinkTimer)
+    show('idle', true)
+    say('')
+  }, STUCK_AFTER)
+}
+
 function applyCharState(id, s) {
   if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
   charState[id] = s
@@ -430,6 +451,7 @@ function applyCharState(id, s) {
   if (id !== charId || !s.pose) return
   lastActive = Date.now()
   clearTimeout(thinkTimer)
+  watchStuck()
   const ev = s.event || ''
   if (s.pose === 'oops' || (ev === 'Stop' && s.pose === 'surprised')) lastTrouble[id] = Date.now()
   else if (ev === 'Stop' && (s.pose === 'happy' || s.pose === 'proud')) lastTrouble[id] = 0  // 最后顺利完成了，不算

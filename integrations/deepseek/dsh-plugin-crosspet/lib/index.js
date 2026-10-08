@@ -173,6 +173,13 @@ export function apply(ctx, config = {}) {
   // 压缩上下文：会话日志里的 compaction/start、compaction/end
   ctx.on("session/event", (session, event) => {
     noteRoute(session);
+    // 一轮结束都会记 turn/end（reason.kind：completed / aborted / error / blocked）；
+    // 正常完成由 agent/turn-stopping 处理，这里补上被你打断、出错停下的情况，不然会一直停在思考
+    if (event?.type === "turn/end") {
+      const kind = event.data?.reason?.kind;
+      if (kind === "aborted") { tools = 0; state("surprised", "Stop"); }
+      else if (kind === "error") { tools = 0; state("oops", "Stop"); }
+    }
     if (event?.type === "compaction/start") state("compact", "PreCompact");
     else if (event?.type === "compaction/end") state("thinking", "PostCompact");
   });
