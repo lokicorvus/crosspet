@@ -830,7 +830,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // 挥手道别再走；第一次退出时说明什么时候会再出来，多停一会儿让人看清
         let hint = aiAutostart && !defaults.bool(forKey: "quitHinted")
         if hint { defaults.set(true, forKey: "quitHinted") }
-        js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来')" : "farewell()")
+        js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来', 5000)" : "farewell(null, 2000)")
         DispatchQueue.main.asyncAfter(deadline: .now() + (hint ? 5 : 2)) { NSApp.terminate(nil) }
     }
 

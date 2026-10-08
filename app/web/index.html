@@ -40,6 +40,8 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #poof.go i { animation: puff .6s ease-out forwards; }
 @keyframes puff { 0% { opacity: .95; transform: translate(0,0) scale(.3); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.3); } }
 .m-dash  { animation: dash 2.2s ease-in-out forwards; }
+.m-leave { animation: leave 1s ease-in forwards; }
+@keyframes leave { 0% { transform: none; } 100% { transform: translateX(28%) rotate(4deg); opacity: 0; } }
 @keyframes dash { 0%, 55% { transform: none; } 100% { transform: translateX(28%) rotate(4deg); opacity: 0; } }
 #caption { margin-top: -2px; padding: 2px 9px; border-radius: 8px; background: rgba(255,255,255,.85);
   color: #6b4a3a; font-size: 11px; min-height: 14px; }
@@ -234,9 +236,15 @@ function surface() {
 }
 // 手动退出前的告别：这句话钉住，退出前不让别的台词或清空盖掉
 let farewellLine = null
-// 从菜单退出：挥手道别（没画 bye 立绘的先用 happy）。line 为空时说一句她自己的道别台词
-function farewell(line) {
-  if (!egg) { clearTimeout(thinkTimer); clearTimeout(stuckTimer); updatingNow = false; show('bye', true) }
+// 从菜单退出：挥手道别（没画 bye 立绘的先用 happy），最后一秒转身走开。
+// line 为空时说一句她自己的道别台词；ms 是外壳多久之后退出
+function farewell(line, ms = 2000) {
+  if (!egg) {
+    clearTimeout(thinkTimer); clearTimeout(stuckTimer); updatingNow = false
+    show('bye', true)
+    $('body').className = 'm-bob'   // 先挥着手轻轻晃，别一上来就走（bye 的动作是彩蛋访客的「走开」）
+    setTimeout(() => { $('body').className = 'm-leave' }, Math.max(0, ms - 1100))
+  }
   farewellLine = line || pick(linesOf('bye') || ['']) || ''
   say(farewellLine)
 }

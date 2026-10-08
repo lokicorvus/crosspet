@@ -659,7 +659,7 @@ namespace CrossPet
             // 挥手道别再走；第一次退出时说明什么时候会再出来，多停一会儿让人看清
             var hint = AIAutostart && !Store.Flag("quitHinted");
             if (hint) { Store.Settings["quitHinted"] = true; Store.SaveSettings(); }
-            Js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来')" : "farewell()");
+            Js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来', 5000)" : "farewell(null, 2000)");
             var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(hint ? 5 : 2) };
             t.Tick += (_, __) => { t.Stop(); Quit(); };
             t.Start();
