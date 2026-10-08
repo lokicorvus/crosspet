@@ -29,6 +29,12 @@ def backup(path: Path) -> None:
         dst = path.with_name(f"{path.name}.bak-crosspet-{time.strftime('%Y%m%d-%H%M%S')}")
         shutil.copy2(path, dst)
         print(f"  已备份 {path} → {dst.name}")
+        # 只留最近 3 份，免得每次接入 / 更新都多一个
+        for old in sorted(path.parent.glob(f"{path.name}.bak-crosspet-*"))[:-3]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
 
 
 def load_json(path: Path) -> dict:
@@ -248,10 +254,52 @@ def codex(install: bool) -> None:
 
 
 # ---- DeepSeek Harness（插件）----
-DSH_PROFILE = Path(os.environ.get("DSH_HOME") or HOME / ".dsh") / "profiles/desktop"
+DSH_BLOCK_START = "# ── CrossPet 桌宠（integrations/deepseek）"
+
+
+def dsh_profile() -> Path:
+    """DeepSeek Harness 当前的 profile 目录。home 和 profile 名都可能不一样（有的机器只有 profiles/web），
+    所以不写死：DSH_PROFILE_DIR / DSH_PROFILE 环境变量优先；否则先找已经接入过 CrossPet 的，
+    再找 desktop，再取最近改过的那个。一个都没有时返回默认位置（用来提示）"""
+    if os.environ.get("DSH_PROFILE_DIR"):
+        return Path(os.environ["DSH_PROFILE_DIR"])
+    if os.environ.get("DSH_HOME"):
+        homes = [Path(os.environ["DSH_HOME"])]  # 设了就只认它
+    else:
+        homes = [HOME / ".dsh"]
+        if os.name == "nt" and os.environ.get("APPDATA"):
+            homes.append(Path(os.environ["APPDATA"]) / "dsh-desktop/harness")
+    profiles = []
+    for home in homes:
+        try:
+            profiles += [p for p in (home / "profiles").iterdir()
+                         if p.is_dir() and not p.name.startswith(".") and p.name != "node_modules"
+                         and ((p / "package.json").exists() or (p / "cordis.patch.yml").exists())]
+        except OSError:
+            pass
+    if not profiles:
+        return homes[0] / "profiles/desktop"
+    wanted = os.environ.get("DSH_PROFILE")
+    for p in profiles:
+        if wanted and p.name == wanted:
+            return p
+
+    def ours(p: Path) -> bool:
+        try:
+            return DSH_BLOCK_START in (p / "cordis.patch.yml").read_text(encoding="utf-8")
+        except OSError:
+            return False
+
+    def mtime(p: Path) -> float:
+        return max((f.stat().st_mtime for f in (p / "cordis.patch.yml", p / "package.json") if f.exists()), default=0)
+
+    return (next((p for p in profiles if ours(p)), None) or next((p for p in profiles if p.name == "desktop"), None)
+            or max(profiles, key=mtime))
+
+
+DSH_PROFILE = dsh_profile()
 DSH_PLUGIN_NAME = "@local/dsh-plugin-crosspet"
 DSH_PLUGIN_DIR = SUPPORT / "dsh-plugin-crosspet"
-DSH_BLOCK_START = "# ── CrossPet 桌宠（integrations/deepseek）"
 DSH_BLOCK = f"""
 {DSH_BLOCK_START} ──
 # 把 DeepSeek 的工作状态和余额写给桌宠；移除本段即恢复原样。
@@ -284,7 +332,8 @@ def remove_link(link: Path) -> None:
 
 def deepseek(install: bool) -> None:
     if not DSH_PROFILE.exists():
-        print(f"  没找到 {DSH_PROFILE}，请先打开一次 DeepSeek Harness 桌面版")
+        print(f"  没找到 {DSH_PROFILE}，请先打开一次 DeepSeek Harness 桌面版"
+              "（如果 Harness 装在别处，可以用环境变量 DSH_PROFILE_DIR 指定 profile 目录）")
         return
     pkg_path = DSH_PROFILE / "package.json"
     patch_path = DSH_PROFILE / "cordis.patch.yml"
@@ -300,6 +349,14 @@ def deepseek(install: bool) -> None:
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
         shutil.copytree(REPO / "integrations/deepseek/dsh-plugin-crosspet", DSH_PLUGIN_DIR)
+        # Harness 的插件列表显示 package.json 里的版本：跟插件代码里的 PLUGIN_VERSION 保持一致
+        try:
+            ver = re.search(r'PLUGIN_VERSION = "([^"]+)"', (DSH_PLUGIN_DIR / "lib/index.js").read_text(encoding="utf-8")).group(1)
+            pj = load_json(DSH_PLUGIN_DIR / "package.json")
+            pj["version"] = ver
+            save_json(DSH_PLUGIN_DIR / "package.json", pj)
+        except Exception:
+            pass
         deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR.as_posix()}"
         link.parent.mkdir(parents=True, exist_ok=True)
         remove_link(link)

@@ -22,6 +22,45 @@ async function write($: EngineInterface, file: string, data: unknown): Promise<v
 const ID = 'claude'
 const BIG_JOB_TOOLS = 8
 
+// 跟着 AI 出现：会话开始 / 发消息时看一眼，桌宠没开着就打开。用户从菜单手动退出过（user-quit）就先不管，
+// 直到 Claude 关掉重开或重启电脑（Claude 是在退出之后才打开的，记号就作废）；在设置里关了（ai-autostart-off）就不管。
+// 不等它跑完，失败也不影响 Claude；一分钟内最多看一次
+let lastEnsure = 0
+// Claude 程序是什么时候打开的（毫秒）：顺着父进程往上找到 launchd 下面那一层。sh 的 $PPID 就是这个引擎进程
+async function appStartedAt($: EngineInterface): Promise<number> {
+  const { stdout } = await $.process.run(['/bin/sh', '-c', 'echo $PPID; /bin/ps -A -o pid=,ppid=,etime='])
+  const [first, ...lines] = stdout.trim().split('\n')
+  const procs = new Map<number, [number, number]>()
+  for (const line of lines) {
+    const [pid, ppid, etime] = line.trim().split(/\s+/)
+    if (!etime) continue
+    const [days, clock] = etime.includes('-') ? etime.split('-') : ['0', etime]
+    const secs = clock.split(':').reduce((a, b) => a * 60 + Number(b), 0) + Number(days) * 86400
+    procs.set(Number(pid), [Number(ppid), secs])
+  }
+  let pid = Number(first)
+  while (procs.has(pid) && procs.get(pid)![0] > 1 && procs.has(procs.get(pid)![0])) pid = procs.get(pid)![0]
+  return procs.has(pid) ? Date.now() - procs.get(pid)![1] * 1000 : 0
+}
+async function ensurePet($: EngineInterface): Promise<void> {
+  if (Date.now() - lastEnsure < 60_000) return
+  lastEnsure = Date.now()
+  const local = await $.env.get('LOCALAPPDATA')
+  if (local) {  // Windows：交给随包 Python 跑钩子脚本的 --ensure（查单实例互斥量、用独立进程打开）
+    await $.process.run([`${local}\\Programs\\CrossPet\\python\\python.exe`, `${local}\\CrossPet\\crosspet-hook.py`, '--ensure'], { timeoutMs: 10_000 })
+    return
+  }
+  // macOS：不用 Python（没装开发者工具的 Mac 上调 python3 会弹安装框）
+  const data = `${await $.env.get('HOME')}/Library/Application Support/CrossPet`
+  if (await $.fs.exists(`${data}/ai-autostart-off`)) return
+  if (await $.fs.exists(`${data}/user-quit`) && await appStartedAt($) <= (await $.fs.stat(`${data}/user-quit`)).mtimeMs) return
+  try {
+    const pid = (await $.fs.read(`${await stateDir($)}/pet.pid`)).trim()
+    if (/^\d+$/.test(pid) && (await $.process.run(['/bin/kill', '-0', pid])).exitCode === 0) return  // 在跑
+  } catch {}
+  await $.process.run(['/usr/bin/open', '-g', '-b', 'io.github.crosspet'], { timeoutMs: 10_000 })  // -g：后台打开，不抢焦点
+}
+
 type Limit = { kind: string; percentUsed: number; resetsAt?: string }
 
 function poseForTool(tool: string): string {
@@ -58,6 +97,7 @@ export const register: Register = on => {
   let tools = 0
 
   on('session.start', async ($, e, next) => {
+    void ensurePet($).catch(() => {})
     await write($, `${ID}-state.json`, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
     const usage = await $.session.usage()
     const q = quotaOf(usage.rateLimits)
@@ -66,6 +106,7 @@ export const register: Register = on => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    void ensurePet($).catch(() => {})
     tools = 0
     await write($, `${ID}-state.json`, { pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 })
     return next(e)

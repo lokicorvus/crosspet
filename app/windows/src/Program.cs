@@ -21,6 +21,8 @@ namespace CrossPet
                 if (!first) { show.Set(); return; }
 
                 Directory.CreateDirectory(Store.Data);
+                try { File.Delete(Pet.UserQuitFlag); } catch { }   // 自己打开了：恢复跟着 AI 出现
+                try { Directory.CreateDirectory(Store.State); File.WriteAllText(Path.Combine(Store.State, "pet.pid"), Process.GetCurrentProcess().Id.ToString()); } catch { }   // DSH 插件看它判断桌宠在不在跑
                 AppDomain.CurrentDomain.UnhandledException += (_, e) => Store.Log("崩溃: " + e.ExceptionObject);
                 Store.Log($"启动 {Store.Version}，{Environment.OSVersion}，64 位进程 = {Environment.Is64BitProcess}");
                 System.Windows.Forms.Application.EnableVisualStyles();
@@ -62,6 +64,7 @@ namespace CrossPet
                     }
                 };
                 app.Run();
+                try { File.Delete(Path.Combine(Store.State, "pet.pid")); } catch { }
             }
         }
     }

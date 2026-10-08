@@ -5,6 +5,7 @@
     python3 crosspet-hook.py <角色id>          # 角色id：claude / gpt / deepseek / gemini
     python3 crosspet-hook.py <角色id> <事件名>  # 事件 JSON 里不带事件名的（Antigravity）
     python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode）：按模型选角色
+    python3 crosspet-hook.py --ensure           # 只确保桌宠在跑（没开着就打开；用户手动退出过或关了这个功能就不管）
 钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
 
 只写状态目录（默认 /tmp/crosspet，可用环境变量 CROSSPET_STATE_DIR 改）里的两个小文件：
@@ -25,11 +26,187 @@ character = sys.argv[1] if len(sys.argv) > 1 else "claude"
 default_data = Path(os.environ.get("CROSSPET_DATA_DIR") or str(Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "CrossPet"))
 state_dir = Path(os.environ.get("CROSSPET_STATE_DIR") or (str(default_data / "state") if os.name == "nt" else "/tmp/crosspet"))
 
+# 跟着 AI 出现：开始干活（会话开始 / 发消息 / 调模型）时桌宠没开着就把它打开。
+# 用户从菜单手动退出过（user-quit）就先不管，直到这个 AI 程序关掉重开、或者重启电脑：
+# 看 AI 程序（钩子往上找到的顶层进程）是在退出之后才打开的，记号就作废。设置里关掉了（ai-autostart-off）就不管。
+# 也可以单独调用：crosspet-hook.py --ensure（不读事件、不写状态，只确保桌宠在跑；Windows 上 Claude Code 的 mod 用它）
+LAUNCH_EVENTS = ("SessionStart", "UserPromptSubmit", "BeforeAgent", "PreInvocation")
+
+
+def app_started_at():
+    """调用这个钩子的 AI 程序是哪个、什么时候打开的：顺着父进程往上找，到系统进程下面那一层为止
+    （macOS：launchd；Windows：系统目录里的程序，比如 explorer、svchost，或者虚拟机工具的常驻进程）。
+    中间的命令行外壳（cmd、PowerShell）会跳过去。终端里跑的命令行工具找到的是终端程序。返回 (时间, 程序名)"""
+    now = time.time()
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        k32.OpenProcess.restype = wintypes.HANDLE
+
+        class Entry(ctypes.Structure):
+            _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                        ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                        ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+                        ("szExeFile", ctypes.c_wchar * 260)]
+        procs = {}
+        snap = k32.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
+        entry = Entry()
+        entry.dwSize = ctypes.sizeof(Entry)
+        ok = k32.Process32FirstW(wintypes.HANDLE(snap), ctypes.byref(entry))
+        while ok:
+            procs[entry.th32ProcessID] = entry.th32ParentProcessID
+            ok = k32.Process32NextW(wintypes.HANDLE(snap), ctypes.byref(entry))
+        k32.CloseHandle(wintypes.HANDLE(snap))
+
+        def info(pid: int):
+            """(打开时间, 程序完整路径)；打不开（权限不够、已经退出）返回 (0, "")"""
+            h = k32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not h:
+                return 0, ""
+            h = wintypes.HANDLE(h)
+            times = [wintypes.FILETIME() for _ in range(4)]
+            path = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(1024)
+            try:
+                if not k32.GetProcessTimes(h, *[ctypes.byref(t) for t in times]):
+                    return 0, ""
+                k32.QueryFullProcessImageNameW(h, 0, path, ctypes.byref(size))
+            finally:
+                k32.CloseHandle(h)
+            ft = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+            return ft / 1e7 - 11644473600, path.value  # 1601 年起的 100 纳秒 → Unix 秒
+
+        windows = os.environ.get("SystemRoot", r"C:\Windows").lower().rstrip("\\") + "\\"
+        shells = ("cmd.exe", "powershell.exe", "pwsh.exe", "conhost.exe", "bash.exe", "sh.exe", "wsl.exe")
+        tools = ("\\parallels\\", "\\vmware\\", "\\oracle\\virtualbox")
+
+        def system(path: str) -> bool:
+            p = path.lower()
+            name = p.rsplit("\\", 1)[-1]
+            return not p or (p.startswith(windows) and name not in shells) or any(t in p for t in tools)
+
+        pid = os.getpid()
+        start, path = info(pid)
+        while pid in procs:
+            parent = procs[pid]
+            if parent not in procs:
+                break
+            parent_start, parent_path = info(parent)
+            if system(parent_path) or not parent_start or parent_start > start:  # 后者：进程号被重用了，真正的父进程早没了
+                break
+            pid, start, path = parent, parent_start, parent_path
+        return start, path.rsplit("\\", 1)[-1]
+    import subprocess
+    out = subprocess.run(["/bin/ps", "-A", "-o", "pid=,ppid=,etime=,comm="], capture_output=True, text=True, timeout=5).stdout
+    procs = {}
+    for line in out.splitlines():
+        parts = line.split(None, 3)
+        if len(parts) == 4:
+            days, _, clock = parts[2].rpartition("-")
+            secs = 0
+            for piece in clock.split(":"):
+                secs = secs * 60 + int(piece)
+            procs[int(parts[0])] = (int(parts[1]), secs + int(days or 0) * 86400, parts[3])
+    pid = os.getpid()
+    while pid in procs and procs[pid][0] > 1 and procs[pid][0] in procs:
+        pid = procs[pid][0]
+    if pid not in procs:
+        return 0, ""
+    name = procs[pid][2]
+    return now - procs[pid][1], (name.split(".app/")[0].rsplit("/", 1)[-1] if ".app/" in name else name.rsplit("/", 1)[-1])
+
+
+def ensure_pet() -> str:
+    """返回这次的结果（写进 <状态目录>/autostart.txt，排查「为什么没出来」用）"""
+    data = default_data if os.name == "nt" else Path.home() / "Library/Application Support/CrossPet"
+    quit_flag = data / "user-quit"
+    if quit_flag.exists():
+        quit_at = quit_flag.stat().st_mtime
+        try:
+            started, app = app_started_at()
+            note = f"（{app or '没找到 AI 程序'} 打开于 {time.strftime('%H:%M:%S', time.localtime(started))}，退出于 {time.strftime('%H:%M:%S', time.localtime(quit_at))}）"
+        except Exception as e:
+            started, note = 0, f"（查 AI 启动时间出错 {e!r}）"
+        if started <= quit_at:
+            return "不打开：从菜单手动退出过，这个 AI 是在那之前就开着的" + note
+        fresh_note = "手动退出后重新打开过 AI" + note + "，"
+    else:
+        fresh_note = ""
+    if (data / "ai-autostart-off").exists():
+        return "不打开：设置里关掉了「AI 开始工作时自动出现」"
+    import subprocess
+    quiet = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True)
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        # 桌宠在跑时握着这个互斥量（单实例）；能打开就是在跑
+        handle = kernel32.OpenMutexW(0x00100000, False, "Local\\CrossPet-" + os.environ.get("USERNAME", ""))
+        if handle:
+            kernel32.CloseHandle(handle)
+            return "已经在跑"
+        exe = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "Programs/CrossPet/CrossPet.exe"
+        if not exe.exists():
+            return f"不打开：没找到 {exe}"
+        # 独立进程：不挂在 AI 进程下面，AI 退出时桌宠不会被一起关掉
+        detached = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        try:
+            subprocess.Popen([str(exe)], cwd=str(exe.parent), creationflags=detached | 0x01000000, **quiet)  # + CREATE_BREAKAWAY_FROM_JOB
+        except OSError:
+            # 有的 AI（WorkBuddy）把钩子放进不许脱离的作业对象，一轮结束就把里面的进程全关掉，直接打开的桌宠会跟着闪退。
+            # 交给已经在跑的资源管理器去打开（和从开始菜单打开一样），桌宠就不在这个作业对象里了
+            explorer = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "explorer.exe"
+            subprocess.Popen([str(explorer), str(exe)], creationflags=detached, **quiet)
+            return fresh_note + "已打开（由资源管理器打开）"
+        return fresh_note + "已打开"
+    else:
+        try:
+            os.kill(int((state_dir / "pet.pid").read_text().strip()), 0)
+            return "已经在跑"
+        except PermissionError:
+            return "已经在跑"
+        except Exception:
+            pass
+        # -g：在后台打开，不抢你正在用的窗口的焦点
+        subprocess.Popen(["/usr/bin/open", "-g", "-b", "io.github.crosspet"], start_new_session=True, **quiet)
+        return fresh_note + "已打开"
+
+
+def ensure_pet_logged(source: str) -> None:
+    try:
+        result = ensure_pet()
+    except Exception as e:
+        result = f"出错：{e!r}"
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        # Windows 上带 BOM：系统自带的 PowerShell 5 没有 BOM 就按 GBK 读，中文会乱码
+        (state_dir / "autostart.txt").write_text(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {source}：{result}\n",
+                                                 encoding="utf-8-sig" if os.name == "nt" else "utf-8")
+    except Exception:
+        pass
+
+
+if character == "--ensure":
+    ensure_pet_logged("--ensure")
+    sys.exit(0)
+
 try:
     # 按 UTF-8 读：Windows 上 Python 默认用系统编码（中文系统是 GBK），事件里一有中文就会解码失败
     event = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
 except Exception:
     sys.exit(0)
+
+# Codex 会在对话结束后自己在后台整理记忆（工作目录在 ~/.codex/memories），也会调工具，但不是你让它干的活，
+# 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管
+if character == "gpt":
+    try:
+        codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
+        cwd = Path(str(event.get("cwd") or "")).resolve() if event.get("cwd") else None
+        if cwd and (cwd == codex_home or codex_home in cwd.parents):
+            sys.exit(0)
+    except (OSError, ValueError):
+        pass
 
 # 多模型宿主（WorkBuddy）：每条事件都带当前模型名，按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
@@ -244,6 +421,11 @@ if pose:
     tmp = state_dir / f".{character}-state.json"
     tmp.write_text(json.dumps(state))
     tmp.replace(state_dir / f"{character}-state.json")
+
+
+if name in LAUNCH_EVENTS:
+    ensure_pet_logged(f"{character} {name}")
+
 if arg_event:
     print("{}")
 sys.exit(0)

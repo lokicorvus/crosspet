@@ -26,6 +26,8 @@ try {
         New-Item -ItemType Directory -Path $destination -Force | Out-Null
         Copy-Item -Path (Join-Path $PSScriptRoot '*') -Destination $destination -Recurse -Force
     }
+    # 去掉「从网上下载的」标记：不然由资源管理器打开（AI 开始工作时自动出现）可能会弹安全警告
+    Get-ChildItem -LiteralPath $destination -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
     $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'CrossPet.lnk'
     $ws = New-Object -ComObject WScript.Shell
     $link = $ws.CreateShortcut($shortcut)

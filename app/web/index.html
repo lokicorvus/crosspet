@@ -75,6 +75,10 @@ html.no-name #caption { display: none; }
 @keyframes squish { 50% { transform: scale(.96, 1.05); } }
 @keyframes gift { 0% { transform: translateY(3%) scale(1.05,.93); } 45% { transform: translateY(-9%) scale(.97,1.04); } 100% { transform: none; } }
 @keyframes jolt { 0% { transform: translate(0,0) rotate(0); } 25% { transform: translate(-3%, -4%) rotate(-4deg) scale(.97,1.04); } 60% { transform: translate(1%, 0) rotate(1.5deg); } 100% { transform: none; } }
+/* 从别的窗口后面浮到最上层（显示层级「跟着 AI」）：先藏起来，换完层级再淡入、轻轻上浮，不要一下子盖上来 */
+#wrap.sunk { opacity: 0; }
+#wrap.surface { animation: surface .45s cubic-bezier(.2,.8,.2,1); }
+@keyframes surface { from { opacity: 0; transform: translateY(5%) scale(.97); } to { opacity: 1; transform: none; } }
 </style></head>
 <body>
 <div id="wrap">
@@ -207,7 +211,32 @@ function setAuraMode(mode) {
   c.toggle('aura-on', mode === 'on')
   c.toggle('aura-off', mode === 'off')
 }
+// 能点到的区域（网页像素，[x, y, 宽, 高]）：桌宠本体、气泡、名牌、额度。窗口其余透明的地方让点击穿过去，
+// 点到后面的窗口（窗口比桌宠大，是给动作、气泡留的空间）
+function hitRects() {
+  const out = []
+  for (const id of ['body', 'bubble', 'caption', 'quota']) {
+    const el = $(id)
+    if (!el || (id === 'bubble' && el.classList.contains('hide'))) continue
+    const cs = getComputedStyle(el)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    const r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) continue
+    out.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8].map(Math.round))
+  }
+  return JSON.stringify(out)
+}
+function sink() { $('wrap').classList.remove('surface'); $('wrap').classList.add('sunk') }
+function surface() {
+  const w = $('wrap')
+  w.classList.remove('sunk', 'surface'); void w.offsetWidth; w.classList.add('surface')
+  setTimeout(() => w.classList.remove('surface'), 500)
+}
+// 手动退出前的告别：这句话钉住，退出前不让别的台词或清空盖掉
+let farewellLine = null
+function farewell(line) { farewellLine = line; say(line) }
 function say(line) {
+  if (farewellLine !== null && line !== farewellLine) return
   const b = $('bubble')
   if (!line) { b.classList.add('hide'); return }
   b.textContent = line

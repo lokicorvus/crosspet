@@ -72,10 +72,13 @@ namespace CrossPet
             web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
             grid.Children.Add(web);
             // 透明的接鼠标层：拖动 / 单击 / 右键由窗口自己处理（和 macOS 版的 DragView 一样），网页只负责画
-            var hit = new Border { Background = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0)) };
+            // 只在桌宠本体、气泡、名牌、额度上铺：窗口其余地方完全透明，点击直接落到后面的窗口
+            // （窗口比桌宠大，是给动作、气泡留的空间；透明窗口里全透明的像素本来就不接鼠标）
+            hit = new Canvas();
             grid.Children.Add(hit);
             Window.Content = grid;
             WireMouse(hit);
+            Every(TimeSpan.FromMilliseconds(250), () => { _ = UpdateHitRects(); });
 
             Window.Loaded += async (_, __) => await InitWeb();
             Window.Show();
@@ -235,7 +238,7 @@ namespace CrossPet
         }
 
         // ---------------- 显示层级 ----------------
-        // always：始终在最上层；ai：前台是 AI 应用、或者 AI 正在干活 / 等你回答时在最上层，其他时候是普通窗口（会被挡住）；
+        // always：始终在最上层；ai：前台是 AI 应用、AI 等你回答、刚干完活时在最上层，其他时候是普通窗口（会被挡住）；
         // normal：普通窗口。另外全屏程序（视频 / 游戏 / 演示）在前台时整个隐藏
         static string LayerMode => Store.Settings.TryGetValue("layer", out var v) && v is string s && (s == "ai" || s == "normal") ? s : "always";
         static bool HideFullscreen => !(Store.Settings.TryGetValue("hideFullscreen", out var v) && v is bool b && !b);
@@ -246,8 +249,10 @@ namespace CrossPet
         {
             if (frontIsAI) return true;
             var now = DateTime.UtcNow;
+            // 等你回答：一直等到你回答（最长 10 分钟）；刚干完活：浮上来一会儿。
+            // AI 在后台干活时不浮上来：选这个模式的人就是嫌挡路，干活时往往正是你切去忙别的
             return lastPose.Values.Any(p => p.pose == "asking" ? (now - p.at).TotalMinutes < 10
-                : (now - p.at).TotalSeconds < 45 && !new[] { "idle", "sleeping", "happy", "proud" }.Contains(p.pose));
+                : (now - p.at).TotalSeconds < 8 && (p.pose == "happy" || p.pose == "proud"));
         }
 
         void ApplyLayer()
@@ -261,9 +266,29 @@ namespace CrossPet
                 if (hide) Window.Hide(); else { Window.Show(); if (Window.Topmost) Native.BringToTop(hwnd); }
             }
             var top = LayerMode == "always" || (LayerMode == "ai" && AIActive());
-            if (Window.Topmost == top) return;
+            if (Window.Topmost == top || surfacing) return;
+            // 原本被别的窗口挡着、要浮上来：先藏起来，换完层级再淡入（没被挡住就直接换，免得闪一下）
+            if (top && !hiddenForFullscreen && Native.Covered(hwnd)) { _ = Surface(); return; }
             Window.Topmost = top;
             if (top) Native.BringToTop(hwnd); else Native.DropFromTop(hwnd);
+        }
+
+        bool surfacing;
+        async Task Surface()
+        {
+            surfacing = true;
+            try
+            {
+                await Eval("sink()");
+                await Task.Delay(50);
+                Window.Topmost = true;
+                Native.BringToTop(hwnd);
+            }
+            finally
+            {
+                surfacing = false;
+                Js("surface()");
+            }
         }
 
         void FollowForeground()
@@ -323,21 +348,46 @@ namespace CrossPet
             finally { askingGemini = false; }
         }
 
+        // ---------------- 能点到的区域 ----------------
+        Canvas hit;
+        static readonly Brush HitBrush = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
+        string lastHitRects;
+        async Task UpdateHitRects()
+        {
+            if (hit == null || !ready || Mouse.LeftButton == MouseButtonState.Pressed) return;
+            var json = await Eval("hitRects()");
+            if (json == lastHitRects || json == "null") return;
+            lastHitRects = json;
+            if (!(Store.Json.DeserializeObject(Store.Json.Deserialize<string>(json)) is object[] list)) return;
+            var zoom = Window.Width / BaseWidth;   // 网页像素 → 窗口坐标
+            hit.Children.Clear();
+            foreach (var item in list)
+            {
+                if (!(item is object[] r) || r.Length != 4) continue;
+                var box = new System.Windows.Shapes.Rectangle { Fill = HitBrush, Width = Convert.ToDouble(r[2]) * zoom, Height = Convert.ToDouble(r[3]) * zoom };
+                Canvas.SetLeft(box, Convert.ToDouble(r[0]) * zoom);
+                Canvas.SetTop(box, Convert.ToDouble(r[1]) * zoom);
+                hit.Children.Add(box);
+            }
+        }
+
         // ---------------- 鼠标：单击摸头、拖动换位置、右键菜单 ----------------
         void WireMouse(UIElement hit)
         {
             Point down = default; bool pressed = false;
-            hit.MouseLeftButtonDown += (_, e) => { down = e.GetPosition(Window); pressed = true; };
+            // 按下时抓住鼠标：能点的只有桌宠那几块，拖的时候鼠标出了这几块也要继续收到移动
+            hit.MouseLeftButtonDown += (_, e) => { down = e.GetPosition(Window); pressed = true; hit.CaptureMouse(); };
             hit.MouseMove += (_, e) =>
             {
                 if (!pressed || e.LeftButton != MouseButtonState.Pressed) return;
                 var p = e.GetPosition(Window);
                 if (Math.Abs(p.X - down.X) + Math.Abs(p.Y - down.Y) <= 4) return;
                 pressed = false;
+                hit.ReleaseMouseCapture();
                 try { Window.DragMove(); } catch { }
                 SavePosition();
             };
-            hit.MouseLeftButtonUp += (_, __) => { if (pressed) { pressed = false; Js("handleClick('pat')"); } };
+            hit.MouseLeftButtonUp += (_, __) => { hit.ReleaseMouseCapture(); if (pressed) { pressed = false; Js("handleClick('pat')"); } };
             hit.MouseRightButtonUp += (_, __) =>
             {
                 var menu = new Forms.ContextMenuStrip();
@@ -418,7 +468,7 @@ namespace CrossPet
             if (developer) menu.Items.Add(Item("开发者控制台…", OpenDev));
             menu.Items.Add(Item("回到右下角", Recenter));
             Sep();
-            menu.Items.Add(Item("退出 CrossPet", Quit));
+            menu.Items.Add(Item("退出 CrossPet", UserQuit));
         }
 
         // ---------------- 设置窗口（web/settings.html，和 macOS 版共用） ----------------
@@ -499,7 +549,7 @@ namespace CrossPet
                 ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
-                ["login"] = LoginEnabled, ["character"] = current, ["updating"] = updating,
+                ["login"] = LoginEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c => new Dictionary<string, object>
                 {
                     ["id"] = c.id, ["name"] = c.name,
@@ -546,6 +596,7 @@ namespace CrossPet
                             Store.Settings[key] = on; Store.SaveSettings();
                             if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
                             break;
+                        case "aiAutostart": SetAIAutostart(on); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id); break;
                     }
@@ -586,6 +637,32 @@ namespace CrossPet
 
         static void Toggle(string key) { Store.Settings[key] = !Store.Flag(key); Store.SaveSettings(); }
         static void Open(string target) { try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch (Exception e) { Store.Log("打开失败: " + e.Message); } }
+
+        // ---------------- 跟着 AI 出现 ----------------
+        // 接入的 AI 开始工作时，钩子脚本 / DSH 插件发现桌宠没在跑（查单实例互斥量）就把它打开。
+        // 从菜单手动退出 = 这会儿不想看到它：记下 user-quit（看文件修改时间），在那之前就开着的 AI 不再把它拉起来；
+        // AI 程序关掉重开、重启电脑后就作废，自己打开桌宠也会清掉（见 Program）。
+        // 设置里关掉「AI 开始工作时自动出现」= 写 ai-autostart-off。一键更新时的退出不算手动退出。
+        public static string UserQuitFlag => Path.Combine(Store.Data, "user-quit");
+        static string AIAutostartOffFlag => Path.Combine(Store.Data, "ai-autostart-off");
+        static bool AIAutostart => !File.Exists(AIAutostartOffFlag);
+        static void SetAIAutostart(bool on)
+        {
+            try { if (on) File.Delete(AIAutostartOffFlag); else File.WriteAllText(AIAutostartOffFlag, ""); }
+            catch (Exception e) { Store.Log("设置跟着 AI 出现失败: " + e.Message); }
+        }
+
+        /// 菜单里的「退出」：用户主动退出。第一次退出时说一句，让人知道什么时候会再出来
+        void UserQuit()
+        {
+            try { File.WriteAllText(UserQuitFlag, ""); } catch { }
+            if (!AIAutostart || Store.Flag("quitHinted")) { Quit(); return; }
+            Store.Settings["quitHinted"] = true; Store.SaveSettings();
+            Js("farewell('我先走啦～下次重新打开 AI 我再出来')");
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            t.Tick += (_, __) => { t.Stop(); Quit(); };
+            t.Start();
+        }
 
         public void Quit()
         {

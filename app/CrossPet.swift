@@ -77,6 +77,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func applicationDidFinishLaunching(_ note: Notification) {
         syncBundledResources()
+        markLaunched()
 
         let size = NSSize(width: Self.baseSize.width * petScale, height: Self.baseSize.height * petScale)
         var origin = NSPoint.zero
@@ -117,6 +118,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
+        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.updateClickThrough() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
         // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
         Timer.scheduledTimer(withTimeInterval: 3 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
@@ -801,10 +803,38 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         panel.setFrameOrigin(NSPoint(x: screen.maxX - panel.frame.width - 40, y: screen.minY + 100))
         defaults.removeObject(forKey: "origin")
     }
-    @objc func quit() { NSApp.terminate(nil) }
+    // MARK: 跟着 AI 出现
+    // 接入的 AI 开始工作时，钩子脚本 / DSH 插件发现桌宠没在跑就把它打开（看 /tmp/crosspet/pet.pid）。
+    // 从菜单手动退出 = 这会儿不想看到它：记下 user-quit（看文件修改时间），在那之前就开着的 AI 不再把它拉起来；
+    // AI 程序关掉重开、重启电脑后就作废，自己打开桌宠也会清掉。
+    // 设置里关掉「AI 开始工作时自动出现」= 写 ai-autostart-off。两个记号都放在 Application Support，重启电脑也不丢。
+    var userQuitFlag: URL { root.appendingPathComponent("user-quit") }
+    var aiAutostartOffFlag: URL { root.appendingPathComponent("ai-autostart-off") }
+    var aiAutostart: Bool { !FileManager.default.fileExists(atPath: aiAutostartOffFlag.path) }
+    func setAIAutostart(_ on: Bool) {
+        if on { try? FileManager.default.removeItem(at: aiAutostartOffFlag) }
+        else { try? Data().write(to: aiAutostartOffFlag) }
+    }
+    func markLaunched() {
+        try? FileManager.default.removeItem(at: userQuitFlag)
+        try? FileManager.default.createDirectory(at: stateDir, withIntermediateDirectories: true)
+        try? String(ProcessInfo.processInfo.processIdentifier).write(to: stateDir.appendingPathComponent("pet.pid"), atomically: true, encoding: .utf8)
+    }
+    func applicationWillTerminate(_ note: Notification) {
+        try? FileManager.default.removeItem(at: stateDir.appendingPathComponent("pet.pid"))
+    }
+
+    /// 菜单里的「退出」：用户主动退出。第一次退出时说一句，让人知道什么时候会再出来
+    @objc func quit() {
+        try? Data().write(to: userQuitFlag)
+        guard aiAutostart, !defaults.bool(forKey: "quitHinted") else { NSApp.terminate(nil); return }
+        defaults.set(true, forKey: "quitHinted")
+        js("farewell('我先走啦～下次重新打开 AI 我再出来')")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { NSApp.terminate(nil) }
+    }
 
     // MARK: 显示层级
-    // always：始终在最上层；ai：前台是 AI 应用、或者 AI 正在干活 / 等你回答时在最上层，其他时候是普通窗口（会被挡住）；
+    // always：始终在最上层；ai：前台是 AI 应用、AI 等你回答、刚干完活时在最上层，其他时候是普通窗口（会被挡住）；
     // normal：普通窗口。全屏时隐藏用 macOS 自己的机制：不允许出现在全屏程序的空间里
     var layerMode: String { defaults.string(forKey: "layer") ?? "always" }
     var hideInFullscreen: Bool { defaults.object(forKey: "hideFullscreen") as? Bool ?? true }
@@ -817,7 +847,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         return lastPose.values.contains { p in
             let age = now.timeIntervalSince(p.at)
             if p.pose == "asking" { return age < 600 }                        // 等你回答：一直等到你回答
-            return age < 45 && !["idle", "sleeping", "happy", "proud"].contains(p.pose)   // 正在干活
+            return age < 8 && ["happy", "proud"].contains(p.pose)              // 刚干完活：浮上来一会儿
+            // AI 在后台干活时不浮上来：选这个模式的人就是嫌挡路，干活时往往正是你切去忙别的
         }
     }
 
@@ -825,8 +856,67 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let top = layerMode == "always" || (layerMode == "ai" && aiActive)
         let level: NSWindow.Level = top ? .floating : .normal
         guard panel.level != level else { return }
-        panel.level = level
-        if top { panel.orderFrontRegardless() }
+        // 原本被别的窗口挡着、要浮上来：先藏起来，换完层级再淡入（没被挡住就直接换，免得闪一下）
+        guard top, isCovered() else {
+            panel.level = level
+            if top { panel.orderFrontRegardless() } else { orderBelowFrontWindow() }
+            return
+        }
+        web.evaluateJavaScript("sink()") { [weak self] _, _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                guard let self, self.layerMode == "always" || (self.layerMode == "ai" && self.aiActive) else { self?.js("surface()"); return }
+                self.panel.level = .floating
+                self.panel.orderFrontRegardless()
+                self.js("surface()")
+            }
+        }
+    }
+
+    // MARK: 点击穿透
+    // 窗口比桌宠大（给动作、气泡留的空间）：鼠标不在桌宠本体、气泡、名牌、额度上时让窗口不接鼠标，点击落到后面的窗口
+    var hitRects: [CGRect] = []
+    var hitRectsAt = Date.distantPast
+
+    func updateClickThrough() {
+        let p = NSEvent.mouseLocation, f = panel.frame
+        guard f.contains(p) else { return }
+        if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
+        if Date().timeIntervalSince(hitRectsAt) > 0.25 {
+            hitRectsAt = Date()
+            web.evaluateJavaScript("hitRects()") { [weak self] r, _ in
+                guard let text = r as? String, let data = text.data(using: .utf8),
+                      let list = try? JSONSerialization.jsonObject(with: data) as? [[Double]] else { return }
+                self?.hitRects = list.filter { $0.count == 4 }.map { CGRect(x: $0[0], y: $0[1], width: $0[2], height: $0[3]) }
+            }
+        }
+        let zoom = f.width / Self.baseSize.width   // 网页像素 → 屏幕点
+        let point = CGPoint(x: (p.x - f.minX) / zoom, y: (f.maxY - p.y) / zoom)
+        let over = hitRects.isEmpty || hitRects.contains { $0.contains(point) }
+        if panel.ignoresMouseEvents == over { panel.ignoresMouseEvents = !over }
+    }
+
+    /// 降到普通层级后还排在所有普通窗口最前面、压在你正在用的窗口上：挪到前台程序最前面那个窗口的后面
+    func orderBelowFrontWindow() {
+        guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier, pid != ProcessInfo.processInfo.processIdentifier,
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]],
+              let front = list.first(where: { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0 }),
+              let number = front[kCGWindowNumber as String] as? Int else { return }
+        panel.order(.below, relativeTo: number)
+    }
+
+    /// 桌宠中间那块有没有被别的普通窗口挡住（只看窗口位置和层级，不需要录屏权限）
+    func isCovered() -> Bool {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenAboveWindow, .excludeDesktopElements],
+                                                    CGWindowID(panel.windowNumber)) as? [[String: Any]] else { return false }
+        let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
+        let f = panel.frame
+        let core = CGRect(x: f.minX, y: screenTop - f.maxY, width: f.width, height: f.height).insetBy(dx: f.width * 0.25, dy: f.height * 0.2)
+        return list.contains { w in
+            guard (w[kCGWindowLayer as String] as? Int) == 0, (w[kCGWindowAlpha as String] as? Double ?? 1) > 0.05,
+                  let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b) else { return false }
+            return r.intersects(core)
+        }
     }
 
     @objc func setLayer(_ sender: NSMenuItem) {
@@ -913,6 +1003,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
+            "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0, "defaultName": defaultNames[$0] ?? $0, "custom": names[$0] ?? ""] },
             "updating": updating,
@@ -1029,6 +1120,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
             case "agyQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
+            case "aiAutostart":
+                setAIAutostart(value as? Bool ?? true)
             case "login":
                 if (value as? Bool ?? false) != (SMAppService.mainApp.status == .enabled) { toggleLogin() }
             case "character":
