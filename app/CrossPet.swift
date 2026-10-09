@@ -66,6 +66,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var charactersDir: URL { root.appendingPathComponent("characters") }
 
     var characterIds: [String] = []           // 可切换的角色（不含彩蛋）
+    var skinChoices: [String: [(id: String, name: String)]] = [:]   // 角色 → 可换的衣服（皮肤）
+    var baseOutfit: [String: String] = [:]   // 原版衣服叫什么（character.json 的 outfit，比如「女仆装」）
     var displayNames: [String: String] = [:]  // id → 显示名（含用户改的名）
     var appToCharacter: [String: String] = [:]
     var stamps: [String: Date] = [:]
@@ -331,15 +333,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         displayNames = [:]
         let fm = FileManager.default
         let renamed = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
-        let dirs = (try? fm.contentsOfDirectory(at: charactersDir, includingPropertiesForKeys: nil)) ?? []
-        for dir in dirs.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            guard let data = try? Data(contentsOf: dir.appendingPathComponent("character.json")),
-                  var info = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
+        let dirs = ((try? fm.contentsOfDirectory(at: charactersDir, includingPropertiesForKeys: nil)) ?? [])
+            .sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        // 立绘：<文件名去掉 -2、-3> 是姿态名，idle-blink 是眨眼帧（照着 idle 本身画的）
+        func sprites(_ dir: URL) -> (poses: [String: [String]], blink: String?, blinkBase: String?) {
             let files = ((try? fm.contentsOfDirectory(atPath: dir.path)) ?? [])
                 .filter { $0.hasSuffix(".webp") || $0.hasSuffix(".png") }.sorted()
             var poses: [String: [String]] = [:]
-            var blink: String?
-            var blinkBase: String?  // 眨眼帧是照着 idle 本身（不是 idle-2、idle-3）画的
+            var blink: String?, blinkBase: String?
             for f in files {
                 let name = (f as NSString).deletingPathExtension
                 let url = dir.appendingPathComponent(f).absoluteString
@@ -348,10 +349,31 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 let pose = name.split(separator: "-").first.map(String.init) ?? name
                 poses[pose, default: []].append(url)
             }
+            return (poses, blink, blinkBase)
+        }
+        // 皮肤（另一套衣服）：character.json 里写 "skinOf": "<角色>"，不单独算角色；选了它，那个角色就用这套立绘，台词、动作逻辑照旧
+        skinChoices = [:]
+        var skinSprites: [String: (poses: [String: [String]], blink: String?, blinkBase: String?)] = [:]
+        for dir in dirs {
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent("character.json")),
+                  let info = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let base = info["skinOf"] as? String else { continue }
+            let sp = sprites(dir)
+            guard sp.poses["idle"] != nil else { continue }
+            skinChoices[base, default: []].append((dir.lastPathComponent, info["skinName"] as? String ?? dir.lastPathComponent))
+            skinSprites[dir.lastPathComponent] = sp
+        }
+        let chosen = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
+        for dir in dirs {
+            guard let data = try? Data(contentsOf: dir.appendingPathComponent("character.json")),
+                  var info = try? JSONSerialization.jsonObject(with: data) as? [String: Any], info["skinOf"] == nil else { continue }
             let id = dir.lastPathComponent
+            var sp = sprites(dir)
+            if let skin = chosen[id], let s = skinSprites[skin], skinChoices[id]?.contains(where: { $0.id == skin }) == true { sp = s }
+            let (poses, blink, blinkBase) = sp
             let isEgg = info["egg"] as? Bool == true  // 彩蛋角色：不进菜单、不绑应用
             guard isEgg ? poses["pop"] != nil : (poses["idle"] != nil || poses["default"] != nil) else { continue }
-            if !isEgg { defaultNames[id] = info["name"] as? String ?? id }
+            if !isEgg { defaultNames[id] = info["name"] as? String ?? id; baseOutfit[id] = info["outfit"] as? String }
             if !isEgg, let custom = renamed[id], !custom.isEmpty { info["name"] = custom }
             info["poses"] = poses
             info["blink"] = blink ?? NSNull()
@@ -1163,7 +1185,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "edgeDock": edgeDockEnabled,
             "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
-            "characters": characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0, "defaultName": defaultNames[$0] ?? $0, "custom": names[$0] ?? ""] },
+            "characters": characterIds.map { id -> [String: Any] in
+                var c: [String: Any] = ["id": id, "name": displayNames[id] ?? id, "defaultName": defaultNames[id] ?? id, "custom": names[id] ?? ""]
+                if let skins = skinChoices[id], !skins.isEmpty {   // 有别的衣服：原版排第一
+                    c["skins"] = [["id": "", "name": baseOutfit[id] ?? "原版"]] + skins.map { ["id": $0.id, "name": $0.name] }
+                    c["skin"] = (defaults.dictionary(forKey: "skins") as? [String: String])?[id] ?? ""
+                }
+                return c
+            },
             "updating": updating,
         ]
         if let r = latestRelease, canSelfUpdate { state["update"] = r.tag }
@@ -1293,6 +1322,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             pushSettings()
         case "integrate":
             if let target = msg["target"] as? String, let action = msg["action"] as? String { integrate(action, target) }
+        case "skin":   // 换衣服：记下来，重新载入立绘；正在显示的就是她的话马上换上
+            guard let id = msg["id"] as? String, characterIds.contains(id), let skin = msg["skin"] as? String else { return }
+            var skins = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
+            if skin.isEmpty { skins.removeValue(forKey: id) } else { skins[id] = skin }
+            defaults.set(skins, forKey: "skins")
+            loadCharacters()
+            js("refreshLook(\(quote(id)))")
+            pushSettings()
         case "rename":
             guard let id = msg["id"] as? String, characterIds.contains(id) else { return }
             var names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]

@@ -71,6 +71,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
   <h2>角色</h2>
   <div class="item"><div class="label">当前角色</div>
     <div class="ctl"><select id="character"></select></div></div>
+  <div class="item hidden" id="skinRow"><div class="label">衣服<small>换一套立绘，台词和动作不变</small></div>
+    <div class="ctl"><select id="skin"></select></div></div>
   <div class="item"><div class="label">名字<small>留空恢复默认</small></div>
     <div class="ctl"><input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div></div>
   <div class="item"><div class="label">跟随前台 AI 应用<small>切到哪个 AI 的 App，就换成哪个角色</small></div>
@@ -140,6 +142,10 @@ function setState(s) {
   sel.replaceChildren(...s.characters.map(c => new Option(c.name, c.id, false, c.id === s.character)))
   const cur = s.characters.find(c => c.id === s.character)
   if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
+  // 有别的衣服（皮肤）的角色才显示「衣服」
+  const skins = cur?.skins || []
+  $('skinRow').classList.toggle('hidden', skins.length < 2)
+  $('skin').replaceChildren(...skins.map(k => new Option(k.name, k.id, false, k.id === (cur.skin || ''))))
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   renderIntegrations(s.integrations)
 }
@@ -172,6 +178,7 @@ for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => po
 $('size').oninput = () => { $('sizeVal').textContent = Math.round($('size').value * 100) + '%'; post({ cmd: 'set', key: 'size', value: +$('size').value }) }
 document.querySelector('[data-reset-size]').onclick = () => post({ cmd: 'set', key: 'size', value: 1 })
 $('character').onchange = () => post({ cmd: 'set', key: 'character', value: $('character').value })
+$('skin').onchange = () => post({ cmd: 'skin', id: state.character, skin: $('skin').value })
 const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
 $('saveName').onclick = saveName
 $('name').onkeydown = e => { if (e.key === 'Enter') saveName() }

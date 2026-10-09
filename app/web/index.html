@@ -540,6 +540,13 @@ function justUpdated(version) {
   }, 6000)
 }
 
+// 换了衣服（皮肤）：外壳重新 init 过立绘清单后调它，正在显示的就是这个角色就重新换上
+function refreshLook(id) {
+  if (charId !== id || egg) return
+  charId = null; preloaded = null
+  setCharacter(id, true)
+}
+
 function setName(id, name) {
   if (!manifest.characters[id]) return
   manifest.characters[id].name = name

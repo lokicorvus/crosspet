@@ -708,11 +708,22 @@ namespace CrossPet
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
-                ["characters"] = Characters().Select(c => new Dictionary<string, object>
+                ["characters"] = Characters().Select(c =>
                 {
-                    ["id"] = c.id, ["name"] = c.name,
-                    ["defaultName"] = Store.ReadJson(Path.Combine(Store.Characters, c.id, "character.json"))?["name"] as string ?? c.id,
-                    ["custom"] = Store.Names.TryGetValue(c.id, out var n) ? n as string ?? "" : "",
+                    var d = new Dictionary<string, object>
+                    {
+                        ["id"] = c.id, ["name"] = c.name,
+                        ["defaultName"] = Store.ReadJson(Path.Combine(Store.Characters, c.id, "character.json"))?["name"] as string ?? c.id,
+                        ["custom"] = Store.Names.TryGetValue(c.id, out var n) ? n as string ?? "" : "",
+                    };
+                    if (Store.SkinChoices.TryGetValue(c.id, out var skins) && skins.Count > 0)   // 有别的衣服：原版排第一
+                    {
+                        var list = new List<object> { new Dictionary<string, object> { ["id"] = "", ["name"] = Store.BaseOutfit.TryGetValue(c.id, out var bo) && bo != null ? bo : "原版" } };
+                        list.AddRange(skins.Select(k => (object)new Dictionary<string, object> { ["id"] = k.id, ["name"] = k.name }));
+                        d["skins"] = list;
+                        d["skin"] = Store.Skins != null && Store.Skins.TryGetValue(c.id, out var cur) ? cur as string ?? "" : "";
+                    }
+                    return d;
                 }).ToList(),
                 ["integrations"] = integrated == null ? null : IntegrationTargets.Select(t => new Dictionary<string, object>
                     { ["id"] = t.id, ["label"] = t.label, ["note"] = t.note, ["installed"] = integrated.Contains(t.id) }).ToList(),
@@ -758,6 +769,16 @@ namespace CrossPet
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id); break;
+                    }
+                    break;
+                case "skin":   // 换衣服：记下来，重新载入立绘；正在显示的就是她的话马上换上
+                    if (msg.TryGetValue("id", out var kid) && kid is string skinId && Characters().Any(x => x.id == skinId) && msg.TryGetValue("skin", out var kv) && kv is string skinName)
+                    {
+                        if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
+                        if (skinName == "") sd.Remove(skinId); else sd[skinId] = skinName;
+                        Store.SaveSettings();
+                        LoadCharacters();
+                        Js($"init({ManifestJson}); refreshLook({Q(skinId)})");
                     }
                     break;
                 case "rename":

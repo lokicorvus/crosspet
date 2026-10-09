@@ -112,29 +112,60 @@ namespace CrossPet
         }
 
         /// <summary>扫描 characters/&lt;id&gt;/：character.json + 立绘；和 macOS 版 loadCharacters 一样的规则</summary>
+        // 皮肤（另一套衣服）：character.json 里写 "skinOf": "<角色>"，不单独算角色；选了它，那个角色就用这套立绘，台词、动作逻辑照旧
+        public static Dictionary<string, List<(string id, string name)>> SkinChoices = new Dictionary<string, List<(string, string)>>();
+        public static Dictionary<string, string> BaseOutfit = new Dictionary<string, string>();   // 原版衣服叫什么（outfit，比如「女仆装」）
+        public static Dictionary<string, object> Skins => Settings.TryGetValue("skins", out var v) && v is Dictionary<string, object> d ? d : null;
+
+        // 立绘：<文件名去掉 -2、-3> 是姿态名，idle-blink 是眨眼帧（照着 idle 本身画的）
+        static (Dictionary<string, List<string>> poses, string blink, string blinkBase) Sprites(string dir)
+        {
+            var id = Path.GetFileName(dir);
+            var poses = new Dictionary<string, List<string>>();
+            string blink = null, blinkBase = null;
+            foreach (var f in Directory.GetFiles(dir).Where(f => f.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                                                      .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
+            {
+                var stem = Path.GetFileNameWithoutExtension(f);
+                var url = $"https://{DataHost}/characters/{Uri.EscapeDataString(id)}/{Uri.EscapeDataString(Path.GetFileName(f))}";
+                if (stem == "idle-blink") { blink = url; continue; }
+                if (stem == "idle") blinkBase = url;
+                var pose = stem.Split('-')[0];
+                if (!poses.ContainsKey(pose)) poses[pose] = new List<string>();
+                poses[pose].Add(url);
+            }
+            return (poses, blink, blinkBase);
+        }
+
         public static Dictionary<string, object> Manifest()
         {
             var chars = new Dictionary<string, object>();
-            foreach (var dir in Directory.GetDirectories(Characters).OrderBy(d => d, StringComparer.Ordinal))
+            var dirs = Directory.GetDirectories(Characters).OrderBy(d => d, StringComparer.Ordinal).ToList();
+            SkinChoices = new Dictionary<string, List<(string, string)>>();
+            var skinSprites = new Dictionary<string, (Dictionary<string, List<string>>, string, string)>();
+            foreach (var dir in dirs)
             {
                 var info = ReadJson(Path.Combine(dir, "character.json"));
-                if (info == null) continue;
+                if (info == null || !(info.TryGetValue("skinOf", out var so) && so is string skinOf)) continue;
+                var sp = Sprites(dir);
+                if (!sp.poses.ContainsKey("idle")) continue;
+                var sid = Path.GetFileName(dir);
+                if (!SkinChoices.ContainsKey(skinOf)) SkinChoices[skinOf] = new List<(string, string)>();
+                SkinChoices[skinOf].Add((sid, info.TryGetValue("skinName", out var sn) && sn is string n ? n : sid));
+                skinSprites[sid] = sp;
+            }
+            foreach (var dir in dirs)
+            {
+                var info = ReadJson(Path.Combine(dir, "character.json"));
+                if (info == null || info.ContainsKey("skinOf")) continue;
                 var id = Path.GetFileName(dir);
-                var poses = new Dictionary<string, List<string>>();
-                string blink = null, blinkBase = null;
-                foreach (var f in Directory.GetFiles(dir).Where(f => f.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                                                          .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
-                {
-                    var stem = Path.GetFileNameWithoutExtension(f);
-                    var url = $"https://{DataHost}/characters/{Uri.EscapeDataString(id)}/{Uri.EscapeDataString(Path.GetFileName(f))}";
-                    if (stem == "idle-blink") { blink = url; continue; }
-                    if (stem == "idle") blinkBase = url;
-                    var pose = stem.Split('-')[0];
-                    if (!poses.ContainsKey(pose)) poses[pose] = new List<string>();
-                    poses[pose].Add(url);
-                }
+                var (poses, blink, blinkBase) = Sprites(dir);
+                if (Skins != null && Skins.TryGetValue(id, out var chosen) && chosen is string skin && skinSprites.TryGetValue(skin, out var alt)
+                    && SkinChoices.TryGetValue(id, out var list) && list.Any(x => x.id == skin))
+                    (poses, blink, blinkBase) = alt;
                 var egg = info.TryGetValue("egg", out var e) && e is bool b && b;
                 if (egg ? !poses.ContainsKey("pop") : !(poses.ContainsKey("idle") || poses.ContainsKey("default"))) continue;
+                if (!egg) BaseOutfit[id] = info.TryGetValue("outfit", out var o) ? o as string : null;
                 if (!egg && Names.TryGetValue(id, out var custom) && custom is string s && s.Trim() != "") info["name"] = s.Trim();
                 info["poses"] = poses; info["blink"] = blink; info["blinkBase"] = blinkBase;
                 chars[id] = info;
