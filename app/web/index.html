@@ -277,7 +277,7 @@ let farewellLine = null
 // 从菜单退出：挥手道别（没画 bye 立绘的先用 happy），最后一秒转身走开。
 // line 为空时说一句她自己的道别台词；ms 是外壳多久之后退出
 function farewell(line, ms = 2000) {
-  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
+  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); clearTimeout(m.chatter); clearTimeout(m.sayTimer); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
   if (!egg) {
     clearTimeout(thinkTimer); clearTimeout(stuckTimer); updatingNow = false
     show('bye', true)
@@ -351,7 +351,7 @@ function greetDue(id) {
 function setCharacter(id, quiet) {
   if (egg) { clearEggTimers(); egg = null; charId = null }
   if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
-  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
+  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); clearTimeout(m.chatter); clearTimeout(m.sayTimer); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
   setTimeout(refreshMulti, 700)   // 换过去的角色如果也有好几个对话在干活，接着演
   setTimeout(preloadEdges, 900)
   const stage = $('stage')
@@ -674,8 +674,19 @@ function startMulti() {
   multi = { side: 'left', cards: new Map(), order: [], busy: 0, asking: false }
   $('fx').classList.add('hide')
   multi.flipTimer = setInterval(() => { if (multi && !multi.asking) { multi.side = multi.side === 'left' ? 'right' : 'left'; multiPose() } }, SESSION_FLIP)
+  chatterLater()
 }
 // 多会话的台词：刚手忙脚乱时、升级成太忙时、有对话开始等你回答时各说一句（台词在 character.json 的 busy / swamped / asking），4 秒后收起
+// 一直忙着的时候（比如好几个 Codex 对话跑很久）：隔 35～55 秒再嘟囔一句，不然开头那句说完就一直不吭声
+function chatterLater() {
+  if (!multi) return
+  clearTimeout(multi.chatter)
+  multi.chatter = setTimeout(() => {
+    if (!multi) return
+    if (!multi.asking && $('bubble').classList.contains('hide')) multiSay(multi.busy >= 3 ? 'swamped' : 'busy')
+    chatterLater()
+  }, 35000 + Math.random() * 20000)
+}
 function multiSay(kind) {
   const line = pick(linesOf(kind) || [''])
   if (!line) return
@@ -697,7 +708,7 @@ function multiPose() {
 }
 function endMulti() {
   if (!multi) return
-  clearInterval(multi.flipTimer); clearTimeout(multi.recheck); clearTimeout(multi.sayTimer)
+  clearInterval(multi.flipTimer); clearTimeout(multi.recheck); clearTimeout(multi.sayTimer); clearTimeout(multi.chatter)
   for (const c of multi.cards.values()) { c.el.classList.remove('on'); setTimeout(() => c.el.remove(), 400) }
   $('more').classList.remove('on')
   multi = null
