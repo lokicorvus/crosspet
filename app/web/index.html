@@ -351,6 +351,7 @@ function setCharacter(id, quiet) {
   if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
   if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
   setTimeout(refreshMulti, 700)   // 换过去的角色如果也有好几个对话在干活，接着演
+  setTimeout(preloadEdges, 900)
   const stage = $('stage')
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   stage.classList.add('swap')
@@ -476,7 +477,9 @@ function notifyUpdate(tag) {
 // peek：鼠标移到露出来的那截上时换成探出来更多、好奇地看着你的那张（edge_*_peek），切口照样对齐屏幕边缘
 function setTucked(side, peek = false) {
   if (side === tucked && !!peek === tuckedPeek) return
-  const was = tucked
+  const was = tucked, edge = side || was
+  preloadEdges()
+  const before = shownRect()
   tucked = side; tuckedPeek = !!side && !!peek
   const cl = document.documentElement.classList
   cl.toggle('tucked', !!side)
@@ -485,6 +488,33 @@ function setTucked(side, peek = false) {
   clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer)
   if (side) { say(''); setPose(`edge_${side}${tuckedPeek ? '_peek' : ''}`, true) }
   else if (was) { pose = null; show(restPose(), true) }
+  slideFrom(before, edge)
+}
+// 换图前后她的位置不一样（贴着窗口边 ↔ 窗口中间）：先把舞台挪回原来的位置，再 0.3 秒滑过去，不要一下子跳
+// （不用 requestAnimationFrame：窗口在后台、刚从全屏回来时它可能不触发）
+function slideFrom(before, edge) {
+  const stage = $('stage'), img = active
+  const run = () => {
+    const after = shownRect()
+    if (!before || !after) return
+    const dx = edge === 'right' ? (before.left + before.width) - (after.left + after.width) : before.left - after.left
+    if (Math.abs(dx) < 2) return
+    stage.style.transition = 'none'
+    stage.style.transform = `translateX(${dx}px)`
+    void stage.offsetWidth
+    stage.style.transition = 'transform .3s ease-out'
+    stage.style.transform = ''
+    setTimeout(() => { stage.style.transition = '' }, 350)
+  }
+  if (img.complete && img.naturalWidth) run()   // 新图已经解码好（预加载过）：马上量
+  else img.addEventListener('load', run, { once: true })
+}
+// 贴边、探出来、待机的图先载入好：换图时不会有一两帧空白（闪一下）
+let preloaded = null
+function preloadEdges() {
+  if (preloaded === charId) return
+  preloaded = charId
+  for (const p of ['edge_left', 'edge_right', 'edge_left_peek', 'edge_right_peek', 'idle', 'tired']) for (const u of framesFor(p)) { const i = new Image(); i.src = u }
 }
 // 正在显示的立绘实际画出来的范围（object-fit: contain，按 object-position 对齐）
 function shownRect() {

@@ -418,7 +418,7 @@ namespace CrossPet
         // 拖离边缘就不贴了。另一块屏幕接在这边时不算边缘。坐标都是物理像素
         string dock;                 // "left" / "right"
         bool dockOut, dockHover;
-        DateTime? dockLeaveAt;
+        DateTime? dockLeaveAt, dockEnterAt;
         DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
         static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
@@ -484,6 +484,7 @@ namespace CrossPet
         {
             var side = dock;
             if (side == null || hwnd == IntPtr.Zero) return;
+            hit?.Children.Clear(); lastHitRects = null;   // 换了样子，可点区域重新量（旧的范围会让她误以为鼠标在身上，来回闪）
             Native.GetWindowRect(hwnd, out var r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top;
             var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
@@ -527,8 +528,16 @@ namespace CrossPet
         {
             if (dock == null || dockOut || hwnd == IntPtr.Zero) return;
             bool inside = hit != null && hit.IsMouseOver;   // 只算露出来的那截（能点的区域），窗口其余是透明的
-            if (inside) { dockLeaveAt = null; if (!dockHover) { dockHover = true; ApplyDock(); } }
-            else if (dockHover)
+            if (inside)
+            {
+                dockLeaveAt = null;
+                if (dockHover) return;
+                if (dockEnterAt == null) dockEnterAt = DateTime.UtcNow;   // 停一小会儿才探出来，路过不算
+                else if ((DateTime.UtcNow - dockEnterAt.Value).TotalSeconds > 0.12) { dockEnterAt = null; dockHover = true; ApplyDock(); }
+                return;
+            }
+            dockEnterAt = null;
+            if (dockHover)
             {
                 if (dockLeaveAt == null) dockLeaveAt = DateTime.UtcNow;
                 else if ((DateTime.UtcNow - dockLeaveAt.Value).TotalSeconds > 0.6) { dockHover = false; dockLeaveAt = null; ApplyDock(); }

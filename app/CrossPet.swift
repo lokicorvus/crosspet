@@ -950,6 +950,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
     func applyDock() {
         guard let side = dock, let screen = panel.screen ?? NSScreen.main else { return }
+        hitRects = []; hitRectsAt = .distantPast   // 换了样子，可点区域重新量（旧的范围会让她误以为鼠标在身上，来回闪）
         let vf = screen.visibleFrame
         var f = panel.frame
         f.origin.y = min(max(f.origin.y, vf.minY - f.height * 0.15), vf.maxY - f.height)
@@ -990,10 +991,18 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
     }
     /// 缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去
+    var dockEnterAt: Date?
     func updateDockHover(_ inside: Bool) {
         guard dock != nil, !dockOut else { return }
-        if inside { dockLeaveAt = nil; if !dockHover { dockHover = true; applyDock() } }
-        else if dockHover {
+        if inside {
+            dockLeaveAt = nil
+            guard !dockHover else { return }
+            if dockEnterAt == nil { dockEnterAt = Date() }   // 停一小会儿才探出来，路过不算
+            else if Date().timeIntervalSince(dockEnterAt!) > 0.12 { dockEnterAt = nil; dockHover = true; applyDock() }
+            return
+        }
+        dockEnterAt = nil
+        if dockHover {
             if dockLeaveAt == nil { dockLeaveAt = Date() }
             else if Date().timeIntervalSince(dockLeaveAt!) > 0.6 { dockHover = false; dockLeaveAt = nil; applyDock() }
         }
