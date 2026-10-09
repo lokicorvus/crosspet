@@ -523,9 +523,7 @@ namespace CrossPet
         void UpdateDockHover()
         {
             if (dock == null || dockOut || hwnd == IntPtr.Zero) return;
-            Native.GetWindowRect(hwnd, out var r);
-            var p = Forms.Cursor.Position;
-            bool inside = p.X >= r.Left && p.X < r.Right && p.Y >= r.Top && p.Y < r.Bottom;
+            bool inside = hit != null && hit.IsMouseOver;   // 只算露出来的那截（能点的区域），窗口其余是透明的
             if (inside) { dockLeaveAt = null; if (!dockHover) { dockHover = true; ApplyDock(); } }
             else if (dockHover)
             {

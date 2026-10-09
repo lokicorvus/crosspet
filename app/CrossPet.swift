@@ -987,9 +987,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
     }
     /// 缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去
-    func updateDockHover(_ mouse: NSPoint) {
+    func updateDockHover(_ inside: Bool) {
         guard dock != nil, !dockOut else { return }
-        let inside = panel.frame.contains(mouse)
         if inside { dockLeaveAt = nil; if !dockHover { dockHover = true; applyDock() } }
         else if dockHover {
             if dockLeaveAt == nil { dockLeaveAt = Date() }
@@ -1004,8 +1003,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func updateClickThrough() {
         let p = NSEvent.mouseLocation, f = panel.frame
-        updateDockHover(p)
-        guard f.contains(p) else { return }
+        guard f.contains(p) else { updateDockHover(false); return }
         if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
         if Date().timeIntervalSince(hitRectsAt) > 0.25 {
             hitRectsAt = Date()
@@ -1019,6 +1017,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let point = CGPoint(x: (p.x - f.minX) / zoom, y: (f.maxY - p.y) / zoom)
         let over = hitRects.isEmpty || hitRects.contains { $0.contains(point) }
         if panel.ignoresMouseEvents == over { panel.ignoresMouseEvents = !over }
+        updateDockHover(over && !hitRects.isEmpty)   // 缩着时鼠标在露出来的那截上：探出来
     }
 
     /// 降到普通层级后还排在所有普通窗口最前面、压在你正在用的窗口上：挪到前台程序最前面那个窗口的后面

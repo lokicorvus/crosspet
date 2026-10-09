@@ -50,6 +50,14 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #more.on { opacity: 1; }
 /* 贴边：缩在屏幕边上时只露半个身子（扒着边缘的立绘，没画时用平常的），额度、名牌、气泡、特效都藏起来 */
 html.tucked #bubble, html.tucked #caption, html.tucked #quota, html.tucked #fx, html.tucked #cards, html.tucked #aura, html.tucked #shadow { visibility: hidden; }
+/* 有贴边立绘时：立绘贴着窗口那条边放，切口就是窗口的边、也就是屏幕边缘。贴边 / 探出来两张换图时窗口不用动，原地淡入淡出 */
+html.tucked-art.tucked-left #wrap { align-items: flex-start; }
+html.tucked-art.tucked-right #wrap { align-items: flex-end; }
+html.tucked-art #body { left: 0; width: 100%; }
+html.tucked-art #body img { left: 0; width: 100%; }
+html.tucked-art.tucked-left #body img { object-position: 0% 100%; }
+html.tucked-art.tucked-right #body img { object-position: 100% 100%; }
+html.tucked-art #body { animation: none !important; transform: none !important; }
 #fx.hide { opacity: 0; }
 #fx svg { width: 100%; height: 100%; overflow: visible; }
 #poof { position: absolute; left: 50%; top: 55%; width: 0; height: 0; pointer-events: none; }
@@ -241,6 +249,10 @@ function setAuraMode(mode) {
 // 点到后面的窗口（窗口比桌宠大，是给动作、气泡留的空间）
 function hitRects() {
   const out = []
+  if (tucked) {   // 缩在边上：只有露出来的那截能点 / 能让她探出来
+    const b = shownRect()
+    return JSON.stringify(b ? [[b.left - 4, b.top - 4, b.width + 8, b.height + 8].map(Math.round)] : [])
+  }
   for (const id of ['body', 'bubble', 'caption', 'quota']) {
     const el = $(id)
     if (!el || (id === 'bubble' && el.classList.contains('hide'))) continue
@@ -466,17 +478,27 @@ function setTucked(side, peek = false) {
   if (side === tucked && !!peek === tuckedPeek) return
   const was = tucked
   tucked = side; tuckedPeek = !!side && !!peek
-  document.documentElement.classList.toggle('tucked', !!side)
+  const cl = document.documentElement.classList
+  cl.toggle('tucked', !!side)
+  cl.toggle('tucked-left', side === 'left'); cl.toggle('tucked-right', side === 'right')
+  cl.toggle('tucked-art', !!side && !!char()?.poses?.[`edge_${side}`])
   clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer)
   if (side) { say(''); setPose(`edge_${side}${tuckedPeek ? '_peek' : ''}`, true) }
   else if (was) { pose = null; show(restPose(), true) }
 }
-function dockCut(side) {
+// 正在显示的立绘实际画出来的范围（object-fit: contain，按 object-position 对齐）
+function shownRect() {
   const img = active, r = img.getBoundingClientRect(), nw = img.naturalWidth, nh = img.naturalHeight
   if (!nw || !nh) return null
-  const scale = Math.min(r.width / nw, r.height / nh), w = nw * scale, left = r.left + (r.width - w) / 2
-  if (!char()?.poses?.[`edge_${side}`]) return Math.round(left + w / 2)
-  return Math.round(side === 'left' ? left : left + w)
+  const scale = Math.min(r.width / nw, r.height / nh), w = nw * scale, h = nh * scale
+  const px = parseFloat(getComputedStyle(img).objectPosition) / 100
+  return { left: r.left + (r.width - w) * (isNaN(px) ? 0.5 : px), top: r.bottom - h, width: w, height: h }
+}
+function dockCut(side) {
+  const b = shownRect()
+  if (!b) return null
+  if (!char()?.poses?.[`edge_${side}`]) return Math.round(b.left + b.width / 2)
+  return Math.round(side === 'left' ? b.left : b.left + b.width)
 }
 
 // 刚更新完重新打开：开心一下告诉你现在是新版本（等登场招呼演完再说）
