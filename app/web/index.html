@@ -489,6 +489,16 @@ function setTucked(side, peek = false) {
   if (side) { say(''); setPose(`edge_${side}${tuckedPeek ? '_peek' : ''}`, true) }
   else if (was) { pose = null; show(restPose(), true) }
   slideFrom(before, edge)
+  if (!!side !== !!was) repaintSoon()
+}
+// 透明窗口里藏起额度、名牌时，WebKit 偶尔少擦一行像素（页面有缩放时重绘范围取整），留下一条横线：
+// 过渡结束后让整页重新画一遍（切到独立图层再切回来）
+function repaintSoon() {
+  setTimeout(() => {
+    const b = document.body
+    b.style.transform = 'translateZ(0)'
+    setTimeout(() => { b.style.transform = '' }, 60)
+  }, 450)
 }
 // 换图前后她的位置不一样（贴着窗口边 ↔ 窗口中间）：先把舞台挪回原来的位置，再 0.3 秒滑过去，不要一下子跳
 // （不用 requestAnimationFrame：窗口在后台、刚从全屏回来时它可能不触发）
