@@ -740,6 +740,7 @@ namespace CrossPet
             ("gemini", "Gemini CLI", null),
             ("workbuddy", "WorkBuddy", "按当前模型换角色，没有对应角色的模型由当前角色来演"),
             ("zcode", "ZCode（智谱）", "按会话的模型换角色，GLM 角色没装时由当前角色来演"),
+            ("hermes", "Hermes Agent", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
         };
 
         public Dictionary<string, object> SettingsState()

@@ -4,7 +4,7 @@
 用法（在各 AI 的钩子配置里）：
     python3 crosspet-hook.py <角色id>          # 角色id：claude / gpt / deepseek / gemini
     python3 crosspet-hook.py <角色id> <事件名>  # 事件 JSON 里不带事件名的（Antigravity）
-    python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode）：按模型选角色
+    python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode、Hermes Agent）：按模型选角色
     python3 crosspet-hook.py --ensure           # 只确保桌宠在跑（没开着就打开；用户手动退出过或关了这个功能就不管）
 钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
 
@@ -208,10 +208,10 @@ if character == "gpt":
     except (OSError, ValueError):
         pass
 
-# 多模型宿主（WorkBuddy）：每条事件都带当前模型名，按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent）：每条事件都带当前模型名，按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode")
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes")
 # ZCode 默认用智谱的 GLM；它只在会话开始时告诉模型名，之后的事件按会话 id 查当时记下的模型
 HOST_DEFAULT_MODEL = {"zcode": "glm"}
 characters_dir = (default_data if os.name == "nt" else Path.home() / "Library/Application Support/CrossPet") / "characters"
@@ -300,7 +300,7 @@ ANTIGRAVITY_IGNORE = ("task_boundary", "notify_user", "planner_response", "ask_q
 
 # AI 停下来问你问题、让你选选项的工具：Claude Code 的 AskUserQuestion、Codex 的 request_user_input、
 # DeepSeek Harness 的 ask_user_question 等
-ASKING_TOOLS = ("askuserquestion", "request_user_input", "ask_user_question", "ask_user", "ask_question")
+ASKING_TOOLS = ("askuserquestion", "request_user_input", "ask_user_question", "ask_user", "ask_question", "clarify")
 # Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI、WorkBuddy）；idle_prompt 是一轮做完后闲着，不算
 ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission", "agent_needs_input")
 
@@ -309,8 +309,11 @@ def pose_for_tool(t: str) -> str:
     if t in ASKING_TOOLS:
         return "asking"
     # 画图：Codex 内置 image_gen 工具，或用脚本 image_gen.py 生成
-    if any(k in t for k in ("image_gen", "imagegen", "generate_image", "draw", "paint")) or "image_gen" in tool_input:
+    if any(k in t for k in ("image_gen", "imagegen", "generate_image", "video_gen", "draw", "paint")) or "image_gen" in tool_input:
         return "drawing"
+    # Hermes Agent：在本地找文件 / 翻历史会话 / 看终端输出 / 看图，都算看资料（名字里带 search，别当成上网搜）
+    if t in ("search_files", "session_search", "read_terminal", "vision_analyze"):
+        return "reading"
     if "view_image" in t or t == "find_by_name":
         return "reading"
     if t in ("read_url_content",) or t.startswith("browser"):

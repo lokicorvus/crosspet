@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
     python3 tools/integrate.py status
 
 原则：
@@ -514,7 +514,102 @@ def has_antigravity() -> bool:
         return False
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode}
+# ---- Hermes Agent（Nous Research）----
+# 用 Hermes 的 Python 插件（不是 config.yaml 里的 shell 钩子：那个每条命令第一次都要你点同意，网关里还不生效）。
+# 插件放在 <HERMES_HOME>/plugins/crosspet/，要写进 config.yaml 的 plugins.enabled 才会加载：
+# 有 hermes 命令就用 `hermes plugins enable crosspet`，没有就小心地改文本（看不懂的写法不动，提示你手动开）
+HERMES_HOME = Path(os.environ.get("HERMES_HOME") or (str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "hermes") if os.name == "nt" else str(HOME / ".hermes")))
+HERMES_PLUGIN = HERMES_HOME / "plugins/crosspet"
+HERMES_CONFIG = HERMES_HOME / "config.yaml"
+
+
+def hermes_cli():
+    for c in (shutil.which("hermes"), HOME / ".local/bin/hermes", HERMES_HOME / "hermes-agent/venv/bin/hermes",
+              HERMES_HOME / "hermes-agent/venv/Scripts/hermes.exe"):
+        if c and Path(c).exists():
+            return str(c)
+    return None
+
+
+def hermes_enabled_edit(enable: bool) -> bool:
+    """在 config.yaml 的 plugins.enabled 里加上 / 去掉 crosspet。只认常见写法，认不出返回 False"""
+    text = HERMES_CONFIG.read_text(encoding="utf-8") if HERMES_CONFIG.exists() else ""
+    lines = [("plugins:" if re.match(r"^plugins:\s*\{\s*\}\s*$", l) else l) for l in text.splitlines()]   # plugins: {} 当成空的一段
+    top = next((i for i, l in enumerate(lines) if re.match(r"^plugins:\s*(#.*)?$", l)), None)
+    if top is None:
+        if re.search(r"^plugins:", text, re.M):
+            return False   # plugins: 后面跟着行内写法，不碰
+        if enable:
+            lines += ["plugins:", "  enabled:", "    - crosspet"]
+    else:
+        end = next((i for i in range(top + 1, len(lines)) if lines[i].strip() and not lines[i].startswith((" ", "\t", "#"))), len(lines))
+        en = next((i for i in range(top + 1, end) if re.match(r"^\s+enabled:", lines[i])), None)
+        if en is None:
+            if enable:
+                lines[top + 1:top + 1] = ["  enabled:", "    - crosspet"]
+        else:
+            m = re.match(r"^(\s+)enabled:\s*(.*?)\s*(#.*)?$", lines[en])
+            rest = m.group(2)
+            if rest in ("", "[]"):
+                items_end = next((i for i in range(en + 1, end) if lines[i].strip() and not re.match(r"^\s+-\s", lines[i])), end)
+                items = [i for i in range(en + 1, items_end) if re.match(r"^\s+-\s*['\"]?crosspet['\"]?\s*$", lines[i])]
+                if enable and not items:
+                    indent = re.match(r"^(\s*)", lines[en + 1]).group(1) if en + 1 < items_end else m.group(1) + "  "
+                    lines[en] = f"{m.group(1)}enabled:"
+                    lines.insert(en + 1, f"{indent}- crosspet")
+                if not enable and items:
+                    for i in reversed(items):
+                        del lines[i]
+                    if not any(re.match(r"^\s+-\s", lines[i]) for i in range(en + 1, min(items_end - len(items), len(lines)))):
+                        lines[en] = f"{m.group(1)}enabled: []"   # 删空了：写成空列表
+            else:
+                return False   # enabled: [a, b] 这类行内写法，不碰
+    new = "\n".join(lines) + "\n"
+    if new != (text if text.endswith("\n") else text + "\n"):
+        backup(HERMES_CONFIG)
+        HERMES_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+        HERMES_CONFIG.write_text(new, encoding="utf-8")
+    return True
+
+
+def hermes(install: bool) -> None:
+    if install and not found(HERMES_HOME, "Hermes Agent"):
+        return
+    cli = hermes_cli()
+    if install:
+        if os.name == "nt":
+            SUPPORT.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+        if HERMES_PLUGIN.exists():
+            shutil.rmtree(HERMES_PLUGIN)
+        shutil.copytree(REPO / "integrations/hermes/crosspet", HERMES_PLUGIN, ignore=shutil.ignore_patterns("__pycache__"))
+        save_json(HERMES_PLUGIN / "crosspet.json", {"hook": str(SUPPORT / MARK)})
+        print(f"  已装插件到 {HERMES_PLUGIN}")
+    ok = False
+    if cli:
+        import subprocess
+        try:
+            r = subprocess.run([cli, "plugins", "enable" if install else "disable", "crosspet"], capture_output=True, text=True, timeout=60)
+            ok = r.returncode == 0
+        except Exception:
+            ok = False
+    if not ok:
+        ok = hermes_enabled_edit(install)
+    if not install and HERMES_PLUGIN.exists():
+        shutil.rmtree(HERMES_PLUGIN)
+        print(f"  已删除 {HERMES_PLUGIN}")
+    if install:
+        if ok:
+            print(f"  已在 {HERMES_CONFIG} 里启用插件 crosspet → 新开的 Hermes 会话生效；按当前模型换角色，没有对应角色的模型由当前角色来演")
+        else:
+            print("  ！没能自动启用插件，请运行一次：hermes plugins enable crosspet")
+
+
+def has_hermes() -> bool:
+    return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes}
 
 
 def has_hooks(p: Path) -> bool:
@@ -537,6 +632,7 @@ def installed() -> list:
     if has_antigravity() and (ANTIGRAVITY_HOOKS.parent.parent / "antigravity").is_dir(): result.append("antigravity")
     if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()): result.append("workbuddy")
     if has_zcode() and found(ZCODE_HOME, "", ("cli",), quiet=True): result.append("zcode")
+    if has_hermes(): result.append("hermes")
     return result
 
 
@@ -550,6 +646,7 @@ def status() -> None:
     print("Antigravity         :", "已接入" if has_antigravity() else "未接入")
     print("WorkBuddy           :", "已接入" if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()) else "未接入")
     print("ZCode               :", "已接入" if has_zcode() else "未接入")
+    print("Hermes Agent        :", "已接入" if has_hermes() else "未接入")
 
 
 if __name__ == "__main__":

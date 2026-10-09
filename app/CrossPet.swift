@@ -1267,6 +1267,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         ("gemini", "Gemini CLI", "Gemini 桌面 App 没有接口"),
         ("workbuddy", "WorkBuddy", "按当前模型换角色"),
         ("zcode", "ZCode（智谱）", "按会话的模型换角色"),
+        ("hermes", "Hermes Agent", "按当前模型换角色；新开的会话生效"),
     ]
     var integrated: [String]?
     var integrateScript: URL? {
