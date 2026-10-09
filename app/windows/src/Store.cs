@@ -143,6 +143,7 @@ namespace CrossPet
             var dirs = Directory.GetDirectories(Characters).OrderBy(d => d, StringComparer.Ordinal).ToList();
             SkinChoices = new Dictionary<string, List<(string, string)>>();
             var skinSprites = new Dictionary<string, (Dictionary<string, List<string>>, string, string)>();
+            var skinInfo = new Dictionary<string, Dictionary<string, object>>();
             foreach (var dir in dirs)
             {
                 var info = ReadJson(Path.Combine(dir, "character.json"));
@@ -153,6 +154,7 @@ namespace CrossPet
                 if (!SkinChoices.ContainsKey(skinOf)) SkinChoices[skinOf] = new List<(string, string)>();
                 SkinChoices[skinOf].Add((sid, info.TryGetValue("skinName", out var sn) && sn is string n ? n : sid));
                 skinSprites[sid] = sp;
+                skinInfo[sid] = info;
             }
             foreach (var dir in dirs)
             {
@@ -162,7 +164,18 @@ namespace CrossPet
                 var (poses, blink, blinkBase) = Sprites(dir);
                 if (Skins != null && Skins.TryGetValue(id, out var chosen) && chosen is string skin && skinSprites.TryGetValue(skin, out var alt)
                     && SkinChoices.TryGetValue(id, out var list) && list.Any(x => x.id == skin))
+                {
                     (poses, blink, blinkBase) = alt;
+                    info["skin"] = skin;   // 网页据此挑彩蛋（有的彩蛋只在穿某件衣服时出现）
+                    // 皮肤可以有自己的台词 / 登场招呼：写了的覆盖原版，没写的照旧
+                    if (skinInfo[skin].TryGetValue("lines", out var ol) && ol is Dictionary<string, object> own)
+                    {
+                        var lines = info.TryGetValue("lines", out var bl) && bl is Dictionary<string, object> b0 ? b0 : new Dictionary<string, object>();
+                        foreach (var kv2 in own) lines[kv2.Key] = kv2.Value;
+                        info["lines"] = lines;
+                    }
+                    if (skinInfo[skin].TryGetValue("greeting", out var g)) info["greeting"] = g;
+                }
                 var egg = info.TryGetValue("egg", out var e) && e is bool b && b;
                 if (egg ? !poses.ContainsKey("pop") : !(poses.ContainsKey("idle") || poses.ContainsKey("default"))) continue;
                 if (!egg) BaseOutfit[id] = info.TryGetValue("outfit", out var o) ? o as string : null;

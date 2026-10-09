@@ -354,6 +354,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // 皮肤（另一套衣服）：character.json 里写 "skinOf": "<角色>"，不单独算角色；选了它，那个角色就用这套立绘，台词、动作逻辑照旧
         skinChoices = [:]
         var skinSprites: [String: (poses: [String: [String]], blink: String?, blinkBase: String?)] = [:]
+        var skinInfo: [String: [String: Any]] = [:]
         for dir in dirs {
             guard let data = try? Data(contentsOf: dir.appendingPathComponent("character.json")),
                   let info = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -362,6 +363,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             guard sp.poses["idle"] != nil else { continue }
             skinChoices[base, default: []].append((dir.lastPathComponent, info["skinName"] as? String ?? dir.lastPathComponent))
             skinSprites[dir.lastPathComponent] = sp
+            skinInfo[dir.lastPathComponent] = info
         }
         let chosen = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
         for dir in dirs {
@@ -369,7 +371,17 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                   var info = try? JSONSerialization.jsonObject(with: data) as? [String: Any], info["skinOf"] == nil else { continue }
             let id = dir.lastPathComponent
             var sp = sprites(dir)
-            if let skin = chosen[id], let s = skinSprites[skin], skinChoices[id]?.contains(where: { $0.id == skin }) == true { sp = s }
+            if let skin = chosen[id], let s = skinSprites[skin], skinChoices[id]?.contains(where: { $0.id == skin }) == true {
+                sp = s
+                info["skin"] = skin   // 网页据此挑彩蛋（有的彩蛋只在穿某件衣服时出现）
+                // 皮肤可以有自己的台词 / 登场招呼：写了的覆盖原版，没写的照旧
+                if let own = skinInfo[skin]?["lines"] as? [String: Any] {
+                    var lines = info["lines"] as? [String: Any] ?? [:]
+                    for (k, v) in own { lines[k] = v }
+                    info["lines"] = lines
+                }
+                if let g = skinInfo[skin]?["greeting"] { info["greeting"] = g }
+            }
             let (poses, blink, blinkBase) = sp
             let isEgg = info["egg"] as? Bool == true  // 彩蛋角色：不进菜单、不绑应用
             guard isEgg ? poses["pop"] != nil : (poses["idle"] != nil || poses["default"] != nil) else { continue }

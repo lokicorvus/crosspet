@@ -871,8 +871,11 @@ const EGG_CHANCE_PER_MIN = 1 / 40   // 闲着时每分钟的触发概率，约�
 const EGG_CLICK_CHANCE = 0.03       // 点她时也有一点点概率触发
 let egg = null  // 正在演：{ host, timers, waiting }
 
+// 来拜访这个角色的彩蛋；写了 hostSkin 的只在她穿那件衣服（皮肤）时出现。有好几个就随机挑一个
 function eggFor(host) {
-  return Object.entries(manifest.characters).find(([, c]) => c.egg && c.host === host)?.[0]
+  const skin = manifest.characters[host]?.skin || ''
+  const ids = Object.entries(manifest.characters).filter(([, c]) => c.egg && c.host === host && (!c.hostSkin || c.hostSkin === skin)).map(([k]) => k)
+  return ids.length ? pick(ids) : undefined
 }
 function clearEggTimers() { egg?.timers.forEach(t => { clearTimeout(t); clearInterval(t) }); if (egg) egg.timers = [] }
 function poof(then) {
