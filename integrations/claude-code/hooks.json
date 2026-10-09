@@ -79,6 +79,17 @@
         ]
       }
     ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-hook.py\" claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt|elicitation_dialog",

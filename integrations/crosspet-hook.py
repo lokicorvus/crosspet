@@ -405,7 +405,13 @@ elif name in ("Interrupt",):
 elif name in ("PreCompact", "PreCompress"):
     pose = "compact"  # 压缩上下文：把一大堆东西往小箱子里塞
 elif name in ("PostCompact",):
-    pose = "thinking"
+    if str(event.get("trigger", "")).lower() == "manual":
+        # 手动 /compact：压完这一轮就结束了，后面不会再有 Stop
+        pose = "happy"
+        name = "Stop"
+        set_turn_tools(0)
+    else:
+        pose = "thinking"  # 自动压缩发生在一轮中途，压完接着干活
 elif name in ("SubagentStart",):
     pose = "delegating"
 elif name in ("SubagentStop",):

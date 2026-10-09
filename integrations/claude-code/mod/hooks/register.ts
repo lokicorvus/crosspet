@@ -161,7 +161,10 @@ export const register: Register = on => {
     const shown = (e.trigger === 'manual' || e.trigger === 'auto') && !e.agentId
     if (shown) await setState($, { pose: 'compact', event: 'PreCompact', tool: '', ts: Date.now() / 1000 })
     const r = await next(e)
-    if (shown) await setState($, { pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 })
+    // 自动压缩发生在一轮中途，压完接着干活；手动 /compact 压完这一轮就结束了，后面不会再有 Stop，得自己收尾
+    if (shown) await setState($, e.trigger === 'manual'
+      ? { pose: 'happy', event: 'Stop', tool: '', ts: Date.now() / 1000 }
+      : { pose: 'thinking', event: 'PostCompact', tool: '', ts: Date.now() / 1000 })
     return r
   })
 
