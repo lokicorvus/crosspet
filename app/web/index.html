@@ -558,6 +558,7 @@ function refreshMulti() {
     }
     c.el.style.left = slots[i][0] + 'px'; c.el.style.top = slots[i][1] + 'px'
     c.side = i % 2 ? 'right' : 'left'
+    flipCard(c)
     c.el.classList.toggle('done', kind === 'done')
     c.el.classList.toggle('ask', kind === 'ask')
     const bad = kind === 'error' || e.pose === 'oops'
@@ -584,10 +585,19 @@ function setCardPose(c, p) {
   const svg = c.el.querySelector('svg')
   svg.setAttribute('viewBox', `0 0 ${CrossFx.CW} ${CrossFx.CH}`)
   svg.innerHTML = CrossFx.cardProp(p)
-  try {   // 只留道具本身：按它实际占的范围裁
+  try {   // 只留道具本身：按它实际占的范围裁。沿路径移动的小东西（画画的笔刷）原点在画布角上，量的时候先藏起来
+    const moving = [...svg.querySelectorAll('animateMotion')].map(a => a.parentNode)
+    moving.forEach(n => n.setAttribute('display', 'none'))
     const b = svg.getBBox(), pad = 8
+    moving.forEach(n => n.removeAttribute('display'))
     if (b.width > 0) svg.setAttribute('viewBox', `${b.x - pad} ${b.y - pad} ${b.width + pad * 2} ${b.height + pad * 2}`)
   } catch {}
+  flipCard(c)
+}
+// 思考云是画在她右上方的，小尾巴朝左下指向她：卡片在她左边时左右翻过来，小尾巴才朝着她（有字的卡片不翻）
+function flipCard(c) {
+  const cloud = c.pose && CrossFx.cardProp(c.pose) === CrossFx.cardProp('thinking')
+  c.el.querySelector('svg').style.transform = cloud && c.side === 'left' ? 'scaleX(-1)' : ''
 }
 function startMulti() {
   clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(stuckTimer)
