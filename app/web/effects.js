@@ -397,13 +397,29 @@ const priceTag = (up) => {
   // 画的时候按小尺寸算，整体放大到和其他小窗差不多大，右上角对齐
   return `<g transform="translate(${x} ${y}) scale(1.45) translate(${-x} ${-y}) translate(-40 -8)">${tag}${arrow}</g>`
 }
-// 红温：头顶两侧一团团白蒸汽往上冒
-const puff = (x, y, begin) => `<g opacity="0"><circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${INK}" stroke-width="2.5"/><circle cx="${x + 13}" cy="${y - 6}" r="10" fill="#fff" stroke="${INK}" stroke-width="2.5"/>` +
-  `<circle cx="${x - 11}" cy="${y - 5}" r="8" fill="#fff" stroke="${INK}" stroke-width="2.5"/>${fadeLoop('1.4s', begin)}` +
-  `<animateTransform attributeName="transform" type="translate" values="0 10;0 -34" dur="1.4s" begin="${begin}" ${loop}/></g>`
-const angerSteam = puff(196, 118, '0s') + puff(384, 112, '0.5s') + puff(178, 150, '0.9s') + puff(402, 146, '0.3s')
-// 鼓脸：只有一小团
-const angerPuff = puff(392, 120, '0s')
+// 红温：蒸汽从头顶两侧「噗」地斜着喷出去，边冲边胀大再淡掉，左右交替；头的右上方一个「💢」一鼓一鼓地跳
+// 蓬松的云团：先画一圈带描边的圆，再在上面叠一层不带描边的白，几个圆连成一朵没有内部线条的云
+const cloudBlob = (r) => {
+  const parts = [[0, 0, r], [r * 0.8, -r * 0.35, r * 0.75], [-r * 0.8, -r * 0.3, r * 0.7], [r * 0.15, -r * 0.75, r * 0.65]]
+  return parts.map(([x, y, rr]) => `<circle cx="${x}" cy="${y}" r="${rr + 2.5}" fill="#b8b0a6"/>`).join('') +   // 浅灰描边：看起来才是白蒸汽，不是黑点
+    parts.map(([x, y, rr]) => `<circle cx="${x}" cy="${y}" r="${rr - 1}" fill="#fff"/>`).join('')
+}
+const burst = (x, y, dx, dy, r, begin, dur = '1.1s') =>
+  `<g opacity="0"><g>${cloudBlob(r)}</g>` +
+  `<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.12;0.55;1" dur="${dur}" begin="${begin}" ${loop}/>` +
+  `<animateTransform attributeName="transform" type="translate" values="${x} ${y};${x + dx} ${y + dy}" keySplines="0.2 0.8 0.3 1" calcMode="spline" keyTimes="0;1" dur="${dur}" begin="${begin}" ${loop}/>` +
+  `<animateTransform attributeName="transform" type="scale" additive="sum" values="0.5;1.6" dur="${dur}" begin="${begin}" ${loop}/></g>`
+// 「💢」：四道弯弧拼成的十字，红色，按心跳节奏一鼓一鼓
+const vein = (x, y, s, dur = '0.7s') => {
+  const arc = (rot) => `<path d="M6 -16 Q4 -6 14 -5" transform="rotate(${rot})" stroke="#e5483b" stroke-width="4.5" fill="none" stroke-linecap="round"/>`
+  return `<g transform="translate(${x} ${y})"><g>${[0, 90, 180, 270].map(arc).join('')}` +
+    `<animateTransform attributeName="transform" type="scale" values="${s};${s * 1.25};${s};${s * 1.1};${s}" keyTimes="0;0.15;0.35;0.5;1" dur="${dur}" ${loop}/></g></g>`
+}
+// 坐标：人物的头大约在 y 125～300，左右两侧大约在 x 180 / 400；蒸汽贴着头顶两侧喷出去
+const angerSteam = burst(212, 168, -110, -84, 26, '0s') + burst(368, 162, 112, -86, 27, '0.55s') +
+  burst(198, 200, -118, -40, 20, '0.3s') + burst(382, 196, 120, -42, 21, '0.85s') + vein(392, 150, 2.3)
+// 鼓脸：一侧偶尔喷一小团 + 小一点的「💢」
+const angerPuff = burst(366, 166, 90, -66, 19, '0s', '1.6s') + vein(390, 150, 1.6, '1.1s')
 // 被甩晕：头顶三颗小星星绕圈
 const dizzyStars = [0, 1, 2].map(i => `<g>${star(0, 0, 0.55, `${i * 0.1}s`, '#ffd54a', '2s')}` +
   `<animateMotion path="M290 92 m-70 0 a70 20 0 1 0 140 0 a70 20 0 1 0 -140 0" dur="1.6s" begin="-${(i * 1.6 / 3).toFixed(2)}s" ${loop}/></g>`).join('')
