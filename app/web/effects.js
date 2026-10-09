@@ -54,6 +54,8 @@ const AURA                                 = {
   idle: ['#ffd9b0', 0.35], listening: ['#ffb27a', 0.45], thinking: ['#9ec5ff', 0.45], reading: ['#ffe08a', 0.5],
   writing: ['#ffd38a', 0.45], running: ['#9be7b4', 0.45], searching: ['#a6e3ff', 0.45], delegating: ['#d7c4ff', 0.45],
   happy: ['#fff08a', 0.6], proud: ['#ffd54a', 0.6], oops: ['#ff9b9b', 0.5], surprised: ['#e8e2f0', 0.3],
+  annoyed: ['#ffc4b0', 0.4], puffed: ['#ff9f86', 0.5], redhot: ['#ff4a2a', 0.75], sulk: ['#bcc0d6', 0.35], dizzy: ['#d8cfff', 0.45],
+  coaxed: ['#ffc9de', 0.45], forgiven: ['#ffc9de', 0.55],
   pat: ['#ffb6c8', 0.6], sleeping: ['#7f8fd1', 0.45], tired: ['#c9c2b8', 0.45], hum: ['#ffd0e6', 0.45],
   stretch: ['#ffe0b8', 0.35], yawn: ['#d8d0f0', 0.4], drawing: ['#ffd6e8', 0.45],
   asking: ['#c9d4ff', 0.5], update: ['#ffe7a3', 0.55],
@@ -395,6 +397,16 @@ const priceTag = (up) => {
   // 画的时候按小尺寸算，整体放大到和其他小窗差不多大，右上角对齐
   return `<g transform="translate(${x} ${y}) scale(1.45) translate(${-x} ${-y}) translate(-40 -8)">${tag}${arrow}</g>`
 }
+// 红温：头顶两侧一团团白蒸汽往上冒
+const puff = (x, y, begin) => `<g opacity="0"><circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${INK}" stroke-width="2.5"/><circle cx="${x + 13}" cy="${y - 6}" r="10" fill="#fff" stroke="${INK}" stroke-width="2.5"/>` +
+  `<circle cx="${x - 11}" cy="${y - 5}" r="8" fill="#fff" stroke="${INK}" stroke-width="2.5"/>${fadeLoop('1.4s', begin)}` +
+  `<animateTransform attributeName="transform" type="translate" values="0 10;0 -34" dur="1.4s" begin="${begin}" ${loop}/></g>`
+const angerSteam = puff(196, 118, '0s') + puff(384, 112, '0.5s') + puff(178, 150, '0.9s') + puff(402, 146, '0.3s')
+// 鼓脸：只有一小团
+const angerPuff = puff(392, 120, '0s')
+// 被甩晕：头顶三颗小星星绕圈
+const dizzyStars = [0, 1, 2].map(i => `<g>${star(0, 0, 0.55, `${i * 0.1}s`, '#ffd54a', '2s')}` +
+  `<animateMotion path="M290 92 m-70 0 a70 20 0 1 0 140 0 a70 20 0 1 0 -140 0" dur="1.6s" begin="-${(i * 1.6 / 3).toFixed(2)}s" ${loop}/></g>`).join('')
 const named = { bubbles, steam, celebrate: fxCelebrate, victory: fxVictory, priceDown: priceTag(false), priceUp: priceTag(true) }
 
 // ---- 按时段 / 节日打招呼的环境特效 ----
@@ -560,6 +572,10 @@ const surroundings = (p      )         => {
     case 'stretch': return stretchGlow
     case 'yawn': return yawnBubble
     case 'drawing': return easelCard
+    case 'redhot': return angerSteam
+    case 'puffed': return angerPuff
+    case 'dizzy': return dizzyStars
+    case 'coaxed': case 'forgiven': return heart(440, 160, 1.4, '0s') + heart(110, 200, 1.1, '0.8s')
   }
   return GREET_FX[p]
 }

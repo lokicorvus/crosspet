@@ -90,6 +90,12 @@ html.no-name #caption { display: none; }
 .m-slow  { animation: bob-tiny 4.5s ease-in-out infinite; }
 .m-float { animation: float 4.2s ease-in-out infinite; }
 .m-shake { animation: shake 1.4s ease-in-out infinite; }
+/* 红温：浑身发抖、泛红光；被甩晕：东倒西歪 */
+.m-angry { animation: angry .14s linear infinite; }
+.m-angry img { filter: drop-shadow(0 0 7px rgba(255, 60, 30, .75)) saturate(1.15); }
+.m-dizzy { animation: dizzy 1.1s ease-in-out infinite; }
+@keyframes angry { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-1.2%, .4%); } 50% { transform: translate(1.2%, -.4%); } 75% { transform: translate(-.8%, -.3%); } }
+@keyframes dizzy { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
 .m-squish{ animation: squish 1.6s ease-in-out infinite; }
 .m-gift  { animation: gift .65s cubic-bezier(.3,1.6,.5,1) 1, bob-big 1.1s ease-in-out .65s infinite; }
 .m-jolt  { animation: jolt .55s cubic-bezier(.3,1.6,.5,1) 1, bob 3.2s ease-in-out .55s infinite; }
@@ -142,6 +148,8 @@ const MOTION = {
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
+  // 逗她 / 红温
+  annoyed: 'm-rock', puffed: 'm-jolt', redhot: 'm-angry', sulk: 'm-slow', dizzy: 'm-dizzy', coaxed: 'm-sway', forgiven: 'm-hop',
   // 按时段 / 节日打招呼
   greet_morning: 'm-hop', greet_noon: 'm-bob', greet_afternoon: 'm-sway', greet_evening: 'm-sway', greet_night: 'm-slow', greet_dawn: 'm-slow',
   fest_halloween: 'm-gift', fest_christmas: 'm-gift', fest_newyear: 'm-jump', fest_spring: 'm-gift', fest_lantern: 'm-gift',
@@ -153,8 +161,10 @@ const LOCAL_LINES = {
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
-  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right' }
-const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
+  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
+  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy' }
+const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
+  annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
@@ -818,8 +828,77 @@ function handleClick(kind) {
   lastActive = Date.now()
   if (kind === 'pat' && Math.random() < EGG_CLICK_CHANCE && playEgg(true)) return
   if (pose === 'sleeping') { show('yawn', true); say('唔…你回来啦'); return }
+  if (kind === 'pat' && (sulking || angerNow() >= 20)) { coaxHer(); return }   // 生着气的时候摸她 = 哄她
   const pokePose = char()?.pokePose && hasPose(char().pokePose) ? char().pokePose : 'surprised'
   show(kind === 'poke' ? pokePose : 'pat', true)
+}
+
+// ---- 逗她 / 红温 ----
+// 右键「逗她」说她最在意的事（character.json 的 tease），或者按住她快速来回甩，红温值往上加：
+// 20 不耐烦（annoyed）→ 45 鼓脸（puffed）→ 75 红温（redhot，冒蒸汽、发抖），红温后背过身去赌气（sulk）。
+// 生气时摸她就是哄（coaxed）：赌气时摸三下原谅你（forgiven），没到红温时摸一下降一档。红温值不管它会慢慢降
+let anger = 0, angerAt = Date.now(), sulking = false, coax = 0, sulkTimer = null, shakeEndTimer = null, lastTease = ''
+// 已经是这个动作时 show 不会换台词：哄她时每下都说一句
+const showSay = p => { const was = pose; show(p, true); if (was === p) say(pick(linesOf(p) || [''])) }
+const ANGER_DECAY = 2   // 每秒降多少（赌气时不降，要哄）
+function angerNow() {
+  anger = Math.max(0, anger - (sulking ? 0 : (Date.now() - angerAt) / 1000 * ANGER_DECAY))
+  angerAt = Date.now()
+  return anger
+}
+function angerLevel(a) { return a >= 75 ? 'redhot' : a >= 45 ? 'puffed' : a >= 20 ? 'annoyed' : null }
+function addAnger(n) { angerNow(); anger = Math.min(100, anger + n) }
+const teaseBlocked = () => egg || tucked || multi || farewellLine !== null || updatingNow || devHeld()
+// 按现在的红温值做反应
+function react() {
+  if (teaseBlocked()) return
+  const lv = angerLevel(angerNow())
+  if (!lv) return
+  if (sulking) { show('sulk', true); return }
+  if (lv !== 'redhot') { show(lv, true); return }
+  sulking = true; coax = 0
+  show('redhot', true)
+  clearTimeout(sulkTimer)
+  sulkTimer = setTimeout(() => {
+    if (!sulking) return
+    show('sulk', true)
+    // 赌气太久没人哄：自己慢慢消气（不再说话，回到平常）
+    sulkTimer = setTimeout(() => { if (sulking) { sulking = false; anger = 30; angerAt = Date.now(); show('idle', true) } }, 45000)
+  }, 3500)
+}
+function tease() {
+  if (teaseBlocked()) return
+  const lines = linesOf('tease')
+  if (!lines) return
+  lastActive = Date.now()
+  clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(thinkTimer)
+  const options = lines.length > 1 ? lines.filter(l => l !== lastTease) : lines   // 不连着说同一句
+  lastTease = pick(options)
+  say(`你：「${lastTease}」`)
+  setTimeout(() => { addAnger(30); react() }, 1600)
+}
+// 外壳检测到正在被甩（按住快速来回拖）时隔一会儿调一次；停下来就按红温值反应
+function shaken() {
+  if (teaseBlocked()) return
+  lastActive = Date.now()
+  addAnger(7)
+  if (pose !== 'dizzy') show('dizzy', true)
+  clearTimeout(shakeEndTimer)
+  shakeEndTimer = setTimeout(react, 900)
+}
+function coaxHer() {
+  if (sulking) {
+    if (++coax >= 3) return forgive()
+    showSay('coaxed')
+    return
+  }
+  anger = Math.max(0, anger - 25); angerAt = Date.now()
+  showSay(angerLevel(anger) ? 'coaxed' : 'forgiven')
+}
+function forgive() {
+  sulking = false; coax = 0; anger = 0; angerAt = Date.now()
+  clearTimeout(sulkTimer)
+  show('forgiven', true)
 }
 
 // ---- 开发者控制台用（右键「开发者控制台…」）----

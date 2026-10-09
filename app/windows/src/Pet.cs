@@ -408,9 +408,26 @@ namespace CrossPet
                 pressed = false;
                 hit.ReleaseMouseCapture();
                 Undock();
+                // 甩：拖动时横向来回反转方向（记住这个方向上的最远点，往回超过 18 算一次反转），0.9 秒内两次以上就算在甩（逗她）
+                bool shook = false; double swingX = Window.Left, swingDir = 0; var swings = new List<DateTime>(); var lastShake = DateTime.MinValue;
+                EventHandler onMove = (_, __) =>
+                {
+                    double x = Window.Left;
+                    if (swingDir == 0) { if (Math.Abs(x - swingX) > 18) { swingDir = x > swingX ? 1 : -1; swingX = x; } }
+                    else if ((x - swingX) * swingDir > 0) swingX = x;
+                    else if ((swingX - x) * swingDir > 18)
+                    {
+                        swingDir = -swingDir; swingX = x;
+                        swings.Add(DateTime.UtcNow);
+                        swings.RemoveAll(t => (DateTime.UtcNow - t).TotalSeconds > 0.9);
+                        if (swings.Count >= 2 && (DateTime.UtcNow - lastShake).TotalSeconds > 0.3) { shook = true; lastShake = DateTime.UtcNow; Js("shaken()"); }
+                    }
+                };
+                Window.LocationChanged += onMove;
                 try { Window.DragMove(); } catch { }
+                Window.LocationChanged -= onMove;
                 SavePosition();
-                CheckDock();
+                if (!shook) CheckDock();   // 甩她的时候松手不贴边
             };
             hit.MouseLeftButtonUp += (_, __) => { hit.ReleaseMouseCapture(); if (pressed) { pressed = false; Js("handleClick('pat')"); } };
             hit.MouseRightButtonUp += (_, __) =>
@@ -621,6 +638,7 @@ namespace CrossPet
             }
             menu.Items.Add(Item("摸摸头", () => Js("handleClick('pat')")));
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
+            menu.Items.Add(Item("逗她", () => Js("tease()")));
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
             Sep();
             var switchTo = new Forms.ToolStripMenuItem("换角色");
