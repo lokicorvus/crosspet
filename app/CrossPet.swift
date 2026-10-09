@@ -903,6 +903,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var dockOut = false          // 跑出来了
     var dockHover = false
     var dockLeaveAt: Date?
+    var dockedAt = Date.distantPast   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
     var edgeDockEnabled: Bool { defaults.object(forKey: "edgeDock") as? Bool ?? true }
 
     func undock() {
@@ -923,6 +924,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
     func setDock(_ side: String) {
         dock = side
+        dockedAt = Date()
         defaults.set(side, forKey: "dock")
         dockOut = dockBusy
         applyDock()
@@ -931,6 +933,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var dockBusy: Bool {
         let now = Date()
         return lastPose.values.contains { p in
+            guard p.at > dockedAt else { return false }
             let age = now.timeIntervalSince(p.at)
             switch p.pose {
             case "asking": return age < 600

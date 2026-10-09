@@ -419,6 +419,7 @@ namespace CrossPet
         string dock;                 // "left" / "right"
         bool dockOut, dockHover;
         DateTime? dockLeaveAt;
+        DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
         static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
         static void After(int ms, Action a)
@@ -451,6 +452,7 @@ namespace CrossPet
         void SetDock(string side)
         {
             dock = side;
+            dockedAt = DateTime.UtcNow;
             Store.Settings["dock"] = side; Store.SaveSettings();
             dockOut = DockBusy();
             ApplyDock();
@@ -461,6 +463,7 @@ namespace CrossPet
             var now = DateTime.UtcNow;
             return lastPose.Values.Any(p =>
             {
+                if (p.at <= dockedAt) return false;
                 var age = (now - p.at).TotalSeconds;
                 switch (p.pose)
                 {
