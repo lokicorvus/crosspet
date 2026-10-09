@@ -605,8 +605,19 @@ function startMulti() {
   $('fx').classList.add('hide')
   multi.flipTimer = setInterval(() => { if (multi && !multi.asking) { multi.side = multi.side === 'left' ? 'right' : 'left'; multiPose() } }, SESSION_FLIP)
 }
+// 多会话的台词：刚手忙脚乱时、升级成太忙时、有对话开始等你回答时各说一句（台词在 character.json 的 busy / swamped / asking），4 秒后收起
+function multiSay(kind) {
+  const line = pick(linesOf(kind) || [''])
+  if (!line) return
+  say(line)
+  clearTimeout(multi.sayTimer)
+  multi.sayTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, 4000)
+}
 function multiPose() {
   if (!multi) return
+  const level = multi.asking ? 'asking' : multi.busy >= 3 ? 'swamped' : 'busy'
+  if (level !== multi.said && (level !== 'busy' || !multi.said)) multiSay(level)   // 从太忙降回两个时不再说
+  multi.said = level
   if (multi.asking) { if (pose !== 'asking') { setPose('asking'); $('fx').classList.add('hide') } }
   else {
     const p = `${multi.busy >= 3 ? 'swamped' : 'busy'}_${multi.side}`
@@ -616,7 +627,7 @@ function multiPose() {
 }
 function endMulti() {
   if (!multi) return
-  clearInterval(multi.flipTimer); clearTimeout(multi.recheck)
+  clearInterval(multi.flipTimer); clearTimeout(multi.recheck); clearTimeout(multi.sayTimer)
   for (const c of multi.cards.values()) { c.el.classList.remove('on'); setTimeout(() => c.el.remove(), 400) }
   $('more').classList.remove('on')
   multi = null
