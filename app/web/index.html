@@ -49,7 +49,9 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
   font: bold 11px/16px sans-serif; box-shadow: 0 1px 3px rgba(0,0,0,.15); opacity: 0; transition: opacity .3s; }
 #more.on { opacity: 1; }
 /* 贴边：缩在屏幕边上时只露半个身子（扒着边缘的立绘，没画时用平常的），额度、名牌、气泡、特效都藏起来 */
-html.tucked #bubble, html.tucked #caption, html.tucked #quota, html.tucked #fx, html.tucked #cards, html.tucked #aura, html.tucked #shadow { visibility: hidden; }
+html.tucked #bubble, html.tucked #fx, html.tucked #cards, html.tucked #aura, html.tucked #shadow { visibility: hidden; }
+/* 名牌、额度在最底下：直接拿出版面（只隐藏的话，透明窗口偶尔少擦它们底边那一行，缩进去那一下闪一条横线） */
+html.tucked #caption, html.tucked #quota { display: none; }
 /* 有贴边立绘时：立绘贴着窗口那条边放，切口就是窗口的边、也就是屏幕边缘。贴边 / 探出来两张换图时窗口不用动，原地淡入淡出 */
 html.tucked-art.tucked-left #wrap { align-items: flex-start; }
 html.tucked-art.tucked-right #wrap { align-items: flex-end; }
@@ -489,17 +491,16 @@ function setTucked(side, peek = false) {
   if (side) { say(''); setPose(`edge_${side}${tuckedPeek ? '_peek' : ''}`, true) }
   else if (was) { pose = null; show(restPose(), true) }
   slideFrom(before, edge)
-  if (!!side !== !!was) repaintSoon()
+  if (!!side !== !!was) { repaintNow(); repaintSoon() }
 }
 // 透明窗口里藏起额度、名牌时，WebKit 偶尔少擦一行像素（页面有缩放时重绘范围取整），留下一条横线：
 // 过渡结束后让整页重新画一遍（切到独立图层再切回来）
-function repaintSoon() {
-  setTimeout(() => {
-    const b = document.body
-    b.style.transform = 'translateZ(0)'
-    setTimeout(() => { b.style.transform = '' }, 60)
-  }, 450)
+function repaintNow() {
+  const b = document.body
+  b.style.transform = 'translateZ(0)'
+  setTimeout(() => { b.style.transform = '' }, 60)
 }
+function repaintSoon() { setTimeout(repaintNow, 450) }
 // 换图前后她的位置不一样（贴着窗口边 ↔ 窗口中间）：先把舞台挪回原来的位置，再 0.3 秒滑过去，不要一下子跳
 // （不用 requestAnimationFrame：窗口在后台、刚从全屏回来时它可能不触发）
 function slideFrom(before, edge) {
