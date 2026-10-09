@@ -2,7 +2,7 @@
 """把一张白底立绘处理成桌宠用的透明 WebP。
     python3 tools/prepare.py <输入图> <角色id> <姿态名>   → characters/<角色id>/<姿态名>.webp
 做的事：抠掉和图片边缘连通的白底（衣服里的白色不会被抠）→ 去掉飘在空中的小碎片（生图 AI 常画的汗滴、速度线、闪光）
-和贴地的扁平影子 → 抠掉头发之间被围住的白缝（hairgap.py，只对发色分得开的角色）→ 比主角站得低的小帮手挪到同一条地面上 → 裁掉空白 → 统一缩放到 640 高（所有姿态同尺度）→ 存 WebP。
+和贴地的扁平影子 → 抠掉头发之间被围住的白缝（hairgap.py）→ 比主角站得低的小帮手挪到同一条地面上 → 裁掉空白 → 统一缩放到 640 高（所有姿态同尺度）→ 存 WebP。
 """
 import os
 import sys
@@ -14,7 +14,7 @@ from PIL import Image, ImageFilter
 from scipy import ndimage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from hairgap import HAIR_HUE, clean  # noqa: E402
+import hairgap  # noqa: E402
 
 CHARACTERS = Path(__file__).resolve().parent.parent / "characters"
 TARGET_H = 640
@@ -151,8 +151,10 @@ def prepare(src: str, character: str, name: str) -> Path:
     out_dir = CHARACTERS / character
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{name}.webp"
-    if character in HAIR_HUE:  # 头发之间被围住的白缝（见 hairgap.py）
-        im = clean(im, HAIR_HUE[character])[0]
+    if hairgap.available():  # 头发之间被围住的白缝（见 hairgap.py，要先下好模型）
+        im = hairgap.clean(im)[0]
+    else:
+        print("  没有 isnet-anime 模型，跳过抠头发缝（见 tools/hairgap.py）")
     im.save(out, "WEBP", quality=92, method=6)
     return out
 
