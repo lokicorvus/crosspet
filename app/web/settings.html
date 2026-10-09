@@ -71,8 +71,6 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
   <h2>角色</h2>
   <div class="item"><div class="label">当前角色</div>
     <div class="ctl"><select id="character"></select></div></div>
-  <div class="item hidden" id="skinRow"><div class="label">衣服<small>换一套立绘，台词和动作不变</small></div>
-    <div class="ctl"><select id="skin"></select></div></div>
   <div class="item"><div class="label">名字<small>留空恢复默认</small></div>
     <div class="ctl"><input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div></div>
   <div class="item"><div class="label">跟随前台 AI 应用<small>切到哪个 AI 的 App，就换成哪个角色</small></div>
@@ -139,13 +137,12 @@ function setState(s) {
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
   const sel = $('character')
-  sel.replaceChildren(...s.characters.map(c => new Option(c.name, c.id, false, c.id === s.character)))
+  // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」（值写成 角色|皮肤）
+  sel.replaceChildren(...s.characters.flatMap(c => c.skins
+    ? c.skins.map(k => new Option(`${c.name} · ${k.name}`, `${c.id}|${k.id}`, false, c.id === s.character && k.id === (c.skin || '')))
+    : [new Option(c.name, c.id, false, c.id === s.character)]))
   const cur = s.characters.find(c => c.id === s.character)
   if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
-  // 有别的衣服（皮肤）的角色才显示「衣服」
-  const skins = cur?.skins || []
-  $('skinRow').classList.toggle('hidden', skins.length < 2)
-  $('skin').replaceChildren(...skins.map(k => new Option(k.name, k.id, false, k.id === (cur.skin || ''))))
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   renderIntegrations(s.integrations)
 }
@@ -177,8 +174,10 @@ for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'a
 for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
 $('size').oninput = () => { $('sizeVal').textContent = Math.round($('size').value * 100) + '%'; post({ cmd: 'set', key: 'size', value: +$('size').value }) }
 document.querySelector('[data-reset-size]').onclick = () => post({ cmd: 'set', key: 'size', value: 1 })
-$('character').onchange = () => post({ cmd: 'set', key: 'character', value: $('character').value })
-$('skin').onchange = () => post({ cmd: 'skin', id: state.character, skin: $('skin').value })
+$('character').onchange = () => {
+  const [id, skin] = $('character').value.split('|')
+  post(skin === undefined ? { cmd: 'set', key: 'character', value: id } : { cmd: 'skin', id, skin })
+}
 const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
 $('saveName').onclick = saveName
 $('name').onkeydown = e => { if (e.key === 'Enter') saveName() }

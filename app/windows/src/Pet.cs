@@ -199,6 +199,17 @@ namespace CrossPet
         public void Reload() { ready = false; web?.CoreWebView2?.Reload(); }
         public static string Q(string s) => Store.Json.Serialize(s);
 
+        /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
+        void Wear(string id, string skin)
+        {
+            if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
+            if ((sd.TryGetValue(id, out var cur) ? cur as string ?? "" : "") == skin) return;
+            if (skin == "") sd.Remove(id); else sd[id] = skin;
+            Store.SaveSettings();
+            LoadCharacters();
+            Js($"init({ManifestJson}); refreshLook({Q(id)})");
+        }
+
         void SwitchTo(string id)
         {
             if (!Characters().Any(c => c.id == id)) return;
@@ -611,7 +622,19 @@ namespace CrossPet
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
             Sep();
             var switchTo = new Forms.ToolStripMenuItem("换角色");
-            foreach (var (id, name) in Characters()) { var cid = id; switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid), cid == current)); }
+            // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」
+            foreach (var (id, name) in Characters())
+            {
+                var cid = id;
+                if (Store.SkinChoices.TryGetValue(id, out var skins) && skins.Count > 0)
+                {
+                    var worn = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
+                    var baseName = Store.BaseOutfit.TryGetValue(id, out var bo) && bo != null ? bo : "原版";
+                    switchTo.DropDownItems.Add(Item($"{name} · {baseName}", () => { Wear(cid, ""); SwitchTo(cid); }, cid == current && worn == ""));
+                    foreach (var (sid, sname) in skins) { var k = sid; switchTo.DropDownItems.Add(Item($"{name} · {sname}", () => { Wear(cid, k); SwitchTo(cid); }, cid == current && worn == k)); }
+                }
+                else switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid), cid == current));
+            }
             menu.Items.Add(switchTo);
             Sep();
             var layer = new Forms.ToolStripMenuItem("显示层级");
@@ -771,15 +794,9 @@ namespace CrossPet
                         case "character": if (value is string id) SwitchTo(id); break;
                     }
                     break;
-                case "skin":   // 换衣服：记下来，重新载入立绘；正在显示的就是她的话马上换上
+                case "skin":   // 换衣服：记下来，重新载入立绘，并换成这个角色
                     if (msg.TryGetValue("id", out var kid) && kid is string skinId && Characters().Any(x => x.id == skinId) && msg.TryGetValue("skin", out var kv) && kv is string skinName)
-                    {
-                        if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
-                        if (skinName == "") sd.Remove(skinId); else sd[skinId] = skinName;
-                        Store.SaveSettings();
-                        LoadCharacters();
-                        Js($"init({ManifestJson}); refreshLook({Q(skinId)})");
-                    }
+                    { Wear(skinId, skinName); SwitchTo(skinId); }
                     break;
                 case "rename":
                     if (msg.TryGetValue("id", out var rid) && rid is string cid && Characters().Any(x => x.id == cid))

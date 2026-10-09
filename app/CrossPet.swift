@@ -713,12 +713,20 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             menu.addItem(.separator())
             let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
             let sub = NSMenu()
+            // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」
+            let worn = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
             for id in characterIds {
-                let item = NSMenuItem(title: displayNames[id] ?? id, action: #selector(switchCharacter(_:)), keyEquivalent: "")
-                item.representedObject = id
-                item.target = self
-                item.state = id == currentId ? .on : .off
-                sub.addItem(item)
+                let name = displayNames[id] ?? id
+                let outfits: [(skin: String, title: String)] = skinChoices[id].map { skins in
+                    [("", "\(name) · \(baseOutfit[id] ?? "原版")")] + skins.map { ($0.id, "\(name) · \($0.name)") }
+                } ?? [("", name)]
+                for o in outfits {
+                    let item = NSMenuItem(title: o.title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
+                    item.representedObject = "\(id)|\(o.skin)"
+                    item.target = self
+                    item.state = id == currentId && (worn[id] ?? "") == o.skin ? .on : .off
+                    sub.addItem(item)
+                }
             }
             switchItem.submenu = sub
             menu.addItem(switchItem)
@@ -798,7 +806,19 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func poke() { js("handleClick('poke')") }
     @objc func egg() { js("playEgg(true)") }
     @objc func switchCharacter(_ item: NSMenuItem) {
-        if let id = item.representedObject as? String { switchTo(id) }
+        guard let value = item.representedObject as? String else { return }
+        let parts = value.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        if parts.count == 2 { wear(parts[0], parts[1]) }
+        switchTo(parts[0])
+    }
+    /// 换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上
+    func wear(_ id: String, _ skin: String) {
+        var skins = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
+        guard (skins[id] ?? "") != skin else { return }
+        if skin.isEmpty { skins.removeValue(forKey: id) } else { skins[id] = skin }
+        defaults.set(skins, forKey: "skins")
+        loadCharacters()
+        js("refreshLook(\(quote(id)))")
     }
 
     @objc func rename() {
@@ -1336,11 +1356,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             if let target = msg["target"] as? String, let action = msg["action"] as? String { integrate(action, target) }
         case "skin":   // 换衣服：记下来，重新载入立绘；正在显示的就是她的话马上换上
             guard let id = msg["id"] as? String, characterIds.contains(id), let skin = msg["skin"] as? String else { return }
-            var skins = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
-            if skin.isEmpty { skins.removeValue(forKey: id) } else { skins[id] = skin }
-            defaults.set(skins, forKey: "skins")
-            loadCharacters()
-            js("refreshLook(\(quote(id)))")
+            wear(id, skin)
+            switchTo(id)
             pushSettings()
         case "rename":
             guard let id = msg["id"] as? String, characterIds.contains(id) else { return }
