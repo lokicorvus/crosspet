@@ -417,7 +417,7 @@ namespace CrossPet
         // AI 干活时（或在等你回答）自己跑出来，干完过约 10 秒缩回去；鼠标移到露出来的那截上她会探出来一点。
         // 拖离边缘就不贴了。另一块屏幕接在这边时不算边缘。坐标都是物理像素
         string dock;                 // "left" / "right"
-        bool dockOut, dockHover;
+        bool dockOut, dockHover, dockTucked;   // dockTucked：现在是缩着的样子（之后换探出来不用先挪窗口）
         DateTime? dockLeaveAt, dockEnterAt;
         DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
@@ -432,7 +432,7 @@ namespace CrossPet
         void Undock()
         {
             if (dock == null) return;
-            dock = null; dockOut = dockHover = false;
+            dock = null; dockOut = dockHover = dockTucked = false;
             Store.Settings.Remove("dock"); Store.SaveSettings();
             Js("setTucked(null)");
         }
@@ -489,7 +489,16 @@ namespace CrossPet
             int w = r.Right - r.Left, h = r.Bottom - r.Top;
             var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
             int y = Math.Max(wa.Top, Math.Min(r.Top, wa.Bottom - (int)(h * 0.85)));
-            if (dockOut) { Js("setTucked(null)"); Slide(side == "left" ? wa.Left : wa.Right - w, y); return; }
+            int edgeX = side == "left" ? wa.Left : wa.Right - w;
+            if (dockOut) { dockTucked = false; Js("setTucked(null)"); Slide(edgeX, y); return; }
+            // 窗口还没到边上（刚拖过来松手 / 刚干完活）：先整个滑到屏幕边缘，滑完再缩进去。一次只做一个动作，不然窗口在滑、人物也在窗口里滑，看着乱
+            if (!dockTucked && (Math.Abs(r.Left - edgeX) > 1 || Math.Abs(r.Top - y) > 1))
+            {
+                Slide(edgeX, y);
+                await Task.Delay(370);
+                if (dock != side || dockOut) return;
+            }
+            dockTucked = true;
             // 鼠标移上来：换成探出来更多的那张（edge_*_peek），切口照样对齐屏幕边缘（不能光把窗口往外挪，切口会露在屏幕中间）
             var peek = dockHover;
             Js($"setTucked({Q(side)}, {(peek ? "true" : "false")})");
@@ -504,7 +513,9 @@ namespace CrossPet
             }
             if (dock != side || dockOut || dockHover != peek) return;
             double zoom = (double)w / BaseWidth;   // 网页像素 → 物理像素
-            Slide(side == "left" ? wa.Left - (int)(cut * zoom) : wa.Right - (int)(cut * zoom), y);
+            int tx = side == "left" ? wa.Left - (int)(cut * zoom) : wa.Right - (int)(cut * zoom);
+            Native.GetWindowRect(hwnd, out var now);
+            if (Math.Abs(now.Left - tx) > 1) Slide(tx, y);
         }
         DispatcherTimer slideTimer;
         void Slide(int x, int y)

@@ -22,6 +22,7 @@ final class DragView: NSView {
     var onDragStart: (() -> Void)?
     var onDragEnd: (() -> Void)?
     private var downAt: NSPoint = .zero
+    private var originAt: NSPoint = .zero
     private var dragged = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -31,22 +32,23 @@ final class DragView: NSView {
     }
     override func mouseDragged(with event: NSEvent) {
         let p = NSEvent.mouseLocation
-        guard !dragged, abs(p.x - downAt.x) + abs(p.y - downAt.y) > 3, let window else { return }
-        dragged = true
-        onDragStart?()
-        // 交给系统拖（和拖普通窗口一样）：自己一帧帧改坐标的话，「显示器具有单独的空间」开着时（macOS 默认）
-        // 无边框窗口跨不过两块屏幕的交界，拖不到副屏
-        window.performDrag(with: event)
-        // 系统拖完（松手）再存位置、看要不要贴边；performDrag 可能马上返回，所以等鼠标真的松开
-        func finish() {
-            if NSEvent.pressedMouseButtons & 1 != 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: finish); return }
-            defaults.set([window.frame.origin.x, window.frame.origin.y], forKey: "origin")
-            onDragEnd?()
+        if !dragged {
+            guard abs(p.x - downAt.x) + abs(p.y - downAt.y) > 3 else { return }
+            dragged = true
+            onDragStart?()
+            originAt = window?.frame.origin ?? .zero
+            downAt = p
         }
-        finish()
+        // 自己跟着鼠标挪（不用 performDrag 交给系统：macOS 15 起系统拖到屏幕边缘会弹「窗口分屏」预览、松手还会去动窗口，跟贴边抢位置）
+        window?.setFrameOrigin(NSPoint(x: originAt.x + p.x - downAt.x, y: originAt.y + p.y - downAt.y))
     }
     override func mouseUp(with event: NSEvent) {
-        if !dragged { onClick?() }
+        if dragged {
+            if let o = window?.frame.origin { defaults.set([o.x, o.y], forKey: "origin") }
+            onDragEnd?()
+        } else {
+            onClick?()
+        }
     }
     override func rightMouseDown(with event: NSEvent) { onMenu?(event) }
 }
@@ -908,7 +910,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func undock() {
         guard dock != nil else { return }
-        dock = nil; dockOut = false; dockHover = false
+        dock = nil; dockOut = false; dockHover = false; dockTucked = false
         defaults.removeObject(forKey: "dock")
         js("setTucked(null)")
     }
@@ -955,11 +957,29 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         var f = panel.frame
         f.origin.y = min(max(f.origin.y, vf.minY - f.height * 0.15), vf.maxY - f.height)
         if dockOut {
+            dockTucked = false
             js("setTucked(null)")
             f.origin.x = side == "left" ? vf.minX : vf.maxX - f.width
             slide(to: f)
             return
         }
+        // 窗口还没到边上（刚拖过来松手）：先整个滑到屏幕边缘，滑完再缩进去。一次只做一个动作，不然窗口在滑、人物也在窗口里滑，看着乱
+        if !dockTucked {
+            var g = f; g.origin.x = side == "left" ? vf.minX : vf.maxX - f.width
+            if abs(panel.frame.origin.x - g.origin.x) > 1 || abs(panel.frame.origin.y - g.origin.y) > 1 {
+                slide(to: g)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.37) { [weak self] in self?.tuck(side, vf) }
+                return
+            }
+        }
+        tuck(side, vf)
+    }
+    var dockTucked = false   // 现在是缩着的样子（之后换探出来不用先挪窗口）
+    /// 缩进去（或换成探出来那张），按切口位置对齐屏幕边缘。有贴边立绘时切口就是窗口边，窗口不用再动
+    func tuck(_ side: String, _ vf: NSRect) {
+        guard dock == side, !dockOut else { return }
+        dockTucked = true
+        var f = panel.frame
         // 鼠标移上来：换成探出来更多的那张（edge_*_peek），切口照样对齐屏幕边缘（不能光把窗口往外挪，切口会露在屏幕中间）
         let peek = dockHover
         js("setTucked(\(quote(side)), \(peek))")
@@ -968,7 +988,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             guard let self, self.dock == side, !self.dockOut, self.dockHover == peek else { return }
             let zoom = f.width / Self.baseSize.width
             f.origin.x = side == "left" ? vf.minX - CGFloat(cut) * zoom : vf.maxX - CGFloat(cut) * zoom
-            self.slide(to: f)
+            if abs(f.origin.x - self.panel.frame.origin.x) > 1 { self.slide(to: f) }
         }
         if let cut = dockCut[key] { place(cut); return }
         // 换成贴边立绘后再量切口（图要先载入），量过的记下来
