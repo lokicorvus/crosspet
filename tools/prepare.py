@@ -28,8 +28,14 @@ def background_mask(im: Image.Image) -> Image.Image:
     q = deque()
     for x in range(w):
         q.extend([(x, 0), (x, h - 1)])
+    # 贴边立绘（edge_left / edge_right）有一条边框是从人物身上切过去的：那条边不当背景的起点，
+    # 不然贴着切口的白衣服、白头发会被当成白底一路抠进去。用 SKIP_EDGE=left / right 指定
+    skip = os.environ.get("SKIP_EDGE", "")
     for y in range(h):
-        q.extend([(0, y), (w - 1, y)])
+        if skip != "left":
+            q.append((0, y))
+        if skip != "right":
+            q.append((w - 1, y))
     mask = Image.new("L", (w, h), 255)
     mp = mask.load()
     while q:
