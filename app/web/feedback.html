@@ -113,6 +113,7 @@ function card(tags, text, attach) {
   const elements = [{ tag: 'div', text: pt(text || '（没写）') }, { tag: 'hr' }]
   const meta = [`版本 ${i.version || '?'}（${i.platform || '?'}）`, `角色 ${i.character || '—'}`]
   if (attach) meta.push(`系统 ${i.os || '?'}`, `已接入 ${(i.integrations || []).join(', ') || '—'}`)
+  if (attach && i.displays) meta.push(`显示 ${i.displays}`)   // 显示器几块、怎么排、桌宠在哪块、显示层级 / 贴边：多显示器的问题靠它看
   elements.push({ tag: 'div', fields: meta.map(m => ({ is_short: true, text: pt(m) })) })
   if (attach && logTail()) elements.push({ tag: 'note', elements: [pt('最近日志：\n' + logTail())] })
   elements.push({ tag: 'note', elements: [pt(`机器 ${(i.install || '').slice(0, 8)}`)] })
@@ -129,7 +130,7 @@ function setInfo(i) {
   info = i
   const lines = [
     `版本：${i.version}（${i.platform}）`, `系统：${i.os}`, `当前角色：${i.character || '—'}`,
-    `已接入：${(i.integrations || []).join(', ') || '—'}`, '', '最近的运行日志：', logTail() || '（没有）',
+    `已接入：${(i.integrations || []).join(', ') || '—'}`, ...(i.displays ? [`显示：${i.displays}`] : []), '', '最近的运行日志：', logTail() || '（没有）',
   ]
   $('preview').textContent = lines.join('\n')
 }

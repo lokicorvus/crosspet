@@ -1390,9 +1390,29 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "os": "macOS \(ProcessInfo.processInfo.operatingSystemVersionString) \(arch)",
             "character": currentId ?? characterIds.first ?? "",
             "integrations": integrated ?? [],
+            "displays": displaysSummary(),
             "log": String(Self.redact(tail).suffix(6000)),
             "install": installId,
         ]
+    }
+
+    /// 反馈附带的显示信息：几块显示器、各自大小和相对主屏的位置、桌宠在哪块、显示器是否各有空间、显示层级 / 全屏隐藏 / 贴边
+    func displaysSummary() -> String {
+        let screens = NSScreen.screens
+        guard let main = screens.first else { return "" }
+        let parts = screens.enumerated().map { i, s -> String in
+            let f = s.frame
+            var where_ = "主屏"
+            if i > 0 {
+                where_ = f.minX >= main.frame.maxX - 1 ? "右侧" : f.maxX <= main.frame.minX + 1 ? "左侧" : f.minY >= main.frame.maxY - 1 ? "上方" : f.maxY <= main.frame.minY + 1 ? "下方" : "重叠"
+            }
+            let here = panel.screen == s ? "（桌宠在这）" : ""
+            return "\(Int(f.width))×\(Int(f.height))@\(Int(s.backingScaleFactor))x \(where_)\(here)"
+        }
+        var flags = ["层级 \(layerMode)", hideInFullscreen ? "全屏隐藏" : "全屏不隐藏"]
+        if screens.count > 1 { flags.append(NSScreen.screensHaveSeparateSpaces ? "各屏单独空间" : "各屏共用空间") }
+        if let d = dock { flags.append("贴\(d == "left" ? "左" : "右")边") }
+        return "\(screens.count) 块：" + parts.joined(separator: "、") + "；" + flags.joined(separator: "，")
     }
 
     func pushFeedbackInfo() {

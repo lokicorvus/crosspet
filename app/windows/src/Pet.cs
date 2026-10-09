@@ -876,7 +876,28 @@ namespace CrossPet
                 ["version"] = Store.Version, ["platform"] = "windows",
                 ["os"] = $"{Environment.OSVersion.VersionString} {System.Runtime.InteropServices.RuntimeInformation.OSArchitecture}",
                 ["character"] = current ?? "", ["integrations"] = integrated ?? new List<string>(), ["log"] = tail, ["install"] = InstallId,
+                ["displays"] = DisplaysSummary(),
             };
+        }
+        /// <summary>反馈附带的显示信息：几块显示器、各自大小和相对主屏的位置、桌宠在哪块、显示层级 / 全屏隐藏 / 贴边</summary>
+        string DisplaysSummary()
+        {
+            try
+            {
+                var all = Forms.Screen.AllScreens;
+                var main = Forms.Screen.PrimaryScreen.Bounds;
+                var mine = hwnd == IntPtr.Zero ? null : Forms.Screen.FromHandle(hwnd);
+                var parts = all.Select(s =>
+                {
+                    var b = s.Bounds;
+                    var where = s.Primary ? "主屏" : b.Left >= main.Right ? "右侧" : b.Right <= main.Left ? "左侧" : b.Bottom <= main.Top ? "上方" : b.Top >= main.Bottom ? "下方" : "重叠";
+                    return $"{b.Width}×{b.Height} {where}{(mine != null && s.DeviceName == mine.DeviceName ? "（桌宠在这）" : "")}";
+                });
+                var flags = new List<string> { "层级 " + LayerMode, HideFullscreen ? "全屏隐藏" : "全屏不隐藏" };
+                if (dock != null) flags.Add(dock == "left" ? "贴左边" : "贴右边");
+                return $"{all.Length} 块：{string.Join("、", parts)}；{string.Join("，", flags)}";
+            }
+            catch { return ""; }
         }
 
         public void HandleFeedback(Dictionary<string, object> msg)
