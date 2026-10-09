@@ -22,29 +22,31 @@ final class DragView: NSView {
     var onDragStart: (() -> Void)?
     var onDragEnd: (() -> Void)?
     private var downAt: NSPoint = .zero
-    private var originAt: NSPoint = .zero
     private var dragged = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) {
         downAt = NSEvent.mouseLocation
-        originAt = window?.frame.origin ?? .zero
         dragged = false
     }
     override func mouseDragged(with event: NSEvent) {
         let p = NSEvent.mouseLocation
-        let dx = p.x - downAt.x, dy = p.y - downAt.y
-        if !dragged, abs(dx) + abs(dy) > 3 { dragged = true; onDragStart?(); originAt = window?.frame.origin ?? originAt; downAt = p }
-        guard dragged else { return }
-        window?.setFrameOrigin(NSPoint(x: originAt.x + p.x - downAt.x, y: originAt.y + p.y - downAt.y))
+        guard !dragged, abs(p.x - downAt.x) + abs(p.y - downAt.y) > 3, let window else { return }
+        dragged = true
+        onDragStart?()
+        // 交给系统拖（和拖普通窗口一样）：自己一帧帧改坐标的话，「显示器具有单独的空间」开着时（macOS 默认）
+        // 无边框窗口跨不过两块屏幕的交界，拖不到副屏
+        window.performDrag(with: event)
+        // 系统拖完（松手）再存位置、看要不要贴边；performDrag 可能马上返回，所以等鼠标真的松开
+        func finish() {
+            if NSEvent.pressedMouseButtons & 1 != 0 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: finish); return }
+            defaults.set([window.frame.origin.x, window.frame.origin.y], forKey: "origin")
+            onDragEnd?()
+        }
+        finish()
     }
     override func mouseUp(with event: NSEvent) {
-        if dragged {
-            if let o = window?.frame.origin { defaults.set([o.x, o.y], forKey: "origin") }
-            onDragEnd?()
-        } else {
-            onClick?()
-        }
+        if !dragged { onClick?() }
     }
     override func rightMouseDown(with event: NSEvent) { onMenu?(event) }
 }
