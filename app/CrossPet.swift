@@ -956,19 +956,20 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             slide(to: f)
             return
         }
-        js("setTucked(\(quote(side)))")
+        // 鼠标移上来：换成探出来更多的那张（edge_*_peek），切口照样对齐屏幕边缘（不能光把窗口往外挪，切口会露在屏幕中间）
+        let peek = dockHover
+        js("setTucked(\(quote(side)), \(peek))")
+        let key = side + (peek ? "-peek" : "") + currentIdKey
         let place = { [weak self] (cut: Double) in
-            guard let self, self.dock == side, !self.dockOut else { return }
+            guard let self, self.dock == side, !self.dockOut, self.dockHover == peek else { return }
             let zoom = f.width / Self.baseSize.width
-            let peek = self.dockHover ? 30 * zoom : 0   // 鼠标移上来：再探出来一点
-            f.origin.x = side == "left" ? vf.minX - CGFloat(cut) * zoom + peek : vf.maxX - CGFloat(cut) * zoom - peek
+            f.origin.x = side == "left" ? vf.minX - CGFloat(cut) * zoom : vf.maxX - CGFloat(cut) * zoom
             self.slide(to: f)
         }
-        if let cut = dockCut[side + currentIdKey] { place(cut); return }
+        if let cut = dockCut[key] { place(cut); return }
         // 换成贴边立绘后再量切口（图要先载入），量过的记下来
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-            guard let self, self.dock == side, !self.dockOut else { return }
-            let key = side + self.currentIdKey
+            guard let self, self.dock == side, !self.dockOut, self.dockHover == peek else { return }
             self.web.evaluateJavaScript("dockCut(\(self.quote(side)))") { [weak self] r, _ in
                 guard let cut = (r as? NSNumber)?.doubleValue else { return }
                 self?.dockCut[key] = cut

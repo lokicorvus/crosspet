@@ -143,7 +143,7 @@ const LOCAL_LINES = {
 }
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
-  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle' }
+  busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
@@ -157,6 +157,7 @@ let manifest = { characters: {} }
 let charId = null, pose = null, poseSince = 0, currentUrl = '', swappedAt = 0
 let active = document.getElementById('a'), spare = document.getElementById('b')
 let tucked = null   // 贴边缩着：'left' / 'right'（见「贴边」）
+let tuckedPeek = false   // 缩着时鼠标移上来：探出来、好奇地看着你
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
 const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
@@ -217,7 +218,7 @@ function setFx(p, instant) {
   setTimeout(render, 220)
 }
 function setPose(p, instant) {
-  if (tucked) p = `edge_${tucked}`   // 缩在边上：一直扒着，别的动作等她出来再演
+  if (tucked) p = `edge_${tucked}${tuckedPeek ? '_peek' : ''}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
   const frames = framesFor(p)
@@ -460,13 +461,14 @@ function notifyUpdate(tag) {
 // 外壳把她拖到屏幕左 / 右边缘时调 setTucked('left' / 'right')，跑出来时 setTucked(null)。
 // dockCut 告诉外壳「切口」在窗口里的横坐标（网页像素）：贴边立绘是画面边框从她身上切过去，切口就是立绘那条边；
 // 没画贴边立绘时用平常的立绘，切口在她身体正中，屏幕边缘挡住一半
-function setTucked(side) {
-  if (side === tucked) return
+// peek：鼠标移到露出来的那截上时换成探出来更多、好奇地看着你的那张（edge_*_peek），切口照样对齐屏幕边缘
+function setTucked(side, peek = false) {
+  if (side === tucked && !!peek === tuckedPeek) return
   const was = tucked
-  tucked = side
+  tucked = side; tuckedPeek = !!side && !!peek
   document.documentElement.classList.toggle('tucked', !!side)
   clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer)
-  if (side) { say(''); setPose(`edge_${side}`, true) }
+  if (side) { say(''); setPose(`edge_${side}${tuckedPeek ? '_peek' : ''}`, true) }
   else if (was) { pose = null; show(restPose(), true) }
 }
 function dockCut(side) {

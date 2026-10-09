@@ -486,20 +486,21 @@ namespace CrossPet
             var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
             int y = Math.Max(wa.Top, Math.Min(r.Top, wa.Bottom - (int)(h * 0.85)));
             if (dockOut) { Js("setTucked(null)"); Slide(side == "left" ? wa.Left : wa.Right - w, y); return; }
-            Js($"setTucked({Q(side)})");
-            var key = side + current;
+            // 鼠标移上来：换成探出来更多的那张（edge_*_peek），切口照样对齐屏幕边缘（不能光把窗口往外挪，切口会露在屏幕中间）
+            var peek = dockHover;
+            Js($"setTucked({Q(side)}, {(peek ? "true" : "false")})");
+            var key = side + (peek ? "-peek" : "") + current;
             if (!dockCut.TryGetValue(key, out var cut))
             {
                 await Task.Delay(450);   // 换成贴边立绘后再量切口（图要先载入），量过的记下来
-                if (dock != side || dockOut) return;
+                if (dock != side || dockOut || dockHover != peek) return;
                 var res = await Eval($"dockCut({Q(side)})");
                 if (!double.TryParse(res, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out cut)) return;
                 dockCut[key] = cut;
             }
-            if (dock != side || dockOut) return;
+            if (dock != side || dockOut || dockHover != peek) return;
             double zoom = (double)w / BaseWidth;   // 网页像素 → 物理像素
-            int peek = dockHover ? (int)(30 * zoom) : 0;   // 鼠标移上来：再探出来一点
-            Slide(side == "left" ? wa.Left - (int)(cut * zoom) + peek : wa.Right - (int)(cut * zoom) - peek, y);
+            Slide(side == "left" ? wa.Left - (int)(cut * zoom) : wa.Right - (int)(cut * zoom), y);
         }
         DispatcherTimer slideTimer;
         void Slide(int x, int y)
