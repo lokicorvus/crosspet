@@ -1064,7 +1064,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             panel.animator().setFrame(frame, display: true)
         }
     }
-    /// 缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去
+    /// 缩着时鼠标在露出来的那截上停 0.15 秒：探出来；移开 0.3 秒后缩回去
     var dockEnterAt: Date?
     func updateDockHover(_ inside: Bool) {
         guard dock != nil, !dockOut else { return }
@@ -1072,13 +1072,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             dockLeaveAt = nil
             guard !dockHover else { return }
             if dockEnterAt == nil { dockEnterAt = Date() }   // 停一小会儿才探出来，路过不算
-            else if Date().timeIntervalSince(dockEnterAt!) > 0.12 { dockEnterAt = nil; dockHover = true; applyDock() }
+            else if Date().timeIntervalSince(dockEnterAt!) > 0.15 { dockEnterAt = nil; dockHover = true; applyDock() }
             return
         }
         dockEnterAt = nil
         if dockHover {
             if dockLeaveAt == nil { dockLeaveAt = Date() }
-            else if Date().timeIntervalSince(dockLeaveAt!) > 0.6 { dockHover = false; dockLeaveAt = nil; applyDock() }
+            else if Date().timeIntervalSince(dockLeaveAt!) > 0.3 { dockHover = false; dockLeaveAt = nil; applyDock() }
         }
     }
 
@@ -1091,7 +1091,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let p = NSEvent.mouseLocation, f = panel.frame
         guard f.contains(p) else { updateDockHover(false); return }
         if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
-        if Date().timeIntervalSince(hitRectsAt) > 0.25 {
+        // 贴着边时量得勤一点：探出来 / 缩回去要马上跟着鼠标
+        if Date().timeIntervalSince(hitRectsAt) > (dock != nil ? 0.08 : 0.25) {
             hitRectsAt = Date()
             web.evaluateJavaScript("hitRects()") { [weak self] r, _ in
                 guard let text = r as? String, let data = text.data(using: .utf8),

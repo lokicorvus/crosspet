@@ -496,6 +496,7 @@ namespace CrossPet
             var side = dock;
             if (side == null || hwnd == IntPtr.Zero) return;
             hit?.Children.Clear(); lastHitRects = null;   // 换了样子，可点区域重新量（旧的范围会让她误以为鼠标在身上，来回闪）
+            After(500, () => { lastHitRects = null; _ = UpdateHitRects(); });   // 新图换好后再量一次
             Native.GetWindowRect(hwnd, out var r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top;
             var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
@@ -545,24 +546,25 @@ namespace CrossPet
             };
             slideTimer.Start();
         }
-        /// <summary>缩着时鼠标移到露出来的那截上：探出来；移开 0.6 秒后缩回去</summary>
+        /// <summary>缩着时鼠标在露出来的那截上停 0.15 秒：探出来；移开 0.3 秒后缩回去</summary>
         void UpdateDockHover()
         {
             if (dock == null || dockOut || hwnd == IntPtr.Zero) return;
+            if (hit != null && hit.Children.Count == 0) _ = UpdateHitRects();   // 刚换了图：马上量能点的范围，探出来 / 缩回去才跟得上鼠标
             bool inside = hit != null && hit.IsMouseOver;   // 只算露出来的那截（能点的区域），窗口其余是透明的
             if (inside)
             {
                 dockLeaveAt = null;
                 if (dockHover) return;
                 if (dockEnterAt == null) dockEnterAt = DateTime.UtcNow;   // 停一小会儿才探出来，路过不算
-                else if ((DateTime.UtcNow - dockEnterAt.Value).TotalSeconds > 0.12) { dockEnterAt = null; dockHover = true; ApplyDock(); }
+                else if ((DateTime.UtcNow - dockEnterAt.Value).TotalSeconds > 0.15) { dockEnterAt = null; dockHover = true; ApplyDock(); }
                 return;
             }
             dockEnterAt = null;
             if (dockHover)
             {
                 if (dockLeaveAt == null) dockLeaveAt = DateTime.UtcNow;
-                else if ((DateTime.UtcNow - dockLeaveAt.Value).TotalSeconds > 0.6) { dockHover = false; dockLeaveAt = null; ApplyDock(); }
+                else if ((DateTime.UtcNow - dockLeaveAt.Value).TotalSeconds > 0.3) { dockHover = false; dockLeaveAt = null; ApplyDock(); }
             }
         }
 
