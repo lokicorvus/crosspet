@@ -171,7 +171,9 @@ function whenOf(id, p) {
   return WHEN[p] || '专属姿态'
 }
 const fileOf = u => decodeURIComponent(u.split('/').pop())
-const lineOf = (c, p) => ((c.lines || {})[p] || [])[0] || ''
+// 台词按姿态名找；多会话的左右两帧共用一组台词（busy_left / busy_right → busy，swamped_* → swamped）
+const lineKey = p => p.replace(/^(busy|swamped)_(left|right)$/, '$1')
+const lineOf = (c, p) => ((c.lines || {})[lineKey(p)] || [])[0] || ''
 
 // ---- 标记（存在本机）----
 let marks = {}
