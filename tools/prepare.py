@@ -2,7 +2,7 @@
 """把一张白底立绘处理成桌宠用的透明 WebP。
     python3 tools/prepare.py <输入图> <角色id> <姿态名>   → characters/<角色id>/<姿态名>.webp
 做的事：抠掉和图片边缘连通的白底（衣服里的白色不会被抠）→ 去掉飘在空中的小碎片（生图 AI 常画的汗滴、速度线、闪光）
-和贴地的扁平影子 → 比主角站得低的小帮手挪到同一条地面上 → 裁掉空白 → 统一缩放到 640 高（所有姿态同尺度）→ 存 WebP。
+和贴地的扁平影子 → 抠掉头发之间被围住的白缝（hairgap.py，只对发色分得开的角色）→ 比主角站得低的小帮手挪到同一条地面上 → 裁掉空白 → 统一缩放到 640 高（所有姿态同尺度）→ 存 WebP。
 """
 import os
 import sys
@@ -13,10 +13,15 @@ import numpy as np
 from PIL import Image, ImageFilter
 from scipy import ndimage
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hairgap import HAIR_HUE, clean  # noqa: E402
+
 CHARACTERS = Path(__file__).resolve().parent.parent / "characters"
 TARGET_H = 640
 BG_MIN = int(os.environ.get("BG_MIN", 215))
 BG_SPREAD = int(os.environ.get("BG_SPREAD", 28))
+# 配合严格的 BG_MIN / BG_SPREAD 用：先只抠很白的底（保住没描边的白花边、白围裙），再把紧贴着底、几像素以内的浅色光晕也去掉
+BG_HALO = int(os.environ.get("BG_HALO", 0))
 
 
 def background_mask(im: Image.Image) -> Image.Image:
@@ -53,6 +58,13 @@ def background_mask(im: Image.Image) -> Image.Image:
         for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
             if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx]:
                 q.append((nx, ny))
+    if BG_HALO:
+        a = np.array(im.convert("RGB")).astype(int)
+        light = (a.min(-1) > 225) & (a.max(-1) - a.min(-1) < 24)
+        bg = np.array(mask) == 0
+        for _ in range(BG_HALO):
+            bg |= ndimage.binary_dilation(bg) & light
+        mask = Image.fromarray(np.where(bg, 0, 255).astype(np.uint8), "L")
     return mask
 
 
@@ -120,6 +132,16 @@ def ground_helpers(im: Image.Image, labels, keep, main) -> Image.Image:
 
 def prepare(src: str, character: str, name: str) -> Path:
     im = Image.open(src).convert("RGBA")
+    skip = os.environ.get("SKIP_EDGE", "")
+    if skip in ("left", "right"):
+        # 切口那一侧，原图常留着几列白边：先裁掉（大半是白的列），不然不从那侧抠底时会留成一条白线
+        a = np.array(im.convert("RGB")).astype(int)
+        cols = ((a.min(-1) > 235) & (a.max(-1) - a.min(-1) < 20)).mean(0) > 0.6
+        n = 0
+        while n < len(cols) // 4 and cols[n if skip == "left" else -1 - n]:
+            n += 1
+        if n:
+            im = im.crop((n, 0, im.width, im.height) if skip == "left" else (0, 0, im.width - n, im.height))
     mask, labels, keep, main = drop_debris(background_mask(im))
     im.putalpha(mask)
     im = ground_helpers(im, labels, keep, main)  # 先挪，再柔化边缘，免得原位置留下一圈看不见的晕边
@@ -129,6 +151,8 @@ def prepare(src: str, character: str, name: str) -> Path:
     out_dir = CHARACTERS / character
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"{name}.webp"
+    if character in HAIR_HUE:  # 头发之间被围住的白缝（见 hairgap.py）
+        im = clean(im, HAIR_HUE[character])[0]
     im.save(out, "WEBP", quality=92, method=6)
     return out
 
