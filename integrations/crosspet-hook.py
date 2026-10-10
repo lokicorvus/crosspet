@@ -281,10 +281,12 @@ def installed(c) -> bool:
 SELF_HOSTS = ("claude", "gpt")
 if character in SELF_HOSTS:
     host = character
+    # 先看事件里的模型名（Claude Code 会话开始时给的、Codex 每条都给的，是实际要用的那个）；
+    # 环境变量只在事件里没有时兜底：CC Switch 之类会把它们写进 settings.json，但 Claude 桌面 App 登录的账号照样走 Anthropic
     env_model = os.environ.get("ANTHROPIC_MODEL", "") if host == "claude" else ""
     model = remember_session_model(host, env_model)
-    mapped = (character_for_url(os.environ.get("ANTHROPIC_BASE_URL", "")) if host == "claude" else None) \
-        or character_for_model(model)
+    mapped = character_for_model(model) \
+        or (character_for_url(os.environ.get("ANTHROPIC_BASE_URL", "")) if host == "claude" else None)
     if not installed(mapped):
         mapped = host
     character = mapped

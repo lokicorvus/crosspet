@@ -32,7 +32,7 @@
 - 修复：DeepSeek 女仆装贴边时围裙和裙摆花边是空的（透出后面的颜色）
 
 **用别家的模型时换成对应的角色**
-- Claude Code 走 DeepSeek、智谱 GLM 的兼容接口（ANTHROPIC_BASE_URL），或者用别家的模型名时，换成大肥鱼、GLM 来演；看接口地址和模型名，增强版 mod 每次请求都看，中途 /model 换了也跟得上
+- Claude Code 走 DeepSeek、智谱 GLM 的兼容接口时，换成大肥鱼、GLM 来演；看的是实际用的模型名（增强版 mod 还用 API 报的实际作答模型校正），中途 /model 换了也跟得上。CC Switch 写进配置的环境变量不会再让 Claude 桌面 App 被误认成 DeepSeek
 - Codex 换成别家模型（比如 model_provider 指向 DeepSeek）时同样换角色；认不出的模型还是由 Claude / GPT 自己来演
 - DeepSeek Harness 里用 GLM（比如通过 OpenCode Go）时换成 GLM 来演
 - 切到 Claude、Codex 的 App 时，按最近一次会话用的模型换角色；Windows 上 App 开在前台时中途换模型也会马上跟着换

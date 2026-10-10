@@ -21,9 +21,11 @@ async function write($: EngineInterface, file: string, data: unknown): Promise<v
 }
 const ID = 'claude'
 
-// 走别家的兼容接口（ANTHROPIC_BASE_URL 指向 DeepSeek / 智谱……，或者用别家的模型名）时换成对应的角色演，
-// 认不出的还是 Claude。每次向模型发请求前（turn.step）看一眼这次用的模型，中途 /model 换了也跟得上。
-// 接口地址比模型名可信：DeepSeek、智谱的 Anthropic 兼容接口也收 Claude 的模型名
+// 走别家的兼容接口（DeepSeek / 智谱……）时换成对应的角色演，认不出的还是 Claude。
+// 看的是模型名：每次请求前（turn.step）看这次要用的模型，回复回来再用 API 报的「实际作答的模型」校正，中途 /model 换了也跟得上。
+// 不看环境变量：CC Switch 之类会把 ANTHROPIC_BASE_URL / ANTHROPIC_MODEL 写进 settings.json，
+// 但 Claude 桌面 App 登录的账号照样走 Anthropic，只看环境变量会把它误认成 DeepSeek。
+// 接口地址只在模型名完全认不出时参考
 function characterForUrl(url: string): string | undefined {
   const u = url.toLowerCase()
   if (u.includes('deepseek.com')) return 'deepseek'
@@ -46,8 +48,9 @@ async function charactersDir($: EngineInterface): Promise<string> {
   return local ? `${local}\\CrossPet\\characters` : `${await $.env.get('HOME')}/Library/Application Support/CrossPet/characters`
 }
 async function noteModel($: EngineInterface, model: string): Promise<void> {
+  if (!model) return
   const sid = await $.session.id()
-  let who = characterForUrl((await $.env.get('ANTHROPIC_BASE_URL')) ?? '') ?? characterForModel(model) ?? ID
+  let who = characterForModel(model) ?? characterForUrl((await $.env.get('ANTHROPIC_BASE_URL')) ?? '') ?? ID
   if (who !== ID && !(await $.fs.exists(`${await charactersDir($)}/${who}/character.json`))) who = ID   // 这个角色没装
   const old = actors.get(sid)
   if (old === who) return
@@ -163,8 +166,6 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     void ensurePet($).catch(() => {})
-    // 还没发请求时先按环境变量猜（只配了 ANTHROPIC_BASE_URL / ANTHROPIC_MODEL 的情况）
-    await noteModel($, (await $.env.get('ANTHROPIC_MODEL')) ?? '').catch(() => {})
     await setState($, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
     const usage = await $.session.usage()
     const q = quotaOf(usage.rateLimits)
@@ -182,7 +183,9 @@ export const register: Register = on => {
   // 每次向模型发请求前：这次用的是哪个模型（只看主对话，子任务的不算）
   on('turn.step', async function* ($, e, next) {
     if (!e.agentId) await noteModel($, e.model).catch(() => {})
-    return yield* next(e)
+    const r = yield* next(e)
+    if (!e.agentId && r?.usage?.model) await noteModel($, r.usage.model).catch(() => {})   // API 报的实际作答模型
+    return r
   })
 
   on('tool.call', async ($, e, next) => {
