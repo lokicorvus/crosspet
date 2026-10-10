@@ -325,7 +325,12 @@ function renderQuota() {
   }))
   el.className = q?.low ? 'low' : ''
 }
-function restPose() { return quota[charId]?.low ? 'tired' : 'idle' }
+// 临时动作（打招呼、开心、被摸头……）演完回到哪：AI 还在干活 / 等你回答就回到那个样子，
+// 不然一条要跑好几分钟的命令中途她演了个招呼，之后一直没有新事件，就会站着不动
+function restPose() {
+  if (aiActivity()) { const p = charState[charId].pose; return p === 'listening' ? 'thinking' : p }
+  return quota[charId]?.low ? 'tired' : 'idle'
+}
 // 这个角色有没有某个姿态的专属立绘
 const hasPose = p => !!char()?.poses?.[p]
 // 角色外观相关的 CSS 变量：气泡边框、读书时飘的字符颜色
