@@ -1,10 +1,20 @@
 # 更新记录
 
-## 未发布
+## 1.3.1 · 修复 DeepSeek Harness 的第三方服务商被删（2026-10-10）
 
-**修复：接入 DeepSeek Harness 会删掉自己加的第三方服务商**
-- 以前重新接入、撤销，或者更新后自动刷新已接入的 AI 时，会连带删掉 Harness 写在 CrossPet 那段配置中间的东西（比如在 Harness 里加的第三方服务商）。现在只删 CrossPet 自己写的那几行
-- 已经被删掉的会自动找回：下次更新或重新接入 DeepSeek 时，从当时留下的备份里把被删的配置补回去（你后来自己重新加过的不会重复加），只找回这一次
+**出了什么问题**
+- 接入 DeepSeek Harness 时，CrossPet 会在 `cordis.patch.yml` 末尾加一小段配置。之后你在 Harness 里加第三方服务商（或者改别的设置），Harness 也写在文件末尾，正好落在 CrossPet 这段中间
+- 重新接入、撤销接入，或者更新 CrossPet 后自动刷新已接入的 AI 时，CrossPet 会把自己那段整段删掉再重写，夹在中间的服务商配置也被一起删了。更新到 1.3.0 时会自动刷新，所以接过 DeepSeek、又在 Harness 里加过服务商的，更新后服务商就不见了
+
+**修了什么**
+- 现在只删 CrossPet 自己写的那几行，别的内容一行不动
+- 已经被删的会自动找回：CrossPet 每次改这个文件前都留了备份（`cordis.patch.yml.bak-crosspet-时间`），更新到 1.3.1 时会从备份里把被误删的配置补回去。你后来自己重新加过的不会重复加；只找回这一次，以后你自己删掉的不会再被加回来
+
+**你要做的**
+1. 更新到 1.3.1（右键桌宠一键更新，或者重新下载安装）。更新时会自动刷新 DeepSeek 接入并找回配置，日志里会写「已从备份找回 N 条……」
+2. 完全退出 DeepSeek Harness（Windows 包括任务栏右下角的托盘图标，macOS 用 ⌘Q），再打开，看看服务商是否回来了
+3. 更新前别反复点「接入 DeepSeek」：备份只留最近 3 份，多点几次，存着服务商的那份就会被挤掉
+4. 如果没找回来，也可以手动恢复：到 `~/.dsh/profiles/desktop/`（Windows 是 `%USERPROFILE%\.dsh\profiles\desktop\`）找时间最新的那几份 `cordis.patch.yml.bak-crosspet-*`，把里面 `# ── CrossPet 桌宠` 和 `# ── CrossPet 结束 ──` 之间、不是 `crosspet` 的那些条目复制回 `cordis.patch.yml`
 
 ## 1.3.0 · 手忙脚乱、贴边、甩她红温、卫衣皮肤（2026-10-10）
 
