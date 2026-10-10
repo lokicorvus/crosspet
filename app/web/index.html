@@ -5,7 +5,12 @@
 :root { --aura: #ffd9b0; --aura-o: .35; }
 html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-select: none; cursor: default;
   font-family: -apple-system, "PingFang SC", sans-serif; }
-#wrap { display: flex; flex-direction: column; align-items: center; }
+/* 从下往上排：底栏（名牌 + 额度）固定高度贴着窗口底边，人物在它上面，气泡从人物头顶往上长。
+   这样名牌开关、额度有几行、台词有多长，人物都不挪位置，额度也不会被长台词挤出窗口
+   （Windows 上微软雅黑行高大，之前开着名牌、台词折两三行时额度会被挤出去） */
+#wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100vh; }
+#wrap > * { flex-shrink: 0; }
+#foot { height: 62px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
 #bubble { max-width: 228px; min-height: 18px; margin-top: 4px; padding: 5px 11px; border-radius: 12px;
   background: rgba(255,255,255,.95); border: 1.5px solid var(--accent, #e0b48a); color: #4a2418;
   font-size: 13px; line-height: 1.35; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.12);
@@ -134,8 +139,7 @@ html.no-name #caption { display: none; }
     <div id="cards"><div id="more"></div></div>
     <div id="poof"><i style="--dx:-60px;--dy:-30px"></i><i style="--dx:55px;--dy:-35px"></i><i style="--dx:-45px;--dy:40px"></i><i style="--dx:50px;--dy:35px"></i><i style="--dx:0;--dy:-60px"></i></div>
   </div>
-  <div id="caption"></div>
-  <div id="quota"></div>
+  <div id="foot"><div id="caption"></div><div id="quota"></div></div>
 </div>
 <script src="effects.js"></script>
 <script>
@@ -573,7 +577,7 @@ function justUpdated(version) {
 // Claude 的配置被别的工具改掉了（比如 CC Switch 3.x 切换服务商会整个重写 settings.json），外壳已经接回去了：说一声
 function configHealed() {
   if (egg || farewellLine !== null) return
-  const line = 'Claude 的配置被别的工具改掉了，我已经接回去啦～新开的会话生效'
+  const line = 'Claude 配置被改掉了，已接回～新会话生效'
   say(line)
   setTimeout(() => { if ($('bubble').textContent === line) say('') }, 9000)
 }

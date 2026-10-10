@@ -27,7 +27,8 @@ namespace CrossPet
     sealed class Pet
     {
         const string Repo = "lokicorvus/crosspet";
-        readonly CoreWebView2Environment env;
+        CoreWebView2Environment env;   // 浏览器进程崩溃后要换一个新的（见 RecoverWeb）
+        Grid grid;
         public Window Window { get; private set; }
         WebView2CompositionControl web;
         IntPtr hwnd;
@@ -68,7 +69,7 @@ namespace CrossPet
                 RestorePosition();
             };
 
-            var grid = new Grid();
+            grid = new Grid();
             web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
             grid.Children.Add(web);
             // 透明的接鼠标层：拖动 / 单击 / 右键由窗口自己处理（和 macOS 版的 DragView 一样），网页只负责画
@@ -142,6 +143,9 @@ namespace CrossPet
                 core.Settings.IsZoomControlEnabled = false;
                 core.Settings.IsStatusBarEnabled = false;
                 web.ZoomFactor = Scale;
+                // 网页进程 / 浏览器进程崩溃（显卡驱动、系统睡眠醒来、内存不够时偶尔会）：不处理的话她就一直停住，
+                // 之后每次调网页都报「控件已失效」
+                core.ProcessFailed += (_, a) => Window.Dispatcher.BeginInvoke(new Action(() => _ = RecoverWeb(a.ProcessFailedKind)));
                 core.NavigationCompleted += async (_, a) =>
                 {
                     ready = false;
@@ -169,6 +173,36 @@ namespace CrossPet
                 Store.Log("WebView2 初始化失败: " + e);
                 MessageBox.Show("桌宠画面启动失败：\n" + e.Message + "\n\n日志：" + Path.Combine(Store.Data, "windows.log"), "CrossPet");
             }
+        }
+
+        readonly List<DateTime> crashes = new List<DateTime>();
+        /// <summary>WebView2 崩溃后恢复：网页进程挂了就重新加载；浏览器进程挂了控件就废了，换新的环境和控件重来。
+        /// 显卡进程挂了 WebView2 会自己重启，不用管。10 分钟内最多恢复 3 次，免得一直崩一直重来</summary>
+        async Task RecoverWeb(CoreWebView2ProcessFailedKind kind)
+        {
+            Store.Log("WebView2 进程崩溃: " + kind);
+            if (kind == CoreWebView2ProcessFailedKind.GpuProcessExited) return;
+            crashes.RemoveAll(t => (DateTime.UtcNow - t).TotalMinutes > 10);
+            if (crashes.Count >= 3) { Store.Log("10 分钟内崩溃太多次，不再自动恢复"); return; }
+            crashes.Add(DateTime.UtcNow);
+            ready = false;
+            try
+            {
+                if (kind != CoreWebView2ProcessFailedKind.BrowserProcessExited && web?.CoreWebView2 != null)
+                {
+                    web.CoreWebView2.Reload();
+                    return;
+                }
+                var old = web;
+                web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
+                grid.Children.Remove(old);
+                grid.Children.Insert(0, web);
+                try { old.Dispose(); } catch { }
+                env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Store.Data, "webview2"));
+                await InitWeb();
+                Store.Log("WebView2 已恢复");
+            }
+            catch (Exception e) { Store.Log("WebView2 恢复失败: " + e); }
         }
 
         /// <summary>两个虚拟域名：程序自带的网页（安装目录）、角色立绘和数据（数据目录）。只在这两个域名里加载，外部网页一律不开</summary>
@@ -1157,15 +1191,27 @@ namespace CrossPet
                 var req = new HttpRequestMessage(HttpMethod.Get, $"https://api.github.com/repos/{Repo}/releases/latest");
                 req.Headers.UserAgent.ParseAdd("CrossPet/" + Store.Version);
                 var res = await http.SendAsync(req);
-                var body = Store.Json.DeserializeObject(await res.Content.ReadAsStringAsync()) as Dictionary<string, object>;
-                var tag = body?["tag_name"] as string;
+                Dictionary<string, object> body = null;
+                try { body = Store.Json.DeserializeObject(await res.Content.ReadAsStringAsync()) as Dictionary<string, object>; } catch { }
+                var tag = body != null && body.TryGetValue("tag_name", out var t) ? t as string : null;
+                var fromPage = false;
+                if (tag == null)
+                {
+                    // 接口限流（同一个网络每小时 60 次）或者返回了报错：改看网页 releases/latest 跳转到哪个版本（不限流，get.sh 也这么查）
+                    Store.Log($"检查更新：接口没给版本号（HTTP {(int)res.StatusCode}），改查网页");
+                    var page = await http.GetAsync($"https://github.com/{Repo}/releases/latest");
+                    var final = page.RequestMessage?.RequestUri?.AbsolutePath ?? "";
+                    var i = final.LastIndexOf("/tag/", StringComparison.Ordinal);
+                    if (i >= 0) { tag = Uri.UnescapeDataString(final.Substring(i + 5)); fromPage = true; }
+                }
                 if (tag != null && Newer(tag, Store.Version))
                 {
-                    var url = body.TryGetValue("html_url", out var u) && u is string s && s.StartsWith("https://github.com/") ? s : $"https://github.com/{Repo}/releases/latest";
+                    var url = body != null && body.TryGetValue("html_url", out var u) && u is string s && s.StartsWith("https://github.com/") ? s : $"https://github.com/{Repo}/releases/tag/{tag}";
                     var first = latestRelease?.tag != tag;
                     latestRelease = (tag, url);
                     updateZip = null;
-                    if (body.TryGetValue("assets", out var a) && a is object[] assets)
+                    if (fromPage) updateZip = $"https://github.com/{Repo}/releases/download/{tag}/CrossPet-Windows.zip";   // 包名固定（一键更新按名字找）
+                    else if (body.TryGetValue("assets", out var a) && a is object[] assets)
                         foreach (var asset in assets.OfType<Dictionary<string, object>>())
                             if (asset.TryGetValue("name", out var n) && n as string == "CrossPet-Windows.zip" &&
                                 asset.TryGetValue("browser_download_url", out var d) && d is string dl &&
@@ -1176,7 +1222,7 @@ namespace CrossPet
                     settings?.Push();
                     if (manual && updateZip == null) Open(url);
                 }
-                else if (manual) MessageBox.Show($"已经是最新版本（{Store.Version}）。", "CrossPet");
+                else if (manual) MessageBox.Show(tag == null ? "暂时连不上 GitHub，稍后再试。" : $"已经是最新版本（{Store.Version}）。", "CrossPet");
             }
             catch (Exception e)
             {

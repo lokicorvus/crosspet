@@ -208,8 +208,21 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
             guard let self = self else { return }
             let obj = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-            let tag = obj?["tag_name"] as? String ?? ""
-            let page = (obj?["html_url"] as? String).flatMap(URL.init(string:))
+            if let tag = obj?["tag_name"] as? String, !tag.isEmpty {
+                self.gotLatest(tag, page: (obj?["html_url"] as? String).flatMap(URL.init(string:)), manual: manual)
+                return
+            }
+            // 接口限流（同一个网络每小时 60 次）或者返回了报错：改看网页 releases/latest 跳转到哪个版本（不限流，get.sh 也这么查）
+            guard let latest = URL(string: "https://github.com/\(self.repoSlug)/releases/latest") else { return }
+            URLSession.shared.dataTask(with: URLRequest(url: latest, timeoutInterval: 15)) { [weak self] _, res, _ in
+                let path = res?.url?.path ?? ""
+                let tag = path.range(of: "/tag/").map { String(path[$0.upperBound...]) } ?? ""
+                self?.gotLatest(tag, page: res?.url, manual: manual)
+            }.resume()
+        }.resume()
+    }
+
+    func gotLatest(_ tag: String, page: URL?, manual: Bool) {
             DispatchQueue.main.async {
                 if !tag.isEmpty, let page = page, self.isNewer(tag, than: self.currentVersion) {
                     let isFresh = self.latestRelease?.tag != tag
@@ -223,7 +236,6 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                     alert.runModal()
                 }
             }
-        }.resume()
     }
 
     // 一键更新：在后台跑一遍官方安装命令（get.sh：下载最新的 macOS 安装包 → 替换 App → 按新版刷新已接入的 AI → 重新打开），
