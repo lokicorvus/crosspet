@@ -748,6 +748,7 @@ function applyCharState(id, s) {
   if (id !== charId || !s.pose) return
   lastActive = Date.now()
   if (multi) return   // 正在演多会话：她的样子由各对话的状态决定（refreshMulti），这里不动
+  if (Date.now() < shakingUntil && s.event !== 'Stop') return   // 正被甩着：先只记下状态，甩停了 resumeWork 回到最新的活上（不然晕和干活来回闪）
   clearTimeout(thinkTimer)
   watchStuck()
   const ev = s.event || ''
@@ -886,7 +887,7 @@ function react(afterWork) {
   }, 3500)
 }
 // 外壳检测到正在被甩（按住快速来回拖）时隔一会儿调一次；停下来就按红温值反应。
-// AI 正在干活时被甩：只抱怨一句，样子不动；火憋着，干完不庆祝、直接按火气生气（见 applyCharState 的 Stop）。
+// AI 正在干活时被甩：晕着抱怨一句，停手就回去干活；火憋着，干完不庆祝、直接按火气生气（见 applyCharState 的 Stop）。
 // 在等你回答：不切走提问的样子，只催你一句。多会话手忙脚乱：小卡片被甩得东倒西歪
 function shaken() {
   if (egg || tucked || farewellLine !== null || updatingNow || devHeld()) return
@@ -895,10 +896,22 @@ function shaken() {
   if (multi) { complain('shakeMulti', ['我已经够乱了！']); wobbleCards(); return }
   const ai = aiActivity()
   if (ai === 'asking') { complain('shakeAsk', ['别晃啦，快回答我呀！']); return }
-  if (ai === 'work') { complain('shakeWork', ['别晃啦，我在干活呢！']); return }   // 干活时只抱怨，样子不动，火憋着干完再发
   show('dizzy', true)   // 已经在晕也再调一次：重新计「晕」的 3 秒，一直甩就一直晕，不会中途闪回待机
   clearTimeout(shakeEndTimer)
+  if (ai === 'work') {   // 干活时被甩：晕着抱怨一句，停手就回去干活；火憋着，干完再发
+    complain('shakeWork', ['别晃啦，我在干活呢！'])
+    shakingUntil = Date.now() + 1200
+    shakeEndTimer = setTimeout(resumeWork, 1200)
+    return
+  }
   shakeEndTimer = setTimeout(react, 900)
+}
+// 甩停了：回到手上的活（AI 最新的那个动作；不换台词，抱怨还留在气泡里）
+function resumeWork() {
+  if (aiActivity() !== 'work') return react()
+  const p = charState[charId].pose
+  setPose(p === 'listening' ? 'thinking' : p)
+  shownAt = Date.now()
 }
 // AI 现在在干嘛：'asking'（等你回答）/ 'work'（干活）/ null（闲着）。看 AI 写来的最新状态，太久没动静的不算
 function aiActivity() {
@@ -910,7 +923,7 @@ function aiActivity() {
 }
 // 抱怨一句：同一种 4 秒内只说一次，3.5 秒后收起
 const complainedAt = {}
-let complainTimer = null, wobbleTimer = null
+let complainTimer = null, wobbleTimer = null, shakingUntil = 0
 function complain(key, fallback) {
   if (Date.now() - (complainedAt[key] || 0) < 4000) return
   complainedAt[key] = Date.now()
