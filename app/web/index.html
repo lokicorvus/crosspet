@@ -94,9 +94,6 @@ html.no-name #caption { display: none; }
 .m-angry { animation: angry .14s linear infinite; }
 .m-angry img { filter: drop-shadow(0 0 7px rgba(255, 60, 30, .75)) saturate(1.15); }
 .m-dizzy { animation: dizzy 1.1s ease-in-out infinite; }
-/* 气呼呼地干活：火气到了鼓脸以上还在干活时，整个人带着抖和红光（抖在外层，不和立绘自己的动作抢） */
-#stage.fuming { animation: angry .2s linear infinite; }
-#stage.fuming #body img { filter: drop-shadow(0 0 8px rgba(255, 50, 30, .8)) saturate(1.12); }
 /* 多会话时被甩：小卡片东倒西歪 */
 #cards.shaken .scard { animation: card-wobble .22s ease-in-out 4 alternate; }
 #cards.shaken .scard:nth-child(even) { animation-direction: alternate-reverse; }
@@ -751,7 +748,6 @@ function applyCharState(id, s) {
   if (id !== charId || !s.pose) return
   lastActive = Date.now()
   if (multi) return   // 正在演多会话：她的样子由各对话的状态决定（refreshMulti），这里不动
-  if (Date.now() < shakingUntil) return   // 正被甩着：先只记下状态，甩停了 resumeWork 再回到最新的活上（不然晕和干活来回闪）
   clearTimeout(thinkTimer)
   watchStuck()
   const ev = s.event || ''
@@ -780,16 +776,13 @@ function applyCharState(id, s) {
     }
     show('listening', true)
     thinkTimer = setTimeout(() => show('thinking'), LISTEN_TO_THINKING)
-  } else if (ev === 'Stop' && (s.pose === 'happy' || s.pose === 'proud') && !sulking && angerNow() >= 20) {
-    // 干活时被甩过、火气还没消：干完不说平常的开心话，「哼，做完了」，过一会儿再按火气给脸色（秋后算账）
-    show(s.pose, true)
-    say(pick(linesOf('doneAngry') || ['……做完了。哼。']))
+  } else if (ev === 'Stop' && (s.pose === 'happy' || s.pose === 'proud') && !sulking && angerLevel(angerNow())) {
+    // 干活时被甩、憋着的火还没消：干完不庆祝，直接按火气生气，说「干活时被你晃」的那套台词（秋后算账）
     clearTimeout(shakeEndTimer)
-    shakeEndTimer = setTimeout(react, 3000)
+    react('work')
   } else {
     show(s.pose)
   }
-  updateFuming()
 }
 
 // ---- 额度里的「社区梗」时刻 ----
@@ -873,14 +866,17 @@ function angerLevel(a) { return a >= 75 ? 'redhot' : a >= 45 ? 'puffed' : a >= 2
 function addAnger(n) { angerNow(); anger = Math.min(100, anger + n) }
 const angerBlocked = () => egg || tucked || multi || farewellLine !== null || updatingNow || devHeld()
 // 按现在的红温值做反应
-function react() {
+// afterWork：干活时被甩、干完才发作，换成 work 开头的那套台词（workAnnoyed / workPuffed / workRedhot）
+function react(afterWork) {
   if (angerBlocked()) return
   const lv = angerLevel(angerNow())
   if (!lv) return
   if (sulking) { show('sulk', true); return }
-  if (lv !== 'redhot') { show(lv, true); return }
+  const said = () => { if (afterWork) { const l = linesOf('work' + lv[0].toUpperCase() + lv.slice(1)); if (l) say(pick(l)) } }
+  if (lv !== 'redhot') { show(lv, true); said(); return }
   sulking = true; coax = 0
   show('redhot', true)
+  said()
   clearTimeout(sulkTimer)
   sulkTimer = setTimeout(() => {
     if (!sulking) return
@@ -890,8 +886,8 @@ function react() {
   }, 3500)
 }
 // 外壳检测到正在被甩（按住快速来回拖）时隔一会儿调一次；停下来就按红温值反应。
-// AI 正在干活时被甩：晕一下、抱怨一句，1 秒多回到手上的活，不进入不耐烦 / 鼓脸那几档；火气照样记着，干完再算账
-// （见 applyCharState 的 Stop）。在等你回答：不切走提问的样子，只催你一句。多会话手忙脚乱：小卡片被甩得东倒西歪
+// AI 正在干活时被甩：只抱怨一句，样子不动；火憋着，干完不庆祝、直接按火气生气（见 applyCharState 的 Stop）。
+// 在等你回答：不切走提问的样子，只催你一句。多会话手忙脚乱：小卡片被甩得东倒西歪
 function shaken() {
   if (egg || tucked || farewellLine !== null || updatingNow || devHeld()) return
   lastActive = Date.now()
@@ -899,10 +895,10 @@ function shaken() {
   if (multi) { complain('shakeMulti', ['我已经够乱了！']); wobbleCards(); return }
   const ai = aiActivity()
   if (ai === 'asking') { complain('shakeAsk', ['别晃啦，快回答我呀！']); return }
+  if (ai === 'work') { complain('shakeWork', ['别晃啦，我在干活呢！']); return }   // 干活时只抱怨，样子不动，火憋着干完再发
   show('dizzy', true)   // 已经在晕也再调一次：重新计「晕」的 3 秒，一直甩就一直晕，不会中途闪回待机
-  if (ai === 'work') { complain('shakeWork', ['别晃啦，我在干活呢！']); shakingUntil = Date.now() + 1200 }
   clearTimeout(shakeEndTimer)
-  shakeEndTimer = ai === 'work' ? setTimeout(resumeWork, 1200) : setTimeout(react, 900)
+  shakeEndTimer = setTimeout(react, 900)
 }
 // AI 现在在干嘛：'asking'（等你回答）/ 'work'（干活）/ null（闲着）。看 AI 写来的最新状态，太久没动静的不算
 function aiActivity() {
@@ -912,17 +908,9 @@ function aiActivity() {
   if (s.pose === 'asking') return 'asking'
   return NOT_WORKING.has(s.pose) ? null : 'work'
 }
-// 甩停了：回到手上的活（不换台词，抱怨还留在气泡里）
-function resumeWork() {
-  if (aiActivity() !== 'work') return react()
-  const p = charState[charId].pose
-  setPose(p === 'listening' ? 'thinking' : p)
-  shownAt = Date.now()
-  updateFuming()
-}
 // 抱怨一句：同一种 4 秒内只说一次，3.5 秒后收起
 const complainedAt = {}
-let complainTimer = null, wobbleTimer = null, shakingUntil = 0
+let complainTimer = null, wobbleTimer = null
 function complain(key, fallback) {
   if (Date.now() - (complainedAt[key] || 0) < 4000) return
   complainedAt[key] = Date.now()
@@ -937,11 +925,6 @@ function wobbleCards() {
   clearTimeout(wobbleTimer)
   wobbleTimer = setTimeout(() => c.classList.remove('shaken'), 1000)
 }
-// 气呼呼地干活：火气到了鼓脸以上、AI 还在干活时带着抖和红光；火气消了或者干完了就停
-function updateFuming() {
-  $('stage').classList.toggle('fuming', !multi && !tucked && !egg && pose !== 'dizzy' && aiActivity() === 'work' && angerNow() >= 45)
-}
-setInterval(updateFuming, 1000)
 function coaxHer() {
   if (sulking) {
     if (++coax >= 3) return forgive()
