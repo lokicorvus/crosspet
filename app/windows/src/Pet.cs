@@ -230,6 +230,7 @@ namespace CrossPet
                 foreach (var kind in new[] { "state", "quota", "sessions" })   // sessions：好几个对话同时干活时各自的状态
                 {
                     if (id == "current" && kind == "quota") continue;
+                    if (id == "deepseek" && kind == "quota" && !DsQuotaEnabled) continue;
                     var file = Path.Combine(Store.State, $"{id}-{kind}.json");
                     FileInfo fi;
                     try { fi = new FileInfo(file); if (!fi.Exists || fi.Length > 1_000_000) continue; } catch { continue; }
@@ -449,6 +450,8 @@ namespace CrossPet
         DateTime? dockLeaveAt, dockEnterAt;
         DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
+        /// <summary>DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉</summary>
+        static bool DsQuotaEnabled => !(Store.Settings.TryGetValue("dsQuota", out var v) && v is bool b && !b);
         static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
         static void After(int ms, Action a)
         {
@@ -751,7 +754,7 @@ namespace CrossPet
                 ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
-                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c =>
                 {
                     var d = new Dictionary<string, object>
@@ -810,6 +813,11 @@ namespace CrossPet
                             if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
+                        case "dsQuota":
+                            Store.Settings["dsQuota"] = on; Store.SaveSettings();
+                            stamps.Remove("deepseek-quota");   // 重新打开时马上读一次
+                            if (!on) Js("setQuota('deepseek', null)");
+                            break;
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id); break;

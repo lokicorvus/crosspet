@@ -481,7 +481,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
         for id in characterIds + ["current"] {
             // sessions：同一个 AI 好几个对话同时干活时，每个对话各自的状态（演「手忙脚乱」用）
-            for kind in ["state", "quota", "sessions"] where !(id == "current" && kind == "quota") {
+            for kind in ["state", "quota", "sessions"] where !(id == "current" && kind == "quota") && !(id == "deepseek" && kind == "quota" && !dsQuotaEnabled) {
                 let url = stateDir.appendingPathComponent("\(id)-\(kind).json")
                 let key = "\(id)-\(kind)"
                 guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -980,6 +980,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var dockLeaveAt: Date?
     var dockedAt = Date.distantPast   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
     var edgeDockEnabled: Bool { defaults.object(forKey: "edgeDock") as? Bool ?? true }
+    /// DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉
+    var dsQuotaEnabled: Bool { defaults.object(forKey: "dsQuota") as? Bool ?? true }
 
     func undock() {
         guard dock != nil else { return }
@@ -1234,7 +1236,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
-            "edgeDock": edgeDockEnabled,
+            "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled,
             "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { id -> [String: Any] in
@@ -1360,6 +1362,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
             case "agyQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
+            case "dsQuota":
+                let on = value as? Bool ?? true
+                defaults.set(on, forKey: "dsQuota")
+                stamps["deepseek-quota"] = nil   // 重新打开时马上读一次
+                if !on { js("setQuota('deepseek', null)") }
             case "edgeDock":
                 let on = value as? Bool ?? true
                 defaults.set(on, forKey: "edgeDock")
