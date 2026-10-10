@@ -427,7 +427,7 @@ namespace CrossPet
                 pressed = false;
                 hit.ReleaseMouseCapture();
                 Undock();
-                // 甩：拖动时横向来回反转方向（记住这个方向上的最远点，往回超过 18 算一次反转），0.9 秒内两次以上就算在甩（逗她）
+                // 甩：拖动时横向来回反转方向（记住这个方向上的最远点，往回超过 18 算一次反转），0.9 秒内两次以上就算在甩（惹她生气）
                 bool shook = false; double swingX = Window.Left, swingDir = 0; var swings = new List<DateTime>(); var lastShake = DateTime.MinValue;
                 EventHandler onMove = (_, __) =>
                 {
@@ -659,7 +659,6 @@ namespace CrossPet
             }
             menu.Items.Add(Item("摸摸头", () => Js("handleClick('pat')")));
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
-            menu.Items.Add(Item("逗她", () => Js("tease()")));
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
             Sep();
             var switchTo = new Forms.ToolStripMenuItem("换角色");

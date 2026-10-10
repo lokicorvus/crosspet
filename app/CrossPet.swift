@@ -21,7 +21,7 @@ final class DragView: NSView {
     var onMenu: ((NSEvent) -> Void)?
     var onDragStart: (() -> Void)?
     var onDragEnd: (() -> Void)?
-    var onShake: (() -> Void)?        // 按住快速来回甩（逗她）
+    var onShake: (() -> Void)?        // 按住快速来回甩（惹她生气）
     private var shook = false          // 这次拖动甩过：松手不贴边
     private var swingX: CGFloat = 0, swingDir: CGFloat = 0, swings: [Date] = [], shakeSaid = Date.distantPast
     private var downAt: NSPoint = .zero
@@ -726,7 +726,6 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         }
         add(menu, "摸摸头", #selector(pat))
         add(menu, "戳一下", #selector(poke))
-        add(menu, "逗她", #selector(tease))
         add(menu, "召唤彩蛋", #selector(egg))
         if characterIds.count > 1 {
             menu.addItem(.separator())
@@ -824,7 +823,6 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     @objc func pat() { js("handleClick('pat')") }
     @objc func poke() { js("handleClick('poke')") }
     @objc func egg() { js("playEgg(true)") }
-    @objc func tease() { js("tease()") }
 
     @objc func switchCharacter(_ item: NSMenuItem) {
         guard let value = item.representedObject as? String else { return }

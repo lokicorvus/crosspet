@@ -148,7 +148,7 @@ const MOTION = {
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
-  // 逗她 / 红温
+  // 甩她 / 红温
   annoyed: 'm-rock', puffed: 'm-jolt', redhot: 'm-angry', sulk: 'm-slow', dizzy: 'm-dizzy', coaxed: 'm-sway', forgiven: 'm-hop',
   // 按时段 / 节日打招呼
   greet_morning: 'm-hop', greet_noon: 'm-bob', greet_afternoon: 'm-sway', greet_evening: 'm-sway', greet_night: 'm-slow', greet_dawn: 'm-slow',
@@ -841,11 +841,11 @@ function handleClick(kind) {
   show(kind === 'poke' ? pokePose : 'pat', true)
 }
 
-// ---- 逗她 / 红温 ----
-// 右键「逗她」说她最在意的事（character.json 的 tease），或者按住她快速来回甩，红温值往上加：
+// ---- 甩她 / 红温 ----
+// 按住她快速来回甩，红温值往上加（甩 1 秒左右不耐烦，3～4 秒红温）：
 // 20 不耐烦（annoyed）→ 45 鼓脸（puffed）→ 75 红温（redhot，冒蒸汽、发抖），红温后背过身去赌气（sulk）。
 // 生气时摸她就是哄（coaxed）：赌气时摸三下原谅你（forgiven），没到红温时摸一下降一档。红温值不管它会慢慢降
-let anger = 0, angerAt = Date.now(), sulking = false, coax = 0, sulkTimer = null, shakeEndTimer = null, lastTease = ''
+let anger = 0, angerAt = Date.now(), sulking = false, coax = 0, sulkTimer = null, shakeEndTimer = null
 // 已经是这个动作时 show 不会换台词：哄她时每下都说一句
 const showSay = p => { const was = pose; show(p, true); if (was === p) say(pick(linesOf(p) || [''])) }
 const ANGER_DECAY = 2   // 每秒降多少（赌气时不降，要哄）
@@ -856,10 +856,10 @@ function angerNow() {
 }
 function angerLevel(a) { return a >= 75 ? 'redhot' : a >= 45 ? 'puffed' : a >= 20 ? 'annoyed' : null }
 function addAnger(n) { angerNow(); anger = Math.min(100, anger + n) }
-const teaseBlocked = () => egg || tucked || multi || farewellLine !== null || updatingNow || devHeld()
+const angerBlocked = () => egg || tucked || multi || farewellLine !== null || updatingNow || devHeld()
 // 按现在的红温值做反应
 function react() {
-  if (teaseBlocked()) return
+  if (angerBlocked()) return
   const lv = angerLevel(angerNow())
   if (!lv) return
   if (sulking) { show('sulk', true); return }
@@ -874,20 +874,9 @@ function react() {
     sulkTimer = setTimeout(() => { if (sulking) { sulking = false; anger = 30; angerAt = Date.now(); show('idle', true) } }, 45000)
   }, 3500)
 }
-function tease() {
-  if (teaseBlocked()) return
-  const lines = linesOf('tease')
-  if (!lines) return
-  lastActive = Date.now()
-  clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(thinkTimer)
-  const options = lines.length > 1 ? lines.filter(l => l !== lastTease) : lines   // 不连着说同一句
-  lastTease = pick(options)
-  say(`你：「${lastTease}」`)
-  setTimeout(() => { addAnger(30); react() }, 1600)
-}
 // 外壳检测到正在被甩（按住快速来回拖）时隔一会儿调一次；停下来就按红温值反应
 function shaken() {
-  if (teaseBlocked()) return
+  if (angerBlocked()) return
   lastActive = Date.now()
   addAnger(7)
   if (pose !== 'dizzy') show('dizzy', true)
