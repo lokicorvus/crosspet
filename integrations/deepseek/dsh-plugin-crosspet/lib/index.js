@@ -68,12 +68,20 @@ export function apply(ctx, config = {}) {
   // 当前在用的模型对应的角色：每条会话事件都看一眼会话的请求路由（和 Harness 自带插件一样用 requestContext）
   const custom = config.characters && typeof config.characters === "object" ? config.characters : {};
   let character = ID;
+  // 最近一次请求走的服务商：记在 <状态目录>/deepseek-host.json，Harness 重新打开、还没发消息时先按上次的算
+  let provider = null;
+  try { provider = JSON.parse(readFileSync(join(dir, `${ID}-host.json`), "utf8")).provider || null; } catch {}
   function noteRoute(session) {
     let route;
     try { route = session?.requestContext?.(); } catch { return; }
     if (!route?.provider && !route?.model) return;
     const next = characterFor(route.provider, route.model, custom);
-    if (next === character) return;
+    const switched = route.provider && route.provider !== provider;
+    if (switched) {
+      provider = route.provider;
+      publishQuota();   // 换了服务商：余额该显示还是该藏起来
+    }
+    if (next === character && !switched) return;
     character = next;
     writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
       .catch(() => {});
@@ -249,7 +257,18 @@ export function apply(ctx, config = {}) {
     ctx.logger?.warn?.(`crosspet: 账号服务不可用 ${String(e?.message ?? e)}`);
   }
 
-  const show = (total, currency, available = true) => writeJson(`${ID}-quota.json`, {
+  // 余额只属于 DeepSeek 官方的两个服务商（登录的账号、填的 API Key）。正在用别家的服务商
+  // （OpenCode Go、OpenRouter、自定义网关……）时官方余额跟她干活没关系：不显示，也不因为余额低没精神
+  const OFFICIAL = new Set(["deepseek-account", "deepseek-official"]);
+  let lastQuota = null;
+  function publishQuota() {
+    if (provider && !OFFICIAL.has(provider)) return writeJson(`${ID}-quota.json`, { text: "", low: false }).catch(() => {});
+    if (lastQuota) return writeJson(`${ID}-quota.json`, lastQuota).catch(() => {});
+    return Promise.resolve();
+  }
+  const setQuota = (q) => { lastQuota = q; return publishQuota(); };
+
+  const show = (total, currency, available = true) => setQuota({
     text: `余额 ${currency === "USD" ? "$" : "¥"}${total.toFixed(2)}`,
     balance: total,  // 桌宠比对用：余额变多（充值）时播「大口吃白饭」
     low: !available || total < lowBalance,
@@ -299,7 +318,7 @@ export function apply(ctx, config = {}) {
       if (byKey === "ok" || byAccount === "ok") return;
       if (byKey === "no-key" && ["no-account", "not-signed-in"].includes(byAccount)) {
         // 两样都没有：名牌上说清楚怎么办，别一声不吭
-        await writeJson(`${ID}-quota.json`, { text: "余额：请在 Harness 登录账号或填 API Key", low: false });
+        await setQuota({ text: "余额：请在 Harness 登录账号或填 API Key", low: false });
         return;
       }
       ctx.logger?.warn?.(`crosspet: 查余额失败（API Key：${byKey}，账号：${byAccount}）`);
