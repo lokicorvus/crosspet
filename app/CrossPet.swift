@@ -16,6 +16,15 @@ import WebKit
 let defaults = UserDefaults.standard
 let stateDir = URL(fileURLWithPath: "/tmp/crosspet", isDirectory: true)
 
+enum PerformanceMode: String, CaseIterable {
+    case eco, balanced, full
+    var title: String { switch self { case .eco: return "省电"; case .balanced: return "均衡"; case .full: return "完整" } }
+    var stateInterval: TimeInterval { switch self { case .eco: return 1; case .balanced: return 0.5; case .full: return 0.3 } }
+    var pointerInterval: TimeInterval { switch self { case .eco: return 0.2; case .balanced: return 0.1; case .full: return 0.05 } }
+    var hitCacheInterval: TimeInterval { switch self { case .eco: return 1; case .balanced: return 0.5; case .full: return 0.25 } }
+    var scaleFPS: Double { switch self { case .eco: return 15; case .balanced: return 30; case .full: return 60 } }
+}
+
 final class DragView: NSView {
     var onClick: (() -> Void)?
     var onMenu: ((NSEvent) -> Void)?
@@ -49,6 +58,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var panel: NSPanel!
     var web: WKWebView!
     var timer: Timer?
+    var pointerTimer: Timer?
+    var hostLifecycle: HostLifecycle?
+    var lifecycleApplicationLookup: (String) -> [NSRunningApplication] = {
+        NSRunningApplication.runningApplications(withBundleIdentifier: $0)
+    }
     var quotaTimer: Timer?
     var ready = false
     var currentId: String?
@@ -76,6 +90,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // MARK: 启动
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        guard configureHostLifecycle() else { return }
         syncBundledResources()
         markLaunched()
 
@@ -117,8 +132,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
-        timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.updateClickThrough() }
+        configurePerformanceTimers()
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
         // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
         Timer.scheduledTimer(withTimeInterval: 3 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
@@ -126,6 +140,73 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 30) { self?.checkForUpdate(manual: false) }   // 等网络连上
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkForUpdate(manual: false) }
+    }
+
+    var performanceMode: PerformanceMode {
+        if let raw = defaults.string(forKey: "performanceMode"), let mode = PerformanceMode(rawValue: raw) { return mode }
+        return .full
+    }
+
+    func configurePerformanceTimers() {
+        timer?.invalidate(); pointerTimer?.invalidate()
+        let mode = performanceMode
+        timer = Timer.scheduledTimer(withTimeInterval: mode.stateInterval, repeats: true) { [weak self] _ in
+            guard let self, self.hostLifecycle?.check() != false else { return }
+            self.pollStates()
+        }
+        timer?.tolerance = mode == .full ? 0 : mode.stateInterval * 0.2
+        pointerTimer = Timer.scheduledTimer(withTimeInterval: mode.pointerInterval, repeats: true) { [weak self] _ in self?.updateClickThrough() }
+        pointerTimer?.tolerance = mode == .full ? 0 : mode.pointerInterval * 0.2
+    }
+
+    func applyPerformanceMode(_ mode: PerformanceMode) {
+        defaults.set(mode.rawValue, forKey: "performanceMode")
+        configurePerformanceTimers()
+        js("setPerformanceMode(\(quote(mode.rawValue)))")
+        updateStatusTooltip()
+        pushSettings()
+    }
+
+    @objc func selectPerformanceMode(_ sender: NSMenuItem) {
+        if let raw = sender.representedObject as? String, let mode = PerformanceMode(rawValue: raw) { applyPerformanceMode(mode) }
+    }
+
+    // MARK: 可选的应用生命周期绑定（只决定退出，不代替工作事件接入）
+    var lifecycleHost: String { defaults.string(forKey: "lifecycleHost") ?? "" }
+
+    @discardableResult
+    func configureHostLifecycle() -> Bool {
+        hostLifecycle?.stop()
+        hostLifecycle = nil
+        guard !lifecycleHost.isEmpty else { return true }
+        let lifecycle = HostLifecycle(hostBundleIdentifier: lifecycleHost,
+                                      applicationLookup: lifecycleApplicationLookup) { NSApp.terminate(nil) }
+        hostLifecycle = lifecycle
+        return lifecycle.start()
+    }
+
+    func applyLifecycleHost(_ identifier: String) {
+        // Select an already running app, so enabling a binding cannot immediately
+        // close the settings window. An absent saved host still exits at startup.
+        guard identifier.isEmpty || (identifier != Bundle.main.bundleIdentifier &&
+            !lifecycleApplicationLookup(identifier).filter({ !$0.isTerminated }).isEmpty) else {
+            settingsWeb?.evaluateJavaScript("notice('请先打开要绑定的应用，再重新打开设置')", completionHandler: nil)
+            return
+        }
+        defaults.set(identifier, forKey: "lifecycleHost")
+        configureHostLifecycle()
+    }
+
+    func lifecycleHostOptions() -> [[String: String]] {
+        var labels: [String: String] = [:]
+        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && !app.isTerminated {
+            guard let id = app.bundleIdentifier, id != Bundle.main.bundleIdentifier else { continue }
+            labels[id] = app.localizedName ?? id
+        }
+        if !lifecycleHost.isEmpty && labels[lifecycleHost] == nil { labels[lifecycleHost] = lifecycleHost }
+        return [["id": "", "name": "不绑定（默认）"]] + labels.sorted {
+            $0.value.localizedStandardCompare($1.value) == .orderedAscending
+        }.map { ["id": $0.key, "name": $0.value] }
     }
 
     // MARK: 更新
@@ -296,8 +377,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             return
         }
         ready = true
+        js("setPerformanceMode(\(quote(performanceMode.rawValue))); setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled))")
         loadCharacters()
-        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled))")
         stamps = [:]
         pollStates()
         refreshGPTQuota()
@@ -641,6 +722,18 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func buildMenu() -> NSMenu {
         let menu = NSMenu()
+        let performanceItem = NSMenuItem(title: "运行模式：\(performanceMode.title)", action: nil, keyEquivalent: "")
+        let performanceMenu = NSMenu()
+        for mode in PerformanceMode.allCases {
+            let item = NSMenuItem(title: mode.title, action: #selector(selectPerformanceMode(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.state = performanceMode == mode ? .on : .off
+            performanceMenu.addItem(item)
+        }
+        performanceItem.submenu = performanceMenu
+        menu.addItem(performanceItem)
+        menu.addItem(.separator())
         if let r = latestRelease {
             if canSelfUpdate {
                 add(menu, updating ? "⬆️ 正在更新到 \(r.tag)…" : "⬆️ 更新到 \(r.tag)", #selector(selfUpdate))
@@ -701,12 +794,16 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             let image = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "CrossPet")
             image?.isTemplate = true
             button.image = image
-            button.toolTip = "CrossPet：单击把她叫到最前面，右键打开菜单"
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         statusItem = item
+        updateStatusTooltip()
+    }
+
+    func updateStatusTooltip() {
+        statusItem?.button?.toolTip = "CrossPet · \(performanceMode.title)模式：单击把她叫到最前面，右键打开菜单"
     }
 
     @objc func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -821,6 +918,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         try? String(ProcessInfo.processInfo.processIdentifier).write(to: stateDir.appendingPathComponent("pet.pid"), atomically: true, encoding: .utf8)
     }
     func applicationWillTerminate(_ note: Notification) {
+        hostLifecycle?.stop()
         try? FileManager.default.removeItem(at: stateDir.appendingPathComponent("pet.pid"))
     }
 
@@ -882,7 +980,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let p = NSEvent.mouseLocation, f = panel.frame
         guard f.contains(p) else { return }
         if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
-        if Date().timeIntervalSince(hitRectsAt) > 0.25 {
+        if Date().timeIntervalSince(hitRectsAt) > performanceMode.hitCacheInterval {
             hitRectsAt = Date()
             web.evaluateJavaScript("hitRects()") { [weak self] r, _ in
                 guard let text = r as? String, let data = text.data(using: .utf8),
@@ -959,7 +1057,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let from = shownScale > 0 ? shownScale : petScale
         guard abs(target - from) > 0.06 else { shownScale = target; applyScale(target); return }
         let start = Date()
-        scaleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] t in
+        scaleTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / performanceMode.scaleFPS, repeats: true) { [weak self] t in
             guard let self else { t.invalidate(); return }
             let k = min(1, Date().timeIntervalSince(start) / 0.2)
             let eased = 1 - pow(1 - k, 3)
@@ -1008,6 +1106,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0, "defaultName": defaultNames[$0] ?? $0, "custom": names[$0] ?? ""] },
             "updating": updating,
+            "performanceMode": performanceMode.rawValue,
+            "lifecycleHost": lifecycleHost, "lifecycleHosts": lifecycleHostOptions(),
         ]
         if let r = latestRelease, canSelfUpdate { state["update"] = r.tag }
         if let list = integrated, integrateScript != nil {
@@ -1105,6 +1205,10 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             guard let key = msg["key"] as? String else { return }
             let value = msg["value"]
             switch key {
+            case "performanceMode":
+                if let raw = value as? String, let mode = PerformanceMode(rawValue: raw) { applyPerformanceMode(mode) }
+            case "lifecycleHost":
+                if let id = value as? String { applyLifecycleHost(id) }
             case "size":
                 if let n = value as? Double { let v = min(1.6, max(0.6, (n * 100).rounded() / 100)); defaults.set(v, forKey: "size"); animateScale(to: CGFloat(v)) }
             case "showName":
@@ -1357,11 +1461,16 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
 }
 
-let app = NSApplication.shared
-let delegate = App()
-app.delegate = delegate
-app.setActivationPolicy(.accessory)
-app.run()
+@main
+struct CrossPetMain {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = App()
+        app.delegate = delegate
+        app.setActivationPolicy(.accessory)
+        withExtendedLifetime(delegate) { app.run() }
+    }
+}
 
 /// 只信任本机 127.0.0.1 的自签名证书（Antigravity 后台服务用的是自签名 HTTPS）
 final class LocalhostTrust: NSObject, URLSessionDelegate {

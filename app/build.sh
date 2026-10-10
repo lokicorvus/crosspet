@@ -31,7 +31,7 @@ PLIST
 
 # 两种芯片各编一份，再合成一个通用二进制
 for arch in arm64 x86_64; do
-  swiftc -O -target "$arch-apple-macos13.0" app/CrossPet.swift -o "build/CrossPet-$arch" \
+  swiftc -parse-as-library -O -target "$arch-apple-macos13.0" app/CrossPet.swift app/HostLifecycle.swift -o "build/CrossPet-$arch" \
     -framework Cocoa -framework WebKit -framework ServiceManagement
 done
 lipo -create build/CrossPet-arm64 build/CrossPet-x86_64 -output "$APP/Contents/MacOS/CrossPet"

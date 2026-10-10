@@ -56,6 +56,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 </div>
 
 <div class="card">
+  <div class="item hidden" data-only="performanceMode" id="performanceRow"><div class="label">运行模式：<b id="performanceLabel"></b><small id="performanceHint"></small></div>
+    <div class="ctl"><div class="seg" id="performance" aria-label="运行模式"><button data-v="eco" aria-pressed="false">省电</button><button data-v="balanced" aria-pressed="false">均衡</button><button data-v="full" aria-pressed="false">完整</button></div></div></div>
   <h2>外观</h2>
   <div class="item"><div class="label">大小</div>
     <div class="ctl"><input type="range" id="size" min="0.6" max="1.6" step="0.01"><span class="val" id="sizeVal"></span><button data-reset-size>还原</button></div></div>
@@ -96,6 +98,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 
 <div class="card">
   <h2>其他</h2>
+  <div class="item hidden" data-only="lifecycleHost" id="lifecycleRow"><div class="label">跟随应用退出<small>只跟随选中的应用；最后一个实例完全退出后桌宠退出，关闭窗口或切到后台不会退出。先打开应用再打开设置以选择。启动仍由工作事件或手动打开触发。</small></div>
+    <div class="ctl"><select id="lifecycleHost" aria-label="跟随应用退出" style="max-width: 180px"></select></div></div>
   <div class="item"><div class="label" id="loginLabel">登录时自动启动</div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="login"><span></span></label></div></div>
   <div class="item"><div class="label">AI 开始工作时自动出现<small>接入的 AI 开始干活时，桌宠没开着就自己打开；从菜单退出后，要等重新打开 AI 或重启电脑才会再自己出现</small></div>
@@ -133,7 +137,16 @@ function setState(s) {
   $('sizeVal').textContent = Math.round(s.size * 100) + '%'
   for (const el of document.querySelectorAll('[data-key]')) el.checked = !!s[el.dataset.key]
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
+  $('lifecycleHost').replaceChildren(...(s.lifecycleHosts || []).map(h => new Option(h.name, h.id, false, h.id === s.lifecycleHost)))
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
+  const modes = { eco: ['省电', '静态姿态，少量眨眼；工作状态和点击照常响应'], balanced: ['均衡', '持续动画约每秒 10 次，保留特效；图片按需加载'], full: ['完整', '原有动画频率，预加载全部角色图片'] }
+  const mode = modes[s.performanceMode]
+  $('performanceLabel').textContent = mode?.[0] || ''
+  $('performanceHint').textContent = mode?.[1] || ''
+  for (const b of $('performance').children) {
+    const selected = b.dataset.v === s.performanceMode
+    b.classList.toggle('on', selected); b.setAttribute('aria-pressed', String(selected))
+  }
   const sel = $('character')
   sel.replaceChildren(...s.characters.map(c => new Option(c.name, c.id, false, c.id === s.character)))
   const cur = s.characters.find(c => c.id === s.character)
@@ -166,10 +179,12 @@ function notice(text) { toast(text) }
 
 for (const el of document.querySelectorAll('[data-key]')) el.onchange = () => post({ cmd: 'set', key: el.dataset.key, value: el.checked })
 for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
+for (const b of $('performance').children) b.onclick = () => post({ cmd: 'set', key: 'performanceMode', value: b.dataset.v })
 for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
 $('size').oninput = () => { $('sizeVal').textContent = Math.round($('size').value * 100) + '%'; post({ cmd: 'set', key: 'size', value: +$('size').value }) }
 document.querySelector('[data-reset-size]').onclick = () => post({ cmd: 'set', key: 'size', value: 1 })
 $('character').onchange = () => post({ cmd: 'set', key: 'character', value: $('character').value })
+$('lifecycleHost').onchange = () => post({ cmd: 'set', key: 'lifecycleHost', value: $('lifecycleHost').value })
 const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
 $('saveName').onclick = saveName
 $('name').onkeydown = e => { if (e.key === 'Enter') saveName() }

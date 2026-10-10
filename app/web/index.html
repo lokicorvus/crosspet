@@ -81,6 +81,9 @@ html.no-name #caption { display: none; }
 #wrap.sunk { opacity: 0; }
 #wrap.surface { animation: surface .45s cubic-bezier(.2,.8,.2,1); }
 @keyframes surface { from { opacity: 0; transform: translateY(5%) scale(.97); } to { opacity: 1; transform: none; } }
+/* Eco: redraw for state changes, without continuous animation loops. */
+html.low-power #body, html.low-power #aura, html.low-power #wrap, html.low-power #poof i { animation: none !important; }
+html.low-power #bubble, html.low-power #stage, html.low-power #body img, html.low-power #fx, html.low-power #aura { transition: none !important; }
 </style></head>
 <body>
 <div id="wrap">
@@ -95,6 +98,7 @@ html.no-name #caption { display: none; }
   <div id="quota"></div>
 </div>
 <script src="effects.js"></script>
+<script src="performance.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -139,6 +143,26 @@ let active = document.getElementById('a'), spare = document.getElementById('b')
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let lastActive = Date.now()
 const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
+let performanceMode = 'full'
+const preloadedImages = new Set()
+function preloadImages() {
+  for (const c of Object.values(manifest.characters))
+    for (const list of Object.values(c.poses)) for (const u of list) {
+      if (preloadedImages.has(u)) continue
+      preloadedImages.add(u)
+      const i = new Image(); i.src = u
+    }
+}
+function setPerformanceMode(mode) {
+  if (!['eco', 'balanced', 'full'].includes(mode)) return
+  performanceMode = mode
+  document.documentElement.classList.toggle('low-power', mode === 'eco')
+  CrossPetPerformance.setMode(mode)
+  clearInterval(longThinkTimer)
+  longThinkTimer = setInterval(checkLongThink, mode === 'full' ? 1000 : 5000)
+  if (mode === 'full') preloadImages()
+  if (pose) setFx(pose, true)
+}
 
 const char = () => manifest.characters[charId]
 const linesOf = p => (char()?.lines && char().lines[p]) || LOCAL_LINES[p]
@@ -184,11 +208,13 @@ setInterval(() => {
 function setFx(p, instant) {
   const fx = $('fx')
   const render = () => {
+    if (performanceMode === 'eco') { fx.replaceChildren(); fx.classList.remove('hide'); return }
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
     const named = char()?.fx?.[p]
     const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
+    CrossPetPerformance.refresh()
   }
   if (instant) { render(); return }
   fx.classList.add('hide')
@@ -200,6 +226,7 @@ function setPose(p, instant) {
   const frames = framesFor(p)
   showImage(instant ? frames[0] : pick(frames), instant)
   $('body').className = MOTION[p] || 'm-bob'
+  CrossPetPerformance.refresh()
   const aura = (window.CrossFx && CrossFx.AURA[p]) || ['#ffd9b0', .35]
   document.documentElement.style.setProperty('--aura', aura[0])
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
@@ -212,6 +239,7 @@ function setAuraMode(mode) {
   const c = document.documentElement.classList
   c.toggle('aura-on', mode === 'on')
   c.toggle('aura-off', mode === 'off')
+  CrossPetPerformance.refresh()
 }
 // 能点到的区域（网页像素，[x, y, 宽, 高]）：桌宠本体、气泡、名牌、额度。窗口其余透明的地方让点击穿过去，
 // 点到后面的窗口（窗口比桌宠大，是给动作、气泡留的空间）
@@ -294,8 +322,8 @@ function show(p, urgent) {
 // ---- 由 Swift 调用 ----
 function init(m) {
   manifest = m
-  for (const c of Object.values(m.characters))
-    for (const list of Object.values(c.poses)) for (const u of list) { const i = new Image(); i.src = u }
+  // Reduced modes load images on demand; original full mode keeps preloading.
+  if (performanceMode === 'full') preloadImages()
   if (!charId || !manifest.characters[charId]) setCharacter(Object.keys(m.characters).find(k => !m.characters[k].egg), true)
   else { $('caption').textContent = char().name }
 }
@@ -596,10 +624,14 @@ function devStatus() {
 }
 
 // ---- 闲着的时候：偶尔哼歌 / 伸懒腰 / 打哈欠，太久没动静就睡 ----
+let lastIdleAttempt = 0
 setInterval(() => {
   if (devHeld() || egg || (pose !== 'idle' && pose !== 'tired')) return
   const quiet = Date.now() - lastActive
   if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
+  if (performanceMode === 'eco') return
+  if (performanceMode === 'balanced' && Date.now() - lastIdleAttempt < 60000) return
+  lastIdleAttempt = Date.now()
   if (Math.random() > .42) return
   const builtin = ['hum', 'stretch', ...(quiet > 3 * 60 * 1000 ? ['yawn'] : [])]
   const own = (char()?.idleActions || []).filter(hasPose)
@@ -610,11 +642,12 @@ setInterval(() => {
 }, 20000)
 
 // 想得久了换成专属的「深度思考」：character.json 里 longThink: { after: 秒, pose: 姿态 }
-setInterval(() => {
+function checkLongThink() {
   const lt = char()?.longThink
   if (!lt || devHeld() || egg || pose !== 'thinking' || !hasPose(lt.pose)) return
   if (Date.now() - poseSince > (lt.after || 20) * 1000) show(lt.pose, true)
-}, 1000)
+}
+let longThinkTimer = setInterval(checkLongThink, 1000)
 
 // ---- 彩蛋：角色闲着时，偶尔变成 cos 它的 DeepSeek ----
 // 流程：跳出来 → 装模作样（一直装，等你点她）→ 你点一下 → 被识破 → 溜走 → 变回原角色
@@ -696,12 +729,13 @@ function endEgg() {
 // 设置里可以关掉随机彩蛋；右键「召唤彩蛋」不受影响
 let eggsEnabled = true
 function setEggsEnabled(on) { eggsEnabled = !!on }
-setInterval(() => { if (eggsEnabled && !devHeld() && !devActive && !egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
+setInterval(() => { if (performanceMode !== 'eco' && eggsEnabled && !devHeld() && !devActive && !egg && Math.random() < EGG_CHANCE_PER_MIN) playEgg(false) }, 60000)
 
 // ---- 生动一点：同一状态有多张图时停留久了换一张；有眨眼帧就偶尔眨眼 ----
 setInterval(() => {
+  if (performanceMode === 'eco') return
   const frames = framesFor(pose)
-  if (!devHeld() && frames.length > 1 && Date.now() - poseSince > 8000) {
+  if (!devHeld() && frames.length > 1 && Date.now() - poseSince > (performanceMode === 'balanced' ? 20000 : 8000)) {
     poseSince = Date.now()
     showImage(pick(frames.filter(u => u !== currentUrl)))
   }
@@ -716,7 +750,7 @@ setInterval(() => {
       setTimeout(() => blink.classList.remove('on'), 140)
     }
     blinkLoop()
-  }, 3000 + Math.random() * 3500)
+  }, performanceMode === 'eco' ? 20000 + Math.random() * 10000 : performanceMode === 'balanced' ? 8000 + Math.random() * 6000 : 3000 + Math.random() * 3500)
 })()
 </script>
 </body></html>

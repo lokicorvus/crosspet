@@ -1,0 +1,80 @@
+{
+  "kind": "isolated WebKit renderer",
+  "window_points": [
+    260,
+    362
+  ],
+  "aura": "on",
+  "warmup_seconds": 5,
+  "measurement_seconds": 20,
+  "hardware": {
+    "model": "Mac mini",
+    "identifier": "Mac16,10",
+    "chip": "Apple M4",
+    "cpu_cores": 10,
+    "performance_cores": 4,
+    "efficiency_cores": 6,
+    "memory_gb": 16
+  },
+  "system": {
+    "macos": "27.0.1",
+    "build": "26A434",
+    "webkit": "22625.1.29.11.28",
+    "architecture": "arm64"
+  },
+  "cpu_basis": "Sum of CPU time deltas for harness and three WebKit helpers / elapsed time; 100% means one core fully busy",
+  "limitations": [
+    "One machine; table uses one 20-second sample per mode/pose; an earlier local run showed different CPU values",
+    "Full means full mode of this branch, not a separately measured upstream binary",
+    "Fresh harness process per trial; file/OS caches are not cleared",
+    "Does not include production native polling, hooks, updater or quota features",
+    "GPU and Networking verified by cache bundle ID; WebContent paired by new process and type",
+    "Footprint sampled once at end; ps CPU time has limited precision",
+    "System background load was not controlled"
+  ],
+  "results": [
+    {
+      "mode": "full",
+      "pose": "idle",
+      "duration_seconds": 20.012,
+      "average_cpu_percent": 18.39,
+      "footprint_mib": 138.74
+    },
+    {
+      "mode": "balanced",
+      "pose": "idle",
+      "duration_seconds": 20.013,
+      "average_cpu_percent": 5.0,
+      "footprint_mib": 113.39
+    },
+    {
+      "mode": "eco",
+      "pose": "idle",
+      "duration_seconds": 20.018,
+      "average_cpu_percent": 0.2,
+      "footprint_mib": 57.32
+    },
+    {
+      "mode": "full",
+      "pose": "reading",
+      "duration_seconds": 20.018,
+      "average_cpu_percent": 28.42,
+      "footprint_mib": 142.35
+    },
+    {
+      "mode": "balanced",
+      "pose": "reading",
+      "duration_seconds": 20.014,
+      "average_cpu_percent": 7.14,
+      "footprint_mib": 119.47
+    },
+    {
+      "mode": "eco",
+      "pose": "reading",
+      "duration_seconds": 20.009,
+      "average_cpu_percent": 0.1,
+      "footprint_mib": 59.02
+    }
+  ],
+  "notes": "Final PR renderer remeasured; system caches and other application load were not controlled. Do not infer a fixed improvement percentage."
+}
