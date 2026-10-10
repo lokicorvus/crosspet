@@ -385,14 +385,120 @@ def dsh_profile() -> Path:
 DSH_PROFILE = dsh_profile()
 DSH_PLUGIN_NAME = "@local/dsh-plugin-crosspet"
 DSH_PLUGIN_DIR = SUPPORT / "dsh-plugin-crosspet"
+DSH_BLOCK_END = "# ── CrossPet 结束 ──"
 DSH_BLOCK = f"""
 {DSH_BLOCK_START} ──
 # 把 DeepSeek 的工作状态和余额写给桌宠；移除本段即恢复原样。
 - insert:
     - id: crosspet
       name: '{DSH_PLUGIN_NAME}'
-# ── CrossPet 结束 ──
+{DSH_BLOCK_END}
 """
+DSH_RESTORED = SUPPORT / "dsh-patch-restored"   # 一次性找回做过了（见 dsh_restore）
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def dsh_strip(text: str) -> str:
+    """去掉 CrossPet 自己写进 cordis.patch.yml 的那几行，别的一行不动。
+    Harness 加服务商等配置时会写到文件末尾，也就是我们这段的两行注释中间（甚至挂在我们的 - insert: 下面），
+    所以不能按注释区间整段删：只删两行注释、结束注释、我们那一项；- insert: 下面没别的东西了才删它"""
+    lines = text.split("\n")
+    drop, headers = set(), []
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if s.startswith(DSH_BLOCK_START) or s.startswith("# 把 DeepSeek 的工作状态和余额写给桌宠") or s == DSH_BLOCK_END:
+            drop.add(i)
+            if s.startswith(DSH_BLOCK_START) and i > 0 and not lines[i - 1].strip():
+                drop.add(i - 1)   # 接入时在这段前面空的那一行
+        elif re.fullmatch(r"-\s+id:\s*['\"]?crosspet['\"]?", s):
+            body = [i]
+            j = i + 1
+            while j < len(lines) and lines[j].strip() and _indent(lines[j]) > _indent(line) and not lines[j].lstrip().startswith("-"):
+                body.append(j)
+                j += 1
+            if not any(DSH_PLUGIN_NAME in lines[k] for k in body):
+                continue
+            drop.update(body)
+            k = i - 1
+            while k >= 0 and (k in drop or not lines[k].strip() or lines[k].lstrip().startswith("#")):
+                k -= 1
+            if k >= 0 and re.fullmatch(r"-\s*insert:\s*", lines[k]):
+                headers.append(k)
+    for k in headers:   # 我们那个 - insert: 下面还挂着别人的条目就留着
+        after = (lines[j] for j in range(k + 1, len(lines)) if j not in drop)
+        nxt = next((l for l in after if l.strip() and not l.lstrip().startswith("#")), "")
+        if _indent(nxt) == 0:
+            drop.add(k)
+    out = "\n".join(l for i, l in enumerate(lines) if i not in drop).rstrip("\n")
+    return out + "\n" if out.strip() else ""
+
+
+def dsh_units(text: str) -> list:
+    """把 cordis.patch.yml 拆成一条条配置：顶层每个 - xxx: 一条；- insert: 这种下面是列表的，按列表项拆开"""
+    items = []
+    for line in text.split("\n"):
+        if not line.strip() or (_indent(line) == 0 and line.startswith("#")):
+            continue
+        if _indent(line) == 0:
+            items.append([line])
+        elif items:
+            items[-1].append(line)
+    units = []
+    for head, *body in items:
+        firsts = [l for l in body if not l.lstrip().startswith("#")]
+        if re.fullmatch(r"-\s*\w+:\s*", head) and firsts and firsts[0].lstrip().startswith("- "):
+            ind, cur = _indent(firsts[0]), None
+            for l in body:
+                if _indent(l) == ind and l.lstrip().startswith("- "):
+                    cur = [head, l]
+                    units.append(cur)
+                elif cur:
+                    cur.append(l)
+        else:
+            units.append([head] + body)
+    return ["\n".join(u) for u in units]
+
+
+def dsh_key(unit: str) -> tuple:
+    m = re.search(r"^\s*(?:-\s+)?id:\s*['\"]?([^'\"\s#]+)", unit, re.M)
+    head = unit.split("\n", 1)[0].strip()
+    return ("id", head, m.group(1)) if m else ("text", " ".join(unit.split()))
+
+
+def dsh_restore(patch: str, patch_path: Path) -> str:
+    """一次性找回：1.3.0 及以前的接入工具按注释区间整段删，把夹在我们两行注释中间的服务商配置删掉了。
+    当时改文件前都备份过：从备份里找出被夹在中间的条目，现在文件里没有的（按 id 比对）补回去。只做一次，
+    免得以后用户自己删掉的又被加回来"""
+    if DSH_RESTORED.exists():
+        return patch
+    have = {dsh_key(u) for u in dsh_units(dsh_strip(patch))}
+    restored = []
+    for bak in sorted(patch_path.parent.glob(f"{patch_path.name}.bak-crosspet-*"), reverse=True):   # 新的优先
+        try:
+            text = bak.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if DSH_BLOCK_START not in text or DSH_BLOCK_END not in text[text.index(DSH_BLOCK_START):]:
+            continue
+        start = text.index(DSH_BLOCK_START)
+        region = text[start:text.index(DSH_BLOCK_END, start) + len(DSH_BLOCK_END)]
+        for unit in dsh_units(dsh_strip(region)):
+            key = dsh_key(unit)
+            if key not in have:
+                have.add(key)
+                restored.append(unit)
+    if restored:
+        patch = (patch.rstrip("\n") + "\n" if patch.strip() else "") + "\n".join(restored) + "\n"
+        print(f"  已从备份找回 {len(restored)} 条被旧版接入工具误删的配置（比如第三方服务商）")
+    try:
+        DSH_RESTORED.parent.mkdir(parents=True, exist_ok=True)
+        DSH_RESTORED.write_text(time.strftime("%Y-%m-%d %H:%M:%S"), encoding="utf-8")
+    except OSError:
+        pass
+    return patch
 
 
 def make_link(link: Path, target: Path) -> None:
@@ -426,10 +532,7 @@ def deepseek(install: bool) -> None:
     pkg = load_json(pkg_path)
     deps = pkg.setdefault("dependencies", {})
     patch = patch_path.read_text(encoding="utf-8") if patch_path.exists() else ""
-    if DSH_BLOCK_START in patch:  # 先去掉旧的一段
-        start = patch.index(DSH_BLOCK_START)
-        end = patch.index("# ── CrossPet 结束 ──", start) + len("# ── CrossPet 结束 ──\n")
-        patch = patch[:start].rstrip("\n") + "\n" + patch[end:]
+    patch = dsh_restore(dsh_strip(patch), patch_path)   # 先去掉旧的那几行（只去我们自己的）；找回要赶在下面备份删掉老备份之前
     if install:
         if DSH_PLUGIN_DIR.exists():
             shutil.rmtree(DSH_PLUGIN_DIR)
