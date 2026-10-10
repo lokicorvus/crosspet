@@ -148,6 +148,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
         Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.updateClickThrough() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
+        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.watchClaudeConfig() }
         // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
         Timer.scheduledTimer(withTimeInterval: 3 * 3600, repeats: true) { [weak self] _ in self?.checkForUpdate(manual: false) }
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -1299,6 +1300,50 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             } catch { output = error.localizedDescription }
             let code = p.isRunning ? -1 : p.terminationStatus
             DispatchQueue.main.async { done(output, code) }
+        }
+    }
+
+    // MARK: 接入被别的工具冲掉时接回去
+    // CC Switch 3.x 切换服务商会整个重写 ~/.claude/settings.json，CrossPet 的 mod / 钩子跟着没了，她就不跟着 Claude 动了。
+    // 每 3 秒看一眼这个文件，有改动就等 2 秒（等对方写完）跑一次 integrate.py heal：只补 CrossPet 自己的那一项，
+    // 在 CrossPet 里撤销过的不管。启动时也看一次（桌宠关着时被冲掉的）。一小时最多接 6 次，免得和别的工具来回打架
+    var claudeConfigStamp: Date?
+    var healTimes: [Date] = []
+    var healPending: DispatchWorkItem?
+    /// 系统自带的 python3 能直接用（装了开发者工具）：没装时一调用就弹「安装命令行工具」，后台的自动检查不能弹窗
+    lazy var pythonReady: Bool = {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        p.arguments = ["-p"]
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        do { try p.run(); p.waitUntilExit(); return p.terminationStatus == 0 } catch { return false }
+    }()
+    var claudeSettingsURL: URL {
+        let dir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude")
+        return dir.appendingPathComponent("settings.json")
+    }
+    func watchClaudeConfig() {
+        guard ready, let stamp = (try? FileManager.default.attributesOfItem(atPath: claudeSettingsURL.path))?[.modificationDate] as? Date,
+              stamp != claudeConfigStamp else { return }
+        claudeConfigStamp = stamp
+        healPending?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.healIntegrations() }
+        healPending = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2, execute: work)
+    }
+    func healIntegrations() {
+        healTimes = healTimes.filter { Date().timeIntervalSince($0) < 3600 }
+        guard healTimes.count < 6, pythonReady, integrateScript != nil else { return }
+        runIntegrate(["heal"]) { [weak self] out, code in
+            guard let self, code == 0 else { return }
+            let last = out.split(separator: "\n").last.map(String.init) ?? "[]"
+            let healed = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String] ?? []
+            guard !healed.isEmpty else { return }
+            self.healTimes.append(Date())
+            NSLog("CrossPet: 接回被冲掉的接入 \(healed)")
+            self.js("configHealed()")
+            self.refreshIntegrated()
         }
     }
 

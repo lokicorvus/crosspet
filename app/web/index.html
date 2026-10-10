@@ -561,6 +561,14 @@ function justUpdated(version) {
   }, 6000)
 }
 
+// Claude 的配置被别的工具改掉了（比如 CC Switch 3.x 切换服务商会整个重写 settings.json），外壳已经接回去了：说一声
+function configHealed() {
+  if (egg || farewellLine !== null) return
+  const line = 'Claude 的配置被别的工具改掉了，我已经接回去啦～新开的会话生效'
+  say(line)
+  setTimeout(() => { if ($('bubble').textContent === line) say('') }, 9000)
+}
+
 // 换了衣服（皮肤）：外壳重新 init 过立绘清单后调它，正在显示的就是这个角色就重新换上
 function refreshLook(id) {
   if (charId !== id || egg) return

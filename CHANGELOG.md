@@ -31,6 +31,11 @@
 - DeepSeek Harness 里用 GLM（比如通过 OpenCode Go）时换成 GLM 来演
 - 切到 Claude、Codex 的 App 时，按最近一次会话用的模型换角色；Windows 上 App 开在前台时中途换模型也会马上跟着换
 
+**被别的工具改掉时自动接回去**
+- CC Switch 3.x 切换服务商会整个重写 Claude 的 settings.json，把 CrossPet 的增强版 mod / 钩子一起冲掉，她就不跟着 Claude 动了。现在桌宠开着时会发现并在几秒内自动接回去，气泡里说一声（新开的会话生效）；只补 CrossPet 自己的那一项，撤销过的不再接
+- 接入 Claude 时检测到 CC Switch 3.x 会提示升级到 4.0 以上（4.0 起切换不再冲掉别的配置）
+- 设置里「已接入」改成真实检查配置还在不在
+
 **其他**
 - DeepSeek Harness 里用的是别家服务商（内置的 OpenCode Go、OpenRouter、自定义网关……）时，不再显示 DeepSeek 官方余额，也不会因为官方账户没钱一直没精神；换回 DeepSeek 账号 / API Key 时余额自动回来
 - 「设置…」→ 额度里多了「显示 DeepSeek 余额」开关（默认开），完全不想看余额时可以关掉

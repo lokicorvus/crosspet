@@ -24,8 +24,11 @@ SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (str(Path(os.environ.get("
 MARK = "crosspet-hook.py"
 
 
+QUIET = False   # 自动接回去（heal）时不备份：只补 CrossPet 自己的一项，备份多了会把之前真正有用的备份挤掉
+
+
 def backup(path: Path) -> None:
-    if path.exists():
+    if path.exists() and not QUIET:
         dst = path.with_name(f"{path.name}.bak-crosspet-{time.strftime('%Y%m%d-%H%M%S')}")
         shutil.copy2(path, dst)
         print(f"  已备份 {path} → {dst.name}")
@@ -237,6 +240,88 @@ def claude_mod(install: bool) -> None:
             print(f"  ！终端里的 Claude Code 是 {'.'.join(map(str, v))}，还不会加载 mod：请先更新 Claude Code，"
                   "或者改用标准钩子（claude-hooks，所有版本可用，只是不显示额度）")
         print("  → 公司 / 组织账号如果被管理员禁了自己装的 mod，或者在 WSL 里用，mod 不会运行，请改用标准钩子")
+
+
+def claude_mod_ok() -> bool:
+    """mod 真的接着：文件夹在，而且 settings.json 的 CLAUDE_CODE_PLUGIN_DIRS 里有它"""
+    if not CLAUDE_MOD_DIR.exists():
+        return False
+    try:
+        dirs = load_json(CLAUDE_SETTINGS).get("env", {}).get("CLAUDE_CODE_PLUGIN_DIRS", "")
+    except Exception:
+        return True   # 正被别的程序写到一半：先当没事
+    return any(Path(os.path.expanduser(d)) == CLAUDE_MOD_DIR for d in dirs.split(os.pathsep) if d)
+
+
+def ccswitch_note() -> None:
+    """CC Switch 3.x 切换服务商时会整个重写 ~/.claude/settings.json，CrossPet 的接入跟着被冲掉（4.0 起只换关键字段）"""
+    if not (HOME / ".cc-switch").exists():
+        return
+    version = None
+    plist = Path("/Applications/CC Switch.app/Contents/Info.plist")
+    if plist.exists():
+        try:
+            import plistlib
+            version = plistlib.loads(plist.read_bytes()).get("CFBundleShortVersionString")
+        except Exception:
+            pass
+    if version and not version.startswith(("1.", "2.", "3.")):
+        return
+    which = f"CC Switch {version}" if version else "CC Switch（如果是 3.x 版）"
+    print(f"  ！检测到 {which}：切换服务商时会重写 Claude 的配置，把 CrossPet 的接入一起冲掉。"
+          "桌宠开着时会自动接回去（新开的会话生效），建议把 CC Switch 升级到 4.0 以上，就不会再被冲掉")
+
+
+# 用户接入过、想一直接着的目标。被别的工具改掉了（比如 CC Switch 3.x 切换服务商会整个重写 settings.json），
+# 桌宠发现后调 `integrate.py heal` 接回去；在 CrossPet 里撤销接入的就不再管
+WANTED = SUPPORT / "wanted.json"
+HEALABLE = {"claude-mod": claude_mod_ok, "claude-hooks": lambda: has_hooks(CLAUDE_SETTINGS)}
+
+
+def wanted() -> set:
+    try:
+        return set(json.loads(WANTED.read_text(encoding="utf-8")))
+    except Exception:
+        return set()
+
+
+def set_wanted(target: str, on: bool) -> None:
+    w = wanted()
+    if on == (target in w):
+        return
+    (w.add if on else w.discard)(target)
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    WANTED.write_text(json.dumps(sorted(w)), encoding="utf-8")
+
+
+def heal() -> list:
+    """接过、现在却不在了的接回去，返回接回去的目标。还没记过的老用户：mod 文件夹在就算接过"""
+    global QUIET
+    if not CLAUDE_SETTINGS.exists():
+        return []
+    try:
+        load_json(CLAUDE_SETTINGS)
+    except Exception:
+        return []   # 正被别的程序写到一半，下次再看
+    if CLAUDE_MOD_DIR.exists():
+        set_wanted("claude-mod", True)
+    if has_hooks(CLAUDE_SETTINGS):
+        set_wanted("claude-hooks", True)
+    healed = []
+    import contextlib
+    import io
+    for target in sorted(wanted() & set(HEALABLE)):
+        if HEALABLE[target]():
+            continue
+        QUIET = True
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                TARGETS[target](True)
+        finally:
+            QUIET = False
+        if HEALABLE[target]():
+            healed.append(target)
+    return healed
 
 
 # ---- Codex ----
@@ -625,7 +710,7 @@ def installed() -> list:
     claude = found(CLAUDE_HOME, "", CLAUDE_OURS, quiet=True)
     result = []
     if claude and has_hooks(CLAUDE_SETTINGS): result.append("claude-hooks")
-    if claude and CLAUDE_MOD_DIR.exists(): result.append("claude-mod")
+    if claude and claude_mod_ok(): result.append("claude-mod")
     if has_hooks(CODEX_HOOKS) and found(CODEX_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("codex")
     if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8"): result.append("deepseek")
     if has_hooks(GEMINI_SETTINGS) and found(GEMINI_SETTINGS.parent, "", ("settings.json", "config"), quiet=True): result.append("gemini")
@@ -638,7 +723,7 @@ def installed() -> list:
 
 def status() -> None:
     print("Claude Code 标准钩子:", "已接入" if has_hooks(CLAUDE_SETTINGS) else "未接入")
-    print("Claude Code mod     :", "已接入" if CLAUDE_MOD_DIR.exists() else "未接入")
+    print("Claude Code mod     :", "已接入" if claude_mod_ok() else "被别的工具改掉了（桌宠开着时会自动接回去）" if CLAUDE_MOD_DIR.exists() else "未接入")
     print("Codex               :", "已接入" if has_hooks(CODEX_HOOKS) else "未接入")
     dsh = (DSH_PROFILE / "cordis.patch.yml")
     print("DeepSeek Harness    :", "已接入" if dsh.exists() and DSH_BLOCK_START in dsh.read_text(encoding="utf-8") else "未接入")
@@ -658,9 +743,16 @@ if __name__ == "__main__":
         for t in installed():
             print(f"更新 {t}：")
             TARGETS[t](True)
+    elif len(sys.argv) == 2 and sys.argv[1] == "heal":   # 给桌宠用：被别的工具冲掉的接回去，输出接回去的目标（JSON 数组）
+        print(json.dumps(heal()))
     elif len(sys.argv) == 3 and sys.argv[1] in ("install", "uninstall") and sys.argv[2] in TARGETS:
-        print(f"{'接入' if sys.argv[1] == 'install' else '撤销'} {sys.argv[2]}：")
-        TARGETS[sys.argv[2]](sys.argv[1] == "install")
+        target, install = sys.argv[2], sys.argv[1] == "install"
+        print(f"{'接入' if install else '撤销'} {target}：")
+        TARGETS[target](install)
+        if target in HEALABLE:
+            set_wanted(target, install and HEALABLE[target]())
+            if install:
+                ccswitch_note()
     else:
         print(__doc__)
         sys.exit(1)

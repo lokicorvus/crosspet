@@ -102,6 +102,7 @@ namespace CrossPet
 
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), RefreshQuota);
+            Every(TimeSpan.FromSeconds(3), WatchClaudeConfig);
             // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
             Every(TimeSpan.FromHours(3), () => _ = CheckForUpdate());
             Microsoft.Win32.SystemEvents.PowerModeChanged += (_, e) =>
@@ -739,6 +740,43 @@ namespace CrossPet
         }
 
         List<string> integrated;   // 已接入的 AI（设置窗口打开时查一次，接入 / 撤销后再查）
+        // ---------------- 接入被别的工具冲掉时接回去 ----------------
+        // CC Switch 3.x 切换服务商会整个重写 .claude\settings.json，CrossPet 的 mod / 钩子跟着没了。每 3 秒看一眼这个文件，
+        // 有改动就等 2 秒（等对方写完）跑一次 integrate.py heal：只补 CrossPet 自己的那一项，在 CrossPet 里撤销过的不管。
+        // 启动时也看一次。一小时最多接 6 次，免得和别的工具来回打架。和 macOS 版一样
+        DateTime? claudeConfigStamp;
+        readonly List<DateTime> healTimes = new List<DateTime>();
+        DispatcherTimer healPending;
+        static string ClaudeSettings => Path.Combine(Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is string d && d != "" ? d
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude"), "settings.json");
+        void WatchClaudeConfig()
+        {
+            if (!ready) return;
+            DateTime stamp;
+            try { var fi = new FileInfo(ClaudeSettings); if (!fi.Exists) return; stamp = fi.LastWriteTimeUtc; } catch { return; }
+            if (stamp == claudeConfigStamp) return;
+            claudeConfigStamp = stamp;
+            healPending?.Stop();
+            healPending = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            healPending.Tick += (_, __) => { healPending.Stop(); HealIntegrations(); };
+            healPending.Start();
+        }
+        void HealIntegrations()
+        {
+            healTimes.RemoveAll(t => (DateTime.UtcNow - t).TotalHours >= 1);
+            if (healTimes.Count >= 6 || !File.Exists(Store.Python)) return;
+            Task.Run(() =>
+            {
+                var (output, code) = RunIntegrate("heal");
+                if (code != 0) return;
+                List<string> healed = null;
+                try { healed = (Store.Json.DeserializeObject(output.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
+                if (healed == null || healed.Count == 0) return;
+                Store.Log("接回被冲掉的接入: " + string.Join(", ", healed));
+                Window.Dispatcher.Invoke(() => { healTimes.Add(DateTime.UtcNow); Js("configHealed()"); RefreshIntegrated(); });
+            });
+        }
+
         public void RefreshIntegrated(Action done = null)
         {
             Task.Run(() =>
