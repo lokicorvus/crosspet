@@ -17,4 +17,6 @@
 
 **探出来（再 10 张）**：鼠标移上去时她探出来更多、好奇地看着你，见 [06-探出来.md](06-探出来.md)（拿上面画好的贴边图当底图改）。
 
+**Claude 补头顶**：Claude 的 `edge_left`、`edge_right`、`edge_left_peek` 头顶被画框切掉了，重画见 [07-claude-补头顶.md](07-claude-补头顶.md)。以后画贴边图要写明头顶上方留白。
+
 以后想加：缩着很久没动静时趴在边上打瞌睡（`edge_left_sleep` / `edge_right_sleep`）。
