@@ -15,7 +15,7 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
-const PLUGIN_VERSION = "1.2.4";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
+const PLUGIN_VERSION = "1.3.0";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 10 * 60 * 1000;
 
