@@ -234,10 +234,11 @@ def character_for_model(model: str):
     return None
 
 
-def remember_session_model(host: str) -> str:
+def remember_session_model(host: str, fallback: str = "") -> str:
     """有的宿主只在会话开始时给模型名：记下来（按会话 id），之后的事件查它"""
     sid = str(event.get("session_id") or event.get("sessionId") or "")
-    path = state_dir / f"{host}-sessions.json"
+    # claude / gpt 是角色名，<角色>-sessions.json 已经是多会话状态文件了，模型另记一个文件
+    path = state_dir / (f"{host}-models.json" if host in SELF_HOSTS else f"{host}-sessions.json")
     try:
         known = json.loads(path.read_text())
     except Exception:
@@ -253,16 +254,55 @@ def remember_session_model(host: str) -> str:
             tmp.replace(path)
         except Exception:
             pass
-    return model or known.get(sid, "") or HOST_DEFAULT_MODEL.get(host, "")
+    return model or known.get(sid, "") or fallback or HOST_DEFAULT_MODEL.get(host, "")
 
+
+def character_for_url(url: str):
+    """Claude Code 走别家的兼容接口（ANTHROPIC_BASE_URL）：看接口地址是谁家的。
+    DeepSeek、智谱的 Anthropic 兼容接口也收 Claude 的模型名（会换成自家模型），所以地址比模型名可信"""
+    u = url.lower()
+    if "deepseek.com" in u:
+        return "deepseek"
+    if "bigmodel.cn" in u or "z.ai" in u or "zhipu" in u:
+        return "glm"
+    if "moonshot" in u or "kimi" in u:
+        return "kimi"
+    return None
+
+
+def installed(c) -> bool:
+    return bool(c) and (characters_dir / c / "character.json").exists() and \
+        any((characters_dir / c / f"idle.{ext}").exists() for ext in ("webp", "png"))
+
+
+# 自己就有角色、但也能接别家接口的：Claude Code（ANTHROPIC_BASE_URL + 别家模型名）、Codex（换了 model_provider）。
+# 按模型换成对应的角色，认不出的模型还是由自己来演。Codex 每条事件都带模型名；Claude Code 只在会话开始时给，
+# 另外看环境变量里的模型名和接口地址
+SELF_HOSTS = ("claude", "gpt")
+if character in SELF_HOSTS:
+    host = character
+    env_model = os.environ.get("ANTHROPIC_MODEL", "") if host == "claude" else ""
+    model = remember_session_model(host, env_model)
+    mapped = (character_for_url(os.environ.get("ANTHROPIC_BASE_URL", "")) if host == "claude" else None) \
+        or character_for_model(model)
+    if not installed(mapped):
+        mapped = host
+    character = mapped
+    event["model"] = model
+    try:
+        state_dir.mkdir(parents=True, exist_ok=True)
+        hp = state_dir / f".{host}-host.json"
+        hp.write_text(json.dumps({"character": mapped, "model": model, "ts": time.time()}))
+        hp.replace(state_dir / f"{host}-host.json")
+    except Exception:
+        pass
 
 if character in MULTI_MODEL_HOSTS:
     host = character
     model = remember_session_model(host)
     mapped = character_for_model(model)
     # 对应的角色还没装（比如还没画立绘的新角色）：当成认不出的模型，由当前角色来演
-    if mapped and not ((characters_dir / mapped / "character.json").exists()
-                       and any((characters_dir / mapped / f"idle.{ext}").exists() for ext in ("webp", "png"))):
+    if mapped and not installed(mapped):
         mapped = None
     character = mapped or "current"
     event["model"] = model

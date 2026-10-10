@@ -21,14 +21,62 @@ async function write($: EngineInterface, file: string, data: unknown): Promise<v
 }
 const ID = 'claude'
 
-// 写状态；同时按会话另外记一份 claude-sessions.json（{会话id: {pose, event, ts}}），
-// 同时开着好几个 Claude 会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
+// 走别家的兼容接口（ANTHROPIC_BASE_URL 指向 DeepSeek / 智谱……，或者用别家的模型名）时换成对应的角色演，
+// 认不出的还是 Claude。每次向模型发请求前（turn.step）看一眼这次用的模型，中途 /model 换了也跟得上。
+// 接口地址比模型名可信：DeepSeek、智谱的 Anthropic 兼容接口也收 Claude 的模型名
+function characterForUrl(url: string): string | undefined {
+  const u = url.toLowerCase()
+  if (u.includes('deepseek.com')) return 'deepseek'
+  if (u.includes('bigmodel.cn') || u.includes('z.ai') || u.includes('zhipu')) return 'glm'
+  return undefined
+}
+function characterForModel(model: string): string | undefined {
+  const m = model.toLowerCase()
+  if (/glm|zhipu|chatglm|z\.ai|zai-/.test(m)) return 'glm'
+  if (m.includes('deepseek')) return 'deepseek'
+  if (/claude|anthropic|opus|sonnet|haiku/.test(m)) return 'claude'
+  if (m.includes('gemini')) return 'gemini'
+  if (/^(gpt|o[1-9]|codex|chatgpt)/.test(m) || m.includes('openai')) return 'gpt'
+  return undefined
+}
+// 会话 id → 正在演的角色（还没看到模型时是 Claude）
+const actors = new Map<string, string>()
+async function charactersDir($: EngineInterface): Promise<string> {
+  const local = await $.env.get('LOCALAPPDATA')
+  return local ? `${local}\\CrossPet\\characters` : `${await $.env.get('HOME')}/Library/Application Support/CrossPet/characters`
+}
+async function noteModel($: EngineInterface, model: string): Promise<void> {
+  const sid = await $.session.id()
+  let who = characterForUrl((await $.env.get('ANTHROPIC_BASE_URL')) ?? '') ?? characterForModel(model) ?? ID
+  if (who !== ID && !(await $.fs.exists(`${await charactersDir($)}/${who}/character.json`))) who = ID   // 这个角色没装
+  const old = actors.get(sid)
+  if (old === who) return
+  actors.set(sid, who)
+  // 换了角色：这个会话从原来那个角色的多会话记录里拿掉，免得那边留着一张「还在忙」的卡片
+  if (old) await dropSession($, old, sid)
+  // 桌宠切到 Claude 的 App 时按它换角色（和 DeepSeek Harness、WorkBuddy 的 <宿主>-host.json 一样）
+  await write($, `${ID}-host.json`, { character: who, model, ts: Date.now() / 1000 })
+}
+async function dropSession($: EngineInterface, who: string, sid: string): Promise<void> {
+  try {
+    const file = `${await stateDir($)}/${who}-sessions.json`
+    const known = JSON.parse(await $.fs.read(file))
+    if (!(sid in known)) return
+    delete known[sid]
+    await $.fs.write(file, JSON.stringify(known))
+  } catch {}
+}
+
+// 写状态；同时按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
+// 同时开着好几个会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
 type State = { pose: string; event: string; tool: string; ts: number }
 async function setState($: EngineInterface, state: State): Promise<void> {
-  await write($, `${ID}-state.json`, state)
+  let sid = ''
+  try { sid = await $.session.id() } catch {}
+  const who = actors.get(sid) ?? ID
+  await write($, `${who}-state.json`, state)
   try {
-    const sid = await $.session.id()
-    const file = `${await stateDir($)}/${ID}-sessions.json`
+    const file = `${await stateDir($)}/${who}-sessions.json`
     let known: Record<string, { pose: string; event: string; ts: number }> = {}
     try { known = JSON.parse(await $.fs.read(file)) } catch {}
     known[sid] = { pose: state.pose, event: state.event, ts: state.ts }
@@ -115,6 +163,8 @@ export const register: Register = on => {
 
   on('session.start', async ($, e, next) => {
     void ensurePet($).catch(() => {})
+    // 还没发请求时先按环境变量猜（只配了 ANTHROPIC_BASE_URL / ANTHROPIC_MODEL 的情况）
+    await noteModel($, (await $.env.get('ANTHROPIC_MODEL')) ?? '').catch(() => {})
     await setState($, { pose: 'idle', event: 'SessionStart', tool: '', ts: Date.now() / 1000 })
     const usage = await $.session.usage()
     const q = quotaOf(usage.rateLimits)
@@ -127,6 +177,12 @@ export const register: Register = on => {
     tools = 0
     await setState($, { pose: 'listening', event: 'UserPromptSubmit', tool: '', ts: Date.now() / 1000 })
     return next(e)
+  })
+
+  // 每次向模型发请求前：这次用的是哪个模型（只看主对话，子任务的不算）
+  on('turn.step', async function* ($, e, next) {
+    if (!e.agentId) await noteModel($, e.model).catch(() => {})
+    return yield* next(e)
   })
 
   on('tool.call', async ($, e, next) => {

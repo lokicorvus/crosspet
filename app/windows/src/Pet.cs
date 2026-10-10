@@ -224,6 +224,23 @@ namespace CrossPet
         void Poll()
         {
             if (!ready) return;
+            // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）里换了模型：
+            // 它正在前台的话马上换成那个模型的角色
+            var hostChanged = false;
+            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt" })
+            {
+                try
+                {
+                    var fi = new FileInfo(Path.Combine(Store.State, host + "-host.json"));
+                    if (!fi.Exists) continue;
+                    var stamp = fi.LastWriteTimeUtc.Ticks.ToString();
+                    if (stamps.TryGetValue(host + "-host", out var old) && old == stamp) continue;
+                    if (old != null) hostChanged = true;
+                    stamps[host + "-host"] = stamp;
+                }
+                catch { }
+            }
+            if (hostChanged) FollowForeground();
             var latestActive = (id: (string)null, ts: 0.0);
             // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
             foreach (var id in Characters().Select(c => c.id).Concat(new[] { "current" }))
