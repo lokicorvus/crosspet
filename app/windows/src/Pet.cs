@@ -103,6 +103,12 @@ namespace CrossPet
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), RefreshQuota);
             Every(TimeSpan.FromSeconds(3), WatchClaudeConfig);
+            // 锁屏时动画全停（看不见还在画，白白耗电）
+            SystemEvents.SessionSwitch += (_, e) =>
+            {
+                if (e.Reason == SessionSwitchReason.SessionLock || e.Reason == SessionSwitchReason.SessionUnlock)
+                    Window.Dispatcher.BeginInvoke(new Action(() => Js($"setPageHidden({(e.Reason == SessionSwitchReason.SessionLock ? "true" : "false")})")));
+            };
             // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）
             Every(TimeSpan.FromHours(3), () => _ = CheckForUpdate());
             Microsoft.Win32.SystemEvents.PowerModeChanged += (_, e) =>
@@ -141,7 +147,7 @@ namespace CrossPet
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")})");
+                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")})");
                     if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
@@ -469,6 +475,8 @@ namespace CrossPet
         DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
         /// <summary>DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉</summary>
+        /// <summary>省电模式（默认关）：特效每秒 15 帧、闲着 10 秒就停（平时 30 帧、30 秒）</summary>
+        static bool PowerSave => Store.Settings.TryGetValue("powerSave", out var v) && v is bool b && b;
         static bool DsQuotaEnabled => !(Store.Settings.TryGetValue("dsQuota", out var v) && v is bool b && !b);
         static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
         static void After(int ms, Action a)
@@ -808,7 +816,7 @@ namespace CrossPet
                 ["size"] = Scale, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"),
-                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["powerSave"] = PowerSave, ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c =>
                 {
                     var d = new Dictionary<string, object>
@@ -853,6 +861,7 @@ namespace CrossPet
                             break;
                         case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
                         case "hideFullscreen": Store.Settings["hideFullscreen"] = on; Store.SaveSettings(); ApplyLayer(); break;
+                        case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Js($"setPowerSave({(on ? "true" : "false")})"); break;
                         case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }

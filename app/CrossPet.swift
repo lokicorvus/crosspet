@@ -145,6 +145,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(appActivated(_:)),
             name: NSWorkspace.didActivateApplicationNotification, object: nil)
+        // 看不见时停动画：窗口被完全挡住、屏幕休眠、锁屏（锁屏时会话失活）
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: panel, queue: .main) { [weak self] _ in self?.updatePageHidden() }
+        let ws = NSWorkspace.shared.notificationCenter
+        for (name, asleep) in [(NSWorkspace.screensDidSleepNotification, true), (NSWorkspace.screensDidWakeNotification, false),
+                               (NSWorkspace.sessionDidResignActiveNotification, true), (NSWorkspace.sessionDidBecomeActiveNotification, false)] {
+            ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.screensAsleep = asleep; self?.updatePageHidden() }
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
         Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.updateClickThrough() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshGPTQuota(); self?.refreshAntigravityQuota() }
@@ -329,7 +336,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         if let side = defaults.string(forKey: "dock"), edgeDockEnabled {   // 上次是贴着边的
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.setDock(side) }
         }
-        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled))")
+        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave))")
+        updatePageHidden()
         stamps = [:]
         pollStates()
         refreshGPTQuota()
@@ -982,6 +990,14 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var edgeDockEnabled: Bool { defaults.object(forKey: "edgeDock") as? Bool ?? true }
     /// DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉
     var dsQuotaEnabled: Bool { defaults.object(forKey: "dsQuota") as? Bool ?? true }
+    /// 省电模式（默认关）：特效每秒 15 帧、闲着 10 秒就停（平时 30 帧、30 秒）
+    var powerSave: Bool { defaults.bool(forKey: "powerSave") }
+    // 看不见的时候（窗口被完全挡住、锁屏、屏幕休眠）让网页把动画全停了
+    var screensAsleep = false
+    func updatePageHidden() {
+        guard ready else { return }
+        js("setPageHidden(\(screensAsleep || !panel.occlusionState.contains(.visible)))")
+    }
 
     func undock() {
         guard dock != nil else { return }
@@ -1236,7 +1252,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             "size": Double(petScale), "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"),
             "login": SMAppService.mainApp.status == .enabled,
-            "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled,
+            "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "powerSave": powerSave,
             "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { id -> [String: Any] in
@@ -1406,6 +1422,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 if (value as? Bool ?? false) != defaults.bool(forKey: "gptQuota") { toggleGPTQuota() }
             case "agyQuota":
                 if (value as? Bool ?? false) != defaults.bool(forKey: "agyQuota") { toggleAntigravityQuota() }
+            case "powerSave":
+                let on = value as? Bool ?? false
+                defaults.set(on, forKey: "powerSave"); js("setPowerSave(\(on))")
             case "dsQuota":
                 let on = value as? Bool ?? true
                 defaults.set(on, forKey: "dsQuota")

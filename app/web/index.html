@@ -32,6 +32,10 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 #body img.on { opacity: 1; }
 #body img#blink { transition: none; }
 #fx { position: absolute; inset: 0; transition: opacity .3s; pointer-events: none; }
+/* 闲着久了：身边的特效淡出（见「特效省电」） */
+#fx.rest { opacity: 0; transition: opacity 1.2s; }
+/* 看不见（被挡住、锁屏）：所有动画暂停 */
+html.frozen *, html.frozen *::before, html.frozen *::after { animation-play-state: paused !important; }
 /* 多会话：每个正在干活的对话一张小卡片，放在桌宠两侧 / 四个角 */
 #cards { position: absolute; inset: 0; pointer-events: none; }
 .scard { position: absolute; width: 66px; height: 56px; transition: left .35s ease, top .35s ease, opacity .35s ease, transform .35s ease; opacity: 0; transform: scale(.6); }
@@ -248,6 +252,7 @@ function setPose(p, instant) {
   const frames = framesFor(p)
   showImage(instant ? frames[0] : pick(frames), instant)
   $('body').className = MOTION[p] || 'm-bob'
+  noteRest(p)
   const aura = (window.CrossFx && CrossFx.AURA[p]) || ['#ffd9b0', .35]
   document.documentElement.style.setProperty('--aura', aura[0])
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
@@ -601,6 +606,42 @@ function watchStuck() {
     say('')
   }, STUCK_AFTER)
 }
+
+// ---- 特效省电 ----
+// 实测（M 系列 Mac）：身边的 SVG 特效（星星、思考云、小卡片）是耗电大头，60 帧时整个桌宠占一个核的 16%～19%，
+// 停掉特效只剩 1.5%；人物浮动、光晕是 CSS 变换，几乎不花钱。所以只管特效：
+// - 刷新率限到 30 帧（省电模式 15 帧）：暂停 SVG 自己的时钟，由一个定时器按帧推进（#fx、多会话卡片都算）
+// - 闲着（待机 / 累 / 睡着）超过 30 秒（省电模式 10 秒）：特效淡出并停下；睡着的 zZz 保留，每秒 5 帧
+// - 窗口看不见（被挡住、锁屏、屏幕休眠）：外壳调 setPageHidden(true)，全部暂停
+const RESTING = new Set(['idle', 'tired', 'sleeping'])
+let powerSave = false, fxResting = false, pageHidden = false, fxClock = null, fxFps = 0, restTimer = null
+function fxTick() {
+  const now = performance.now()
+  for (const s of document.querySelectorAll('#fx svg, #cards svg')) {
+    if (s._fxT === undefined) { s.pauseAnimations(); s._fxT = s.getCurrentTime(); s._fxS = now }
+    s.setCurrentTime(s._fxT + (now - s._fxS) / 1000)
+  }
+}
+function applyFxRate() {
+  const fps = pageHidden ? 0 : fxResting ? (pose === 'sleeping' ? 5 : 0) : powerSave ? 15 : 30
+  $('fx').classList.toggle('rest', fxResting && pose !== 'sleeping' && !pageHidden)
+  document.documentElement.classList.toggle('frozen', pageHidden)
+  if (fps === fxFps && (fps === 0 || fxClock)) return
+  fxFps = fps
+  clearInterval(fxClock); fxClock = null
+  fxTick()   // 新出现的先接管（停住自己的时钟）
+  if (fps > 0) fxClock = setInterval(fxTick, 1000 / fps)
+}
+// 新画上去的特效马上接管，别先按 60 帧跑一下
+new MutationObserver(() => fxTick()).observe(document.getElementById('stage'), { childList: true, subtree: true })
+function noteRest(p) {
+  clearTimeout(restTimer)
+  if (fxResting) { fxResting = false; applyFxRate() }
+  if (RESTING.has(p)) restTimer = setTimeout(() => { if (RESTING.has(pose)) { fxResting = true; applyFxRate() } }, powerSave ? 10000 : 30000)
+}
+function setPowerSave(on) { powerSave = !!on; fxFps = -1; noteRest(pose); applyFxRate() }
+function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
+applyFxRate()
 
 // ---- 多会话：同一个 AI 好几个对话同时在干活 ----
 // 外壳把 <角色>-sessions.json（{会话id: {pose, event, ts}}）交过来。两个以上同时在干活时她「手忙脚乱」：
