@@ -2,7 +2,7 @@
   "skinOf": "deepseek",
   "skinName": "Claude 卫衣",
   "name": "DeepSeek",
-  "greeting": "穿上这件，今天的我很聪明哦！",
+  "greeting": "好的，我现在是 Claude！",
   "lines": {
     "idle": [
       "感觉脑子变好用了～",
