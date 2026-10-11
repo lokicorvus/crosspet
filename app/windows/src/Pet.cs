@@ -509,7 +509,7 @@ namespace CrossPet
         DateTime dockedAt = DateTime.MinValue;   // 刚拖到边上：之前就在进行的工作不算，先缩进去给个反应，AI 有新动作再跑出来
         readonly Dictionary<string, double> dockCut = new Dictionary<string, double>();   // 切口位置（网页像素），按 边 + 角色 记
         /// <summary>DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉</summary>
-        /// <summary>省电模式（默认关）：特效每秒 15 帧、闲着 10 秒就停（平时 30 帧、30 秒）</summary>
+        /// <summary>省电模式（默认关）：闲着 10 秒就暂停特效（平时 30 秒）；睡眠特效保持播放</summary>
         static bool PowerSave => Store.Settings.TryGetValue("powerSave", out var v) && v is bool b && b;
         static bool DsQuotaEnabled => !(Store.Settings.TryGetValue("dsQuota", out var v) && v is bool b && !b);
         static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);

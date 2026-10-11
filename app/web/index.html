@@ -617,40 +617,34 @@ function watchStuck() {
 }
 
 // ---- 特效省电 ----
-// 实测（M 系列 Mac）：身边的 SVG 特效（星星、思考云、小卡片）是耗电大头，60 帧时整个桌宠占一个核的 16%～19%，
-// 停掉特效只剩 1.5%；人物浮动、光晕是 CSS 变换，几乎不花钱。所以只管特效：
-// - 刷新率限到 30 帧（省电模式 15 帧）：暂停 SVG 自己的时钟，由一个定时器按帧推进（#fx、多会话卡片都算）
-// - 闲着（待机 / 累 / 睡着）超过 30 秒（省电模式 10 秒）：特效淡出并停下；睡着的 zZz 保留，每秒 5 帧
-// - 窗口看不见（被挡住、锁屏、屏幕休眠）：外壳调 setPageHidden(true)，全部暂停
+// 可见时使用 SVG 自己的时钟。反复 pauseAnimations + setCurrentTime 是时间跳转，
+// 在 WebKit 中可能让叠加位移的特效短暂错位；恢复时还会跨过隐藏期间的时间。
+// 闲置特效淡出并暂停（省电模式更早），睡眠的 zZz 保留；看不见时全部暂停。
 const RESTING = new Set(['idle', 'tired', 'sleeping'])
-let powerSave = false, fxResting = false, pageHidden = false, fxClock = null, fxFps = 0, restTimer = null
-function fxTick() {
-  const now = performance.now()
+let powerSave = false, fxResting = false, pageHidden = false, restTimer = null
+function syncFxPlayback() {
+  const paused = pageHidden || (fxResting && pose !== 'sleeping')
   for (const s of document.querySelectorAll('#fx svg, #cards svg')) {
-    if (s._fxT === undefined) { s.pauseAnimations(); s._fxT = s.getCurrentTime(); s._fxS = now }
-    s.setCurrentTime(s._fxT + (now - s._fxS) / 1000)
+    if (paused) {
+      if (!s.animationsPaused()) s.pauseAnimations()
+    } else if (s.animationsPaused()) s.unpauseAnimations()
   }
 }
-function applyFxRate() {
-  const fps = pageHidden ? 0 : fxResting ? (pose === 'sleeping' ? 5 : 0) : powerSave ? 15 : 30
+function applyFxPlayback() {
   $('fx').classList.toggle('rest', fxResting && pose !== 'sleeping' && !pageHidden)
   document.documentElement.classList.toggle('frozen', pageHidden)
-  if (fps === fxFps && (fps === 0 || fxClock)) return
-  fxFps = fps
-  clearInterval(fxClock); fxClock = null
-  fxTick()   // 新出现的先接管（停住自己的时钟）
-  if (fps > 0) fxClock = setInterval(fxTick, 1000 / fps)
+  syncFxPlayback()
 }
-// 新画上去的特效马上接管，别先按 60 帧跑一下
-new MutationObserver(() => fxTick()).observe(document.getElementById('stage'), { childList: true, subtree: true })
+// 换姿态 / 新增会话卡片时，新 SVG 也遵守当前暂停状态。
+new MutationObserver(syncFxPlayback).observe(document.getElementById('stage'), { childList: true, subtree: true })
 function noteRest(p) {
   clearTimeout(restTimer)
-  if (fxResting) { fxResting = false; applyFxRate() }
-  if (RESTING.has(p)) restTimer = setTimeout(() => { if (RESTING.has(pose)) { fxResting = true; applyFxRate() } }, powerSave ? 10000 : 30000)
+  if (fxResting) { fxResting = false; applyFxPlayback() }
+  if (RESTING.has(p)) restTimer = setTimeout(() => { if (RESTING.has(pose)) { fxResting = true; applyFxPlayback() } }, powerSave ? 10000 : 30000)
 }
-function setPowerSave(on) { powerSave = !!on; fxFps = -1; noteRest(pose); applyFxRate() }
-function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
-applyFxRate()
+function setPowerSave(on) { powerSave = !!on; noteRest(pose); applyFxPlayback() }
+function setPageHidden(h) { pageHidden = !!h; applyFxPlayback() }
+applyFxPlayback()
 
 // ---- 多会话：同一个 AI 好几个对话同时在干活 ----
 // 外壳把 <角色>-sessions.json（{会话id: {pose, event, ts}}）交过来。两个以上同时在干活时她「手忙脚乱」：

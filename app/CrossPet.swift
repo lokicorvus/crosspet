@@ -1002,7 +1002,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var edgeDockEnabled: Bool { defaults.object(forKey: "edgeDock") as? Bool ?? true }
     /// DeepSeek 余额（默认开）：用别家订阅（OpenCode Go……）跑 DeepSeek 模型时官方账户没钱，她会一直没精神，可以关掉
     var dsQuotaEnabled: Bool { defaults.object(forKey: "dsQuota") as? Bool ?? true }
-    /// 省电模式（默认关）：特效每秒 15 帧、闲着 10 秒就停（平时 30 帧、30 秒）
+    /// 省电模式（默认关）：闲着 10 秒就暂停特效（平时 30 秒）；睡眠特效保持播放
     var powerSave: Bool { defaults.bool(forKey: "powerSave") }
     // 看不见的时候（窗口被完全挡住、锁屏、屏幕休眠）让网页把动画全停了
     var screensAsleep = false
