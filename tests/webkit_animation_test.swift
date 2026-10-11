@@ -9,8 +9,28 @@ let output = URL(fileURLWithPath: CommandLine.arguments[3], isDirectory: true)
 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
 final class AnimationTest: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     var web: WKWebView!
-    var window: NSWindow!
+    var window: NSPanel!
+    var ready = false
+    func visibilityChanged() {
+        guard ready else { return }
+        let hidden = !window.occlusionState.contains(.visible)
+        web.evaluateJavaScript("setPageHidden(\(hidden)); window.dispatchEvent(new CustomEvent('crosspet-native-visibility', {detail: {hidden: \(hidden)}}));", completionHandler: nil)
+    }
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let command = message.body as? [String: Any], command["command"] as? String == "nativeVisibilityCycle" {
+            // Let AppKit settle between cycles; notifications are asynchronous.
+            window.orderFrontRegardless()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                self.window.orderOut(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    self.window.orderFrontRegardless()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        self.web.evaluateJavaScript("window.__nativeCycleDone?.();", completionHandler: nil)
+                    }
+                }
+            }
+            return
+        }
         guard let json = message.body as? String else { exit(1) }
         do {
             try json.write(to: output.appendingPathComponent("result.json"), atomically: true, encoding: .utf8)
@@ -26,7 +46,10 @@ final class AnimationTest: NSObject, WKNavigationDelegate, WKScriptMessageHandle
         } catch { print(error); exit(1) }
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        web.evaluateJavaScript(test) { _, error in
+        ready = true
+        // Empty pose fixtures have no character bitmap. Keep an opaque surface so
+        // an idle fade cannot itself change AppKit occlusion during this test.
+        web.evaluateJavaScript("document.body.style.background = '#fff';\n" + test) { _, error in
             if let error = error { print(error); exit(1) }
         }
     }
@@ -39,7 +62,15 @@ let config = WKWebViewConfiguration()
 config.userContentController.add(runner, name: "result")
 runner.web = WKWebView(frame: NSRect(x: 0, y: 0, width: 260, height: 362), configuration: config)
 runner.web.navigationDelegate = runner
-runner.window = NSWindow(contentRect: runner.web.bounds, styleMask: [.titled], backing: .buffered, defer: false)
+runner.web.setValue(false, forKey: "drawsBackground")
+runner.window = NSPanel(contentRect: runner.web.bounds, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+runner.window.isOpaque = false
+runner.window.backgroundColor = .clear
+runner.window.hasShadow = false
+runner.window.level = .floating
+runner.window.hidesOnDeactivate = false
+runner.window.collectionBehavior = [.canJoinAllSpaces, .stationary]
+NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: runner.window, queue: .main) { _ in runner.visibilityChanged() }
 runner.window.title = "CrossPet isolated SVG regression test"
 runner.window.contentView = runner.web
 runner.window.orderFrontRegardless()

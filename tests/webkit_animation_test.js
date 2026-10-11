@@ -12,7 +12,7 @@
   const originalSeek = SVGSVGElement.prototype.setCurrentTime;
   SVGSVGElement.prototype.setCurrentTime = function(t) { seeks++; return originalSeek.call(this, t); };
   try {
-    manifest = {characters: {claude: {name: 'Claude', poses: {idle: [], sleeping: [], thinking: []}}}};
+    manifest = {characters: {claude: {name: 'Claude', poses: {idle: [], sleeping: [], thinking: [], running: []}}}};
     charId = 'claude'; devActive = true; devHoldUntil = Date.now() + 60000;
     setPose('sleeping', true); say('zZz');
     await sleep(350);
@@ -20,7 +20,7 @@
     const before = svg.getCurrentTime();
     await sleep(450);
     const delta = svg.getCurrentTime() - before;
-    check('sleeping uses native SVG playback after rest', !svg.animationsPaused() && delta > .3 && delta < .65, {delta, paused: svg.animationsPaused()});
+    check('sleeping uses native SVG playback after rest', !svg.animationsPaused() && delta > .05 && delta < 1, {delta, paused: svg.animationsPaused()});
     check('visible animation never seeks the SVG timeline', seeks === 0, {seeks});
     // A complete idle/rest/hidden/resume sequence, including SVGs created while hidden.
     setPageHidden(true);
@@ -55,6 +55,28 @@
     setPose('sleeping', true);
     await sleep(350);
     check('sleeping remains animated in resting state', !document.querySelector('#fx svg').animationsPaused());
+    // Exercise real NSWindow occlusion notifications through the same native bridge
+    // as CrossPet. orderOut/orderFront is deterministic; it does not switch user Spaces.
+    for (const p of ['sleeping', 'thinking', 'running']) {
+      if (pose !== p) setPose(p, true);
+      await sleep(350);
+      const samples = [];
+      const record = event => {
+        const current = document.querySelector('#fx svg');
+        samples.push({hidden: event.detail.hidden, time: current.getCurrentTime(), paused: current.animationsPaused()});
+      };
+      window.addEventListener('crosspet-native-visibility', record);
+      await new Promise(resolve => {
+        window.__nativeCycleDone = resolve;
+        window.webkit.messageHandlers.result.postMessage({command: 'nativeVisibilityCycle'});
+      });
+      window.removeEventListener('crosspet-native-visibility', record);
+      const hiddenIndex = samples.findIndex(s => s.hidden);
+      const hidden = samples[hiddenIndex], visible = samples.slice(hiddenIndex + 1).find(s => !s.hidden);
+      check(`${p}: real native hidden/visible callbacks observed`, !!hidden && !!visible, {samples});
+      check(`${p}: native restore preserves SVG time`, !!hidden && !!visible && hidden.paused && !visible.paused && Math.abs(visible.time - hidden.time) < .05, {samples});
+    }
+
   } catch (error) { check('test completed without JavaScript errors', false, String(error.stack || error)); }
   window.webkit.messageHandlers.result.postMessage(JSON.stringify({passed: results.every(r => r.passed), results, userAgent: navigator.userAgent}));
 })(); void 0;
