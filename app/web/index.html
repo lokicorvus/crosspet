@@ -1163,6 +1163,7 @@ function devRelease() {
 function devStatus() {
   const frames = framesFor(pose)
   return { charId, pose, egg: egg ? { host: egg.host, waiting: egg.waiting } : null, held: devHeld(),
+    hidden: pageHidden,
     image: currentUrl.split('/').slice(-2).join('/'), usesFallback: !!(pose && !char()?.poses?.[pose]),
     fx: (char()?.fx || {})[pose] || null, quota: quota, bubble: $('bubble').classList.contains('hide') ? '' : $('bubble').textContent,
     frames: frames.length, fallback: POSE_FALLBACK, transient: TRANSIENT }

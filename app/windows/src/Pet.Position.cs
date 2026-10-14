@@ -26,8 +26,18 @@ namespace CrossPet
         {
             Native.GetWindowRect(hwnd, out var r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top, x, y;
-            if (Store.Settings.TryGetValue("position", out var pos) && pos is Dictionary<string, object> p && p.ContainsKey("x"))
+            if (Store.Settings.TryGetValue(PositionKey, out var pos) && pos is Dictionary<string, object> p && p.ContainsKey("x"))
             { x = Convert.ToInt32(p["x"]); y = Convert.ToInt32(p["y"]); }
+            else if (IsCompanion)
+            {
+                // 新出现的小桌宠：贴在本体左边依次排开，排不下就换列，尽量不叠在一起
+                Native.GetWindowRect(owner.hwnd, out var anchor);
+                var screen = Forms.Screen.FromHandle(owner.hwnd).WorkingArea;
+                var columns = Math.Max(1, (screen.Width - 40) / (w + 12));
+                x = anchor.Left - (slot % columns) * (w + 12);
+                y = anchor.Top - (slot / columns) * (h + 12);
+                if (x < screen.Left) x = screen.Right - 40 - w - (slot % columns) * (w + 12);
+            }
             else { var wa = Forms.Screen.PrimaryScreen.WorkingArea; x = wa.Right - w - 40; y = wa.Bottom - h - 100; }
             var (cx, cy) = Clamp(x, y, w, h);
             Native.MoveTo(hwnd, cx, cy);
@@ -42,7 +52,7 @@ namespace CrossPet
         void SavePosition()
         {
             Native.GetWindowRect(hwnd, out var r);
-            Store.Settings["position"] = new Dictionary<string, object> { ["x"] = r.Left, ["y"] = r.Top };
+            Store.Settings[PositionKey] = new Dictionary<string, object> { ["x"] = r.Left, ["y"] = r.Top };
             Store.SaveSettings();
         }
     }

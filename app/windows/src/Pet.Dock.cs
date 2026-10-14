@@ -48,7 +48,7 @@ namespace CrossPet
         {
             if (dock == null) return;
             dock = null; dockOut = dockHover = dockTucked = false;
-            Store.Settings.Remove("dock"); Store.SaveSettings();
+            Store.Settings.Remove(DockKey); Store.SaveSettings();
             Js("setTucked(null)");
         }
         void CheckDock()
@@ -68,15 +68,19 @@ namespace CrossPet
         {
             dock = side;
             dockedAt = DateTime.UtcNow;
-            Store.Settings["dock"] = side; Store.SaveSettings();
+            Store.Settings[DockKey] = side; Store.SaveSettings();
             dockOut = DockBusy();
             ApplyDock();
         }
-        /// <summary>AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来</summary>
+        /// <summary>AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来。小桌宠只看自己那个模型的状态</summary>
         bool DockBusy()
         {
             var now = DateTime.UtcNow;
-            return lastPose.Values.Any(p =>
+            // 多桌宠：工作事件也走 ActivityState，和单只时看 lastPose 是一回事，但小桌宠只有它自己那个模型的记录
+            var work = Controller.activity.Effective(current, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0);
+            if (work != null && ActivityState.Timestamp(work) > new DateTimeOffset(dockedAt, TimeSpan.Zero).ToUnixTimeMilliseconds() / 1000.0) return true;
+            var poses = IsCompanion ? owner.lastPose.Where(kv => kv.Key == current).Select(kv => kv.Value) : lastPose.Values;
+            return poses.Any(p =>
             {
                 if (p.at <= dockedAt) return false;
                 var age = (now - p.at).TotalSeconds;

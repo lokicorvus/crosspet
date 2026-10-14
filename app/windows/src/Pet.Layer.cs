@@ -31,6 +31,7 @@ namespace CrossPet
 
         bool AIActive()
         {
+            if (IsCompanion) return owner.AIActive();   // 小桌宠自己没有 lastPose，跟控制者走
             if (frontIsAI) return true;
             var now = DateTime.UtcNow;
             // 等你回答：一直等到你回答（最长 10 分钟）；刚干完活：浮上来一会儿。
@@ -89,18 +90,19 @@ namespace CrossPet
         {
             if (Window == null || hwnd == IntPtr.Zero) return;
             if (userHidden) return;   // 你用快捷键藏起来了：什么都别把她翻出来
-            // 全屏时隐藏
-            var hide = HideFullscreen && !fullscreenOverride && Native.InFullscreen(hwnd);
+            // 全屏时隐藏；多桌宠下还叠加「这只现在该不该显示」——不该显示的（模型不工作了）一起走隐身
+            var hide = !wanted || (HideFullscreen && !fullscreenOverride && Native.InFullscreen(hwnd));
             if (hide != hiddenForFullscreen)
             {
                 hiddenForFullscreen = hide;
-                Store.Log(hide ? $"全屏中，先藏起来（前台 {Native.ForegroundExe()}）" : "退出全屏，出来了");
+                if (hide) Store.Log(wanted ? $"全屏中，先藏起来（前台 {Native.ForegroundExe()}）" : "这只模型不工作了，收起来");
+                else Store.Log(wanted ? "退出全屏，出来了" : "又开工了，出来");
                 SetConcealed(hide);
             }
             var top = LayerMode == "always" || (LayerMode == "ai" && AIActive());
             if (Window.Topmost == top || surfacing) return;
             // 原本被别的窗口挡着、要浮上来：先藏起来，换完层级再淡入（没被挡住就直接换，免得闪一下）
-            if (top && !hiddenForFullscreen && Native.Covered(hwnd)) { _ = Surface(); return; }
+            if (top && wanted && !hiddenForFullscreen && Native.Covered(hwnd)) { _ = Surface(); return; }
             Window.Topmost = top;
             if (!top) Native.DropFromTop(hwnd); else Raise();
         }
@@ -108,6 +110,7 @@ namespace CrossPet
         bool surfacing;
         async Task Surface()
         {
+            if (!wanted) return;   // 这只现在不该显示，别把她浮上来
             surfacing = true;
             try
             {

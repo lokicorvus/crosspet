@@ -29,7 +29,8 @@ namespace CrossPet
             var match = exe == "" ? null : map?.FirstOrDefault(kv => string.Equals(kv.Key, exe, StringComparison.OrdinalIgnoreCase)).Value as string;
             frontIsAI = !string.IsNullOrWhiteSpace(match);
             ApplyLayer();
-            if (!ready || Paused || !Store.Flag("followApps") || exe == "") return;
+            // 多桌宠开着、又有模型在干活时：角色由「哪个模型在工作」定，不再跟着前台程序换
+            if (!ready || Paused || !Store.Flag("followApps") || exe == "" || (MultiPet && activeModels.Count > 0)) return;
             if (string.IsNullOrWhiteSpace(match)) return;   // 对照表里没有，或者值留空：这个程序不跟随
             match = HostCharacter(match);
             if (match != current) SwitchTo(match);

@@ -11,6 +11,22 @@ namespace CrossPet
     {
         const string WebView2Download = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 
+        /// <summary>单实例锁按「数据目录」区分：同一个 CROSSPET_DATA_DIR 仍然只开一只（再开就把已经在跑的叫到右下角），
+        /// 不同的 CROSSPET_DATA_DIR 是不同实例，可以并排显示多只桌宠。标准数据目录不加后缀，和现有 AI 钩子认的名称保持一致</summary>
+        static string InstanceTag()
+        {
+            var d = Store.Data ?? "";
+            if (d.Length == 0) return "";
+            var standard = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CrossPet");
+            if (string.Equals(Path.GetFullPath(d).TrimEnd('\\', '/'), Path.GetFullPath(standard).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) return "";
+            unchecked
+            {
+                uint h = 2166136261u;                       // FNV-1a
+                foreach (var ch in d.ToLowerInvariant()) { h = (h ^ ch) * 16777619u; }
+                return "-" + h.ToString("x8");
+            }
+        }
+
         /// WPF 渲染线程挂了（0x88980406 UCEERR_RENDERTHREADFAILURE）：这之后窗口不会再重画，当作没事继续跑就是画面冻住
         static bool IsRenderThreadFailure(Exception e)
         {
@@ -39,9 +55,10 @@ namespace CrossPet
         [STAThread]
         static void Main()
         {
-            // 只开一个：再次打开时让已经在跑的那个回到右下角
-            using (var mutex = new Mutex(true, @"Local\CrossPet-" + Environment.UserName, out var first))
-            using (var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\CrossPet-Show-" + Environment.UserName))
+            // 只开一个：再次打开时让已经在跑的那个回到右下角（多实例补丁：按数据目录区分，见 InstanceTag）
+            var tag = InstanceTag();
+            using (var mutex = new Mutex(true, @"Local\CrossPet-" + Environment.UserName + tag, out var first))
+            using (var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\CrossPet-Show-" + Environment.UserName + tag))
             {
                 if (!first) { show.Set(); return; }
 

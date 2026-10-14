@@ -34,6 +34,91 @@ namespace CrossPet
         public void Reload() { ready = false; web?.CoreWebView2?.Reload(); }
         public static string Q(string s) => Store.Json.Serialize(s);
 
+        /// <summary>发给所有桌宠（本体 + 跟着的小桌宠）。控制者读到的状态、设置变更都走这里，保证每只看到的都一样</summary>
+        void Broadcast(string code)
+        {
+            Js(code);
+            foreach (var pet in companions.Values) pet.Js(code);
+        }
+
+        /// <summary>把当前的工作状态、额度和会话状态补给一只（新建出来的）小桌宠</summary>
+        void Replay(Pet pet)
+        {
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+            foreach (var kv in activity.States.Where(kv => ActivityState.Fresh(kv.Value, now)))
+                pet.Js($"applyCharState({Q(kv.Key)}, {Store.Json.Serialize(kv.Value)})");
+            foreach (var kv in quotas) pet.Js($"setQuota({Q(kv.Key)}, {Store.Json.Serialize(kv.Value)})");
+            foreach (var kv in activity.Sessions) pet.Js($"setSessions({Q(kv.Key)}, {Store.Json.Serialize(kv.Value)})");
+        }
+
+        /// <summary>谁该显示、谁该收起来。控制者每轮状态检查后调一次：按当前工作模型集合决定每只桌宠的去留，
+        /// 工作模型变了才记日志、刷设置窗口</summary>
+        void ReconcilePets()
+        {
+            if (IsCompanion) return;   // 只有控制者管这一群：小桌宠不自己造同伴（否则会一只套一只）
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
+            var previous = activeModels;
+            activeModels = activity.Active(now);
+            if (!MultiPet)
+            {
+                // 关掉多桌宠：只留本体这一只，工作模型换了就换角色（和上游单只的行为一致）
+                SetWanted(true);
+                foreach (var pet in companions.Values) pet.SetWanted(false);
+                if (Store.Flag("followEvents") && activeModels.Count > 0)
+                {
+                    var latest = activeModels.OrderByDescending(id => ActivityState.Timestamp(activity.Effective(id, now))).First();
+                    if (latest != current) SwitchTo(latest);
+                }
+                Js($"setEggsEnabled({(EggsEnabled ? "true" : "false")})");
+                return;
+            }
+            if (activeModels.Count > 0)
+            {
+                hadActivity = true;
+                if (!activeModels.Contains(current)) SwitchTo(activeModels[0]);
+                SetWanted(true);
+                foreach (var id in activeModels.Where(m => m != current))
+                {
+                    if (!companions.TryGetValue(id, out var pet))
+                    {
+                        // 藏着的小桌宠随时可以被重建；先把已经不在工作的收掉，缓存的网页控件数量就跟着当前工作模型走
+                        foreach (var old in companions.Keys.Where(k => !activeModels.Contains(k)).ToList())
+                        { companions[old].Window.Close(); companions.Remove(old); }
+                        var used = new HashSet<int>(companions.Values.Select(p => p.slot));
+                        var next = 1; while (used.Contains(next)) next++;
+                        pet = new Pet(env, this, id, next);
+                        companions.Add(id, pet);
+                        pet.Start();
+                    }
+                    pet.SetWanted(true);
+                }
+            }
+            else
+            {
+                SetWanted(!HideIdle);
+                // 从「有活干」回到「全空闲」：把停在最后一个动作上的本体叫回待机
+                if (hadActivity && previous.Count > 0 && activity.States.TryGetValue(current, out var state) && !ActivityState.Fresh(state, now))
+                    Js($"applyCharState({Q(current)}, {{pose:'idle',event:'Timeout',ts:{now.ToString(System.Globalization.CultureInfo.InvariantCulture)}}})");
+            }
+            foreach (var kv in companions)
+                kv.Value.SetWanted(activeModels.Contains(kv.Key) && kv.Key != current);
+            if (!previous.SequenceEqual(activeModels))
+            {
+                Broadcast($"setEggsEnabled({(EggsEnabled && activeModels.Count == 0 ? "true" : "false")})");
+                Store.Log("多桌宠工作模型: " + (activeModels.Count == 0 ? "待机" : string.Join(", ", activeModels)));
+                settings?.Push();
+            }
+        }
+
+        /// <summary>这只桌宠该不该显示。收起时走 SetConcealed（隐身：透明 + 鼠标穿透），不用 Hide()，
+        /// 免得反复藏放把 WPF 渲染线程弄挂（原因见 Pet.Layer.cs）</summary>
+        void SetWanted(bool value)
+        {
+            wanted = value;
+            ApplyLayer();
+            UpdateDock();
+        }
+
         /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
         void Wear(string id, string skin)
         {
@@ -42,16 +127,21 @@ namespace CrossPet
             if (skin == "") sd.Remove(id); else sd[id] = skin;
             Store.SaveSettings();
             LoadCharacters();
-            Js($"init({ManifestJson}); refreshLook({Q(id)})");
+            foreach (var pet in companions.Values) pet.LoadCharacters();   // 小桌宠也重新载入立绘清单
+            Broadcast($"init({ManifestJson}); refreshLook({Q(id)})");
         }
 
         void SwitchTo(string id)
         {
             if (!Characters().Any(c => c.id == id)) return;
+            if (IsCompanion) return;   // 跟着的小桌宠的角色由控制者决定，不自己换
+            // 多桌宠开着又有模型在工作时，只允许切到正在工作的模型（每只桌宠固定演一个模型）
+            if (MultiPet && activeModels.Count > 0 && !activeModels.Contains(id)) return;
             current = id;
             if (dock != null && !dockOut) After(800, ApplyDock);   // 换了角色，切口位置跟着变
             Store.Settings["character"] = id; Store.SaveSettings();
-            Js($"setCharacter({Q(id)})");
+            Js($"setCharacter({Q(id)}, {(MultiPet && activeModels.Count > 0 ? "true" : "false")})");
+            Replay(this);   // 换过来之后把当前状态补上，免得新角色停在待机
             settings?.Push();
         }
 
@@ -94,7 +184,14 @@ namespace CrossPet
                     if (value == null) continue;   // 可能正被另一边写一半，下次再读
                     stamps[key] = stamp;
                     var json = Store.Json.Serialize(value);
-                    if (kind == "sessions") { if (!Paused) Js($"setSessions({Q(id)}, {json})"); continue; }
+                    if (kind == "sessions" && !Paused)
+                    {
+                        // 同一个模型的多个对话各自的状态：记下来交给 ActivityState 判「这个模型还在不在干活」
+                        var sessionTarget = id == "current" ? current : id;
+                        activity.Sessions[sessionTarget] = value;
+                        Broadcast($"setSessions({Q(sessionTarget)}, {json})");
+                        continue;
+                    }
                     dev?.Js($"logEvent({Q(id)}, {Q(kind)}, {json}, {(Paused ? "true" : "false")})");
                     if (Paused) continue;
                     if (kind == "state")
@@ -104,7 +201,9 @@ namespace CrossPet
                         var ts = value.TryGetValue("ts", out var t) ? Convert.ToDouble(t) : 0;
                         lastPose[id] = (pose ?? "", DateTime.UtcNow);
                         if (id != "current" && pose != "idle" && pose != "sleeping" && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts < 30 && ts > latestActive.ts) latestActive = (id, ts);
-                        Js($"applyCharState({Q(id)}, {json})");
+                        var target = id == "current" ? current : id;
+                        activity.States[target] = value;   // 控制者留着这份，用来算工作模型集合、补给新建的小桌宠
+                        Broadcast($"applyCharState({Q(target)}, {json})");
                         // Codex 回完一轮：额度记录刚写进会话，马上读一次（不然要等每分钟一次的定时刷新）
                         if (id == "gpt")
                         {
@@ -112,11 +211,11 @@ namespace CrossPet
                             else codexBusyAt = DateTime.UtcNow;   // 在干活：定时查额度改成 1 分钟一次（CodexTickDue）
                         }
                     }
-                    else Js($"setQuota({Q(id)}, {json})");
+                    else { quotas[id] = value; Broadcast($"setQuota({Q(id)}, {json})"); }
                 }
-            if (latestActive.id != null && latestActive.id != current && Store.Flag("followEvents")) SwitchTo(latestActive.id);
+            if (!Paused) ReconcilePets();
             ApplyLayer();
-            UpdateDock();
+            foreach (var pet in companions.Values) pet.ApplyLayer();
         }
     }
 }

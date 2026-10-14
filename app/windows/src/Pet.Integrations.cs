@@ -137,6 +137,7 @@ namespace CrossPet
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
+                ["multiPet"] = MultiPet, ["hideIdlePets"] = HideIdle, ["activeModels"] = activeModels.ToList(),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["powerSave"] = PowerSave,
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
@@ -184,35 +185,37 @@ namespace CrossPet
                         case "size":
                             var v = Math.Min(1.6, Math.Max(0.6, Math.Round(Convert.ToDouble(value) * 100) / 100));
                             Store.Settings["size"] = v; Store.SaveSettings(); ApplySizes(v);
+                            foreach (var pet in companions.Values) pet.ApplySizes(v);   // 大小是共享的：小桌宠跟着变
                             break;
                         case "textSize":   // 单独调文字：同时记为解锁
                             Store.Settings["textSize"] = Math.Min(1.6, Math.Max(0.6, Math.Round(Convert.ToDouble(value) * 100) / 100));
                             Store.Settings["textLinked"] = false; Store.SaveSettings(); ApplySizes();
                             break;
                         case "textLinked": Store.Settings["textLinked"] = !(value is bool lb) || lb; Store.SaveSettings(); ApplySizes(); break;
-                        case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
+                        case "multiPet": case "hideIdlePets": SetMultiOption(key, on); break;
+                        case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Broadcast($"setShowName({(on ? "true" : "false")})"); break;
                         case "hideFullscreen": Store.Settings["hideFullscreen"] = on; Store.SaveSettings(); ApplyLayer(); break;
                         case "hideHotkey": if (value is string hk) { Store.Settings["hideHotkey"] = hk; Store.SaveSettings(); RegisterHideHotKey(); } break;
-                        case "quotaAggregate": Store.Settings["quotaAggregate"] = on; Store.SaveSettings(); Js($"setQuotaAggregate({(on ? "true" : "false")})"); break;
-                        case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Js($"setPowerSave({(on ? "true" : "false")})"); break;
-                        case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
+                        case "quotaAggregate": Store.Settings["quotaAggregate"] = on; Store.SaveSettings(); Broadcast($"setQuotaAggregate({(on ? "true" : "false")})"); break;
+                        case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Broadcast($"setPowerSave({(on ? "true" : "false")})"); break;
+                        case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Broadcast($"setEggsEnabled({(on && (!MultiPet || activeModels.Count == 0) ? "true" : "false")})"); break;
                         case "aura":
-                            if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
+                            if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Broadcast($"setAuraMode({Q(m)})"); }
                             break;
                         case "followApps": case "followEvents": Store.Settings[key] = on; Store.SaveSettings(); break;
                         case "gptQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) RefreshCodexQuota(CodexWhy.Now); else Js("setCodexQuota(null)");
+                            if (on) RefreshCodexQuota(CodexWhy.Now); else { quotas.Remove("gpt"); Broadcast("setQuota('gpt', null)"); Broadcast("setCodexQuota(null)"); }
                             break;
                         case "agyQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
+                            if (on) _ = RefreshGeminiQuota(); else { quotas.Remove("gemini"); Broadcast("setQuota('gemini', null)"); }
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
                         case "dsQuota":
                             Store.Settings["dsQuota"] = on; Store.SaveSettings();
                             stamps.Remove("deepseek-quota");   // 重新打开时马上读一次
-                            if (!on) Js("setQuota('deepseek', null)");
+                            if (!on) { quotas.Remove("deepseek"); Broadcast("setQuota('deepseek', null)"); }
                             break;
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;

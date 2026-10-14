@@ -27,7 +27,7 @@ namespace CrossPet
         string lastHitRects;
         async Task UpdateHitRects()
         {
-            if (hit == null || !ready || Mouse.LeftButton == MouseButtonState.Pressed) return;
+            if (hit == null || !ready || !wanted || concealed || Mouse.LeftButton == MouseButtonState.Pressed) return;
             var json = await Eval("hitRects()");
             if (json == lastHitRects || json == "null") return;
             lastHitRects = json;
@@ -84,7 +84,7 @@ namespace CrossPet
             {
                 var menu = new Forms.ContextMenuStrip();
                 // 按住 Shift 右键才出现「开发者控制台」（macOS 版是 ⌥）
-                FillMenu(menu, (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+                FillMenu(menu, (Keyboard.Modifiers & ModifierKeys.Shift) != 0, this);   // 右键哪只，菜单就作用在哪只身上
                 menu.Closed += (_, ___) => Window.Dispatcher.BeginInvoke(new Action(menu.Dispose));
                 menu.Show(Forms.Cursor.Position);
             };

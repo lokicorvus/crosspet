@@ -160,6 +160,13 @@ namespace CrossPet
             scaleTimer.Start();
         }
 
+        /// <summary>多桌宠的两个开关：存下来立刻重算一遍该显示哪几只（不用等下一轮轮询）</summary>
+        void SetMultiOption(string key, bool value)
+        {
+            Store.Settings[key] = value; Store.SaveSettings();
+            ReconcilePets(); settings?.Push();
+        }
+
         void OpenSettings()
         {
             if (settings == null) { settings = new SettingsWindow(this, env); settings.Closed += () => settings = null; }

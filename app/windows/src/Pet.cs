@@ -52,13 +52,35 @@ namespace CrossPet
         double pageFoot = 62;      // 画布底栏高（网页像素）
         double shownFootPx;        // 窗口现在的底栏在屏幕上多高（物理像素）；0 = 还没按画布设过
 
-        public Pet(CoreWebView2Environment env) { this.env = env; }
+        // ---- 多桌宠：正在干活的每个模型各显示一只，互不抢同一个画面 ----
+        // 主 Pet（owner == null）是「控制者」：由它一个人读状态文件、算当前工作模型集合，再把结果广播给跟着的小桌宠；
+        // 跟着的小桌宠（owner != null）各有自己的窗口和网页，但不建托盘、不重复同步资源、不重复轮询状态文件。
+        readonly Pet owner;
+        readonly string fixedCharacter;
+        readonly int slot;
+        readonly Dictionary<string, Pet> companions = new Dictionary<string, Pet>();
+        readonly ActivityState activity = new ActivityState();
+        readonly Dictionary<string, Dictionary<string, object>> quotas = new Dictionary<string, Dictionary<string, object>>();
+        List<string> activeModels = new List<string>();
+        bool wanted = true;
+        bool hadActivity;
+        bool closed;
+        bool webStarted;
+        bool IsCompanion => owner != null;
+        string PositionKey => IsCompanion ? "position-" + fixedCharacter : "position";
+        string DockKey => IsCompanion ? "dock-" + fixedCharacter : "dock";
+        Pet Controller => owner ?? this;
+        bool MultiPet => !Store.Settings.TryGetValue("multiPet", out var v) || !(v is bool b) || b;
+        bool HideIdle => Store.Flag("hideIdlePets");
+
+        public Pet(CoreWebView2Environment env, Pet owner = null, string character = null, int slot = 0)
+        { this.env = env; this.owner = owner; fixedCharacter = character; this.slot = slot; }
 
         // ---------------- 启动 ----------------
         public void Start()
         {
-            Store.SyncResources();
-            current = Store.Settings.TryGetValue("character", out var c) && c is string s ? s : "claude";
+            if (!IsCompanion) Store.SyncResources();   // 资源只同步一次，跟着的小桌宠不重复拷
+            current = fixedCharacter ?? (Store.Settings.TryGetValue("character", out var c) && c is string s ? s : "claude");
 
             Window = new Window
             {
@@ -84,6 +106,7 @@ namespace CrossPet
             hit = new Canvas();
             grid.Children.Add(hit);
             Window.Content = grid;
+            Window.Closed += (_, __) => { closed = true; ready = false; web.Dispose(); };
             WireMouse(hit);
             Every(TimeSpan.FromMilliseconds(250), () => { _ = UpdateHitRects(); });
             Every(TimeSpan.FromMilliseconds(80), UpdateDockHover);
@@ -91,8 +114,10 @@ namespace CrossPet
             // 换 DPI 时 WPF 先按新缩放排好窗口再发这个事件；等这一轮排版走完再让网页控件对齐（原因见 ResyncWebForDpi）
             Window.DpiChanged += (_, e) => Window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
                 new Action(() => ResyncWebForDpi(e.OldDpi.DpiScaleX, e.NewDpi.DpiScaleX)));
-            Window.Loaded += async (_, __) => await InitWeb();
+            Window.Loaded += async (_, __) => { if (webStarted) return; webStarted = true; await InitWeb(); };
             Window.Show();
+
+            if (IsCompanion) return;   // 跟着的小桌宠：没有托盘、不查更新、不接入 AI，只显示自己那只
 
             tray = new Forms.NotifyIcon { Text = "CrossPet", Visible = true };
             try { tray.Icon = new System.Drawing.Icon(Path.Combine(Store.Install, "AppIcon.ico")); } catch { tray.Icon = System.Drawing.SystemIcons.Application; }
@@ -108,6 +133,8 @@ namespace CrossPet
             {
                 fullscreenOverride = false;   // 前台窗口换了：双击托盘临时叫出来的作废，重新按全屏规则来
                 if (hwnd != IntPtr.Zero) Raise();
+                foreach (var pet in companions.Values)
+                    if (pet.wanted) pet.Raise();
                 appSwitch.Stop(); appSwitch.Start();
             });
 
@@ -140,10 +167,11 @@ namespace CrossPet
             first.Start();
         }
 
-        static void Every(TimeSpan t, Action a)
+        void Every(TimeSpan t, Action a)
         {
             var timer = new DispatcherTimer { Interval = t };
             timer.Tick += (_, __) => { try { a(); } catch (Exception e) { Store.Log("定时任务出错: " + e); } };
+            Window.Closed += (_, __) => timer.Stop();   // 跟着的小桌宠会被关掉重建，定时器要跟着停
             timer.Start();
         }
 
@@ -153,6 +181,7 @@ namespace CrossPet
             try
             {
                 await web.EnsureCoreWebView2Async(env);
+                if (closed) return;
                 var core = web.CoreWebView2;
                 Map(core);
                 core.Settings.AreDefaultContextMenusEnabled = false;
@@ -166,10 +195,11 @@ namespace CrossPet
                 core.NavigationCompleted += async (_, a) =>
                 {
                     ready = false;
+                    if (closed) return;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
                     await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")})");
-                    if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
+                    if (Store.Settings.TryGetValue(DockKey, out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 每只桌宠分别记住贴边状态
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
                     if (last != Store.Version)
@@ -181,6 +211,13 @@ namespace CrossPet
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
                     After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
                     stamps.Clear();
+                    if (IsCompanion)
+                    {
+                        owner.Replay(this);   // 刚建出来的小桌宠：把当前工作状态和额度补给它，免得空着
+                        Js($"setEggsEnabled({(EggsEnabled && (!MultiPet || owner.activeModels.Count == 0) ? "true" : "false")})");
+                        ApplyLayer();
+                        return;   // 小桌宠不自己轮询、不接入、不查更新：它显示什么全听控制者的
+                    }
                     Poll();
                     RefreshQuota();
                     RefreshCodexQuota(CodexWhy.Now);

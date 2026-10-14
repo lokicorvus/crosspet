@@ -50,17 +50,31 @@ namespace CrossPet
             userHidden = hidden;
             if (!hidden) { fullscreenOverride = true; hiddenForFullscreen = false; }
             SetConcealed(hidden);
+            // 多桌宠：快捷键藏的是整群，不然叫回来以后旁边还杵着几只
+            foreach (var pet in companions.Values)
+            {
+                pet.userHidden = hidden;
+                if (!hidden) { pet.fullscreenOverride = true; pet.hiddenForFullscreen = false; }
+                pet.SetConcealed(hidden);
+            }
             if (!hidden) RefreshCodexQuota(CodexWhy.Tick);   // 藏着时没查：叫回来补一次（自带间隔，不会多问）
         }
 
         public void Recenter()
         {
             Undock();
-            Store.Settings.Remove("position"); Store.SaveSettings();
+            Store.Settings.Remove(PositionKey); Store.SaveSettings();
             RestorePosition();
-            if (userHidden) SetUserHidden(false);   // 快捷键藏起来的：一起恢复（包括动画）
-            fullscreenOverride = true; hiddenForFullscreen = false;   // 你主动叫她：全屏时也出来，前台窗口换了再按规则藏
-            SetConcealed(false);
+            // 只有控制者管「整群」的隐藏状态：小桌宠自己 Recenter 时别再遍历一遍，免得把同伴的状态改乱
+            if (!IsCompanion)
+            {
+                if (userHidden) SetUserHidden(false);   // 快捷键藏起来的：一起恢复（包括动画）
+                fullscreenOverride = true; hiddenForFullscreen = false;   // 你主动叫她：全屏时也出来，前台窗口换了再按规则藏
+                SetConcealed(false);
+                // 小桌宠没有托盘，叫本体回右下角时把它们一起摆回原位
+                foreach (var pet in companions.Values) pet.Recenter();
+            }
+            ApplyLayer();
         }
         bool fullscreenOverride;
     }
