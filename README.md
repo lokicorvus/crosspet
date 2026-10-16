@@ -12,7 +12,7 @@
 
 ![Claude、GPT、DeepSeek、Gemini、GLM 五个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
-> 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google、智谱、腾讯无关。角色形象来自社区二创，见 [致谢与授权](#致谢与授权)。
+> 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google、智谱、腾讯、阿里巴巴无关。角色形象来自社区二创或 CrossPet 原创设定，见 [致谢与授权](#致谢与授权)。
 
 ## 她会做什么
 
@@ -20,7 +20,7 @@
 
 - **跟着 AI 干活**：思考、读文件、写代码、跑命令、上网查资料、画图、派子任务、出错、完成。每个状态都有一张立绘，身边配一个小动画（小终端、浏览器、画板、任务清单……）。一轮里用了 8 次以上工具的大活干完，她会戴上自己的皇冠得意一下；AI 压缩上下文时，她会把一大堆东西往小箱子里硬塞；AI 停下来问你问题、让你选选项或者请求授权时，她会一直看着你等你回答（Claude Code、DeepSeek Harness）。
 - **同时干好几件事**：同一个 AI 开着两个以上对话一起干活时，她左右来回转着忙，每个对话一张小卡片演它在做什么；三个以上直接崩溃。干完的打绿勾、出错的变红、等你回答的那张会跳。
-- **用别家模型也换装**：Claude Code 走 DeepSeek、智谱的兼容接口，Codex 换成别家模型，DeepSeek Harness、WorkBuddy、ZCode、Hermes 里换模型时，她都换成对应的角色来演（按实际用的模型名判断，认不出的由当前角色来演）。
+- **用别家模型也换装**：Claude Code 走 DeepSeek、智谱的兼容接口，Codex 换成别家模型，DeepSeek Harness、WorkBuddy、ZCode、Hermes、Qwen Code 里换模型时，她都换成对应的角色来演（按实际用的模型名判断，认不出的由当前角色来演）。
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。「设置…」里打开「合并显示各家额度」后，小窗里会把各家的额度排在一起，每行前面标名字（默认只显示当前角色自己的）。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着。单击摸摸头，右键能戳她一下。有新版本时，她会举着礼物来告诉你。
 - **贴边**：把她拖到屏幕左边或右边，她就缩到边上只露半个身子扒着屏幕，不挡你干活；AI 干活时自己跑出来，干完过约 10 秒缩回去；鼠标靠近时她会探出头来看你。
@@ -33,6 +33,7 @@
   - **DeepSeek**：闲着会扒白饭、摸鱼、游泳，被戳会生气，想得太久会揉太阳穴；余额变多时抱着比脑袋还大的饭碗开吃
   - **Gemini**：生图时拿香蕉当画笔（Nano Banana）；闲着会反重力飘起来
   - **GLM**：笑眯眯的「心机涨价狐」，戳她会被抓到偷偷改价签；闲着会拉下眼罩假装自己是「神秘新模型」，或者抱着一摞售罄的会员卡得意；大活干完时掀开眼罩揭晓真身
+  - **Qwen**：好奇的国风千问娘，浅蓝侧编发配小书生帽，展开折扇听你说话、陪你思考
 
 ## 支持的 AI
 
@@ -45,8 +46,9 @@
 | **GLM**（智谱 ZCode） | ✅ | ✅ ZCode 钩子 | — |
 | **WorkBuddy**（腾讯，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
+| **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
 
-DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode 和 Hermes Agent：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
+DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、Qwen Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。千问角色已内置立绘。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode 和 Hermes Agent：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
 ## 快速开始
 
@@ -95,7 +97,7 @@ cd crosspet
 会编译、装到 `~/Applications`，然后挨个问你要接哪些 AI。只想接某一个也行：
 
 ```bash
-python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini、workbuddy、zcode、hermes
+python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini、workbuddy、zcode、hermes、qwen
 python3 tools/integrate.py status            # 看看现在接了哪些
 ```
 
@@ -170,6 +172,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处；没填 Key 时调 Harness 自己的账号服务查，登录凭据始终留在 Harness 里，插件只拿到余额数字。
 - WorkBuddy、ZCode：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它们的登录凭据，所以也不显示它们的额度 / 积分。
 - Hermes Agent：插件只把事件名、工具名、当前模型名和会话 id 交给钩子脚本，不传对话内容和命令参数；工具结果只看成功还是出错。
+- Qwen Code：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它的登录凭据，所以也不显示额度。
 - CrossPet 自己只联网做一件事：每 3 小时（以及电脑从睡眠中醒来时）查一次 GitHub 上有没有新版本，只读公开的版本号；点「更新」时才下载安装包。（GPT 额度的查询是 Codex 自己发的，见上面）
 
 ## 更新与卸载
@@ -186,13 +189,14 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 
 ## 致谢与授权
 
-角色形象都是社区二创的再创作，CrossPet 只是把她们做成桌宠，立绘由 AI 生图工具按这些设定绘制：
+这些角色涉及社区已有的 AI 拟人二创；CrossPet 结合各自来源制作桌宠版本，并用 AI 生图工具绘制项目立绘：
 
 - **DeepSeek 娘**：原型「溟月」由 **上善无形** 创作（2025-06，CC BY-NC-SA 4.0）；深蓝女仆鲸鱼娘（社区昵称「大肥鱼」）由 B 站 **ZipZipPipe** 二创。
 - **GPT 娘（白龙）**：社区通称「御姐白龙」，出自 B 站 **ZipZipPipe**。
 - **GLM 娘（黑狐狸女仆）**：CrossPet 的原创设定，「心机涨价狐」的性格取自社区对智谱的印象。
+- **Qwen 娘（国风折扇）**：社区流行的千问娘设定（浅蓝侧编发、小书生帽、蓝白国风服饰、折扇）。
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
-- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」是各自公司的商标，本项目仅用于指代对应产品。
+- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」是各自公司的商标，本项目仅用于指代对应产品。
 
 - **穿 Claude 卫衣的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
@@ -204,6 +208,6 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 **授权**
 
 - 代码：[MIT](LICENSE)
-- 角色立绘与设定（`characters/`、`docs/prompts/`、`docs/images/`）：[CC BY-NC-SA 4.0](characters/LICENSE.md)。可以转载和二创，须署名、**不得商用**，衍生作品用同样的协议。
+- 本项目有权授权的角色立绘、文字设定与提示词（`characters/`、`docs/prompts/`、`docs/images/`）：[CC BY-NC-SA 4.0](characters/LICENSE.md)。转载和改编须署名、**不得商用**；公开分享改编素材时按同一协议发布。社区既有设定及第三方作品的权利以各自来源为准。
 
 README 里的配图由 `python3 tools/readme_images.py` 按 App 的真实布局生成，顶部横幅和宣传图由 `python3 tools/promo_images.py` 生成。

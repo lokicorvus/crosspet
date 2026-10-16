@@ -9,6 +9,7 @@ extension App {
     /// 读 /tmp/crosspet/<id>-state.json 和 <id>-quota.json，有变化就交给画面。
     func pollStates() {
         guard ready else { return }
+        var latestActive: (id: String?, ts: Double) = (nil, 0)
         // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
         for id in characterIds + ["current"] {
             // sessions：同一个 AI 好几个对话同时干活时，每个对话各自的状态（演「手忙脚乱」用）
@@ -21,8 +22,14 @@ extension App {
                 // 状态只认 10 分钟内的，免得开机读到旧状态
                 if kind == "state", Date().timeIntervalSince(stamp) > 600 { continue }
                 guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8) else { continue }
-                if kind == "state", let pose = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["pose"] as? String {
+                if kind == "state", let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let pose = state["pose"] as? String {
                     lastPose[id] = (pose, stamp)
+                    // 终端里的 AI 没有独立的前台 App：跟随最近一条正在工作的事件。
+                    if id != "current", pose != "idle", pose != "sleeping",
+                       let ts = state["ts"] as? Double, Date().timeIntervalSince1970 - ts < 30, ts > latestActive.ts {
+                        latestActive = (id, ts)
+                    }
                 }
                 if kind == "sessions" { if !pauseRealEvents { js("setSessions(\(quote(id)), \(text))") }; continue }
                 devJS("logEvent(\(quote(id)), \(quote(kind)), \(text), \(pauseRealEvents))")
@@ -37,11 +44,12 @@ extension App {
                 }
             }
         }
+        if followEvents, !pauseRealEvents, let id = latestActive.id, id != currentId { switchTo(id) }
         applyLayer()
         updateDock()
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）正在前台、
         // 里面换了模型：马上换成那个模型的角色
-        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt"] {
+        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen"] {
             let url = stateDir.appendingPathComponent("\(host)-host.json")
             guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
                   stamp != stamps["\(host)-host"] else { continue }

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen
     python3 tools/integrate.py status
 
 原则：
@@ -676,6 +676,24 @@ def gemini(install: bool) -> None:
         remove_hooks(GEMINI_SETTINGS)
 
 
+# ---- Qwen Code（阿里）----
+# 用户设置在 ~/.qwen/settings.json，钩子写在里面的 hooks 字段：格式和 Claude Code 一样
+#（要写 type: "command"，matcher 支持 "*" / ".*"），不是它上游 Gemini CLI 的那套。
+# timeout 的单位也跟着 Claude Code 是「秒」：Gemini CLI 模板里那个 5000 在这里会被当成毫秒兼容值。
+# 没有能把 ~/.qwen 整体挪走的环境变量（只有 QWEN_CODE_SYSTEM_SETTINGS_PATH 这类系统级路径），所以按默认位置找。
+QWEN_SETTINGS = HOME / ".qwen/settings.json"
+
+
+def qwen(install: bool) -> None:
+    if install:
+        if not found(QWEN_SETTINGS.parent, "Qwen Code", ("settings.json",)):
+            return
+        merge_hooks(QWEN_SETTINGS, REPO / "integrations/qwen/hooks.json")
+        print("  → 新开的 Qwen Code 会话生效（钩子在会话开始时读配置）")
+    else:
+        remove_hooks(QWEN_SETTINGS)
+
+
 # ---- Antigravity ----
 # 它的 hooks.json 是「名字 → 各事件」的格式，CrossPet 只占 "crosspet" 这一项
 ANTIGRAVITY_HOOKS = HOME / ".gemini/config/hooks.json"
@@ -803,7 +821,7 @@ def has_hermes() -> bool:
     return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes}
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen}
 
 
 def has_hooks(p: Path) -> bool:
@@ -827,6 +845,7 @@ def installed() -> list:
     if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()): result.append("workbuddy")
     if has_zcode() and found(ZCODE_HOME, "", ("cli",), quiet=True): result.append("zcode")
     if has_hermes(): result.append("hermes")
+    if has_hooks(QWEN_SETTINGS) and found(QWEN_SETTINGS.parent, "", ("settings.json",), quiet=True): result.append("qwen")
     return result
 
 
@@ -860,7 +879,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen"}
 
 
 def short(p) -> str:
@@ -1052,6 +1071,7 @@ def diagnose() -> str:
     L.append(f"  最近消息：{seen('deepseek')}")
     # 其他
     L.append(f"[Gemini CLI] {file_state(GEMINI_SETTINGS, lambda: has_hooks(GEMINI_SETTINGS))}；最近消息 {seen('gemini')}")
+    L.append(f"[Qwen Code] {file_state(QWEN_SETTINGS, lambda: has_hooks(QWEN_SETTINGS))}；最近消息 {seen('qwen')}")
     L.append(f"[Antigravity] {file_state(ANTIGRAVITY_HOOKS, has_antigravity)}；最近消息 {seen('antigravity')}")
     for d in workbuddy_dirs():
         if d.exists():
@@ -1102,6 +1122,7 @@ def status() -> None:
     print("WorkBuddy           :", "已接入" if any(has_hooks(d / "settings.json") for d in workbuddy_dirs()) else "未接入")
     print("ZCode               :", "已接入" if has_zcode() else "未接入")
     print("Hermes Agent        :", "已接入" if has_hermes() else "未接入")
+    print("Qwen Code           :", "已接入" if has_hooks(QWEN_SETTINGS) else "未接入")
 
 
 if __name__ == "__main__":

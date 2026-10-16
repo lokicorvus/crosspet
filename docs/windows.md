@@ -49,6 +49,8 @@
 | DeepSeek Harness | 工作状态 + 余额。余额优先用你填的 API Key 查；没填 Key 就用 Harness 里登录的账号查。接入后要从托盘完全退出 Harness 再打开 |
 | Antigravity | 跟着工作状态动 |
 | Gemini CLI | 跟着工作状态动 |
+| WorkBuddy、ZCode、Hermes Agent | 按当前模型换角色，跟着工作状态动 |
+| Qwen Code | 使用千问模型时切换为千问角色，跟着工作状态动；新开的会话生效 |
 
 - GPT 额度：右键 →「设置…」里打开「显示 GPT 额度」，从 Codex 会话记录里只读额度数字。
 - Gemini 额度：右键 →「设置…」里打开「显示 Gemini 额度」，需要 Antigravity 开着。和 macOS 版一样，只在本机向 Antigravity 后台服务问额度（用它每次启动随机生成、只在本机有效的令牌），不碰账号凭据。

@@ -41,6 +41,7 @@ function characterFor(provider, model, custom = {}) {
   for (const s of [m.toLowerCase(), p.toLowerCase()]) {
     if (/deepseek/.test(s)) return "deepseek";
     if (/glm|zhipu|bigmodel|chatglm|z-ai|zai-/.test(s)) return "glm";
+    if (/qwen|dashscope|bailian|tongyi/.test(s)) return "qwen";
     if (/claude|anthropic/.test(s)) return "claude";
     if (/gemini|google|vertex/.test(s)) return "gemini";
     if (/gpt|codex|openai|chatgpt|(^|[^a-z])o[1-9]/.test(s)) return "gpt";

@@ -19,6 +19,7 @@ extension App {
     var textLinked: Bool { defaults.object(forKey: "textLinked") as? Bool ?? true }
     var showName: Bool { defaults.object(forKey: "showName") as? Bool ?? true }
     var followApps: Bool { defaults.object(forKey: "followApps") as? Bool ?? true }
+    var followEvents: Bool { defaults.object(forKey: "followEvents") as? Bool ?? true }
     var eggsEnabled: Bool { defaults.object(forKey: "eggs") as? Bool ?? true }
 
     /// 换大小时窗口锚在哪：
@@ -126,7 +127,7 @@ extension App {
         let names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
         var state: [String: Any] = [
             "version": currentVersion, "platform": "mac",
-            "size": Double(petScale), "textSize": textScale, "textLinked": textLinked, "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps,
+            "size": Double(petScale), "textSize": textScale, "textLinked": textLinked, "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps, "followEvents": followEvents,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"), "gptQuotaNote": codexNote,
             "login": SMAppService.mainApp.status == .enabled,
             "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "powerSave": powerSave,

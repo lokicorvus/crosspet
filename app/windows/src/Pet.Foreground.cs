@@ -39,7 +39,7 @@ namespace CrossPet
         /// 一个程序里能用好几家模型（比如 DeepSeek Harness）：它的接入插件把当前角色写在 &lt;角色&gt;-host.json，
         /// 切到这个程序时换成那个角色。一天内写的才算，角色不存在就还用对照表里的
         /// </summary>
-        static readonly Dictionary<string, string> HostDefaults = new Dictionary<string, string> { ["zcode"] = "glm" };
+        static readonly Dictionary<string, string> HostDefaults = new Dictionary<string, string> { ["zcode"] = "glm", ["qwen"] = "qwen" };
         string HostCharacter(string id)
         {
             var file = Path.Combine(Store.State, id + "-host.json");

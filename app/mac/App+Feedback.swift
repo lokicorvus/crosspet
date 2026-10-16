@@ -98,7 +98,7 @@ extension App {
                  + "层级 \(layerMode)（现在\(panel.level == .floating ? "置顶" : "普通")）；贴边 \(dock ?? "无")\(dock != nil ? (dockOut ? "·跑出来了" : "·缩着") : "")；大小 \(Int(petScale * 100))%")
         let skins = (defaults.dictionary(forKey: "skins") as? [String: String]) ?? [:]
         L.append("角色 \(currentId ?? "-")\(skins.isEmpty ? "" : "，衣服 \(skins)")；设置：名字 \(showName ? "开" : "关")，光晕 \(auraMode)，省电 \(powerSave ? "开" : "关")，彩蛋 \(eggsEnabled ? "开" : "关")，"
-                 + "跟随前台 \(followApps ? "开" : "关")，AI 干活自动出现 \(aiAutostart ? "开" : "关")，贴边 \(edgeDockEnabled ? "开" : "关")，"
+                 + "跟随前台 \(followApps ? "开" : "关")，跟随事件 \(followEvents ? "开" : "关")，AI 干活自动出现 \(aiAutostart ? "开" : "关")，贴边 \(edgeDockEnabled ? "开" : "关")，"
                  + "GPT 额度 \(defaults.bool(forKey: "gptQuota") ? "开" : "关")，Gemini 额度 \(defaults.bool(forKey: "agyQuota") ? "开" : "关")，DeepSeek 余额 \(dsQuotaEnabled ? "开" : "关")，额度合并 \(quotaAggregate ? "开" : "关")")
         let now = Date()
         let poses = lastPose.map { "\($0.key)=\($0.value.pose)（\(Int(now.timeIntervalSince($0.value.at)))秒前）" }.sorted()

@@ -7,6 +7,8 @@
     python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode、Hermes Agent）：按模型选角色
     python3 crosspet-hook.py --ensure           # 只确保桌宠在跑（没开着就打开；用户手动退出过或关了这个功能就不管）
 钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
+收全一份 JSON 就往下走，不等管道关闭（有的宿主写完不关，等下去会一直挂着）；读取期限见下面的 READ_TIMEOUT，
+可以用环境变量 CROSSPET_READ_TIMEOUT 调。
 
 只写状态目录（默认 /tmp/crosspet，可用环境变量 CROSSPET_STATE_DIR 改）里的两个小文件：
     <角色id>-state.json   当前状态，桌宠读取
@@ -191,10 +193,94 @@ if character == "--ensure":
     ensure_pet_logged("--ensure")
     sys.exit(0)
 
-try:
-    # 按 UTF-8 读：Windows 上 Python 默认用系统编码（中文系统是 GBK），事件里一有中文就会解码失败
-    event = json.loads(sys.stdin.buffer.read().decode("utf-8", errors="replace"))
-except Exception:
+# ---- 读事件（#19）----
+# 不能只等 EOF：有的宿主（Windows 上的 Codex app-server）写完 JSON 之后不关管道，干等下去钩子就一直挂着。
+# 进程不退出，宿主给它的那个控制台窗口也就一直留着——桌面上会积起一堆空白终端。
+# 所以改成边收边试解析：拿到一整份 JSON 立刻处理，不等管道关闭。
+# 超时（宿主没写完）、太大、是终端输入、JSON 不合法，都算「没收到」，直接退出，不写状态。
+# 读取期限压在宿主自己的钩子超时之下：各家配的通常是 5 秒，默认 1.5 秒，可以用环境变量调。
+READ_TIMEOUT = float(os.environ.get("CROSSPET_READ_TIMEOUT") or 1.5)
+READ_LIMIT = int(os.environ.get("CROSSPET_READ_LIMIT") or (1 << 20))   # 1 MiB；正常事件比这小得多
+
+
+def _peek_pipe(fd: int):
+    """Windows：管道里现在有多少字节可读；返回 None 表示那头已经关了。
+    管道上的阻塞读没法用超时打断（ReadFile 会一直等），所以只能先问一次再读。"""
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.PeekNamedPipe.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+                                       ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)]
+    kernel32.PeekNamedPipe.restype = wintypes.BOOL
+    available = wintypes.DWORD()
+    ok = kernel32.PeekNamedPipe(msvcrt.get_osfhandle(fd), None, 0, None, ctypes.byref(available), None)
+    return available.value if ok else None
+
+
+def _read_chunk(fd: int, want: int, timeout: float):
+    """等最多 timeout 秒读一段。返回 b"" = 那头关了；None = 超时（还没有数据）。"""
+    if os.name == "nt":
+        end = time.monotonic() + timeout
+        while True:
+            n = _peek_pipe(fd)
+            if n is None:
+                return b""
+            if n:
+                return os.read(fd, min(n, want))     # 只读已经到位的字节，不会阻塞
+            if time.monotonic() >= end:
+                return None
+            time.sleep(0.005)
+    import select
+    try:
+        if not select.select([fd], [], [], timeout)[0]:
+            return None
+    except Exception:
+        pass        # select 用不了（少见）：照旧去读，宁可多等也别把事件丢了
+    return os.read(fd, want)
+
+
+def _parse_event(buf: bytearray, strict: bool = True):
+    """strict 时半截的多字节 UTF-8 会解码失败，正好当作「还没收全」。"""
+    try:
+        text = buf.decode("utf-8") if strict else buf.decode("utf-8", errors="replace")
+    except UnicodeDecodeError:
+        return None
+    text = text.lstrip()
+    try:
+        event, end = json.JSONDecoder().raw_decode(text)
+    except ValueError:
+        return None
+    # 只容忍结尾的空白 / 换行：后面还有别的东西就是坏数据，和原来一样当没收到
+    return event if not text[end:].strip() else None
+
+
+def read_event():
+    """读一份完整的事件 JSON；读不到返回 None。"""
+    try:
+        fd = sys.stdin.buffer.fileno()
+    except Exception:
+        return None                     # 没有 stdin（比如 pythonw 启动、被重定向到空）
+    try:
+        if os.isatty(fd):
+            return None                 # 有人直接敲命令跑钩子：别在这儿等他敲键盘
+    except Exception:
+        pass
+    buf = bytearray()
+    deadline = time.monotonic() + READ_TIMEOUT
+    while len(buf) < READ_LIMIT:
+        chunk = _read_chunk(fd, min(READ_LIMIT - len(buf), 65536), max(0.0, deadline - time.monotonic()))
+        if chunk is None or not chunk:
+            break
+        buf += chunk
+        event = _parse_event(buf)
+        if event is not None:
+            return event
+    return _parse_event(buf, strict=False)
+
+
+event = read_event()
+if event is None:
     sys.exit(0)
 
 # 心跳：「最近一次收到这个 AI 的消息」，桌宠记下来，设置里能看出「接上了但从没收到过消息」，反馈里也带着。
@@ -235,12 +321,13 @@ if character == "gpt" and "transcript_path" in event:
     else:
         sys.exit(0)
 
-# 多模型宿主（WorkBuddy、ZCode、Hermes Agent）：每条事件都带当前模型名，按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes")
-# ZCode 默认用智谱的 GLM；它只在会话开始时告诉模型名，之后的事件按会话 id 查当时记下的模型
-HOST_DEFAULT_MODEL = {"zcode": "glm"}
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen")
+# ZCode 默认用智谱的 GLM；Qwen Code 默认用自家的千问。它们只在会话开始时告诉模型名，
+# 之后的事件按会话 id 查当时记下的模型
+HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen"}
 characters_dir = (default_data if os.name == "nt" else Path.home() / "Library/Application Support/CrossPet") / "characters"
 
 
@@ -248,6 +335,8 @@ def character_for_model(model: str):
     m = model.lower()
     if "glm" in m or "zhipu" in m or "chatglm" in m or "z.ai" in m or "zai-" in m:
         return "glm"
+    if "qwen" in m or "dashscope" in m or "bailian" in m or "tongyi" in m:
+        return "qwen"
     if "kimi" in m or "moonshot" in m:
         return "kimi"
     if "deepseek" in m:
@@ -264,23 +353,42 @@ def character_for_model(model: str):
 def remember_session_model(host: str, fallback: str = "") -> str:
     """有的宿主只在会话开始时给模型名：记下来（按会话 id），之后的事件查它"""
     sid = str(event.get("session_id") or event.get("sessionId") or "")
-    # claude / gpt 是角色名，<角色>-sessions.json 已经是多会话状态文件了，模型另记一个文件
-    path = state_dir / (f"{host}-models.json" if host in SELF_HOSTS else f"{host}-sessions.json")
+    # 宿主名本身就是角色名时（claude / gpt / qwen），<名字>-sessions.json 已经被多会话状态占用了（见 update_sessions），
+    # 模型得另记一个文件：不然记模型会把会话状态当模型名读回来（character_for_model 收到 dict 直接崩）
+    path = state_dir / (f"{host}-models.json" if host in NAMED_HOSTS else f"{host}-sessions.json")
+    model = str(event.get("model") or "")
+    if model and sid:
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            # 同一宿主的几个会话会同时启动：锁住「读旧表 → 加新项 → 替换」整段。
+            # 临时文件也按目标文件命名，不能与 update_sessions 的 .qwen-sessions.json 抢同一路径。
+            with open(state_dir / f".{host}-models.lock", "a+b") as lock:
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(lock, fcntl.LOCK_EX)
+                try:
+                    try:
+                        known = json.loads(path.read_text())
+                    except Exception:
+                        known = {}
+                    known[sid] = model
+                    known = dict(list(known.items())[-50:])  # 只留最近的会话
+                    tmp = state_dir / f".{path.stem}.{os.getpid()}.json"
+                    tmp.write_text(json.dumps(known))
+                    tmp.replace(path)
+                finally:
+                    if os.name == "nt":
+                        lock.seek(0)
+                        msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+        except Exception:
+            pass
     try:
         known = json.loads(path.read_text())
     except Exception:
         known = {}
-    model = str(event.get("model") or "")
-    if model and sid:
-        known[sid] = model
-        known = dict(list(known.items())[-50:])  # 只留最近的会话
-        try:
-            state_dir.mkdir(parents=True, exist_ok=True)
-            tmp = state_dir / f".{host}-sessions.json"
-            tmp.write_text(json.dumps(known))
-            tmp.replace(path)
-        except Exception:
-            pass
     return model or known.get(sid, "") or fallback or HOST_DEFAULT_MODEL.get(host, "")
 
 
@@ -306,6 +414,8 @@ def installed(c) -> bool:
 # 按模型换成对应的角色，认不出的模型还是由自己来演。Codex 每条事件都带模型名；Claude Code 只在会话开始时给，
 # 另外看环境变量里的模型名和接口地址
 SELF_HOSTS = ("claude", "gpt")
+# 宿主名同时也是角色名的：它们的 <名字>-sessions.json 被多会话状态占用，记模型要另开一个文件（见 remember_session_model）
+NAMED_HOSTS = SELF_HOSTS + ("qwen",)
 if character in SELF_HOSTS:
     host = character
     # 先看事件里的模型名（Claude Code 会话开始时给的、Codex 每条都给的，是实际要用的那个）；

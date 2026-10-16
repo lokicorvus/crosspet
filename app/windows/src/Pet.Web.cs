@@ -62,7 +62,7 @@ namespace CrossPet
             // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）里换了模型：
             // 它正在前台的话马上换成那个模型的角色
             var hostChanged = false;
-            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt" })
+            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen" })
             {
                 try
                 {

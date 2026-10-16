@@ -23,7 +23,7 @@ try {
         }
         $env:PYTHONUTF8 = '1'
         $env:CROSSPET_DATA_DIR = $data
-        foreach ($target in @('claude-hooks', 'claude-mod', 'codex', 'deepseek', 'gemini', 'antigravity', 'workbuddy', 'zcode', 'hermes')) {
+        foreach ($target in @('claude-hooks', 'claude-mod', 'codex', 'deepseek', 'gemini', 'antigravity', 'workbuddy', 'zcode', 'hermes', 'qwen')) {
             & $python $integrator uninstall $target
             if ($LASTEXITCODE -ne 0) { throw "撤销 $target 的接入失败，程序文件已保留。" }
         }

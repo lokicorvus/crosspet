@@ -2,6 +2,10 @@
 
 ## 未发布
 
+- 新增：接入 Qwen Code（阿里）：钩子写进 `~/.qwen/settings.json`，和 WorkBuddy、ZCode、Hermes Agent 一样按当前模型换角色，**新开一个 Qwen Code 会话生效**。Qwen Code 的钩子格式跟 Claude Code 一样（不是它上游 Gemini CLI 那套），`timeout` 的单位是秒。额度不显示（不碰登录凭据）。新增蓝白国风折扇版千问娘的 62 张立绘，覆盖常用、贴边、互动、时段、节日姿态和通用第二变体；使用千问模型时自动换成她
+- 修复（Windows）：钩子读完事件后一直不退出，桌面上会积起一堆空白终端。原因是 `sys.stdin.buffer.read()` 要等到管道关闭（EOF）才返回，而有的宿主（Codex app-server 方式启动时）写完 JSON 并不关管道，钩子就一直挂着；进程不退，宿主给它的控制台窗口也就一直留着。现在收全一份 JSON 立刻处理，不等管道关闭；「没有输入」「超时」都限时退出，不再无限等（#19）
+- 修复：宿主名和角色名同名的多模型宿主（Claude Code、Codex，以及新加的 Qwen Code）记模型时，和桌宠的多会话状态共用 `<名字>-sessions.json`，两种内容会互相覆盖——第二条事件把会话状态当模型名读，钩子直接抛 `AttributeError` 崩掉。现在这类宿主的模型另记 `<名字>-models.json`
+
 ## 1.3.5 · 修复 Gemini 额度显示、Windows 换缩放后被裁，DeepSeek 余额更及时（2026-10-14）
 
 - 修复：Gemini（Antigravity）额度显示成 0%，或者多出一行 0%。原因是 Gemini 4 发布后，Antigravity 加进了只给 Ultra 套餐用的新模型，别的账号里它标着「不可用」、没有额度信息，被当成了「剩 0%」排在第一行。现在不可用的模型不算进额度；真用完的照样显示 0%

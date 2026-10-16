@@ -121,7 +121,7 @@ extension App {
         guard let c = obj["character"] as? String, characterIds.contains(c) else { return id }
         return c
     }
-    static let hostDefaults = ["zcode": "glm"]
+    static let hostDefaults = ["zcode": "glm", "qwen": "qwen"]
 
     /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
     /// App 启动时窗口会短暂地抢焦点、让焦点，立即响应会来回闪。
