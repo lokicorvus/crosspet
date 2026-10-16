@@ -23,4 +23,5 @@
 | 4 | [04-gemini-红温.md](04-gemini-红温.md) | 7 |
 | 5 | [05-glm-红温.md](05-glm-红温.md) | 7 |
 | 6 | [06-卫衣deepseek-红温.md](06-卫衣deepseek-红温.md)（皮肤，放 `characters/deepseek-hoodie/raw/`） | 7 |
+| 7 | [07-qwen-红温.md](07-qwen-红温.md) | 7 |
 

@@ -17,8 +17,10 @@
 | 8 | [08-deepseek-节日.md](08-deepseek-节日.md) | 8 |
 | 9 | [09-gemini-节日.md](09-gemini-节日.md) | 8 |
 | 10 | [10-glm-节日.md](10-glm-节日.md) | 8 |
+| 11 | [11-qwen-时段.md](11-qwen-时段.md) | 6 |
+| 12 | [12-qwen-节日.md](12-qwen-节日.md) | 8 |
 
-合计 70 张：时段 5×6=30，节日 5×8=40。
+合计 84 张：时段 6×6=36，节日 6×8=48。
 
 时间段：greet_morning 早上（5–11 点）· greet_noon 中午（11–14）· greet_afternoon 下午（14–18）· greet_evening 晚上（18–23）· greet_night 深夜（23–2）· greet_dawn 凌晨（2–5）
 节日：fest_halloween 万圣节 · fest_christmas 圣诞 · fest_newyear 元旦 · fest_spring 春节 · fest_lantern 元宵 · fest_dragonboat 端午 · fest_midautumn 中秋 · fest_national 国庆（出游主题，不放旗帜）
