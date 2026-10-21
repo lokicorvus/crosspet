@@ -44,12 +44,13 @@ extension App {
                 }
             }
         }
-        if followEvents, !pauseRealEvents, let id = latestActive.id, id != currentId { followEvent(id) }
+        // 同角色的新事件也必须撤销更早的异步答复，否则旧请求可能把她切回另一个角色。
+        if let id = latestActive.id { followEvent(id) }
         applyLayer()
         updateDock()
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）正在前台、
         // 里面换了模型：马上换成那个模型的角色
-        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen"] {
+        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "cursor"] {
             let url = stateDir.appendingPathComponent("\(host)-host.json")
             guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
                   stamp != stamps["\(host)-host"] else { continue }
@@ -63,6 +64,9 @@ extension App {
 
     /// 两端使用网页层同一份优先级；这里只采集前台程序及设置并执行结果。
     func followEvent(_ id: String) {
+        followEventGeneration &+= 1
+        let generation = followEventGeneration
+        guard ready, !pauseRealEvents, followEvents, id != currentId else { return }
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
         let host = front.flatMap { appToCharacter[$0] ?? hostApp($0) }
         let foregroundId = host.map { hostCharacter($0) }
@@ -71,11 +75,14 @@ extension App {
                                     "followApps": apps, "followEvents": events, "characters": characterIds]
         guard let data = try? JSONSerialization.data(withJSONObject: input), let json = String(data: data, encoding: .utf8) else { return }
         web.evaluateJavaScript("FollowPolicy.eventTarget(\(json))") { [weak self] result, _ in
-            // 和 Windows 一致：前台、设置或手动选择变了就丢弃旧答复。
-            guard let self, self.ready, !self.pauseRealEvents, self.currentId == currentAt,
+            // 和 Windows 一致：更新的事件、页面或选择已经到来时，旧答复不能再覆盖它。
+            guard let self, self.followEventGeneration == generation, self.ready, !self.web.isLoading,
+                  !self.pauseRealEvents, self.currentId == currentAt,
                   NSWorkspace.shared.frontmostApplication?.bundleIdentifier == front,
-                  self.followApps == apps, self.followEvents == events,
-                  result as? String == id, id != self.currentId else { return }
+                  self.followApps == apps, self.followEvents == events else { return }
+            let currentHost = front.flatMap { self.appToCharacter[$0] ?? self.hostApp($0) }
+            guard currentHost == host, currentHost.map({ self.hostCharacter($0) }) == foregroundId,
+                  self.characterIds.contains(id), result as? String == id, id != self.currentId else { return }
             self.switchTo(id)
         }
     }

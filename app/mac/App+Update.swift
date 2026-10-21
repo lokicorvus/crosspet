@@ -187,6 +187,12 @@ extension App {
         if fm.fileExists(atPath: res.appendingPathComponent("web").path) { replace("web", in: root, from: res) }
         if fm.fileExists(atPath: res.appendingPathComponent("crosspet-hook.py").path) { replace("crosspet-hook.py", in: root, from: res) }
         // 已经接入过的才更新，没接入的不碰
+        let cursorBridge = "crosspet-cursor-bridge.py"
+        let cursorSrc = res.appendingPathComponent("integrations/cursor")
+        if fm.fileExists(atPath: root.appendingPathComponent(cursorBridge).path),
+           fm.fileExists(atPath: cursorSrc.appendingPathComponent(cursorBridge).path) {
+            replace(cursorBridge, in: root, from: cursorSrc)
+        }
         let mods = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/mods/crosspet")
         let modSrc = res.appendingPathComponent("integrations/claude-code/mod")
         if fm.fileExists(atPath: mods.path), fm.fileExists(atPath: modSrc.path) {

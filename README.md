@@ -47,6 +47,9 @@
 | **WorkBuddy**（腾讯，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
 | **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子（未实测） | — |
+| **Cursor**（任意模型） | ✅ 固定角色，首次默认 GPT | ✅ 观察钩子（真实 Cursor 会话待验证） | — |
+
+Cursor 可接入已有角色或自己添加的角色，不附带新立绘。运行 `python3 tools/integrate.py install cursor`，新开会话生效；默认使用 GPT，可将 `~/.cursor/hooks.json` 中本桥命令末尾的 `gpt` 统一改为自己的角色 id，后续刷新会保留。使用前需要先打开 CrossPet，当前 Cursor 桥不会自动拉起已退出的桌宠。具体范围见[接入教程](docs/接入教程.md#cursor)。
 
 DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、Qwen Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。千问角色已内置立绘。**千问的局限**：只有 Qwen Code 能接入；千问桌面客户端没有对外接口，她跟不了它干活。Qwen Code 的接入还没在真实环境里完整测过（干活时的事件要登录才能触发），遇到问题欢迎提 issue。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode 和 Hermes Agent：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
@@ -97,7 +100,7 @@ cd crosspet
 会编译、装到 `~/Applications`，然后挨个问你要接哪些 AI。只想接某一个也行：
 
 ```bash
-python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini、workbuddy、zcode、hermes、qwen
+python3 tools/integrate.py install codex     # 可选：claude-hooks、claude-mod、codex、deepseek、antigravity、gemini、workbuddy、zcode、hermes、qwen、cursor
 python3 tools/integrate.py status            # 看看现在接了哪些
 ```
 

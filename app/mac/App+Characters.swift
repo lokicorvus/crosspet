@@ -8,6 +8,7 @@ extension App {
 
     /// 扫描 characters/<id>/：character.json + 立绘（.webp / .png）。文件名去掉 -2、-3 后缀是姿态名，idle-blink 是眨眼帧。
     func loadCharacters() {
+        followEventGeneration &+= 1
         var chars: [String: Any] = [:]
         appToCharacter = [:]
         characterIds = []
@@ -108,6 +109,7 @@ extension App {
     func hostApp(_ bundle: String) -> String? {
         if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
         if bundle == "dev.zcode.app" { return "zcode" }
+        if bundle == "com.todesktop.230313mzl4w4u92" { return "cursor" }
         return nil
     }
 
@@ -121,10 +123,18 @@ extension App {
             if let d = Self.hostDefaults[id], characterIds.contains(d) { return d }
             return id
         }
-        guard let c = obj["character"] as? String, characterIds.contains(c) else { return id }
+        guard let c = obj["character"] as? String, characterIds.contains(c) else { return id == "cursor" ? (Self.hostDefaults[id].flatMap { characterIds.contains($0) ? $0 : nil } ?? id) : id }
         return c
     }
-    static let hostDefaults = ["zcode": "glm", "qwen": "qwen"]
+    static let hostDefaults = ["zcode": "glm", "qwen": "qwen", "cursor": "gpt"]
+
+    // 菜单和控制台都能直接 reload；统一在导航开始时撤销旧页面上的异步选择。
+    // didFinish 仍按原流程恢复角色、清空 stamps 并重新跟随前台，不改 pendingSwitch 的调度。
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        guard webView === web else { return }
+        followEventGeneration &+= 1
+        ready = false
+    }
 
     /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
     /// App 启动时窗口会短暂地抢焦点、让焦点，立即响应会来回闪。
@@ -135,6 +145,7 @@ extension App {
     }
 
     @objc func appActivated(_ note: Notification) {
+        followEventGeneration &+= 1
         spaceChanged(note)
         guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
         pendingSwitch?.cancel()

@@ -2,6 +2,9 @@ import contextlib
 import os
 import importlib.util
 import io
+import json
+import shlex
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -59,6 +62,11 @@ class IntegrationTests(unittest.TestCase):
                 # Windows 不能按 shebang 直接执行 .py：用临时 cmd 模拟安装的 Codex 命令。
                 fake = Path(tmp) / 'fake_codex.cmd'
                 fake.write_text(f'@echo off\n"{sys.executable}" "{script}" %*\n', encoding='utf-8')
+            else:
+                # Windows 工作树挂载进 WSL 后可能是 CRLF；显式用测试 Python，不依赖 .py 的 shebang。
+                fake = Path(tmp) / 'fake_codex'
+                fake.write_text('#!/bin/sh\nexec ' + shlex.join([sys.executable, str(script)]) + ' "$@"\n', encoding='utf-8')
+                fake.chmod(0o755)
             with mock.patch.dict(os.environ, {'CROSSPET_CODEX_BIN': str(fake)}):
                 found = integrate.codex_programs()
         self.assertTrue(found and found[0].startswith(str(fake)), found)
@@ -124,6 +132,131 @@ class IntegrationTests(unittest.TestCase):
         hook = (integrate.REPO / 'integrations/crosspet-hook.py').read_text(encoding='utf-8')
         for event in integrate.load_json(integrate.REPO / 'integrations/qwen/hooks.json')['hooks']:
             self.assertIn(f'"{event}"', hook, event)
+
+
+class CursorIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='crosspet-cursor-integration-')
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.home = self.root / 'profile'
+        self.target = self.home / '.cursor/hooks.json'
+        self.target.parent.mkdir(parents=True)
+        (self.target.parent / 'user-settings.json').write_text('{}', encoding='utf-8')
+        self.support = self.root / 'data'
+        patch = mock.patch.multiple(integrate, HOME=self.home, CURSOR_HOOKS=self.target, SUPPORT=self.support)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def run_merge(self):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            success = integrate.merge_cursor_hooks(self.target)
+        return success, out.getvalue()
+
+    def ours(self, data):
+        return [entry for entries in data['hooks'].values() if isinstance(entries, list)
+                for entry in entries if integrate.cursor_ours(entry)]
+
+    def test_default_install_idempotent_and_uninstall_preserves_user_hooks(self):
+        other = {'type': 'command', 'command': 'echo keep-user-hook'}
+        original = {'version': 1, 'userOption': {'keep': True}, 'hooks': {'stop': [other], 'userEmptyEvent': []}}
+        integrate.save_json(self.target, original)
+        self.assertTrue(self.run_merge()[0])
+        first = integrate.load_json(self.target)
+        self.assertEqual({integrate.cursor_character(entry) for entry in self.ours(first)}, {'gpt'})
+        self.assertEqual(len(self.ours(first)), 12)
+        self.assertTrue(self.run_merge()[0])
+        self.assertEqual(integrate.load_json(self.target), first)
+        integrate.remove_cursor_hooks(self.target)
+        self.assertEqual(integrate.load_json(self.target), original)
+
+    def test_refresh_preserves_custom_role_and_cleans_retired_events(self):
+        command = 'python3 "old/crosspet-cursor-bridge.py" grok'
+        other = {'type': 'command', 'command': 'echo keep-user-hook'}
+        integrate.save_json(self.target, {'version': 1, 'hooks': {
+            'stop': [{'command': command}, other],
+            'retired': [{'command': command}],
+            'retiredMixed': [{'command': command}, other],
+        }})
+        with contextlib.redirect_stdout(io.StringIO()):
+            integrate.cursor(True)
+        first = integrate.load_json(self.target)
+        self.assertNotIn('retired', first['hooks'])
+        self.assertEqual(first['hooks']['retiredMixed'], [other])
+        self.assertIn(other, first['hooks']['stop'])
+        self.assertEqual({integrate.cursor_character(entry) for entry in self.ours(first)}, {'grok'})
+        self.assertEqual(len(self.ours(first)), 12)
+        self.assertTrue((self.support / integrate.CURSOR_MARK).exists())
+        self.assertTrue(self.run_merge()[0])
+        self.assertEqual(integrate.load_json(self.target), first)
+
+    def test_conflicting_roles_leave_config_and_bridge_untouched(self):
+        integrate.save_json(self.target, {'version': 1, 'hooks': {
+            'stop': [{'command': 'python crosspet-cursor-bridge.py grok'}],
+            'sessionStart': [{'command': 'python crosspet-cursor-bridge.py gpt'}],
+        }})
+        before = self.target.read_bytes()
+        success, output = self.run_merge()
+        self.assertFalse(success)
+        self.assertIn('保留原配置', output)
+        self.assertEqual(self.target.read_bytes(), before)
+        self.assertFalse((self.support / integrate.CURSOR_MARK).exists())
+        self.assertFalse(list(self.target.parent.glob('*.bak-crosspet-*')))
+
+    def test_unrecognized_command_leaves_config_untouched(self):
+        integrate.save_json(self.target, {'version': 1, 'hooks': {'stop': [
+            {'command': 'python crosspet-cursor-bridge.py grok --custom-wrapper'}]}})
+        before = self.target.read_bytes()
+        success, output = self.run_merge()
+        self.assertFalse(success)
+        self.assertIn('无法识别', output)
+        self.assertEqual(self.target.read_bytes(), before)
+
+    def test_quoted_unicode_character_and_missing_argument(self):
+        for role in ('"魅魔娘"', "'grok'", ''):
+            with self.subTest(role=role):
+                integrate.save_json(self.target, {'version': 1, 'hooks': {'stop': [
+                    {'command': f'python "old/crosspet-cursor-bridge.py" {role}'}]}})
+                self.assertTrue(self.run_merge()[0])
+                expected = role.strip('"\'') or 'gpt'
+                self.assertEqual({integrate.cursor_character(entry) for entry in self.ours(integrate.load_json(self.target))}, {expected})
+
+    def test_grouped_hook_format_is_diagnosed_without_partial_changes(self):
+        integrate.save_json(self.target, {'version': 1, 'hooks': {
+            'stop': [{'hooks': [{'command': 'echo keep-grouped'}]}]}})
+        before = self.target.read_bytes()
+        success, output = self.run_merge()
+        self.assertFalse(success)
+        self.assertIn('不是 Cursor', output)
+        self.assertEqual(self.target.read_bytes(), before)
+        self.assertFalse((self.support / integrate.CURSOR_MARK).exists())
+
+    def test_cli_refresh_twice_uses_temp_profile_and_preserves_grok(self):
+        other = {'command': 'echo keep-user-hook', 'type': 'command'}
+        integrate.save_json(self.target, {'version': 1, 'userOption': True, 'hooks': {
+            'stop': [{'command': 'python3 "old/crosspet-cursor-bridge.py" grok'}, other]}})
+        env = dict(os.environ, HOME=str(self.home), USERPROFILE=str(self.home),
+                   LOCALAPPDATA=str(self.home / 'AppData/Local'), APPDATA=str(self.home / 'AppData/Roaming'),
+                   CROSSPET_DATA_DIR=str(self.support), CROSSPET_STATE_DIR=str(self.support / 'state'),
+                   CODEX_HOME=str(self.home / '.codex'), CLAUDE_CONFIG_DIR=str(self.home / '.claude'),
+                   DSH_PROFILE_DIR=str(self.home / 'dsh-profile'), DSH_HOME=str(self.home / 'dsh'),
+                   WORKBUDDY_CONFIG_DIR=str(self.home / '.workbuddy'), HERMES_HOME=str(self.home / '.hermes'),
+                   PYTHONIOENCODING='utf-8', PYTHONDONTWRITEBYTECODE='1')
+        first = None
+        for _ in range(2):
+            result = subprocess.run([sys.executable, '-B', str(integrate.REPO / 'tools/integrate.py'), 'refresh'],
+                                    env=env, capture_output=True, text=True, encoding='utf-8', timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stderr, '')
+            self.assertIn('更新 cursor', result.stdout)
+            after = integrate.load_json(self.target)
+            self.assertEqual({integrate.cursor_character(entry) for entry in self.ours(after)}, {'grok'})
+            self.assertEqual(len(self.ours(after)), 12)
+            self.assertIn(other, after['hooks']['stop'])
+            self.assertTrue(after['userOption'])
+            if first is not None:
+                self.assertEqual(after, first)
+            first = after
 
 # Harness 加的服务商写在文件末尾，也就是我们那段的两行注释中间
 DSH_USER = """- insert:

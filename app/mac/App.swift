@@ -8,8 +8,13 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var web: WKWebView!
     var timer: Timer?
     var quotaTimer: Timer?
-    var ready = false
-    var currentId: String?
+    var followEventGeneration: UInt64 = 0
+    var ready = false {
+        didSet { if ready != oldValue { followEventGeneration &+= 1 } }
+    }
+    var currentId: String? {
+        didSet { followEventGeneration &+= 1 }   // 同 id 的手动选择也要让旧事件答复失效。
+    }
 
     let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("CrossPet", isDirectory: true)
@@ -32,7 +37,9 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var feedbackWindow: NSWindow?
     var feedbackWeb: WKWebView?
     var defaultNames: [String: String] = [:]   // id → character.json 里的原名（设置页显示占位用）
-    var pauseRealEvents = false                // 控制台里测试时，先不让真实 AI 的状态打扰桌宠
+    var pauseRealEvents = false {              // 控制台里测试时，先不让真实 AI 的状态打扰桌宠
+        didSet { if pauseRealEvents != oldValue { followEventGeneration &+= 1 } }
+    }
 
 
     // 更新 用的

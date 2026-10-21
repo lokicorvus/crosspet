@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ],
+    "stop": [
+      {
+        "command": "python3 \"$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py\" gpt",
+        "type": "command",
+        "timeout": 2,
+        "failClosed": false
+      }
+    ]
+  }
+}

@@ -10,7 +10,7 @@
 
 只写状态目录（默认 /tmp/crosspet，可用环境变量 CROSSPET_STATE_DIR 改）里的两个小文件：
     <角色id>-state.json   当前状态，桌宠读取
-    <角色id>-turn.json    本轮用了几次工具（判断「大活」用）
+    <宿主id>-turn-tools.json  按会话和轮次记录用了几次工具（判断「大活」用）
 不影响 AI 本身的行为：一般不向 stdout 输出；Antigravity 要求回一个 JSON，就回空的 {}。
 用 /tmp 是因为有的 AI（比如 DeepSeek Harness）的钩子跑在沙箱里，只允许写 /tmp。
 """
@@ -263,14 +263,23 @@ except Exception:
 if not isinstance(event, dict):
     sys.exit(0)
 
-# 心跳：「最近一次收到这个 AI 的消息」，桌宠记下来，设置里能看出「接上了但从没收到过消息」，反馈里也带着。
-# 文件名按接入的是哪个 AI 分（Antigravity 和 Gemini CLI 都用 gemini 角色，Antigravity 多带一个事件名参数）
-try:
-    seen_key = "antigravity" if character == "gemini" and len(sys.argv) > 2 else character
-    state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / f"seen-{seen_key}").write_text(str(int(time.time())))
-except Exception:
-    pass
+def cursor_bridge_installed() -> bool:
+    """只在 Cursor 确实配置了独立桥时，跳过它导入的 Claude 钩子。卸载后自然恢复旧接入。"""
+    try:
+        config = json.loads((Path.home() / ".cursor/hooks.json").read_text(encoding="utf-8-sig"))
+        hooks = config.get("hooks") if isinstance(config, dict) else None
+        if not isinstance(hooks, dict):
+            return False
+        return any(isinstance(entry, dict) and isinstance(entry.get("command"), str)
+                   and any(mark in entry["command"] for mark in ("crosspet-cursor-bridge.py", "crosspet_cursor_bridge.py"))
+                   for entries in hooks.values() if isinstance(entries, list) for entry in entries)
+    except (OSError, ValueError):
+        return False  # 正在写配置 / 未安装时，保留已有 observer 的行为。
+
+
+# Cursor 会导入 Claude hooks；只在它另有独立桥接时去重，不能让未迁移的用户升级后断联。
+if event.get("cursor_version") and cursor_bridge_installed():
+    sys.exit(0)
 
 # Codex 会在对话结束后自己在后台整理记忆（工作目录在 ~/.codex/memories），也会调工具，但不是你让它干的活，
 # 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管
@@ -300,6 +309,131 @@ if character == "gpt" and "transcript_path" in event:
             time.sleep(0.1)
     else:
         sys.exit(0)
+
+arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
+name = event.get("hook_event_name") or arg_event
+source_host = character  # 不能用按模型换过的角色来分会话 / 工具计数
+
+
+# 从门禁到状态、模型路由、会话卡片写完共用一把宿主锁。只锁 turn_gate 会留下
+# 「工具已获准 → Stop 写完 → 旧工具才替换状态」的窗口。写完会话再关句柄；异常退出也会释放。
+def event_lock(owner: str):
+    state_dir.mkdir(parents=True, exist_ok=True)
+    lock = open(state_dir / f".{owner}-events.lock", "a+b")
+    try:
+        deadline = time.monotonic() + .75
+        while True:
+            try:
+                lock.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("observer event lock busy")
+                time.sleep(.005)
+        return lock
+    except BaseException:
+        lock.close()
+        raise
+
+
+try:
+    _event_lock = event_lock(source_host)
+except OSError:
+    # 观察者写不了状态时安静退出，不绕过锁写共享文件，也不影响 AI。
+    if arg_event:
+        print("{}")
+    sys.exit(0)
+
+
+# ---- 按轮次丢掉迟到的事件（Codex：事件带 turn_id；PR #26 @KQYaili 报的）----
+# 沿用上游的会话 + 轮次账本。子任务另记首次看到时所属的主轮次，换轮后不重新归属。
+TURN_END = ("Stop", "StopFailure", "Interrupt", "SessionEnd")
+TURN_KEEP = 24 * 3600
+
+
+def turn_gate(owner: str, sid: str, tid: str, name: str, child: bool) -> tuple:
+    """返回 (这条事件要不要演, 工具计数所属的主轮次)。调用者持有整条事件的锁。"""
+    path = state_dir / f"{owner}-turns.json"
+    try:
+        book = json.loads(path.read_text(encoding="utf-8-sig"))
+        if not isinstance(book, dict):
+            book = {}
+    except Exception:
+        book = {}
+    now = time.time()
+    book = {k: v for k, v in book.items() if isinstance(v, dict) and now - float(v.get("ts", 0)) < TURN_KEEP}
+    rec = book.get(sid) or {"turn": "", "done": False, "finished": []}
+    finished = rec.get("finished") or []
+    children = rec.get("children")
+    children = children if isinstance(children, dict) else {}
+    if child:
+        key = json.dumps([str(event.get("agent_id")), tid])
+        binding = children.get(key)
+        binding = binding if isinstance(binding, dict) else {}
+        explicit_parent = str(event.get("parent_turn_id") or event.get("root_turn_id") or "")
+        parent = str(binding.get("turn") or explicit_parent or rec.get("turn") or "")
+        allow = not rec.get("done") and not binding.get("done") and parent == rec.get("turn", "")
+        if explicit_parent and explicit_parent != rec.get("turn"):
+            allow = False
+        children[key] = {"turn": parent, "done": bool(binding.get("done") or name in TURN_END or name == "SubagentStop")}
+    elif tid in finished:
+        allow = False
+    else:
+        allow = True
+        # compact / resume 的 SessionStart 不是新轮次，不能退休正在工作的主轮次。
+        metadata = name == "SessionStart" and str(event.get("source", "")).lower() in ("compact", "resume")
+        if tid != rec.get("turn") and not metadata:
+            if rec.get("turn") and rec["turn"] not in finished:
+                finished = (finished + [rec["turn"]])[-128:]
+            rec = {"turn": tid, "done": False, "finished": finished}
+        ends = name in TURN_END or (name == "PostCompact" and str(event.get("trigger", "")).lower() == "manual")
+        if ends:
+            rec["done"] = True
+            rec["finished"] = (finished + [tid])[-128:]
+    rec["children"] = dict(list(children.items())[-128:])
+    rec["ts"] = now
+    book[sid] = rec
+    tmp = state_dir / f".{owner}-turns.{os.getpid()}.json"
+    tmp.write_text(json.dumps(book))
+    tmp.replace(path)
+    return allow, str(rec.get("turn") or tid)
+
+
+turn_id = str(event.get("turn_id") or "")
+turn_sid = str(event.get("session_id") or event.get("sessionId") or event.get("conversationId") or "")
+effective_turn = turn_id
+if turn_id and turn_sid:
+    is_child = bool(event.get("agent_id"))
+    try:
+        allowed, effective_turn = turn_gate(source_host, turn_sid, turn_id, name, is_child)
+    except Exception:
+        # 记账失败不能让旧事件绕过门禁去改模型路由或可见状态；下一条消息再试。
+        allowed = False
+    if not allowed:
+        if arg_event:
+            print("{}")
+        sys.exit(0)
+    if is_child:
+        if name == "UserPromptSubmit":
+            name = "SubagentStart"
+        elif name in TURN_END:
+            name = "SubagentStop"
+
+
+# 心跳：「最近一次收到这个 AI 的消息」，桌宠记下来，设置里能看出「接上了但从没收到过消息」，反馈里也带着。
+# 文件名按接入的是哪个 AI 分（Antigravity 和 Gemini CLI 都用 gemini 角色，Antigravity 多带一个事件名参数）
+try:
+    seen_key = "antigravity" if character == "gemini" and len(sys.argv) > 2 else character
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / f"seen-{seen_key}").write_text(str(int(time.time())))
+except Exception:
+    pass
 
 # 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
@@ -355,6 +489,8 @@ def remember_session_model(host: str, fallback: str = "") -> str:
                         known = json.loads(path.read_text())
                     except Exception:
                         known = {}
+                    if not isinstance(known, dict):
+                        known = {}
                     known[sid] = model
                     known = dict(list(known.items())[-50:])  # 只留最近的会话
                     tmp = state_dir / f".{path.stem}.{os.getpid()}.json"
@@ -370,7 +506,10 @@ def remember_session_model(host: str, fallback: str = "") -> str:
         known = json.loads(path.read_text())
     except Exception:
         known = {}
-    return model or known.get(sid, "") or fallback or HOST_DEFAULT_MODEL.get(host, "")
+    saved = known.get(sid, "") if isinstance(known, dict) else ""
+    if not isinstance(saved, str):
+        saved = ""
+    return model or saved or fallback or HOST_DEFAULT_MODEL.get(host, "")
 
 
 def character_for_url(url: str):
@@ -435,90 +574,6 @@ if character in MULTI_MODEL_HOSTS:
         except Exception:
             pass
 
-arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
-name = event.get("hook_event_name") or arg_event
-
-
-# ---- 按轮次丢掉迟到的事件（Codex：事件带 turn_id；PR #26 @KQYaili 报的）----
-# 一轮结束（Stop / 打断 / 手动 compact 完）后，子任务、工具的事件还会陆续到；上一轮的事件也可能在新的一轮里才到。
-# 不拦的话，她刚开心完又被拉回「思考」，或者正在跑的新一轮被旧事件盖掉。按「会话 + 轮次」记在 <宿主>-turns.json：
-# 结束过的轮次再来的事件直接丢掉；子任务（带 agent_id）跟着主轮次走，主轮次结束了它的事件也丢掉。不带 turn_id 的宿主照旧
-TURN_END = ("Stop", "StopFailure", "Interrupt")
-TURN_KEEP = 24 * 3600
-
-
-def turn_gate(owner: str, sid: str, tid: str, name: str, child: bool) -> bool:
-    """这条事件要不要演。顺便记账（几个钩子可能同时到，用文件锁排队）"""
-    path = state_dir / f"{owner}-turns.json"
-    state_dir.mkdir(parents=True, exist_ok=True)
-    with open(state_dir / f".{owner}-turns.lock", "a+b") as lock:
-        try:
-            if os.name == "nt":
-                import msvcrt
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock, fcntl.LOCK_EX)
-            try:
-                book = json.loads(path.read_text(encoding="utf-8-sig"))
-                if not isinstance(book, dict):
-                    book = {}
-            except Exception:
-                book = {}
-            now = time.time()
-            book = {k: v for k, v in book.items() if isinstance(v, dict) and now - float(v.get("ts", 0)) < TURN_KEEP}
-            rec = book.get(sid) or {"turn": "", "done": False, "finished": []}
-            finished = rec.get("finished") or []
-            if child:
-                allow = not rec.get("done")   # 主轮次已经结束：子任务迟到的事件
-            elif tid in finished:
-                allow = False                 # 结束过的轮次
-            else:
-                allow = True
-                if tid != rec.get("turn"):
-                    # 新的一轮（发了消息、手动 compact、或第一次见到）：被它取代的上一轮也算结束了（没收到 Stop 也一样）
-                    if rec.get("turn") and rec["turn"] not in finished:
-                        finished = (finished + [rec["turn"]])[-20:]
-                    rec = {"turn": tid, "done": False, "finished": finished}
-                ends = name in TURN_END or (name == "PostCompact" and str(event.get("trigger", "")).lower() == "manual")
-                if ends:
-                    rec["done"] = True
-                    rec["finished"] = (finished + [tid])[-20:]
-            rec["ts"] = now
-            book[sid] = rec
-            tmp = state_dir / f".{owner}-turns.{os.getpid()}.json"
-            tmp.write_text(json.dumps(book))
-            tmp.replace(path)
-            return allow
-        finally:
-            if os.name == "nt":
-                try:
-                    lock.seek(0)
-                    msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
-                except Exception:
-                    pass
-
-
-turn_id = str(event.get("turn_id") or "")
-turn_sid = str(event.get("session_id") or "")
-if turn_id and turn_sid:
-    is_child = bool(event.get("agent_id"))
-    try:
-        if not turn_gate(sys.argv[1] if len(sys.argv) > 1 else "claude", turn_sid, turn_id, name, is_child):
-            if arg_event:
-                print("{}")
-            sys.exit(0)
-    except SystemExit:
-        raise
-    except Exception:
-        pass   # 记账出错：照旧演，不能因为这个不动
-    if is_child:
-        # 子任务的第一条消息不是你发的消息；子任务停下也不等于这一轮结束
-        if name == "UserPromptSubmit":
-            name = "SubagentStart"
-        elif name in TURN_END:
-            name = "SubagentStop"
 call = event.get("toolCall") if isinstance(event.get("toolCall"), dict) else {}  # Antigravity
 tool = str(event.get("tool_name") or call.get("name", "")).lower()
 tool_input = json.dumps(event.get("tool_input") or call.get("args", ""), ensure_ascii=False).lower()
@@ -583,18 +638,37 @@ def tool_failed() -> bool:
     return False
 
 
-turn_file = state_dir / f"{character}-turn.json"
+# 计数跟原始宿主 + 会话 + 主轮次走，不能让另一段对话的发消息 / Stop 把它清零。
+# 没有会话 id 的旧宿主保留一份共享计数；有 id 的宿主即使不带 turn_id 也按会话分开。
+turn_file = state_dir / f"{source_host}-turn-tools.json"
+turn_key = json.dumps([turn_sid, effective_turn])
+
+
+def read_tool_counts() -> dict:
+    try:
+        known = json.loads(turn_file.read_text())
+        return known if isinstance(known, dict) else {}
+    except Exception:
+        return {}
 
 
 def turn_tools() -> int:
+    entry = read_tool_counts().get(turn_key)
     try:
-        return int(json.loads(turn_file.read_text()).get("tools", 0))
-    except Exception:
+        return int(entry.get("tools", 0)) if isinstance(entry, dict) else 0
+    except (TypeError, ValueError):
         return 0
 
 
 def set_turn_tools(n: int) -> None:
-    turn_file.write_text(json.dumps({"tools": n}))
+    known = read_tool_counts()
+    now = time.time()
+    known = {k: v for k, v in known.items() if isinstance(v, dict) and now - float(v.get("ts", 0)) < TURN_KEEP}
+    known[turn_key] = {"tools": n, "ts": now}
+    known = dict(sorted(known.items(), key=lambda item: item[1].get("ts", 0))[-256:])
+    tmp = state_dir / f".{source_host}-turn-tools.{os.getpid()}.json"
+    tmp.write_text(json.dumps(known))
+    tmp.replace(turn_file)
 
 
 state_dir.mkdir(parents=True, exist_ok=True)
@@ -666,23 +740,37 @@ elif name in ("BeforeModel", "PreInvocation"):
 elif name in ("SessionEnd",):
     pose = "sleeping"
 
-state = {"pose": pose, "event": name, "tool": tool, "ts": time.time()}
+state = {"pose": pose, "event": name, "tool": tool, "ts": time.time(),
+         "host": source_host, "session": turn_sid, "turn": effective_turn}
 if pose == "thinking" and name in ("PreInvocation", "PostToolUse", "AfterTool"):
     # 快的工具（ls、读文件、grep）从开始到结束常常不到 0.3 秒，桌宠每 0.3 秒才读一次，
     # 刚写的工具动作会被「回去思考」直接盖掉（Antigravity 甚至几毫秒内就开始下一轮思考）。
     # 所以把它捎带上：桌宠先演完那个动作再进入思考；已经演过的（同一个 afterTs）桌宠会跳过。
     try:
         prev = json.loads((state_dir / f"{character}-state.json").read_text())
-        if prev.get("event") == "PreToolUse" and time.time() - float(prev.get("ts", 0)) < 3:
+        if (prev.get("event") == "PreToolUse" and time.time() - float(prev.get("ts", 0)) < 3
+                and (prev.get("host"), prev.get("session"), prev.get("turn")) == (source_host, turn_sid, effective_turn)):
             state.update(after=prev.get("pose"), afterTs=prev.get("ts"), tool=prev.get("tool", ""))
     except Exception:
         pass
+
+if name == "SessionStart" and str(event.get("source", "")).lower() in ("compact", "resume"):
+    # 压缩 / 恢复不是新的一轮。丢掉它，免得把正在做的动作盖成待机。
+    sys.exit(0)
 
 if pose:
     # 临时文件名带进程号：同一个角色的几个钩子同时写（好几个对话一起干活）时不会抢同一个临时文件
     tmp = state_dir / f".{character}-state.{os.getpid()}.json"
     tmp.write_text(json.dumps(state))
-    tmp.replace(state_dir / f"{character}-state.json")
+    for attempt in range(8):
+        try:
+            tmp.replace(state_dir / f"{character}-state.json")
+            break
+        except PermissionError:
+            # Windows 上桌宠可能正读着上一份状态。等一下再换，不要让观察者钩子报错退出。
+            if attempt == 7:
+                raise
+            time.sleep(0.05)
 
 
 # 同一个 AI 同时开着好几个对话在干活：按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
@@ -696,16 +784,20 @@ def update_sessions(sid: str, entry) -> None:
         try:
             if os.name == "nt":
                 import msvcrt
+                lock.seek(0)
                 msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
             else:
                 import fcntl
                 fcntl.flock(lock, fcntl.LOCK_EX)
         except Exception:
-            pass
+            raise  # 没拿到共享会话锁时不能继续读改写，避免覆盖 Cursor 的卡片。
         try:
             known = json.loads(path.read_text())
         except Exception:
             known = {}
+        if not isinstance(known, dict):
+            known = {}
+        known = {k: v for k, v in known.items() if isinstance(v, dict)}
         now = time.time()
         if entry is None:
             known.pop(sid, None)
@@ -731,6 +823,8 @@ if session_id and (pose or name == "SessionEnd"):
     except Exception:
         pass
 
+
+_event_lock.close()  # 自动启动可能查父进程 / 等系统响应，不让下一条钩子等这一步。
 
 if name in LAUNCH_EVENTS:
     ensure_pet_logged(f"{character} {name}")

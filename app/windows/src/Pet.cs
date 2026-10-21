@@ -34,7 +34,12 @@ namespace CrossPet
         IntPtr hwnd;
         bool ready;
         string current;
-        public bool Paused;                     // 开发者控制台测试时，先不把真实 AI 的状态交给桌宠
+        bool paused;
+        public bool Paused                     // 开发者控制台测试时，先不把真实 AI 的状态交给桌宠
+        {
+            get => paused;
+            set { if (paused != value) ++followEventGeneration; paused = value; }
+        }
         public string ManifestJson { get; private set; } = "{}";
         readonly Dictionary<string, string> stamps = new Dictionary<string, string>();
         (string tag, string url)? latestRelease;
@@ -106,6 +111,7 @@ namespace CrossPet
             appSwitch.Tick += (_, __) => { appSwitch.Stop(); FollowForeground(); };
             foreground = new Native.ForegroundWatcher(() =>
             {
+                ++followEventGeneration;
                 fullscreenOverride = false;   // 前台窗口换了：双击托盘临时叫出来的作废，重新按全屏规则来
                 if (hwnd != IntPtr.Zero) Raise();
                 appSwitch.Stop(); appSwitch.Start();
@@ -155,6 +161,7 @@ namespace CrossPet
                 await web.EnsureCoreWebView2Async(env);
                 var core = web.CoreWebView2;
                 Map(core);
+                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; } };
                 core.Settings.AreDefaultContextMenusEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
@@ -229,6 +236,7 @@ namespace CrossPet
             crashes.RemoveAll(t => (DateTime.UtcNow - t).TotalMinutes > 10);
             if (crashes.Count >= 3) { Store.Log("10 分钟内崩溃太多次，不再自动恢复"); return; }
             crashes.Add(DateTime.UtcNow);
+            ++followEventGeneration;
             ready = false;
             try
             {
@@ -262,6 +270,7 @@ namespace CrossPet
         List<(string id, string name)> characters = new List<(string id, string name)>();   // 可切换的角色（不含彩蛋）
         public void LoadCharacters()
         {
+            ++followEventGeneration;
             var m = Store.Manifest();
             ManifestJson = Store.Json.Serialize(m);
             var chars = (Dictionary<string, object>)m["characters"];
