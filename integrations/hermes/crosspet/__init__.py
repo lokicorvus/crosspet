@@ -33,6 +33,10 @@ def _hook_path() -> str:
         pass
     if os.name == "nt":
         return str(Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "CrossPet" / "crosspet-hook.py")
+    if sys.platform == "linux":
+        data = Path(os.environ.get("CROSSPET_DATA_DIR") or str(
+            Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "crosspet"))
+        return str(data / "crosspet-hook.py")
     return str(Path.home() / "Library/Application Support/CrossPet/crosspet-hook.py")
 
 

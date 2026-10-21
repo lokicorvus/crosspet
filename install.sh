@@ -2,6 +2,9 @@
 # CrossPet 一键安装：编译 → 装进「应用程序」→ 逐个询问要接入哪些 AI
 set -e
 cd "$(dirname "$0")"
+if [ "$(uname -s)" = "Linux" ]; then
+  exec /usr/bin/python3 app/linux/install.py --launch "$@"
+fi
 
 say() { printf "\n\033[1m%s\033[0m\n" "$1"; }
 ask() { printf "%s [y/N] " "$1"; read -r a; [ "$a" = "y" ] || [ "$a" = "Y" ]; }

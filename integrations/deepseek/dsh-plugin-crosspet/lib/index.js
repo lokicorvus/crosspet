@@ -55,7 +55,10 @@ function failed(result) {
 }
 
 export function apply(ctx, config = {}) {
-  const data = process.env.CROSSPET_DATA_DIR || join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "CrossPet");
+  const data = process.env.CROSSPET_DATA_DIR || (process.platform === "linux"
+    ? join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "crosspet")
+    : process.platform === "darwin" ? join(homedir(), "Library", "Application Support", "CrossPet")
+    : join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "CrossPet"));
   const dir = config.stateDir || process.env.CROSSPET_STATE_DIR || (process.platform === "win32" ? join(data, "state") : "/tmp/crosspet");
   const lowBalance = lowThresholds(config.lowBalance);  // 按币种的门槛，见 balance.js
   let tools = 0;
@@ -104,7 +107,7 @@ export function apply(ctx, config = {}) {
   // ---- 跟着 AI 出现 ----
   // 桌宠在跑时把自己的进程号写在 <状态目录>/pet.pid；从菜单手动退出时在数据目录写 user-quit（Harness 重开或重启电脑后作废），
   // 设置里关掉时写 ai-autostart-off。用独立进程打开（detached），Harness 退出时桌宠不会被一起关掉
-  const appData = process.platform === "win32" ? data : join(homedir(), "Library", "Application Support", "CrossPet");
+  const appData = data;
   let lastEnsure = 0;
   function noteAutostart(source, result) {  // 写进 <状态目录>/autostart.txt，排查「为什么没出来」用
     const at = new Date().toLocaleString("zh-CN", { hour12: false });
@@ -126,11 +129,13 @@ export function apply(ctx, config = {}) {
           return noteAutostart(source, `不打开：从菜单手动退出过，Harness 是在那之前就开着的（Harness 打开于 ${hm(started)}，退出于 ${hm(quitAt)}）`);
       }
       if (existsSync(join(appData, "ai-autostart-off"))) return noteAutostart(source, "不打开：设置里关掉了「AI 开始工作时自动出现」");
-      try {
-        process.kill(Number(readFileSync(join(dir, "pet.pid"), "utf8").trim()), 0);
-        return noteAutostart(source, "已经在跑");
-      } catch (e) {
-        if (e?.code === "EPERM") return noteAutostart(source, "已经在跑");
+      if (process.platform !== "linux") {  // Linux 交给钩子的单实例锁判断，避开 PID 重用。
+        try {
+          process.kill(Number(readFileSync(join(dir, "pet.pid"), "utf8").trim()), 0);
+          return noteAutostart(source, "已经在跑");
+        } catch (e) {
+          if (e?.code === "EPERM") return noteAutostart(source, "已经在跑");
+        }
       }
       let child;
       if (process.platform === "win32") {
@@ -139,6 +144,10 @@ export function apply(ctx, config = {}) {
         child = spawn(exe, [], { detached: true, stdio: "ignore", cwd: dirname(exe) });
       } else if (process.platform === "darwin") {
         child = spawn("/usr/bin/open", ["-g", "-b", "io.github.crosspet"], { detached: true, stdio: "ignore" });
+      } else if (process.platform === "linux") {
+        // 与标准钩子共用锁、启动配置和手动退出规则。
+        child = spawn("/usr/bin/python3", [join(data, "crosspet-hook.py"), "--ensure"],
+          { detached: true, stdio: "ignore", env: { ...process.env, CROSSPET_DATA_DIR: data, CROSSPET_STATE_DIR: dir } });
       } else return;
       child.on("error", (e) => noteAutostart(source, `打开失败：${String(e?.message ?? e)}`));
       child.unref();

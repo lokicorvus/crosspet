@@ -14,13 +14,17 @@ import json
 import re
 import os
 import shutil
+import shlex
 import sys
 import time
 from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet") if os.name == "nt" else str(HOME / "Library/Application Support/CrossPet")))
+SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (
+    str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet") if os.name == "nt" else
+    str(Path(os.environ.get("XDG_DATA_HOME", str(HOME / ".local/share"))) / "crosspet") if sys.platform == "linux" else
+    str(HOME / "Library/Application Support/CrossPet")))
 MARK = "crosspet-hook.py"
 
 
@@ -87,19 +91,26 @@ def win_arg(path: Path) -> str:
 
 
 def load_template(template: Path, via_cmd: bool = False) -> dict:
-    """读接入模板；在 Windows 上把 macOS 的 python3 + $HOME 路径换成随包 Python 和本机钩子脚本的绝对路径。
+    """读接入模板；Windows / Linux 将 macOS 模板换成本机 Python 和钩子的绝对路径。
     via_cmd：这个 AI 用 cmd /c 跑钩子（Antigravity），命令以引号开头时要再包一层引号，抵消 cmd 剥引号。"""
     data = load_json(template)
-    if os.name != "nt":
+    if os.name != "nt" and sys.platform != "linux":
         return data
-    SUPPORT.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / "crosspet-hook.py")
-    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)}"
+    if os.name == "nt":
+        SUPPORT.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+        prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)}"
+    else:
+        # 安装器 / Linux 外壳部署脚本；解析模板本身不写盘，诊断和测试也会调用这里。
+        # 固定绝对路径，不依赖 AI 进程是否继承 GUI 的 PATH / XDG 环境。
+        prefix = (f"env CROSSPET_DATA_DIR={shlex.quote(str(SUPPORT))} "
+                  f"CROSSPET_STATE_DIR={shlex.quote(str(STATE_DIR))} "
+                  f"{shlex.quote(sys.executable)} {shlex.quote(str(SUPPORT / MARK))}")
     original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py"'
 
     def command(value: str) -> str:
         cmd = prefix + value[len(original):]
-        return f'"{cmd}"' if via_cmd and cmd.startswith('"') else cmd
+        return f'"{cmd}"' if os.name == "nt" and via_cmd and cmd.startswith('"') else cmd
 
     def adapt(obj):
         if isinstance(obj, dict):

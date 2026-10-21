@@ -29,7 +29,7 @@ ask() {
   [ "$a" = "y" ] || [ "$a" = "Y" ]
 }
 
-[ "$(uname)" = "Darwin" ] || die "CrossPet 只支持 macOS。"
+[ "$(uname)" = "Darwin" ] || die "此下载脚本用于 macOS。Ubuntu 24.04 / X11 请克隆源码后运行 ./install.sh，见 docs/linux.md。"
 major=$(sw_vers -productVersion | cut -d. -f1)
 [ "$major" -ge 13 ] || die "CrossPet 需要 macOS 13 或以上（你的是 $(sw_vers -productVersion)）。"
 

@@ -5,10 +5,11 @@
 [![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
 ![Windows 10+](https://img.shields.io/badge/Windows-10%2B-lightgrey)
+![Ubuntu 24.04 X11](https://img.shields.io/badge/Ubuntu-24.04%20X11-orange)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
 [![立绘 CC BY-NC-SA 4.0](https://img.shields.io/badge/%E7%AB%8B%E7%BB%98-CC%20BY--NC--SA%204.0-orange)](characters/LICENSE.md)
 
-一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
+一只浮在桌面角落的小桌宠，支持 Mac、Windows 和 Ubuntu 24.04（X11）。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
 ![Claude、GPT、DeepSeek、Gemini、GLM 五个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
@@ -113,6 +114,19 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 > **测试情况**：在 Windows 11 ARM64 虚拟机和一台 Windows 10 x64 实体电脑上测过：透明显示、拖动、置顶、托盘、右键菜单、设置窗口、全屏隐藏、快捷键隐藏、WorkBuddy 和 ZCode 接入、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、GPT 额度、DeepSeek 余额、开发者控制台、一键更新。
 > **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度、多显示器 / 不同缩放比例的屏幕混用。遇到问题右键「反馈问题…」就行，会自动带上日志和运行状态。
+
+### Ubuntu 24.04（X11）
+
+Linux 版使用 Python + GTK3 + WebKitGTK 4.1，复用同一套角色动画和 AI 钩子。先安装依赖，再在仓库里运行：
+
+```bash
+sudo apt install python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-wnck-3.0 gir1.2-ayatanaappindicator3-0.1
+./install.sh
+```
+
+从应用菜单打开 **CrossPet**，右键 →「设置…」→「接入 AI」。默认 **Ctrl+Alt+P** 隐藏 / 显示，也可以运行 `~/.local/bin/crosspet --show` 找回桌宠。
+
+首版支持 **Ubuntu on Xorg** 会话，暂不支持原生 Wayland；Antigravity 额度采集和自动下载更新尚未移植。安装、目录、自启动及本机验证方法见 [Linux 说明](docs/linux.md)。
 
 ### 接入 AI 改了什么
 

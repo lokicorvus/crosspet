@@ -190,6 +190,14 @@ function setState(s) {
   $('textSizeVal').textContent = Math.round(text * 100) + '%'
   showLink(linked)
   for (const el of document.querySelectorAll('input[data-key]')) el.checked = !!s[el.dataset.key]
+  // 平台外壳明确声明尚未实现的能力，避免开关看似生效、实际没有后端。
+  for (const el of document.querySelectorAll('input[data-key]')) {
+    const reason = s.unavailable?.[el.dataset.key]
+    el.disabled = !!reason
+    el.closest('.item').title = reason || ''
+    const note = el.closest('.item').querySelector('.label small')
+    if (note && reason) note.textContent = reason
+  }
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
   for (const b of $('peakStyle').children) b.classList.toggle('on', b.dataset.v === s.peakStyle)
@@ -205,7 +213,9 @@ function setState(s) {
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
     const n = $('hotkeyNote')
-    n.textContent = s.hotkeyFailed ? '这个快捷键被别的程序占用了，换一个试试' : '按一下藏起来，再按一下出来；也可以点菜单栏的爪印（Windows 双击托盘图标）叫她出来'
+    n.textContent = s.hotkeyFailed ? '这个快捷键被别的程序占用了，换一个试试' : s.platform === 'linux'
+      ? '按一下藏起来，再按一下出来；也可以通过托盘菜单或 crosspet --show 叫她出来'
+      : '按一下藏起来，再按一下出来；也可以点菜单栏的爪印（Windows 双击托盘图标）叫她出来'
     n.classList.toggle('warn', !!s.hotkeyFailed)
   }
   // GPT 额度问不到 Codex 时，外壳把原因交过来（没找到 codex、没登录……）

@@ -16,6 +16,14 @@ async function stateDir($: EngineInterface): Promise<string> {
   dir = custom || (local ? `${local}\\CrossPet\\state` : '/tmp/crosspet')
   return dir
 }
+let linuxData: string | null | undefined
+async function linuxDataDir($: EngineInterface): Promise<string | null> {
+  if (linuxData !== undefined) return linuxData
+  const { stdout } = await $.process.run(['/usr/bin/uname', '-s'], { timeoutMs: 5000 })
+  linuxData = stdout.trim() === 'Linux' ? (await $.env.get('CROSSPET_DATA_DIR') ||
+    `${await $.env.get('XDG_DATA_HOME') || `${await $.env.get('HOME')}/.local/share`}/crosspet`) : null
+  return linuxData
+}
 async function write($: EngineInterface, file: string, data: unknown): Promise<void> {
   await $.fs.write(`${await stateDir($)}/${file}`, JSON.stringify(data))
 }
@@ -45,7 +53,9 @@ function characterForModel(model: string): string | undefined {
 const actors = new Map<string, string>()
 async function charactersDir($: EngineInterface): Promise<string> {
   const local = await $.env.get('LOCALAPPDATA')
-  return local ? `${local}\\CrossPet\\characters` : `${await $.env.get('HOME')}/Library/Application Support/CrossPet/characters`
+  if (local) return `${local}\\CrossPet\\characters`
+  const linux = await linuxDataDir($)
+  return linux ? `${linux}/characters` : `${await $.env.get('HOME')}/Library/Application Support/CrossPet/characters`
 }
 async function noteModel($: EngineInterface, model: string): Promise<void> {
   if (!model) return
@@ -117,6 +127,12 @@ async function ensurePet($: EngineInterface): Promise<void> {
   const local = await $.env.get('LOCALAPPDATA')
   if (local) {  // Windows：交给随包 Python 跑钩子脚本的 --ensure（查单实例互斥量、用独立进程打开）
     await $.process.run([`${local}\\Programs\\CrossPet\\python\\python.exe`, `${local}\\CrossPet\\crosspet-hook.py`, '--ensure'], { timeoutMs: 10_000 })
+    return
+  }
+  const dataDir = await linuxDataDir($)
+  if (dataDir) {
+    const data = dataDir
+    await $.process.run(['/usr/bin/python3', `${data}/crosspet-hook.py`, '--ensure'], { timeoutMs: 10_000 })
     return
   }
   // macOS：不用 Python（没装开发者工具的 Mac 上调 python3 会弹安装框）

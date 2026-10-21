@@ -3,6 +3,9 @@
 set -e
 cd "$(dirname "$0")"
 git pull --ff-only
+if [ "$(uname -s)" = "Linux" ]; then
+  exec /usr/bin/python3 app/linux/install.py --launch
+fi
 app/build.sh
 pkill -x CrossPet 2>/dev/null || true
 rm -rf "$HOME/Applications/CrossPet.app"
