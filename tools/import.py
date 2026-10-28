@@ -18,7 +18,7 @@ for raw in sorted(CHARACTERS.glob("*/raw")):
     if only and cid != only:
         continue
     files = [f for f in sorted(raw.iterdir()) if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
-             and f.stem not in ("portrait", "avatar")]
+             and f.stem not in ("portrait", "portrait-card", "avatar")]
     for f in files:
         subprocess.run([sys.executable, str(TOOLS / "prepare.py"), str(f), cid, f.stem], check=True)
     if any(f.stem == "idle-blink" for f in files) and (CHARACTERS / cid / "idle.webp").exists():

@@ -170,7 +170,7 @@ static class Program
         Check("渲染恢复：损坏记录按一次失败接续", RenderRestartState.Parse("bad", rn).Next(rn)?.Attempts == 2);
         Check("渲染恢复：无历史次数时不继承失败预算", new RenderRestartState(0, rn).Next(rn.AddMinutes(2))?.Attempts == 1);
         // 角色页卡片图：portrait 不算姿态；卡片图只给存在的文件（设置页据此退回待机图 / 色块）
-        Check("卡片图：portrait、avatar 不算姿态", !CardImages.IsSprite("portrait") && !CardImages.IsSprite("avatar") && CardImages.IsSprite("idle") && CardImages.IsSprite("happy-2"));
+        Check("卡片图：portrait、portrait-card、avatar 不算姿态", !CardImages.IsSprite("portrait") && !CardImages.IsSprite("portrait-card") && !CardImages.IsSprite("avatar") && CardImages.IsSprite("idle") && CardImages.IsSprite("happy-2"));
         var cardRoot = Path.Combine(Path.GetTempPath(), "crosspet-cards-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(cardRoot, "deepseek"));
         foreach (var f in new[] { "idle.webp", "idle-blink.webp", "portrait.webp", "avatar.png", "happy.webp" }) File.WriteAllText(Path.Combine(cardRoot, "deepseek", f), "");

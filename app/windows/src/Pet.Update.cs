@@ -66,7 +66,7 @@ namespace CrossPet
                     // 手动检查时也让她在气泡里说、设置里出现「更新」按钮（和 macOS 一样），不跳到网页；
                     // 只有新版本没有 Windows 安装包、没法一键更新时才打开下载页
                     if (first || manual) Js($"notifyUpdate({Q(tag)})");
-                    settings?.Push();
+                    PushSettings();
                     if (manual && updateZip == null) Open(url);
                 }
                 else

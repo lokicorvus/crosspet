@@ -100,11 +100,41 @@ extension App {
     static func fitHeight(_ h: CGFloat) -> CGFloat { min(h, (NSScreen.main?.visibleFrame.height ?? h) - 60) }
 
     @objc func openSettings() { openSettingsAt(tab: nil) }
-    @objc func openCharacterPage() { openSettingsAt(tab: "character") }
+    /// 换角色窗口（右键「换角色…」、设置里的按钮）：大立绘 + 衣服卡 + 角色卡。和设置页同一条通道、同一份状态，
+    /// 单独开一个大窗口好让立绘看得清楚；可以拖大小，系统记住上次的大小和位置
+    @objc func openCharacterPage() {
+        if let w = charactersWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(DevBridge(app: self, kind: .settings), name: "settings")
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: Self.fitHeight(740)),
+                         styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        w.title = "CrossPet 换角色"
+        w.isReleasedWhenClosed = false
+        w.minSize = NSSize(width: 420, height: 400)
+        w.center()
+        w.setFrameAutosaveName("CrossPetCharacters")
+        let v = WKWebView(frame: w.contentView!.bounds, configuration: config)
+        v.autoresizingMask = [.width, .height]
+        v.navigationDelegate = self
+        v.loadFileURL(root.appendingPathComponent("web/characters.html"), allowingReadAccessTo: root)
+        w.contentView!.addSubview(v)
+        charactersWindow = w
+        charactersWeb = v
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            self?.charactersWeb = nil
+            self?.charactersWindow = nil
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+    }
 
     /// 桌宠页面发来的消息：「新功能」卡片点了「去看看」→ 打开设置停在「新功能」页
     func handlePet(_ body: Any) {
-        if let d = body as? [String: Any], let tab = d["openSettings"] as? String { openSettingsAt(tab: tab) }
+        if let d = body as? [String: Any], let tab = d["openSettings"] as? String { if tab == "character" { openCharacterPage() } else { openSettingsAt(tab: tab) } }
         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色
         if let d = body as? [String: Any], let w = d["wear"] as? [String: Any], let id = w["id"] as? String, let skin = w["skin"] as? String,
            characterIds.contains(id), skin.isEmpty || skinChoices[id]?.contains(where: { $0.id == skin }) == true {

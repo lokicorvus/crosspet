@@ -49,7 +49,7 @@ namespace CrossPet
         Native.ForegroundWatcher foreground;
         DispatcherTimer appSwitch;
         DevConsole dev;
-        SettingsWindow settings;
+        SettingsWindow settings, characterWindow;   // 设置窗口、换角色窗口（同一套状态，见 PushSettings）
         FeedbackWindow feedback;
         const double BaseWidth = 260, BaseHeight = 362;
         // 文字大小：网页按「人物大小、文字大小」算出的画布（网页 CSS 尺寸），窗口 = 画布 × 人物大小（app/web/text-size.js）
@@ -205,7 +205,7 @@ namespace CrossPet
                     {
                         if (!(Store.Json.DeserializeObject(a.WebMessageAsJson) is Dictionary<string, object> m)) return;
                         // 「新功能」卡片点了「去看看」：打开设置停在「新功能」页
-                        if (m.TryGetValue("openSettings", out var tab) && tab is string t) { OpenSettings(t); return; }
+                        if (m.TryGetValue("openSettings", out var tab) && tab is string t) { if (t == "character") OpenCharacterWindow(); else OpenSettings(t); return; }
                         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色（和 macOS 的 handlePet 一致）
                         if (m.TryGetValue("wear", out var wv) && wv is Dictionary<string, object> w && w.TryGetValue("id", out var wi) && wi is string wid
                             && w.TryGetValue("skin", out var ws) && ws is string wskin && Characters().Any(c => c.id == wid)

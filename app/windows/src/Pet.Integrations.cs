@@ -53,7 +53,7 @@ namespace CrossPet
                 }
                 catch { }
             }
-            if (changed) { Store.Settings["seen"] = seen; Store.SaveSettings(); settings?.Push(); }
+            if (changed) { Store.Settings["seen"] = seen; Store.SaveSettings(); PushSettings(); }
         }
         static double Now => (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
         static string AgoText(double? ts)
@@ -99,7 +99,7 @@ namespace CrossPet
                 var r = RunIntegrate("installed").output;
                 List<string> list = null;
                 try { list = (Store.Json.DeserializeObject(r.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
-                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); settings?.Push(); done?.Invoke(); });
+                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
             });
             RefreshPlugins();
         }
@@ -114,7 +114,7 @@ namespace CrossPet
                 var (output, code) = RunIntegrate("plugins");
                 var last = (output ?? "").Trim().Split('\n').Last().Trim();
                 try { if (code != 0 || !(Store.Json.DeserializeObject(last) is object[])) return; } catch { return; }
-                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); settings?.Push(); });
+                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
             });
         }
 
@@ -266,10 +266,11 @@ namespace CrossPet
                         case "openReleases": Open("https://github.com/lokicorvus/crosspet/releases"); break;
                         case "devConsole": OpenDev(); break;
                         case "feedback": OpenFeedback(); break;
+                        case "characterWindow": OpenCharacterWindow(); break;
                     }
                     break;
             }
-            settings?.Push();
+            PushSettings();
         }
 
         /// <summary>背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off</summary>

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""设置「角色」页卡片墙用的两张图：衣服卡的展示图 portrait.webp、角色卡的探头头像 avatar.webp。
+"""换角色窗口用的图：大立绘 portrait.webp、衣服卡用的小图 portrait-card.webp、角色卡的探头头像 avatar.webp。
     python3 tools/cards.py            # 处理所有角色
     python3 tools/cards.py grok       # 只处理某个角色
-原图放在 characters/<角色id>/raw/portrait.png、avatar.png（或 raw/cards/ 里），这里按卡片的显示大小缩好再存。
+原图放在 characters/<角色id>/raw/portrait.png、avatar.png（或 raw/cards/ 里），这里按显示大小缩好再存（portrait 出两种尺寸）。
 
 为什么要缩：卡片很小（衣服卡约 117×156、角色卡约 70×92），原图却是 1024 级别。Windows 100% 缩放时 WebView2 要把图缩到
 五分之一，缩这么多会丢细节、出锯齿（1.3.8-beta.2 实测很糊）。这里先用高质量算法缩到卡片大小的两倍：100% 缩放时只缩两倍左右，
@@ -14,7 +14,8 @@ from pathlib import Path
 from PIL import Image
 
 CHARACTERS = Path(__file__).resolve().parent.parent / "characters"
-SIZES = {"portrait": (256, 384), "avatar": (192, 192)}   # 宽 × 高；portrait 是 2:3 竖图，avatar 是方图
+# 输出名 → (原图名, 宽 × 高)。portrait 是 2:3 竖图：大立绘约 224×336 显示，卡片约 128×192；avatar 是方图
+SIZES = {"portrait": ("portrait", (512, 768)), "portrait-card": ("portrait", (256, 384)), "avatar": ("avatar", (192, 192))}
 
 
 def source(cid: str, name: str):
@@ -28,7 +29,8 @@ def source(cid: str, name: str):
 
 def make(src: Path, name: str, out: Path) -> None:
     im = Image.open(src)
-    w, h = SIZES[name]
+    kind, (w, h) = SIZES[name]
+    name = kind
     im = im.convert("RGBA" if name == "avatar" else "RGB")
     # 比例不对时居中裁成目标比例（展示图偏上一点裁，保住脸）
     r = w / h
@@ -50,10 +52,10 @@ def main() -> None:
     for d in sorted(p for p in CHARACTERS.iterdir() if p.is_dir()):
         if only and d.name != only:
             continue
-        for name in SIZES:
-            src = source(d.name, name)
+        for out, (kind, _) in SIZES.items():
+            src = source(d.name, kind)
             if src:
-                make(src, name, d / f"{name}.webp")
+                make(src, out, d / f"{out}.webp")
 
 
 if __name__ == "__main__":

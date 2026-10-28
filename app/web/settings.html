@@ -38,31 +38,13 @@ h1 { font-size: 15px; margin: 0 0 2px; }
 .item.flash { animation: flash 1.5s ease; }
 @keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--accent) 22%, transparent); } 100% { background: transparent; } }
 .item .label { flex: 1; min-width: 0; }
-/* 角色页卡片墙：上面当前角色的衣服（大卡），下面所有角色（小卡）。卡片底色用角色主题色（--c），图是透明背景 */
-.cards { display: grid; gap: 8px; padding: 4px 14px 12px; }
-.cards.outfits { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
-.cards.roster { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
-.pcard { position: relative; border: 2px solid transparent; border-radius: 10px; padding: 0; overflow: hidden; cursor: pointer; color: var(--ink);
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 8%, var(--panel)), color-mix(in srgb, var(--c) 30%, var(--panel))); }
-.pcard:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
-.pcard.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
-.outfits .pcard { height: 156px; }
-.roster .pcard { height: 92px; }
-.pcard img, .pcard .ph { position: absolute; left: 0; right: 0; top: 4px; bottom: 20px; width: 100%; height: calc(100% - 24px); object-fit: contain; }
-.roster .pcard img, .roster .pcard .ph { bottom: 0; height: calc(100% - 4px); }   /* 角色卡没有名字栏，图铺到底 */
-.pcard.avatar img { top: 0; bottom: 0; height: 100%; object-fit: cover; object-position: left bottom; }   /* 探头头像铺满整张卡，从左下角探出来 */
-.pcard.art img { top: 0; bottom: 0; height: 100%; object-fit: cover; object-position: center 25%; }   /* 带背景的整张皮肤图铺满衣服卡，裁的时候保住脸 */
-.pcard .ph { display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: color-mix(in srgb, var(--c) 70%, var(--ink)); }
-.pcard b { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 4px; font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: color-mix(in srgb, var(--panel) 82%, transparent); }
-.pcard .n { position: absolute; top: 4px; right: 5px; font-size: 10px; color: var(--muted); background: var(--panel); border-radius: 6px; padding: 0 5px; }
-.item .label small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.outfits .roster .roster .item .label small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
 .item .ctl { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 button { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 7px; padding: 4px 11px; cursor: pointer; }
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
-.peaksel { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; white-space: nowrap; }
 input[type=text], select { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
 input[type=text] { width: 150px; }
 input[type=range] { width: 150px; accent-color: var(--accent); }
@@ -119,13 +101,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 </div>
 
 <div class="card" data-tab="character">
-  <h2 id="outfitsTitle">衣服</h2>
-  <div class="cards outfits" id="outfitCards"></div>
-  <div id="peakOutfits"></div>
-  <h2>角色</h2>
-  <div class="cards roster" id="characterCards"></div>
-  <div class="item"><div class="label">名字<small>当前角色的名字，留空恢复默认</small></div>
-    <div class="ctl"><input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div></div>
+  <div class="item"><div class="label">换角色、换衣服<small>大立绘挑角色和衣服，改名字、峰谷换装也在那里；右键「换角色…」也能打开</small></div>
+    <div class="ctl"><button class="primary" data-action="characterWindow">打开换角色窗口</button></div></div>
   <div class="item"><div class="label">跟随前台 AI 应用<small>切到哪个 AI 的 App，就换成哪个角色</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="followApps"><span></span></label></div></div>
   <div class="item" data-only="followEvents"><div class="label">跟随 AI 工作事件<small>在终端里用 AI 时，按最近在干活的 AI 换角色</small></div>
@@ -185,8 +162,6 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 <script src="text-size.js"></script>
 <script src="plugin-update.js"></script>
 <script src="whats-new.js"></script>
-<script src="peak-hours.js"></script>
-<script src="character-cards.js"></script>
 <script>
 // 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：页面发 {cmd, ...}，宿主改完设置后调 setState(state) 把最新状态推回来
 const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.settings?.postMessage(msg)
@@ -217,10 +192,6 @@ function setState(s) {
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
   for (const b of $('peakStyle').children) b.classList.toggle('on', b.dataset.v === s.peakStyle)
   for (const b of $('quotaStyle').children) b.classList.toggle('on', b.dataset.v === (s.quotaStyle || 'text'))
-  renderCharacterCards(s)
-  renderPeakOutfits(s)
-  const cur = s.characters.find(c => c.id === s.character)
-  if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
@@ -280,63 +251,6 @@ function renderIntegrations(list) {
 // 宿主做完一件事后的提示（接入结果、检查更新结果等）
 function notice(text) { toast(text) }
 
-// 角色页卡片墙（排法在 character-cards.js）：点衣服卡 = 当前角色换上这套；点角色卡 = 换成她、穿原版。
-// 两种都发 {cmd:'skin'}：外壳记下衣服并切到这个角色
-function renderCharacterCards(s) {
-  const cur = s.characters.find(c => c.id === s.character)
-  $('outfitsTitle').textContent = cur ? `${cur.name} 的衣服` : '衣服'
-  // named：衣服卡底部写衣服名；角色卡只放头像、不写名字（名字栏会挡住扒着下边的手，loki 10-26 定），名字在悬停提示和读屏标签里
-  const card = (c, accent, onClick, count, named = true) => {
-    const b = document.createElement('button')
-    b.className = 'pcard' + (c.on ? ' on' : '') + (c.avatar ? ' avatar' : '') + (c.art ? ' art' : '')
-    b.style.setProperty('--c', accent)
-    b.title = c.name
-    b.setAttribute('aria-label', c.name)
-    const placeholder = () => { const d = document.createElement('div'); d.className = 'ph'; d.textContent = [...c.name][0] || '?'; return d }
-    if (c.image) { const img = document.createElement('img'); img.src = c.image; img.alt = ''; img.onerror = () => img.replaceWith(placeholder()); b.append(img) }
-    else b.append(placeholder())
-    if (named) { const name = document.createElement('b'); name.textContent = c.name; b.append(name) }
-    if (count > 1) { const n = document.createElement('span'); n.className = 'n'; n.textContent = `${count} 套`; b.append(n) }
-    b.onclick = onClick
-    return b
-  }
-  const accent = cur?.accent || '#e0b48a'
-  $('outfitCards').replaceChildren(...CharacterCards.outfitCards(s.characters, s.character)
-    .map(o => card(o, accent, () => post({ cmd: 'skin', id: s.character, skin: o.id }))))
-  $('characterCards').replaceChildren(...CharacterCards.characterCards(s.characters, s.character)
-    .map(c => card(c, c.accent, () => post({ cmd: 'skin', id: c.id, skin: '' }), c.count, false)))
-}
-
-// 按时段换衣服：当前角色有峰谷规则、又有别的衣服时一组「高峰穿 / 空闲穿」（放在角色页，只显示当前角色的）。「不换」= 这一边不管（存的时候删掉）；
-// 改了不会马上换，等下一次时段切换（判断在桌宠页面，peak-hours.js）
-function renderPeakOutfits(s) {
-  const box = $('peakOutfits')
-  if (box.contains(document.activeElement)) return
-  const cur = s.peakSkins || {}
-  box.replaceChildren(...Object.entries(PeakHours.RULES).filter(([id]) => id === s.character).flatMap(([id, rule]) => {
-    const c = s.characters.find(x => x.id === id)
-    if (!c?.skins) return []
-    const item = document.createElement('div'); item.className = 'item'
-    item.innerHTML = `<div class="label">${c.name} 峰谷换装<small>${rule.label}。到点她自己换；时段里你手动换了，等下一段再按这里换。改了这里也是下一段才生效</small></div><div class="ctl peaksel"></div>`
-    for (const [kind, title] of [['peak', '高峰穿'], ['valley', '空闲穿']]) {
-      const sel = document.createElement('select')
-      sel.setAttribute('aria-label', `${c.name}${title}`)
-      const want = cur[id]?.[kind]
-      sel.append(new Option('不换', '-', false, typeof want !== 'string'), ...c.skins.map(k => new Option(k.name, k.id, false, want === k.id)))
-      sel.onchange = () => {
-        const next = JSON.parse(JSON.stringify(state?.peakSkins || {}))
-        const e = next[id] || {}
-        if (sel.value === '-') delete e[kind]; else e[kind] = sel.value
-        if (Object.keys(e).length) next[id] = e; else delete next[id]
-        if (state) state.peakSkins = next
-        post({ cmd: 'set', key: 'peakSkins', value: next })
-      }
-      const lab = document.createElement('label'); lab.textContent = title + ' '; lab.appendChild(sel)
-      item.querySelector('.peaksel').appendChild(lab)
-    }
-    return [item]
-  }))
-}
 for (const el of document.querySelectorAll('input[data-key]')) el.onchange = () => post({ cmd: 'set', key: el.dataset.key, value: el.checked })
 for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
 for (const b of $('peakStyle').children) b.onclick = () => post({ cmd: 'set', key: 'peakStyle', value: b.dataset.v })
@@ -370,9 +284,6 @@ $('textLink').onclick = () => state?.textLinked === false
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
-const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
-$('saveName').onclick = saveName
-$('name').onkeydown = e => { if (e.key === 'Enter') saveName() }
 
 // 标签页：记住上次看的是哪一页（每个人自己的小习惯，存不下也没关系）
 function showTab(tab) {

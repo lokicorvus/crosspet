@@ -216,6 +216,7 @@ extension App {
             return
         }
         if webView === feedbackWeb { return }   // 反馈页面自己发 get 来要信息
+        if webView === charactersWeb { pushSettings(); return }
         if webView === devWeb {
             let info = ["version": currentVersion, "feedbackPath": feedbackURL.path]
             let data = (try? JSONSerialization.data(withJSONObject: info)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"

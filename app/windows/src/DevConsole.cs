@@ -94,11 +94,12 @@ namespace CrossPet
         readonly WebView2 web;
         public event Action Closed;
 
-        public SettingsWindow(Pet pet, CoreWebView2Environment env)
+        /// <summary>page：设置页 settings.html，或者换角色窗口 characters.html（同一套状态和命令，只是单独一个大窗口）</summary>
+        public SettingsWindow(Pet pet, CoreWebView2Environment env, string page = "settings.html", string title = "CrossPet 设置", double width = 560, double height = 780)
         {
             this.pet = pet;
             web = new WebView2();
-            window = new Window { Title = "CrossPet 设置", Width = 560, Height = WindowSize.FitHeight(780), Content = web, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+            window = new Window { Title = title, Width = width, Height = WindowSize.FitHeight(height), MinWidth = 420, Content = web, WindowStartupLocation = WindowStartupLocation.CenterScreen };
             window.Closed += (_, __) => Closed?.Invoke();
             window.Loaded += async (_, __) =>
             {
@@ -115,7 +116,7 @@ namespace CrossPet
                     loaded = true;
                     if (pendingTab != null) { var t = pendingTab; pendingTab = null; ShowTab(t); }
                 };
-                web.CoreWebView2.Navigate(Store.PageUrl("settings.html"));
+                web.CoreWebView2.Navigate(Store.PageUrl(page));
             };
         }
 
@@ -128,6 +129,7 @@ namespace CrossPet
         }
 
         public void Show() { window.Show(); window.Activate(); }
+        public Size Size => new Size(window.ActualWidth, window.ActualHeight);
         public void Push()
         {
             try { web.CoreWebView2?.ExecuteScriptAsync($"setState({Store.Json.Serialize(pet.SettingsState())})"); } catch { }

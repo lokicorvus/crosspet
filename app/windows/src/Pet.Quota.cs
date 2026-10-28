@@ -86,7 +86,7 @@ namespace CrossPet
             // 来源或出错原因变了才记日志（每 5 分钟查一次，照记会刷屏）：反馈附带的日志里能看出额度从哪来、为什么没问到
             var logKey = (rl != null) + "|" + via + "|" + error;
             if (logKey != lastGptLogKey) { lastGptLogKey = logKey; Store.Log("GPT 额度：" + lastGptQuota.Substring(9)); }
-            settings?.Push();
+            PushSettings();
             if (codexLast == null) { Js("setCodexQuota(null)"); return; }
             var p = CodexQuota.Payload(rl != null ? "live" : "stale", codexLast, error, ms);
             p["at"] = new DateTimeOffset(codexLastAt).ToUnixTimeSeconds();

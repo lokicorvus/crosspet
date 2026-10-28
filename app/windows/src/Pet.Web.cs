@@ -43,7 +43,7 @@ namespace CrossPet
             Store.SaveSettings();
             LoadCharacters();
             Js($"init({ManifestJson}); refreshLook({Q(id)})");
-            settings?.Push();   // 设置页开着（角色页的衣服卡）时高亮跟着变：按时段自动换衣服也走这里
+            PushSettings();   // 设置页开着（角色页的衣服卡）时高亮跟着变：按时段自动换衣服也走这里
         }
 
         /// <summary>why：为什么换（front 跟随前台 / event 跟随事件 / manual 菜单或设置 / skin 换衣服），记进换角色记录（反馈「角色换得不对」用）</summary>
@@ -58,7 +58,7 @@ namespace CrossPet
             if (dock != null && !dockOut) After(800, ApplyDock);   // 换了角色，切口位置跟着变
             Store.Settings["character"] = id; Store.SaveSettings();
             Js($"setCharacter({Q(id)})");
-            settings?.Push();
+            PushSettings();
         }
 
         /// <summary>读 AI 写来的状态 / 额度文件（state 目录），有变化就交给网页。和 macOS 版 pollStates 一样</summary>

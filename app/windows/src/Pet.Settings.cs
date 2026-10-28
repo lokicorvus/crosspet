@@ -178,6 +178,27 @@ namespace CrossPet
             if (tab != null) settings.ShowTab(tab);
         }
 
+        /// <summary>换角色窗口（右键「换角色…」、设置里的按钮）：大立绘 + 衣服卡 + 角色卡，可以拖大小，记住上次的大小</summary>
+        void OpenCharacterWindow()
+        {
+            if (characterWindow == null)
+            {
+                var size = Store.Settings.TryGetValue("characterWindow", out var v) && v is Dictionary<string, object> d ? d : null;
+                double W(string k, double def) => size != null && size.TryGetValue(k, out var x) && x != null ? Convert.ToDouble(x) : def;
+                characterWindow = new SettingsWindow(this, env, "characters.html", "CrossPet 换角色", W("w", 760), W("h", 740));
+                characterWindow.Closed += () =>
+                {
+                    var s = characterWindow.Size;
+                    if (s.Width > 0 && s.Height > 0) { Store.Settings["characterWindow"] = new Dictionary<string, object> { ["w"] = Math.Round(s.Width), ["h"] = Math.Round(s.Height) }; Store.SaveSettings(); }
+                    characterWindow = null;
+                };
+            }
+            characterWindow.Show();
+        }
+
+        /// <summary>设置窗口、换角色窗口开着哪个就推给哪个</summary>
+        void PushSettings() { settings?.Push(); characterWindow?.Push(); }
+
         List<string> integrated;   // 已接入的 AI（设置窗口打开时查一次，接入 / 撤销后再查）
     }
 }

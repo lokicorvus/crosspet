@@ -46,7 +46,7 @@ namespace CrossPet
             if (CodexResets && current == "gpt") menu.Items.Add(Item("会重置吗？", () => Js("askReset()")));   // 只有 GPT 有这个需求
             Sep();
             // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
-            if (Characters().Count > 1) { menu.Items.Add(Item("换角色…", () => OpenSettings("character"))); Sep(); }
+            if (Characters().Count > 1) { menu.Items.Add(Item("换角色…", OpenCharacterWindow)); Sep(); }
             var layer = new Forms.ToolStripMenuItem("显示层级");
             foreach (var (mode, title) in new[] { ("always", "始终在最上层"), ("ai", "跟着 AI（用 AI 时才浮在最上层）"), ("normal", "普通窗口（不置顶）") })
             {

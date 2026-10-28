@@ -11,7 +11,7 @@ extension App {
     func cardImages(_ id: String) -> [String: String] {
         let dir = charactersDir.appendingPathComponent(id)
         var d: [String: String] = [:]
-        for stem in ["portrait", "avatar", "idle"] {
+        for stem in ["portrait", "portrait-card", "avatar", "idle"] {   // portrait-card：卡片用的小图
             if let f = ["webp", "png"].map({ dir.appendingPathComponent("\(stem).\($0)") }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
                 d[stem] = f.absoluteString
             }
@@ -38,7 +38,7 @@ extension App {
             var blink: String?, blinkBase: String?
             for f in files {
                 let name = (f as NSString).deletingPathExtension
-                if name == "portrait" || name == "avatar" { continue }   // 展示立绘、探头头像只给设置页的卡片用，不是姿态
+                if name == "portrait" || name == "portrait-card" || name == "avatar" { continue }   // 展示立绘、探头头像只给设置页的卡片用，不是姿态
                 let url = dir.appendingPathComponent(f).absoluteString
                 if name == "idle-blink" { blink = url; continue }
                 if name == "idle" { blinkBase = url }

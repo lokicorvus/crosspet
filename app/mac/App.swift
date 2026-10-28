@@ -33,6 +33,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var devWeb: WKWebView?
     var settingsWindow: NSWindow?
     var settingsWeb: WKWebView?
+    var charactersWindow: NSWindow?   // 换角色窗口：和设置页同一套状态（pushSettings 两个都推）
+    var charactersWeb: WKWebView?
     var pendingSettingsTab: String?   // 设置窗口加载完后切到哪个标签页（从「新功能」卡片打开时是 news）
     var feedbackWindow: NSWindow?
     var feedbackWeb: WKWebView?
