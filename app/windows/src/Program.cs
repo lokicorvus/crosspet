@@ -49,11 +49,18 @@ namespace CrossPet
             return false;
         }
 
+        /// <summary>「双击 exe 就安装」先关着：它每次启动都要判断，判断错了已装好的也会被当成安装包（每次问要不要安装，等于打不开）。
+        /// 1.3.8 正式版不带，下一个测试版打开它单独测</summary>
+        const bool SelfInstall = false;
+
         /// <summary>不是从安装目录打开的（#28）：解压出来的安装包就问要不要现在安装（和一键更新一样在后台跑 install.ps1，装好自己打开），
         /// 还在压缩包里就说先解压。返回 false = 这个进程不往下走</summary>
         static bool FromInstallDir()
         {
-            var destination = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "CrossPet");
+            // 和 install.ps1 一样用 %LOCALAPPDATA%（两边拿法不同，个别电脑上可能对不上）
+            var local = Environment.GetEnvironmentVariable("LOCALAPPDATA");
+            if (string.IsNullOrEmpty(local)) local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var destination = Path.Combine(local, "Programs", "CrossPet");
             switch (InstallCheck.Locate(Store.Install, destination))
             {
                 case InstallCheck.Place.InsideZip:
@@ -80,7 +87,7 @@ namespace CrossPet
         static void Main(string[] args)
         {
             if (!RenderRecovery.WaitForParent(args)) return;
-            if (args.Length == 0 && !FromInstallDir()) return;   // 放在「只开一个」前面：已装的旧版开着时，双击新版的安装包也要能装
+            if (SelfInstall && args.Length == 0 && !FromInstallDir()) return;   // 放在「只开一个」前面：已装的旧版开着时，双击新版的安装包也要能装
             // 只开一个：再次打开时让已经在跑的那个回到右下角
             using (var mutex = new Mutex(true, @"Local\CrossPet-" + Environment.UserName, out var first))
             using (var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\CrossPet-Show-" + Environment.UserName))

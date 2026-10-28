@@ -115,7 +115,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 **要求**：Windows 10（1903 及以上）或 Windows 11，x64 和 ARM64 同一个安装包（约 20 MB）。用系统自带的 WebView2 显示，不用另装运行库；极少数老系统没有 WebView2 的，第一次打开会提示去微软官网装。
 
 1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
-2. 双击里面的 `CrossPet.exe`，在弹出的「安装 CrossPet」里点「确定」：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，十几秒后自动打开。不需要管理员权限。（双击 `install.cmd` 也一样，会显示安装过程）
+2. 双击里面的 `install.cmd`：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，然后自动打开。不需要管理员权限。
 3. 右键桌宠 →「设置…」→「接入 AI」，把你用的 AI 逐个「接入」。
 
 更多说明见 [Windows 说明](docs/windows.md)。
@@ -194,7 +194,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - **一键更新（1.2.1 起）**：有新版本时她会举着礼物、在气泡里提醒你。右键点菜单顶上的「⬆️ 更新到 …」，会自动下载、安装、重新打开，设置、角色和已接入的 AI 都保留，接入也会按新版自动刷新。
 - **从 1.2.0 及更早的版本升级**：旧版还没有一键更新，这一次要手动更新一下：
   - **macOS**：再运行一次「方式一」的安装命令（手动下载的，下载新的 `CrossPet-macOS.zip` 替换旧 App 也行）。
-  - **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `CrossPet.exe`（或 `install.cmd`）覆盖安装。
+  - **Windows**：下载新的 `CrossPet-Windows.zip`，解压后再双击一次 `install.cmd` 覆盖安装。
 - **测试版**：发布页上标着 Pre-release 的是测试版，要手动下载安装；装了测试版之后，「检查更新」会收到后续的测试版和正式版。装正式版的只会收到正式版。
 - **从源码装的**：`./update.sh` 更新，`./uninstall.sh` 卸载。
 - **卸载**：macOS 用「方式一」里的卸载命令；Windows 双击安装目录里的 `uninstall.cmd`。

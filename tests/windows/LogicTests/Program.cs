@@ -143,6 +143,11 @@ static class Program
         Check("打开位置：解压出来的完整安装包", InstallCheck.Locate(pkgDir, full) == InstallCheck.Place.Package);
         Check("打开位置：压缩包里直接双击", InstallCheck.Locate(Path.Combine(icRoot, "Temp1_CrossPet-Windows.zip", "CrossPet"), full) == InstallCheck.Place.InsideZip);
         Check("打开位置：编译目录（没有 install.ps1）照常启动", InstallCheck.Locate(half, full) == InstallCheck.Place.Other);
+        // 宁可漏问也不误判：装好的那份路径和算出来的安装目录对不上时（AppData 重定向、目录链接……），只要叫 …\Programs\CrossPet 就算装好了
+        var redirected = Make(Path.Combine(icRoot, "OneDrive", "AppData", "Programs", "CrossPet"), "characters", "web", "integrations", "tools", "python");
+        File.WriteAllText(Path.Combine(redirected, "install.ps1"), "");
+        Check("打开位置：安装目录对不上，但本身是 Programs\\CrossPet → 当作装好了", InstallCheck.Locate(redirected, full) == InstallCheck.Place.Installed);
+        Check("打开位置：大小写不同也算", InstallCheck.Locate(Path.Combine(icRoot, "x", "programs", "crosspet"), full) == InstallCheck.Place.Installed);
         try { Directory.Delete(icRoot, true); } catch { }
 
         // 「跟着 AI」取消置顶时插到谁下面（1.3.7 用户反馈：右键几次 / 换角色后她不见了——前台是桌面时被插到了壁纸下面）

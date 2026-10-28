@@ -39,6 +39,11 @@ namespace CrossPet
         {
             string Full(string d) { try { return Path.GetFullPath(d).TrimEnd('\\', '/'); } catch { return d.TrimEnd('\\', '/'); } }
             if (string.Equals(Full(exeDir), Full(installDir), StringComparison.OrdinalIgnoreCase)) return Place.Installed;
+            // 宁可漏问，也不能把装好的当成安装包（那样每次打开都问要不要安装，点取消就退出，等于打不开）：
+            // AppData 被重定向、目录链接、短文件名都可能让上面对不上，所以只要本身就叫 …\Programs\CrossPet 也算装好了
+            var segs = Full(exeDir).Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (segs.Length >= 2 && string.Equals(segs[segs.Length - 1], "CrossPet", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(segs[segs.Length - 2], "Programs", StringComparison.OrdinalIgnoreCase)) return Place.Installed;
             // 先认压缩包：有的解压方式会把整包取到临时文件夹，看着齐全，可关掉压缩包窗口就被清掉，不能从那儿装
             if (exeDir.Split('\\', '/').Any(seg => seg.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))) return Place.InsideZip;
             if (File.Exists(Path.Combine(exeDir, "install.ps1")) && Missing(exeDir).Count == 0) return Place.Package;
