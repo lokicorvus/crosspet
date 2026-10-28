@@ -117,13 +117,8 @@ namespace CrossPet
                 }
                 Store.Log("WebView2 运行时 " + version);
                 Store.LoadSettings();
-                // #28：远程控制、虚拟显示器、混合显卡的机器上，换缩放后 WPF 渲染线程可能挂（UCEERR_RENDERTHREADFAILURE）。
-                // 设置里的「兼容模式」让本进程改用软件渲染，只影响桌宠自己（注册表那个开关会拖上所有 WPF 程序）；必须在建窗口之前设
-                if (Store.Flag("softwareRender"))
-                {
-                    System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
-                    Store.Log("兼容模式：软件渲染");
-                }
+                // 不能做「软件渲染」兼容模式（#28 提过）：网页画面是 WebView2CompositionControl 用 D3DImage 贴进透明窗口的，
+                // RenderOptions.ProcessRenderMode = SoftwareOnly 时 D3DImage 不出画面，桌宠整个空白（1.3.8 test.10 实测）
 
                 app.Startup += async (_, __) =>
                 {
