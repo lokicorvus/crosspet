@@ -49,11 +49,38 @@ namespace CrossPet
             return false;
         }
 
+        /// <summary>不是从安装目录打开的（#28）：解压出来的安装包就问要不要现在安装（和一键更新一样在后台跑 install.ps1，装好自己打开），
+        /// 还在压缩包里就说先解压。返回 false = 这个进程不往下走</summary>
+        static bool FromInstallDir()
+        {
+            var destination = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "CrossPet");
+            switch (InstallCheck.Locate(Store.Install, destination))
+            {
+                case InstallCheck.Place.InsideZip:
+                    MessageBox.Show("CrossPet 还在压缩包里，没法直接运行。\n\n请先把压缩包整个解压（右键 →「全部解压缩」），再双击解压出来的 CrossPet.exe。",
+                        "CrossPet", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return false;
+                case InstallCheck.Place.Package:
+                    if (MessageBox.Show($"要把 CrossPet 安装到这台电脑吗？\n\n会装到 {destination}，在开始菜单建快捷方式，装好后自动打开，不需要管理员权限。" +
+                            "已经装过的话就是更新，设置、角色和 AI 接入都保留。\n\n安装要十几秒，装好后桌宠会自己出现。",
+                            "安装 CrossPet", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+                    {
+                        Store.Log("从安装包安装：" + Store.Install);
+                        Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{Path.Combine(Store.Install, "install.ps1")}\" -Update")
+                            { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Store.Install });
+                    }
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
         // [STAThread] 必须紧挨着 Main：WPF 和 WebView2 都要求主线程是 STA（中间插了别的函数，Main 就成了 MTA，启动报 RPC_E_CHANGED_MODE）
         [STAThread]
         static void Main(string[] args)
         {
             if (!RenderRecovery.WaitForParent(args)) return;
+            if (args.Length == 0 && !FromInstallDir()) return;   // 放在「只开一个」前面：已装的旧版开着时，双击新版的安装包也要能装
             // 只开一个：再次打开时让已经在跑的那个回到右下角
             using (var mutex = new Mutex(true, @"Local\CrossPet-" + Environment.UserName, out var first))
             using (var show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\CrossPet-Show-" + Environment.UserName))
@@ -90,6 +117,13 @@ namespace CrossPet
                 }
                 Store.Log("WebView2 运行时 " + version);
                 Store.LoadSettings();
+                // #28：远程控制、虚拟显示器、混合显卡的机器上，换缩放后 WPF 渲染线程可能挂（UCEERR_RENDERTHREADFAILURE）。
+                // 设置里的「兼容模式」让本进程改用软件渲染，只影响桌宠自己（注册表那个开关会拖上所有 WPF 程序）；必须在建窗口之前设
+                if (Store.Flag("softwareRender"))
+                {
+                    System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+                    Store.Log("兼容模式：软件渲染");
+                }
 
                 app.Startup += async (_, __) =>
                 {

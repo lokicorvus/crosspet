@@ -81,6 +81,15 @@ namespace CrossPet
                 var (w1, h1) = first.Value; var (w2, h2) = second.Value;
                 if (!ZoomCheck.Off(pageW, pageH, w1, h1, w2, h2)) return;
                 var dpi = VisualTreeHelper.GetDpi(Window).DpiScaleX;
+                // #28：那台机器这之后 4~5 秒渲染线程就挂了，这行是先兆，写成警告；再逼网页控件按新缩放对齐，最多两次，还不行就走下面的老路
+                if (dpiFrom > 0 && dpiResyncs < 2 && ZoomCheck.StuckAtOldDpi(pageW, pageH, w2, h2, dpiFrom, dpi))
+                {
+                    dpiResyncs++;
+                    Store.Log($"警告：换缩放后网页区域还停在旧缩放上：网页 {Math.Round(w2)}×{Math.Round(h2)}，应为 {Math.Round(pageW)}×{Math.Round(pageH)}，{Math.Round(dpiFrom * 100)}% → {Math.Round(dpi * 100)}%，再对齐一次（第 {dpiResyncs} 次）");
+                    await ResizeWebBounds();
+                    CheckZoomSoon();
+                    return;
+                }
                 var fix = zoomFixes < 3 ? ZoomCheck.Fix(pageW, pageH, w2, h2, dpi, zoomFix) : null;
                 Store.Log($"网页大小和画布对不上{(fix == null ? "（只记录）" : "")}：网页 {Math.Round(w2)}×{Math.Round(h2)}，应为 {Math.Round(pageW)}×{Math.Round(pageH)}，缩放 {Num(Math.Round(web.ZoomFactor, 3))}，DPI {Math.Round(dpi * 100)}%");
                 if (fix == null) return;
@@ -97,15 +106,31 @@ namespace CrossPet
         /// 才按新 DPI 重算网页区域的物理像素（它的 SizeChanged → SyncControllerBounds），换 DPI 时 DIP 大小不变，网页区域就停在旧的
         /// 像素尺寸上，网页却按新缩放画，结果裁掉一截，重启才好（1.3.5 测试在 100%→150% 复现）。这里把它的宽度缩 1 再放回，逼它重算</summary>
         double resyncedDpi;   // 上次对齐时的缩放：同一次换缩放 DpiChanged 会来两遍（1.3.5 测试日志里每次两行），只对齐一次
+        double dpiFrom;   // 最近一次换缩放前的缩放（0 = 这次运行没换过）：CheckZoom 靠它认出「网页区域还停在旧缩放上」
+        int dpiResyncs;   // 这次换缩放后补对齐了几次
         void ResyncWebForDpi(double oldDpi, double newDpi)
         {
             if (web == null || Math.Abs(newDpi - resyncedDpi) < 0.001) return;
             resyncedDpi = newDpi;
+            dpiFrom = oldDpi; dpiResyncs = 0;
             Store.Log($"系统缩放变了：{Math.Round(oldDpi * 100)}% → {Math.Round(newDpi * 100)}%，网页区域重新对齐");
             web.Width = Math.Max(1, web.ActualWidth - 1); web.UpdateLayout();   // 缩小（放大会超出窗口，不一定真的变）
             web.Width = double.NaN; web.UpdateLayout();
             lastHitRects = null; dockCut.Clear();   // 可点区域、贴边切口都按新像素重新量
-            CheckZoomSoon();   // 再量一次网页大小：还对不上的话日志里会有「网页大小和画布对不上」
+            CheckZoomSoon();   // 再量一次网页大小：还停在旧缩放上就补对齐（StuckAtOldDpi），别的对不上记日志
+        }
+
+        /// <summary>补对齐：上面那招在 #28 那台机器（虚拟显示器 + 混合显卡）上没成功，可能是缩 1 再放回在同一帧里被合并了。
+        /// 这次缩得多一点，并且等它真的按缩小的大小画完一帧再放回</summary>
+        async Task ResizeWebBounds()
+        {
+            if (web == null) return;
+            web.Width = Math.Max(1, Math.Round(web.ActualWidth * 0.9)); web.UpdateLayout();
+            await Window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await Task.Delay(100);
+            if (web == null) return;
+            web.Width = double.NaN; web.UpdateLayout();
+            lastHitRects = null; dockCut.Clear();
         }
 
         /// <summary>改大小：窗口 = 画布 × 人物大小，网页按人物大小缩放；放在哪见 Anchor</summary>

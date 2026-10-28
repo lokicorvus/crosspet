@@ -102,6 +102,14 @@ static class Program
         Check("缩放修正：100% 时偏小 0.8 不像算两遍，不修", ZoomCheck.Fix(280, 372, 224, 298, 1.0, 1) == null);
         Check("缩放修正：修过以后又好了（偏大回去）→ 撤销成 1", Near(ZoomCheck.Fix(280, 372, 350, 465, 1.25, 0.8), 1));
         Check("缩放修正：量到的数不对劲不修", ZoomCheck.Fix(280, 372, 0, 0, 1.25, 1) == null);
+        // #28：换缩放后网页区域还停在旧缩放的像素上（虚拟显示器 + 混合显卡）：偏差正好是「旧缩放 ÷ 新缩放」
+        Check("旧缩放：150%→200% 网页 195×271（应为 260×362）认得出", ZoomCheck.StuckAtOldDpi(260, 362, 195, 271, 1.5, 2.0));
+        Check("旧缩放：200%→150% 网页 346×483 认得出", ZoomCheck.StuckAtOldDpi(260, 362, 346, 483, 2.0, 1.5));
+        Check("旧缩放：对齐好了不算", !ZoomCheck.StuckAtOldDpi(260, 362, 260, 362, 1.5, 2.0));
+        Check("旧缩放：偏差不是这个比例不算", !ZoomCheck.StuckAtOldDpi(260, 362, 208, 289.6, 1.5, 2.0));
+        Check("旧缩放：宽高偏得不一样不算", !ZoomCheck.StuckAtOldDpi(260, 362, 195, 300, 1.5, 2.0));
+        Check("旧缩放：缩放没变不算", !ZoomCheck.StuckAtOldDpi(260, 362, 260, 362, 1.5, 1.5));
+        Check("旧缩放：这两个比例老的「算两遍」修正认不出（1.3.8-beta.1 实测没触发）", ZoomCheck.Fix(260, 362, 195, 271, 2.0, 1) == null && ZoomCheck.Fix(260, 362, 346, 483, 1.5, 1) == null);
 
         // 主线程必须是 STA：WPF 和 WebView2 都要求。1.3.7-test 里 [STAThread] 被新加的 InstallComplete 隔开、落到了它头上，
         // Main 变成 MTA，WebView2 一初始化就报 RPC_E_CHANGED_MODE（「无法在设置线程模式后对其加以更改」），桌宠打不开
@@ -128,6 +136,13 @@ static class Program
         var newPkg = Make(Path.Combine(cache, "v1.3.4", "CrossPet"), "characters", "web", "integrations", "tools", "python");
         File.WriteAllText(Path.Combine(newPkg, "install.ps1"), "");
         Check("修复包：挑版本最新的完整安装包（不完整的跳过）", InstallCheck.RepairPackage(cache) == newPkg);
+        // 从哪儿打开的（#28）：解压出来的安装包问要不要安装；还在压缩包里说先解压；开发时的编译目录照常启动
+        var pkgDir = Make(Path.Combine(icRoot, "Downloads", "CrossPet"), "characters", "web", "integrations", "tools", "python");
+        File.WriteAllText(Path.Combine(pkgDir, "install.ps1"), "");
+        Check("打开位置：就在安装目录", InstallCheck.Locate(full, full + "\\") == InstallCheck.Place.Installed);
+        Check("打开位置：解压出来的完整安装包", InstallCheck.Locate(pkgDir, full) == InstallCheck.Place.Package);
+        Check("打开位置：压缩包里直接双击", InstallCheck.Locate(Path.Combine(icRoot, "Temp1_CrossPet-Windows.zip", "CrossPet"), full) == InstallCheck.Place.InsideZip);
+        Check("打开位置：编译目录（没有 install.ps1）照常启动", InstallCheck.Locate(half, full) == InstallCheck.Place.Other);
         try { Directory.Delete(icRoot, true); } catch { }
 
         // 「跟着 AI」取消置顶时插到谁下面（1.3.7 用户反馈：右键几次 / 换角色后她不见了——前台是桌面时被插到了壁纸下面）

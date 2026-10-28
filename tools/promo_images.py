@@ -223,7 +223,7 @@ def slide_install():
     steps = [
         ("1", "GitHub 搜 lokicorvus/crosspet", "打开项目主页，「快速开始」里按系统选"),
         ("2", "Mac：复制那一行命令到终端", "自动下载、安装、接上你用的 AI，不用去系统设置里放行"),
-        ("3", "Windows：下载安装包", "解压后双击 install.cmd，不需要管理员权限"),
+        ("3", "Windows：下载安装包", "解压后双击 CrossPet.exe，不需要管理员权限"),
     ]
     y = 580
     for n, title, sub in steps:
