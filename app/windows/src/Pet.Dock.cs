@@ -35,6 +35,7 @@ namespace CrossPet
         static bool PowerSave => Store.Settings.TryGetValue("powerSave", out var v) && v is bool b && b;
         /// <summary>额度合并显示（默认关）：小窗把各家 AI 的额度排成几行，而不是只显示当前角色的。怎么排在网页里（quota-aggregate.js）</summary>
         static bool QuotaAggregate => Store.Flag("quotaAggregate");
+        static string QuotaStyle => Store.Settings.TryGetValue("quotaStyle", out var v) && v is string s && s == "bars" ? "bars" : "text";   // 额度怎么显示：text 文字（默认）/ bars 额度条（网页层 quota-bars.js）
         static string PeakStyle => Store.Settings.TryGetValue("peakStyle", out var v) && v is string s && (s == "text" || s == "off") ? s : "bar";   // 额度栏怎么显示峰谷时段：bar 时间条（默认）/ text 一行文字 / off（规则在网页层 peak-hours.js）
         static bool CodexResets => Store.Flag("codexResets");   // Codex 重置提醒（默认关，数据来自 codex-resets.com）
         /// <summary>按时段换衣服：{ 角色: { peak: 皮肤, valley: 皮肤 } }（"" = 原版，没写 = 不换）。判断在网页层（peak-hours.js），这里只存（和 macOS 的 cleanPeakSkins 一致）</summary>

@@ -9,10 +9,10 @@
 The first attached image is a desktop-pet sprite that is almost right, but the top of her head is cut off by the top border of the picture. Redraw THE SAME IMAGE with her whole head inside the picture.
 
 Change only this:
-- Move her down / zoom out very slightly so the ENTIRE top of her hair (including any stray strands and the hair flower) is inside the picture, with a clear band of pure white background (about 4–6% of the image height) above the highest point of her hair.
+- Move her down / zoom out very slightly so the ENTIRE top of her hair (including any stray strands and the hair flower) is inside the picture, with a clear band of empty transparent background (about 4–6% of the image height) above the highest point of her hair.
 - Her feet / skirt hem may go a little closer to the bottom edge to make room. Keep her size as close as possible to the first image.
 
-Keep everything else exactly the same as the first image: the pose, the expression, which side the picture border cuts through her body, how much of her is visible, the hands holding the edge, the book, the outfit, colors and line style. The side border still cuts straight through her body with a clean straight cut and no outline along it. Pure flat white background (#FFFFFF), no shadow, no text, no floating symbols, square image 1024x1024 or larger. The second attached image is the character design reference.
+Keep everything else exactly the same as the first image: the pose, the expression, which side the picture border cuts through her body, how much of her is visible, the hands holding the edge, the book, the outfit, colors and line style. The side border still cuts straight through her body with a clean straight cut and no outline along it. Real transparent background (transparent_background: true), no shadow, no text, no floating symbols, square image 1024x1024 or larger. The second attached image is the character design reference.
 
 Save as: <edge_left.png / edge_right.png / edge_left_peek.png，和附件那张同名>
 ```

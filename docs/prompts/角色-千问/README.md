@@ -30,5 +30,5 @@
 | 6 | [06-彩蛋-DeepSeek外包.md](06-彩蛋-DeepSeek外包.md) | 5 |
 
 - **每批只附设定稿这一张**，衣服、帽子、扇子才不会每张不一样（彩蛋附两张）。
-- 画好放进 `characters/qwen/raw/`（彩蛋放 `characters/egg-qwen/raw/`），文件名用清单里的，交给 Claude 导入（去白底、裁切、转 webp、写 `character.json` 和台词）。
+- 画好放进 `characters/qwen/raw/`（彩蛋放 `characters/egg-qwen/raw/`），文件名用清单里的，交给 Claude 导入（裁切、转 webp、写 `character.json` 和台词）。
 - 每批画完缩到约 200px 看：帽子歪在左边、辫子在右肩、扇子都在；和 Gemini、DeepSeek 并排时认得出是她（三个都是蓝紫系，靠帽子、扇子、白金配色区分）；表情温柔大方，不是傲娇。

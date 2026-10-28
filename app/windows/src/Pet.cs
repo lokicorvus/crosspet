@@ -34,7 +34,12 @@ namespace CrossPet
         IntPtr hwnd;
         bool ready;
         string current;
-        public bool Paused;                     // 开发者控制台测试时，先不把真实 AI 的状态交给桌宠
+        bool paused;
+        public bool Paused                     // 开发者控制台测试时，先不把真实 AI 的状态交给桌宠
+        {
+            get => paused;
+            set { if (paused != value) ++followEventGeneration; paused = value; }
+        }
         public string ManifestJson { get; private set; } = "{}";
         readonly Dictionary<string, string> stamps = new Dictionary<string, string>();
         (string tag, string url)? latestRelease;
@@ -44,7 +49,7 @@ namespace CrossPet
         Native.ForegroundWatcher foreground;
         DispatcherTimer appSwitch;
         DevConsole dev;
-        SettingsWindow settings;
+        SettingsWindow settings, characterWindow;   // 设置窗口、换角色窗口（同一套状态，见 PushSettings）
         FeedbackWindow feedback;
         const double BaseWidth = 260, BaseHeight = 362;
         // 文字大小：网页按「人物大小、文字大小」算出的画布（网页 CSS 尺寸），窗口 = 画布 × 人物大小（app/web/text-size.js）
@@ -106,6 +111,7 @@ namespace CrossPet
             appSwitch.Tick += (_, __) => { appSwitch.Stop(); FollowForeground(); };
             foreground = new Native.ForegroundWatcher(() =>
             {
+                ++followEventGeneration;
                 fullscreenOverride = false;   // 前台窗口换了：双击托盘临时叫出来的作废，重新按全屏规则来
                 if (hwnd != IntPtr.Zero) Raise();
                 appSwitch.Stop(); appSwitch.Start();
@@ -155,6 +161,7 @@ namespace CrossPet
                 await web.EnsureCoreWebView2Async(env);
                 var core = web.CoreWebView2;
                 Map(core);
+                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; } };
                 core.Settings.AreDefaultContextMenusEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
@@ -168,7 +175,7 @@ namespace CrossPet
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)})");
+                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)})");
                     if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
@@ -181,6 +188,7 @@ namespace CrossPet
                         if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)}, {Q(last)})");
                     }
                     ready = true;
+                    if (RenderRecovery.Ready()) tray?.ShowBalloonTip(6000, "CrossPet", "上次画面出了问题，现已重新打开。若再次消失，请提交反馈。", Forms.ToolTipIcon.Info);
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
                     After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
                     stamps.Clear();
@@ -188,7 +196,7 @@ namespace CrossPet
                     RefreshQuota();
                     RefreshCodexQuota(CodexWhy.Now);
                     RefreshPlugins(tellPet: true);   // 插件旧了：等她闲下来提醒一句
-                    FollowForeground();
+                    FollowForeground("startup");
                 };
                 // 立绘加载失败时网页发消息过来：记进日志（每次启动最多 5 条），反馈里能看出是哪张图、为什么
                 core.WebMessageReceived += (_, a) =>
@@ -197,7 +205,7 @@ namespace CrossPet
                     {
                         if (!(Store.Json.DeserializeObject(a.WebMessageAsJson) is Dictionary<string, object> m)) return;
                         // 「新功能」卡片点了「去看看」：打开设置停在「新功能」页
-                        if (m.TryGetValue("openSettings", out var tab) && tab is string t) { OpenSettings(t); return; }
+                        if (m.TryGetValue("openSettings", out var tab) && tab is string t) { if (t == "character") OpenCharacterWindow(); else OpenSettings(t); return; }
                         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色（和 macOS 的 handlePet 一致）
                         if (m.TryGetValue("wear", out var wv) && wv is Dictionary<string, object> w && w.TryGetValue("id", out var wi) && wi is string wid
                             && w.TryGetValue("skin", out var ws) && ws is string wskin && Characters().Any(c => c.id == wid)
@@ -228,6 +236,7 @@ namespace CrossPet
             crashes.RemoveAll(t => (DateTime.UtcNow - t).TotalMinutes > 10);
             if (crashes.Count >= 3) { Store.Log("10 分钟内崩溃太多次，不再自动恢复"); return; }
             crashes.Add(DateTime.UtcNow);
+            ++followEventGeneration;
             ready = false;
             try
             {
@@ -261,6 +270,7 @@ namespace CrossPet
         List<(string id, string name)> characters = new List<(string id, string name)>();   // 可切换的角色（不含彩蛋）
         public void LoadCharacters()
         {
+            ++followEventGeneration;
             var m = Store.Manifest();
             ManifestJson = Store.Json.Serialize(m);
             var chars = (Dictionary<string, object>)m["characters"];

@@ -96,3 +96,80 @@ test('4 行以上不管宽不宽都要收紧（底栏高度预算：3 行正常�
   assert.deepStrictEqual([0, 1, 2, 3].map(isCrowded), [false, false, false, false])
   assert.deepStrictEqual([4, 5, 6].map(isCrowded), [true, true, true])
 })
+
+const now = () => Math.floor(Date.now() / 1000)
+const bar = (label, left, group, resetIn) => ({ label, left, group, ...(resetIn == null ? {} : { reset: now() + resetIn }) })
+const H = 3600, D = 86400
+
+test('bars（Antigravity）：Gemini + Argon 一行，Claude/GPT 的 5h | 周另起一行「Agy C/G」，行名按角色名', () => {
+  const bars = [bar('Gemini 5小时', 1, 'Gemini', 5 * H), bar('Gemini 本周', 0.99, 'Gemini', 3 * D), bar('Argon 本周', 0.46, 'Argon', 4 * D),
+                bar('Claude/GPT 5小时', 1, 'Claude/GPT', 5 * H), bar('Claude/GPT 本周', 1, 'Claude/GPT', 6 * D)]
+  const list = rows({ claude: { text: '5小时 剩余 98% · 07:50 重置 ｜ 本周 剩余 99%' }, gemini: { text: '不会被用到 剩余 1%', bars } }, 'claude', ['claude', 'gemini'], nameOf)
+  assert.deepStrictEqual(list.map(r => r.name), ['Claude', 'Gemini', 'Agy C/G'])
+  assert.deepStrictEqual(list.map(r => r.id), ['claude', 'gemini', 'gemini'])
+  const [, main, cg] = list.map(text)
+  assert.match(main[0], /^周 99% · \d+\/\d+$/)       // Gemini 池：5h 满了，用最紧的周窗口；池名不重复（名字那列就是 Gemini）
+  assert.match(main[1], /^Arg 46% · \d+\/\d+$/)      // 独立池：Argon → Arg，只有一个窗口不写窗口名
+  assert.match(cg[0], /^5h 100% · \d\d:\d\d$/)       // Claude/GPT 池：每个窗口一格，短窗口在前
+  assert.match(cg[1], /^周 100% · \d+\/\d+$/)
+})
+
+test('bars 挑窗口：5h 没满就用 5h；一样紧取重置更晚的；最紧 ≤10% 时不被 5h 盖住；0 算用完', () => {
+  const one = bars => text(rows({ gemini: { text: 'x 剩余 1%', bars: [...bars, bar('Claude/GPT 本周', 1, 'Claude/GPT', D)] } }, 'gemini', ['gemini'], nameOf)[0])[0]
+  assert.match(one([bar('Gemini 5小时', 0.5, 'Gemini', H), bar('Gemini 本周', 0.5, 'Gemini', 3 * D)]), /^5h 50% · /)
+  assert.match(one([bar('Gemini 本周', 0.5, 'Gemini', 3 * D), bar('Gemini 5小时', 0.5, 'Gemini', H)]), /^5h 50% · /)
+  assert.match(one([bar('Gemini 5小时', 0.8, 'Gemini', H), bar('Gemini 本周', 0.05, 'Gemini', 3 * D)]), /^周 5% · /)
+  assert.match(one([bar('Gemini 5小时', 0, 'Gemini', H), bar('Gemini 本周', 0, 'Gemini', 3 * D)]), /^周 0% · /)   // 都用完：周更晚重置，限制你的是它
+  assert.match(one([bar('Gemini 今日', 0.4, 'Gemini', H), bar('Gemini 本周', 1, 'Gemini', 3 * D)]), /^今日 40% · /)
+})
+
+test('bars 只有一个池（Claude / GPT 这类，没有 group）：合并显示照旧拆 text；没有 bars 也照旧拆 text', () => {
+  const claude = rows({ claude: { text: '5小时 剩余 91% ｜ 本周 剩余 59%', bars: [{ label: '5小时', left: 0.91, reset: now() + 2 * H }, { label: '本周', left: 0.59 }] } }, 'claude', ['claude'], nameOf)
+  assert.strictEqual(claude.length, 1)
+  assert.deepStrictEqual(text(claude[0]), ['5h 91%', '周 59%'])
+  assert.deepStrictEqual(text(rows({ gemini: { text: 'Gemini 剩余 80% ｜ Claude/GPT 剩余 70%', bars: [] } }, 'gemini', ['gemini'], nameOf)[0]), ['Gemini 80%', 'Claude/GPT 70%'])
+})
+
+test('bars（Antigravity）：总行数超过 4 行（底栏放不下）时，「Agy C/G」并回 Gemini 那一行，只挑一格、不写重置时间', () => {
+  const bars = [bar('Gemini 5小时', 1, 'Gemini', 5 * H), bar('Gemini 本周', 0.99, 'Gemini', 3 * D), bar('Argon 本周', 0.46, 'Argon', 4 * D),
+                bar('Claude/GPT 5小时', 1, 'Claude/GPT', 5 * H), bar('Claude/GPT 本周', 0.7, 'Claude/GPT', 6 * D)]
+  const quota = { claude: { text: '5小时 剩余 98% ｜ 本周 剩余 99%' }, gpt: { text: '5小时 剩余 12% ｜ 本周 剩余 78%' },
+                  deepseek: { text: '余额 ¥23.60' }, gemini: { text: 'x 剩余 1%', bars } }
+  const list = rows(quota, 'gemini', ['claude', 'gpt', 'deepseek', 'gemini'], nameOf)
+  assert.strictEqual(list.length, 4)
+  assert.deepStrictEqual(list.map(r => r.name), ['Gemini', 'Claude', 'DeepSeek', 'GPT'])
+  const gem = text(list[0])
+  assert.strictEqual(gem.length, 3)
+  assert.deepStrictEqual(gem, ['周 99%', 'Arg 46%', 'C/G 周 70%'])   // Claude/GPT 池按同样的规则挑一格；并成一行时不写重置时间，不然太宽
+  // 不拥挤时照旧拆成两行
+  assert.deepStrictEqual(rows({ claude: quota.claude, gemini: quota.gemini }, 'claude', ['claude', 'gemini'], nameOf).map(r => r.name), ['Claude', 'Gemini', 'Agy C/G'])
+})
+
+// ---- 额度条样式的合并显示：每格换成短条（quota-bars 设计 2026-10-26 更新）----
+test('compact 给百分比那一块标上 pct、标签那一块标上 label', () => {
+  const parts = compact('5小时 剩余 98% · 07:50 重置', false)
+  assert.strictEqual(parts.find(p => p.pct != null).pct, 98)
+  assert.strictEqual(parts.find(p => p.label != null).label, '5h')
+  assert.strictEqual(compact('余额 ¥4.96', false).some(p => p.pct != null), false)
+})
+
+test('barCell：窗口名（5h、周、今日）不写，池名（Arg、C/G）留着；颜色三档；余额不是条', () => {
+  const { barCell, level } = require('../app/web/quota-aggregate.js')
+  assert.deepStrictEqual(barCell(compact('5小时 剩余 98% · 07:50 重置', false)), { label: null, pct: 98, level: 'ok' })
+  assert.deepStrictEqual(barCell(compact('本周 剩余 22%', false)), { label: null, pct: 22, level: 'mid' })
+  assert.deepStrictEqual(barCell(compact('Arg 剩余 8%', false)), { label: 'Arg', pct: 8, level: 'low' })
+  assert.deepStrictEqual(barCell(compact('C/G 周 剩余 70%', false)), { label: 'C/G', pct: 70, level: 'ok' })
+  assert.deepStrictEqual(barCell(compact('Gemini 本周 剩余 40%', false)), { label: 'Gemini', pct: 40, level: 'ok' })
+  assert.strictEqual(barCell(compact('余额 ¥4.96', false)), null)
+  assert.deepStrictEqual([31, 30, 11, 10].map(level), ['ok', 'mid', 'mid', 'low'])
+})
+
+test('GPT、Claude 带 bars（没有 group）时，合并显示和只给 text 时一模一样（bars 只给额度条样式的单家显示用）', () => {
+  const { view } = require('../app/web/codex-quota.js')
+  const NOW = Math.floor(Date.now() / 1000)
+  const v = view({ source: 'stale', at: NOW - 3600, rateLimits: { primary: { usedPercent: 10.5, windowDurationMins: 300, resetsAt: NOW + 7200 }, secondary: { usedPercent: 40, windowDurationMins: 10080, resetsAt: NOW - 60 } } }, NOW)
+  const claude = { text: '5小时 剩余 70% ｜ 本周 剩余 40% · 10/29 重置', low: false, bars: [{ label: '5小时', left: 0.7, reset: NOW + 3600 }, { label: '本周', left: 0.4, reset: NOW + 3 * 86400 }] }
+  const withBars = rows({ gpt: v, claude }, 'gpt', ['gpt', 'claude'], nameOf)
+  const textOnly = rows({ gpt: { text: v.text, low: v.low }, claude: { text: claude.text, low: claude.low } }, 'gpt', ['gpt', 'claude'], nameOf)
+  assert.deepStrictEqual(withBars.map(text), textOnly.map(text))
+})

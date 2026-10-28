@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrossPet 换角色</title>
+<style>
+/* 和设置页同一套配色；跟着系统深浅色 */
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --field: #fffdfa; --hover: #faf5ee; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --field: #241f1c; --hover: #332c28; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); }
+body { font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif; color: var(--ink); padding: 16px 18px 20px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--field); color: var(--ink); border-radius: 7px; padding: 4px 11px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+input[type=text], select { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+input[type=text] { width: 160px; }
+h2 { font-size: 11px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; letter-spacing: .04em; }
+
+/* 上半：左边大立绘，右边名字、衣服名、改名、峰谷换装。主角是那张图，不放介绍文字（loki 10-28 定） */
+.top { display: flex; gap: 18px; align-items: flex-start; }
+.stage { position: relative; width: 224px; height: 336px; flex: none; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--c, #e0b48a) 18%, var(--panel)); }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; transition: opacity .15s; }
+.stage.art img { object-fit: cover; object-position: center 25%; }   /* 带背景的整张皮肤图铺满，裁的时候保住脸 */
+.stage .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 64px; font-weight: 700;
+  color: color-mix(in srgb, var(--c, #e0b48a) 70%, var(--ink)); }
+.stage.peek { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }   /* 鼠标停在卡片上：先预览那一套 */
+.info { flex: 1; min-width: 0; padding-top: 4px; }
+.info h1 { font-size: 22px; margin: 0; line-height: 1.25; }
+.info .outfit { color: var(--muted); font-size: 14px; margin: 2px 0 16px; min-height: 21px; }
+.row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); }
+.row .label { flex: 1; min-width: 0; }
+.row .label small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
+.peaksel { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; white-space: nowrap; }
+
+/* 卡片：衣服用带背景的展示图（小图 portrait-card，Windows 上大图缩太狠会糊），角色用探头头像 avatar。卡片底色用角色主题色（--c） */
+.cards { display: grid; gap: 10px; }
+.cards.outfits { grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); }
+.cards.roster { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+.pcard { position: relative; border: 2px solid transparent; border-radius: 12px; padding: 0; overflow: hidden; cursor: pointer; color: var(--ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 8%, var(--panel)), color-mix(in srgb, var(--c) 30%, var(--panel))); }
+.pcard:hover { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.pcard.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+.outfits .pcard { height: 172px; }
+.roster .pcard { height: 106px; }
+.pcard img, .pcard .ph { position: absolute; left: 0; right: 0; top: 4px; width: 100%; height: calc(100% - 26px); object-fit: contain; }
+.roster .pcard img, .roster .pcard .ph { height: calc(100% - 4px); }   /* 角色卡没有名字栏，图铺到底 */
+.pcard.avatar img { top: 0; height: 100%; object-fit: cover; object-position: left bottom; }   /* 探头头像铺满整张卡，从左下角探出来 */
+.pcard.art img { top: 0; height: 100%; object-fit: cover; object-position: center 25%; }
+.pcard .ph { display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 700; color: color-mix(in srgb, var(--c) 70%, var(--ink)); }
+.pcard b { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 4px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: color-mix(in srgb, var(--panel) 82%, transparent); }
+.pcard .n { position: absolute; top: 5px; right: 6px; font-size: 10.5px; color: var(--muted); background: var(--panel); border-radius: 6px; padding: 0 6px; }
+
+/* 窗口拖窄了：大立绘放到上面 */
+@media (max-width: 560px) { .top { flex-direction: column; align-items: stretch; } .stage { width: 100%; } }
+#toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.show { opacity: .92; }
+</style></head>
+<body>
+<div class="top">
+  <div class="stage" id="stage"></div>
+  <div class="info">
+    <h1 id="charName"></h1>
+    <div class="outfit" id="outfitName"></div>
+    <div class="row"><div class="label">名字<small>当前角色的名字，留空恢复默认</small></div>
+      <input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div>
+    <div id="peakOutfits"></div>
+  </div>
+</div>
+<h2 id="outfitsTitle">衣服</h2>
+<div class="cards outfits" id="outfitCards"></div>
+<h2>角色</h2>
+<div class="cards roster" id="characterCards"></div>
+<div id="toast"></div>
+
+<script src="peak-hours.js"></script>
+<script src="character-cards.js"></script>
+<script>
+// 换角色窗口：和设置页用同一条通道、同一份状态（外壳调 setState(state)；页面发 {cmd: skin / rename / set}），只是单独开一个大窗口，
+// 大立绘看得清楚（设置页 560 宽，卡片太小，Windows 上看着糊）。排法在 character-cards.js
+const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.settings?.postMessage(msg)
+const $ = id => document.getElementById(id)
+let state = null
+let peeking = null   // 鼠标停着的卡片：大立绘先预览它，移开恢复
+// 移开不马上恢复：从一张卡挪到另一张时会先离开再进入，马上恢复的话中间会闪一下当前角色（三个来回跳）。
+// 停一会儿还没进别的卡，才换回当前
+let unpeekTimer
+function peekAt(p) { clearTimeout(unpeekTimer); if (peeking !== p) { peeking = p; renderStage() } }
+function unpeekSoon() { clearTimeout(unpeekTimer); unpeekTimer = setTimeout(() => { peeking = null; renderStage() }, 300) }
+
+function toast(text) {
+  const t = $('toast'); t.textContent = text; t.classList.add('show')
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 2200)
+}
+
+function setState(s) {
+  state = s
+  const cur = s.characters.find(c => c.id === s.character)
+  $('outfitsTitle').textContent = cur ? `${cur.name} 的衣服` : '衣服'
+  if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
+  renderStage()
+  renderCards(s)
+  renderPeakOutfits(s)
+}
+
+// 大立绘：平时是正在穿的那套；鼠标停在某张卡上时是那一张（peeking）
+function renderStage() {
+  if (!state) return
+  const cur = state.characters.find(c => c.id === state.character)
+  const st = CharacterCards.stage(state.characters, state.character)
+  const show = peeking || st
+  const box = $('stage')
+  box.style.setProperty('--c', (peeking?.accent) || cur?.accent || '#e0b48a')
+  box.classList.toggle('art', !!show?.art)
+  box.classList.toggle('peek', !!peeking)
+  // 停在衣服卡上：名字不变，下面写「睡衣（预览）」；停在角色卡上：名字换成她，下面写「预览」
+  $('charName').textContent = peeking?.name || cur?.name || ''
+  $('outfitName').textContent = peeking ? (peeking.outfit ? `${peeking.outfit}（预览）` : '预览') : (st?.outfit || '')
+  const name = peeking?.name || cur?.name || '?'
+  if (show?.image) {
+    const img = box.querySelector('img') || document.createElement('img')
+    img.alt = ''
+    img.onerror = () => { box.replaceChildren(placeholder(name)) }
+    if (img.getAttribute('src') !== show.image) img.src = show.image
+    if (!img.isConnected) box.replaceChildren(img)
+  } else box.replaceChildren(placeholder(name))
+}
+const placeholder = name => { const d = document.createElement('div'); d.className = 'ph'; d.textContent = [...name][0] || '?'; return d }
+
+// 点衣服卡 = 当前角色换上这套；点角色卡 = 换成她、穿原版。两种都发 {cmd:'skin'}：外壳记下衣服并切到这个角色
+function renderCards(s) {
+  const cur = s.characters.find(c => c.id === s.character)
+  const accent = cur?.accent || '#e0b48a'
+  // named：衣服卡底部写衣服名；角色卡只放头像（名字栏会挡住扒着下边的手），名字在悬停提示和读屏标签里
+  const card = (c, color, onClick, peek, count, named = true) => {
+    const b = document.createElement('button')
+    b.className = 'pcard' + (c.on ? ' on' : '') + (c.avatar ? ' avatar' : '') + (c.art ? ' art' : '')
+    b.style.setProperty('--c', color)
+    b.title = c.name
+    b.setAttribute('aria-label', c.name)
+    if (c.image) { const img = document.createElement('img'); img.src = c.image; img.alt = ''; img.onerror = () => img.replaceWith(placeholder(c.name)); b.append(img) }
+    else b.append(placeholder(c.name))
+    if (named) { const n = document.createElement('b'); n.textContent = c.name; b.append(n) }
+    if (count > 1) { const n = document.createElement('span'); n.className = 'n'; n.textContent = `${count} 套`; b.append(n) }
+    b.onclick = () => { clearTimeout(unpeekTimer); peeking = null; onClick() }
+    b.onmouseenter = () => peekAt(c.on ? null : peek)   // 停在正穿着的那张上 = 看回当前
+    b.onmouseleave = unpeekSoon
+    return b
+  }
+  $('outfitCards').replaceChildren(...CharacterCards.outfitCards(s.characters, s.character).map(o =>
+    card(o, accent, () => post({ cmd: 'skin', id: s.character, skin: o.id }),
+      { image: o.preview, art: o.art, outfit: o.name, name: cur?.name, accent })))
+  $('characterCards').replaceChildren(...CharacterCards.characterCards(s.characters, s.character).map(c =>
+    card(c, c.accent, () => post({ cmd: 'skin', id: c.id, skin: '' }),
+      { image: c.preview, art: c.art, outfit: '', name: c.name, accent: c.accent }, c.count, false)))
+}
+
+// 按时段换衣服：当前角色有峰谷规则、又有别的衣服时一组「高峰穿 / 空闲穿」。「不换」= 这一边不管（存的时候删掉）；
+// 改了不会马上换，等下一次时段切换（判断在桌宠页面，peak-hours.js）
+function renderPeakOutfits(s) {
+  const box = $('peakOutfits')
+  if (box.contains(document.activeElement)) return
+  const cur = s.peakSkins || {}
+  box.replaceChildren(...Object.entries(PeakHours.RULES).filter(([id]) => id === s.character).flatMap(([id, rule]) => {
+    const c = s.characters.find(x => x.id === id)
+    if (!c?.skins) return []
+    const row = document.createElement('div'); row.className = 'row'
+    row.innerHTML = `<div class="label">峰谷换装<small>${rule.label}。到点她自己换；时段里你手动换了，等下一段再按这里换</small></div><div class="peaksel"></div>`
+    for (const [kind, title] of [['peak', '高峰穿'], ['valley', '空闲穿']]) {
+      const sel = document.createElement('select')
+      sel.setAttribute('aria-label', `${c.name}${title}`)
+      const want = cur[id]?.[kind]
+      sel.append(new Option('不换', '-', false, typeof want !== 'string'), ...c.skins.map(k => new Option(k.name, k.id, false, want === k.id)))
+      sel.onchange = () => {
+        const next = JSON.parse(JSON.stringify(state?.peakSkins || {}))
+        const e = next[id] || {}
+        if (sel.value === '-') delete e[kind]; else e[kind] = sel.value
+        if (Object.keys(e).length) next[id] = e; else delete next[id]
+        if (state) state.peakSkins = next
+        post({ cmd: 'set', key: 'peakSkins', value: next })
+      }
+      const lab = document.createElement('label'); lab.textContent = title + ' '; lab.appendChild(sel)
+      row.querySelector('.peaksel').appendChild(lab)
+    }
+    return [row]
+  }))
+}
+
+const saveName = () => { if (!state) return; post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
+$('saveName').onclick = saveName
+$('name').onkeydown = e => { if (e.key === 'Enter') saveName() }
+// 页面准备好了：请外壳推一次状态（Mac 也会在加载完时推，两边都推没关系）
+post({ cmd: 'get' })
+</script>
+</body></html>

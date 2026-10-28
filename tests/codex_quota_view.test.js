@@ -42,3 +42,20 @@ test('「今日」窗口标签', () => {
   const v = view({ source: 'live', at: NOW, rateLimits: { primary: win(0, 1440, 0) } }, NOW)
   assert.strictEqual(v.text, '今日 剩余 100%')
 })
+
+test('额度条样式：view 带 bars（剩余比例、重置时刻），问不到时 note 写是几点的数据', () => {
+  const v = view({ source: 'live', at: NOW, rateLimits: { primary: win(3, 300, NOW + 3600), secondary: win(40, 10080, NOW + 3 * 86400) } }, NOW)
+  assert.deepStrictEqual(v.bars, [{ label: '5小时', left: 0.97, reset: NOW + 3600 }, { label: '本周', left: 0.6, reset: NOW + 3 * 86400 }])
+  assert.strictEqual(v.note, undefined)
+  const s = view({ source: 'stale', at: NOW - 1800, rateLimits: { primary: win(91, 300, NOW + 1800), secondary: null } }, NOW)
+  assert.strictEqual(s.note, '11:30 的数据')
+  assert.deepStrictEqual(s.bars, [{ label: '5小时', left: 0.09, reset: NOW + 1800 }])
+  const noReset = view({ source: 'live', at: NOW, rateLimits: { primary: { usedPercent: 50, windowDurationMins: 300 } } }, NOW)
+  assert.deepStrictEqual(noReset.bars, [{ label: '5小时', left: 0.5 }])
+})
+
+test('额度条的百分比和文字一致：used 是小数时先取整（69.5 → 文字 30%，条也是 30%，颜色同一档）', () => {
+  const v = view({ source: 'live', at: NOW, rateLimits: { primary: win(69.5, 300, NOW + 3600) } }, NOW)
+  assert.match(v.text, /剩余 30%/)
+  assert.strictEqual(v.bars[0].left, 0.3)
+})

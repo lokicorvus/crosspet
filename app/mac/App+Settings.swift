@@ -96,11 +96,45 @@ extension App {
         }
     }
 
+    /// 设置、反馈窗口默认开到内容基本放得下的高度（反馈的四步一页排开、角色页的卡片墙），屏幕矮就缩到放得下
+    static func fitHeight(_ h: CGFloat) -> CGFloat { min(h, (NSScreen.main?.visibleFrame.height ?? h) - 60) }
+
     @objc func openSettings() { openSettingsAt(tab: nil) }
+    /// 换角色窗口（右键「换角色…」、设置里的按钮）：大立绘 + 衣服卡 + 角色卡。和设置页同一条通道、同一份状态，
+    /// 单独开一个大窗口好让立绘看得清楚；可以拖大小，系统记住上次的大小和位置
+    @objc func openCharacterPage() {
+        if let w = charactersWindow {
+            NSApp.activate(ignoringOtherApps: true)
+            w.makeKeyAndOrderFront(nil)
+            return
+        }
+        let config = WKWebViewConfiguration()
+        config.userContentController.add(DevBridge(app: self, kind: .settings), name: "settings")
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: Self.fitHeight(740)),
+                         styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        w.title = "CrossPet 换角色"
+        w.isReleasedWhenClosed = false
+        w.minSize = NSSize(width: 420, height: 400)
+        w.center()
+        w.setFrameAutosaveName("CrossPetCharacters")
+        let v = WKWebView(frame: w.contentView!.bounds, configuration: config)
+        v.autoresizingMask = [.width, .height]
+        v.navigationDelegate = self
+        v.loadFileURL(root.appendingPathComponent("web/characters.html"), allowingReadAccessTo: root)
+        w.contentView!.addSubview(v)
+        charactersWindow = w
+        charactersWeb = v
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            self?.charactersWeb = nil
+            self?.charactersWindow = nil
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        w.makeKeyAndOrderFront(nil)
+    }
 
     /// 桌宠页面发来的消息：「新功能」卡片点了「去看看」→ 打开设置停在「新功能」页
     func handlePet(_ body: Any) {
-        if let d = body as? [String: Any], let tab = d["openSettings"] as? String { openSettingsAt(tab: tab) }
+        if let d = body as? [String: Any], let tab = d["openSettings"] as? String { if tab == "character" { openCharacterPage() } else { openSettingsAt(tab: tab) } }
         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色
         if let d = body as? [String: Any], let w = d["wear"] as? [String: Any], let id = w["id"] as? String, let skin = w["skin"] as? String,
            characterIds.contains(id), skin.isEmpty || skinChoices[id]?.contains(where: { $0.id == skin }) == true {
@@ -119,7 +153,7 @@ extension App {
         pendingSettingsTab = tab
         let config = WKWebViewConfiguration()
         config.userContentController.add(DevBridge(app: self, kind: .settings), name: "settings")
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 680),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: Self.fitHeight(780)),
                          styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         w.title = "CrossPet 设置"
         w.isReleasedWhenClosed = false
@@ -146,14 +180,17 @@ extension App {
             "size": Double(petScale), "textSize": textScale, "textLinked": textLinked, "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps, "followEvents": followEvents,
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"), "gptQuotaNote": codexNote,
             "login": SMAppService.mainApp.status == .enabled,
-            "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "codexResets": codexResets, "peakStyle": peakStyle, "peakSkins": peakSkins, "powerSave": powerSave,
+            "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "codexResets": codexResets, "peakStyle": peakStyle, "quotaStyle": quotaStyle, "peakSkins": peakSkins, "powerSave": powerSave,
             "hideHotkey": hideHotkey, "hotkeyFailed": hotkeyFailed, "hotkeys": [["id": "off", "label": "不用快捷键"]] + Self.hotkeyChoices.map { ["id": $0.id, "label": $0.label] },
             "aiAutostart": aiAutostart,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { id -> [String: Any] in
-                var c: [String: Any] = ["id": id, "name": displayNames[id] ?? id, "defaultName": defaultNames[id] ?? id, "custom": names[id] ?? ""]
+                var c: [String: Any] = ["id": id, "name": displayNames[id] ?? id, "defaultName": defaultNames[id] ?? id, "custom": names[id] ?? "",
+                                        "images": cardImages(id)]   // 角色页卡片图（原版）
+                if let accent = accents[id] { c["accent"] = accent }
                 if let skins = skinChoices[id], !skins.isEmpty {   // 有别的衣服：原版排第一
-                    c["skins"] = [["id": "", "name": baseOutfit[id] ?? "原版"]] + skins.map { ["id": $0.id, "name": $0.name] }
+                    c["skins"] = [["id": "", "name": baseOutfit[id] ?? "原版", "images": cardImages(id)] as [String: Any]]
+                        + skins.map { ["id": $0.id, "name": $0.name, "images": cardImages($0.id)] as [String: Any] }
                     c["skin"] = (defaults.dictionary(forKey: "skins") as? [String: String])?[id] ?? ""
                 }
                 return c

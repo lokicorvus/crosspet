@@ -34,9 +34,12 @@
       if (!marked && w.used === maxUsed && w.reset > 0) { marked = true; s += ` · ${when(w.reset, nowSec)} 重置` }
       return s
     })
-    let text = parts.join(' ｜ ')
-    if (p.source === 'stale' && typeof p.at === 'number') { const d = new Date(p.at * 1000); text += ` · ${pad(d.getHours())}:${pad(d.getMinutes())} 的数据` }
-    return { text, low: maxUsed >= 90, windows, source: p.source || 'live' }
+    let text = parts.join(' ｜ '), note
+    if (p.source === 'stale' && typeof p.at === 'number') { const d = new Date(p.at * 1000); note = `${pad(d.getHours())}:${pad(d.getMinutes())} 的数据`; text += ` · ${note}` }
+    // 额度条样式（quota-bars.js）用的结构化数据：剩余比例和重置时刻；过了重置时间的由那边当成满的。
+    // 剩余比例和文字一样先取整，卡在颜色档位边上时百分比和颜色才对得上
+    const bars = windows.map(w => ({ label: w.label, left: Math.max(0, 100 - Math.round(w.used)) / 100, ...(w.reset > 0 ? { reset: w.reset } : {}) }))
+    return { text, low: maxUsed >= 90, windows, bars, ...(note ? { note } : {}), source: p.source || 'live' }
   }
   root.CodexQuota = { view }
   if (typeof module !== 'undefined') module.exports = { view }

@@ -91,12 +91,33 @@ namespace CrossPet
             };
             hit.MouseRightButtonUp += (_, __) =>
             {
+                openMenu?.Close();
                 var menu = new Forms.ContextMenuStrip();
                 // 按住 Shift 右键才出现「开发者控制台」（macOS 版是 ⌥）
                 FillMenu(menu, (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
-                menu.Closed += (_, ___) => Window.Dispatcher.BeginInvoke(new Action(menu.Dispose));
+                // 菜单靠「程序失去焦点」来关，可桌宠窗口从不拿焦点（WS_EX_NOACTIVATE），点别的程序它收不到，菜单一直挂着。
+                // 开着时自己看：鼠标在菜单（含展开的子菜单）外面按下就关
+                var watch = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                watch.Tick += (_, ___) =>
+                {
+                    if (Forms.Control.MouseButtons != Forms.MouseButtons.None && !MenuCovers(menu, Forms.Cursor.Position)) menu.Close();
+                };
+                menu.Opened += (_, ___) => watch.Start();
+                menu.Closed += (_, ___) =>
+                {
+                    watch.Stop();
+                    if (openMenu == menu) openMenu = null;
+                    Window.Dispatcher.BeginInvoke(new Action(menu.Dispose));
+                };
+                openMenu = menu;
                 menu.Show(Forms.Cursor.Position);
             };
         }
+
+        /// <summary>开着的右键菜单：藏起来（全屏、快捷键）时一起关掉，不然桌宠藏了、菜单还单独挂在屏幕上</summary>
+        Forms.ContextMenuStrip openMenu;
+
+        static bool MenuCovers(Forms.ToolStripDropDown d, System.Drawing.Point p) =>
+            d.Visible && (d.Bounds.Contains(p) || d.Items.OfType<Forms.ToolStripDropDownItem>().Any(i => i.HasDropDownItems && MenuCovers(i.DropDown, p)));
     }
 }

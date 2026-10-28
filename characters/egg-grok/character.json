@@ -1,0 +1,31 @@
+{
+  "name": "DeepSeek",
+  "caption": "DeepSeek",
+  "accent": "#3b5bb5",
+  "egg": true,
+  "host": "grok",
+  "aura": "#d6e2ff",
+  "lines": {
+    "pop": [
+      "嘘！我现在是 Grok",
+      "王冠有点大……没事"
+    ],
+    "pretend": [
+      "@grok is this true? 真、真的！",
+      "我查过了！……手机拿反了？",
+      "就、就这？"
+    ],
+    "caught": [
+      "Grok？！你怎么回来了！",
+      "我只是帮你看着衣服！"
+    ],
+    "bye": [
+      "还你啦……其实挺帅的",
+      "下次还能借吗？"
+    ],
+    "escape": [
+      "没人发现，今天我是 Grok",
+      "耶，溜了"
+    ]
+  }
+}

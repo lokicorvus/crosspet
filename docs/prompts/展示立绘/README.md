@@ -1,83 +1,10 @@
-# 展示立绘（设置 → 角色页的卡片大图）
+# 角色页卡片墙的图（两套）
 
-设置的「角色」页改成卡片墙：上面一排是当前角色的衣服（大卡片），下面一排是所有角色（小卡片）。每个角色、每套衣服各画一张专门的展示图，像游戏选人界面的角色卡。卡片底色由程序按角色主题色画，图本身是透明背景。
+设置的「角色」页是卡片墙：上面一排是当前角色的衣服，下面一排是所有角色。两排用两套不同的图：
 
-一共 10 张：
-
-| 卡片 | 存到 | 附件（设计参考） | 角色锁定从哪抄 |
+| 用在哪 | 文件名 | 样子 | 提示词 |
 |---|---|---|---|
-| Claude | `characters/claude/raw/portrait.png` | `docs/prompts/ref-claude.webp` | `角色生图提示词.md` · Claude |
-| GPT | `characters/gpt/raw/portrait.png` | `docs/prompts/ref-gpt.webp` | `角色生图提示词.md` · GPT |
-| GPT · 降智龙崽 | `characters/gpt-onesie/raw/portrait.png` | `characters/gpt-onesie/raw/idle.png` | `皮肤-降智龙GPT/01-基础.md` |
-| DeepSeek · 女仆装 | `characters/deepseek/raw/portrait.png` | `docs/prompts/ref-deepseek.webp` | `角色生图提示词.md` · DeepSeek |
-| DeepSeek · Claude 卫衣 | `characters/deepseek-hoodie/raw/portrait.png` | `characters/deepseek-hoodie/raw/idle.png` | `皮肤-卫衣DeepSeek/01-基础.md` |
-| DeepSeek · 睡衣 | `characters/deepseek-pajamas/raw/portrait.png` | `characters/deepseek-pajamas/raw/idle.png` | `皮肤-睡衣DeepSeek/01-基础.md` |
-| DeepSeek · 冬装 | `characters/deepseek-winter/raw/portrait.png` | `characters/deepseek-winter/raw/idle.png` | `皮肤-冬装DeepSeek/01-基础.md` |
-| Gemini | `characters/gemini/raw/portrait.png` | `docs/prompts/ref-gemini.webp` | `角色生图提示词.md` · Gemini |
-| GLM | `characters/glm/raw/portrait.png` | `characters/glm/raw/ref-glm.png` | `角色生图提示词.md` · GLM |
-| Qwen（千问） | `characters/qwen/raw/portrait.png` | `docs/prompts/ref-qwen.webp` | `角色-千问/01-基础.md` |
+| 上排衣服卡（每套衣服一张，原版也算一套，共 11 张） | `portrait.png` | **带场景背景**的整张皮肤立绘，全身、竖版 2:3，像抽卡游戏的角色卡 | [01-展示图（衣服卡）.md](01-展示图（衣服卡）.md) |
+| 下排角色卡（每个角色一张，共 7 张） | `avatar.png` | 方形，从左下角探出脑袋、两只小手扒着下边，和 CrossPet 图标里的 DeepSeek 一样 | [02-角色卡头像（探头）.md](02-角色卡头像（探头）.md) |
 
-## 怎么用
-
-1. 生图工具开 `transparent_background: true`，尺寸选竖版 **1024×1536**。
-2. 每张单独发，按顺序拼：下面的「展示图格式规则」→ 这个角色的「角色锁定」（从上表那个文件里整段复制 `CHARACTER LOCK` 那一段）→ 下面这张的「POSE」那一行。附件只附这一张的参考图。
-3. **先画 DeepSeek 女仆装一张试稿**，看大小、构图满意了再画其余 9 张；其余的都把这张试稿也附上，说明「framing reference only」，保证 10 张头顶、脚底的位置一致，排在一起整齐。
-4. 画好放进上表的 `raw/` 文件夹，告诉我导入。
-
-## 展示图格式规则（每张都贴在最前面）
-
-```
-You are drawing a CHARACTER SELECT portrait for an existing chibi character, like the big character card art in a game's character select screen. The first attached image is the ONLY design reference.
-
-FORMAT RULES:
-- Transparent background: real transparency (alpha). No scenery, no floor, no ground shadow, no glow, no frame, no card border. The app draws the card background itself.
-- No text, no letters, no numbers, no logos other than those already on her outfit, no speech bubbles, no floating symbols or effects (no sparkles, hearts, stars, snowflakes, music notes).
-- Portrait image 1024x1536 (2:3). Exactly one character, full body, centered. Her head starts a little below the top edge (a small empty margin above the hair) and her feet are near the bottom edge; she fills about 90% of the image height.
-- If a second image is attached as "framing reference only", match its head height, foot position and overall size exactly, but ignore its character design.
-- A continuous, closed dark outline around the whole silhouette, so the edges stay clean against any card color.
-- Same art style as the reference: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes. This is a showcase picture, so draw it with a bit more care and detail than a normal sprite (cleaner hair strands, crisp ornaments), but it must still look like the same character in the same style.
-- Hair, accessories, outfit, colors and body features stay EXACTLY as in the reference.
-- A confident "this is me!" showcase pose: a slight three-quarter turn toward the viewer, eyes looking at the viewer, a pose that shows off her signature items. Keep the pose compact: elbows bent, hands close to her body, nothing reaching out of the picture, no long stretched arms. Every prop she holds TOUCHES her hand.
-```
-
-## 每张的 POSE（接在角色锁定后面）
-
-```
-POSE (save as portrait.png) — Claude: holding her open book against her chest with one arm, the other hand raised to shoulder height in a small, shy wave; a soft, warm smile; her cape collar and hair ribbon swaying slightly as if a gentle breeze passed.
-```
-
-```
-POSE (save as portrait.png) — GPT: standing tall and elegant, her small dragon wings half spread, her long tail curling around in front of her feet; one hand resting lightly at her chest, the other holding the edge of her translucent sleeve; a calm, confident small smile with half-lidded eyes.
-```
-
-```
-POSE (save as portrait.png) — GPT dragon-cub onesie: a small happy hop with both sleeve-paws raised to her cheeks, head tilted, the floppy stuffed horn bouncing, plush wings fluttering, the fat tail swaying up behind her; a gentle closed-eye smile with a little blush.
-```
-
-```
-POSE (save as portrait.png) — DeepSeek maid: a cheerful wink with a peace sign next to her face, the other hand holding a small bowl of white rice at her waist; her whale tail curled up high and wagging, the ahoge bouncing; a big bright grin.
-```
-
-```
-POSE (save as portrait.png) — DeepSeek in the Claude hoodie: hands stuffed in the hoodie pocket, chest puffed out to proudly show off the "Claude" name badge, leaning back a little; a cheeky, smug grin with one eye half closed; whale tail swishing.
-```
-
-```
-POSE (save as portrait.png) — DeepSeek in pajamas: hugging her whale pillow with both arms, her cheek resting on top of it, standing on her tiptoes in her fluffy slippers; a sleepy, content smile with eyes half closed; whale tail curled lazily.
-```
-
-```
-POSE (save as portrait.png) — DeepSeek in the winter coat: bundled up and waving with one mittened hand, the other hand tugging her scarf up to her chin; rosy cheeks and a bright happy smile; whale tail peeking out under the coat hem.
-```
-
-```
-POSE (save as portrait.png) — Gemini: a playful cat pose, one paw-hand raised beside her face, the other on her hip, leaning forward slightly; her signature ":3" cat smile and a wink; ears perked, tail curled into a question-mark shape, star charms swinging.
-```
-
-```
-POSE (save as portrait.png) — GLM: hugging her black "Z" book to her chest with one arm, a finger of the other hand on her lips as if keeping a secret; a sly closed-eye fox smile; her big fox tail wrapping forward around her side, the bells on her ribbon swaying.
-```
-
-```
-POSE (save as portrait.png) — Qwen: holding her open fan gracefully beside her face, the small white-and-gold handbag hanging from the other arm; a gentle, generous "rich big-sister" smile; braid and tassels swaying softly.
-```
+**展示图要画背景（不开透明）**，探头头像开透明背景（`transparent_background: true`）。画好放进对应角色的 `raw/` 文件夹，导入后变成 `portrait.webp` / `avatar.webp`。注意：展示图不能走 `tools/import.py`（它会把背景当底色抠掉），交给 Claude 单独转成 webp。没画的卡片自动用待机图顶着，可以画一张换一张。

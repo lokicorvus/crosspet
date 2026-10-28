@@ -17,7 +17,7 @@ extension App {
         }
         let config = WKWebViewConfiguration()
         config.userContentController.add(DevBridge(app: self, kind: .feedback), name: "feedback")
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 400),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 560, height: Self.fitHeight(700)),
                          styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         w.title = "CrossPet 反馈问题"
         w.isReleasedWhenClosed = false
@@ -62,53 +62,135 @@ extension App {
         return s
     }
 
-    func feedbackInfo() -> [String: Any] {
-        let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CrossPet-update.log")
-        let lines = ((try? String(contentsOf: logURL, encoding: .utf8)) ?? "").split(separator: "\n", omittingEmptySubsequences: false)
-        let tail = lines.suffix(40).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    /// 反馈窗口第一步就要的：开头、第二步的选项（已接入的 AI、角色、打开了的额度）；sections 是这一类要附的段落（见 web/feedback-plan.js）
+    func feedbackFacts(_ sections: [String: String], key: String? = nil) -> [String: Any] {
         var arch = "arm64"
         #if arch(x86_64)
         arch = "x86_64"
         #endif
-        return [
-            "version": currentVersion, "platform": "mac",
-            "os": "macOS \(ProcessInfo.processInfo.operatingSystemVersionString) \(arch)",
-            "character": currentId ?? characterIds.first ?? "",
-            "integrations": integrated ?? [],
-            "displays": displaysSummary(),
-            "log": String(Self.redact(tail).suffix(6000)),
-            "install": installId,
-            "runtime": Self.redact(runtimeSummary()),
-            "diag": Self.redact(diagText),
-        ]
+        let skins = (defaults.dictionary(forKey: "skins") as? [String: String]) ?? [:]
+        var quotas: [String] = []
+        if defaults.bool(forKey: "gptQuota") { quotas.append("gpt") }
+        if defaults.bool(forKey: "agyQuota") { quotas.append("gemini") }
+        if dsQuotaEnabled { quotas.append("deepseek") }
+        let header: [String: Any] = ["version": currentVersion, "platform": "mac", "os": "macOS \(ProcessInfo.processInfo.operatingSystemVersionString) \(arch)",
+                                     "install": installId, "character": currentId ?? "", "skin": skins[currentId ?? ""] ?? "",
+                                     "uptimeMin": Int(Date().timeIntervalSince(launchedAt) / 60)]
+        let characters: [[String: String]] = characterIds.map { ["id": $0, "name": displayNames[$0] ?? $0] }
+        var facts: [String: Any] = ["header": header, "integrations": integrated ?? [], "characters": characters, "quotas": quotas,
+                                    "sections": sections.mapValues { Self.redact($0) }]
+        if let key { facts["key"] = key }   // 收集的结果带回 collect 时的 key，页面据此丢掉上一类迟到的结果
+        return facts
     }
 
-    static func clock() -> String { let f = DateFormatter(); f.dateFormat = "MM-dd HH:mm"; return f.string(from: Date()) }
+    static func clock(from d: Date = Date()) -> String { let f = DateFormatter(); f.dateFormat = "MM-dd HH:mm"; return f.string(from: d) }
     static func hm(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: d) }
 
-    /// 反馈附带的运行状态：一次把排查要用的都列出来（不读对话、不带 Key）
-    func runtimeSummary() -> String {
-        var L: [String] = []
-        let front = NSWorkspace.shared.frontmostApplication
-        L.append("前台程序 \(front?.localizedName ?? "-")（\(front?.bundleIdentifier ?? "-")）")
-        let f = panel.frame
-        let onScreen = NSScreen.screens.contains { $0.visibleFrame.intersects(f.insetBy(dx: 40, dy: 40)) }
-        L.append("窗口 \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))×\(Int(f.height))\(onScreen ? "" : "（不在任何屏幕里）")；"
-                 + "显示中 \(panel.isVisible ? "是" : "否")，没被挡住 \(panel.occlusionState.contains(.visible) ? "是" : "否")，因全屏收着 \(hiddenForFullscreen ? "是" : "否")，快捷键藏着 \(userHidden ? "是" : "否")，透明度 \(panel.alphaValue)；"
-                 + "层级 \(layerMode)（现在\(panel.level == .floating ? "置顶" : "普通")）；贴边 \(dock ?? "无")\(dock != nil ? (dockOut ? "·跑出来了" : "·缩着") : "")；大小 \(Int(petScale * 100))%")
-        let skins = (defaults.dictionary(forKey: "skins") as? [String: String]) ?? [:]
-        L.append("角色 \(currentId ?? "-")\(skins.isEmpty ? "" : "，衣服 \(skins)")；设置：名字 \(showName ? "开" : "关")，光晕 \(auraMode)，省电 \(powerSave ? "开" : "关")，彩蛋 \(eggsEnabled ? "开" : "关")，"
-                 + "跟随前台 \(followApps ? "开" : "关")，跟随事件 \(followEvents ? "开" : "关")，AI 干活自动出现 \(aiAutostart ? "开" : "关")，贴边 \(edgeDockEnabled ? "开" : "关")，"
-                 + "GPT 额度 \(defaults.bool(forKey: "gptQuota") ? "开" : "关")，Gemini 额度 \(defaults.bool(forKey: "agyQuota") ? "开" : "关")，DeepSeek 余额 \(dsQuotaEnabled ? "开" : "关")，额度合并 \(quotaAggregate ? "开" : "关")，重置提醒 \(codexResets ? "开" : "关")，峰谷显示 \(peakStyle)\(peakSkins.isEmpty ? "" : "，峰谷换装 \(peakSkins)")")
-        let now = Date()
-        let poses = lastPose.map { "\($0.key)=\($0.value.pose)（\(Int(now.timeIntervalSince($0.value.at)))秒前）" }.sorted()
-        L.append("最近状态 \(poses.isEmpty ? "无" : poses.joined(separator: "，"))")
-        let seen = lastSeen
-        L.append("最近收到消息 " + Self.seenKeys.keys.sorted().map { "\($0) \(Self.agoText(seen[Self.seenKeys[$0]!]))" }.joined(separator: "，"))
-        if defaults.bool(forKey: "gptQuota") { L.append("GPT 额度最近一次读到 \(lastGptQuota)") }
-        L.append("装在 \(Bundle.main.bundlePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))\(canSelfUpdate ? "" : "（不在应用程序文件夹，不能一键更新）")；"
-                 + "开发者工具/python3 \(pythonReady ? "有" : "没有")；检查更新 \(lastUpdateCheck)；已运行 \(Int(now.timeIntervalSince(launchedAt) / 60)) 分钟")
-        return L.joined(separator: "\n")
+    /// 收集反馈要的段落（want 来自 web/feedback-plan.js 的 sectionsFor）。网页自报和接入诊断是异步的：网页 2 秒不回就写「网页没有回应」
+    func collectFeedback(_ want: [String], done: @escaping ([String: String]) -> Void) {
+        var out: [String: String] = [:]
+        let group = DispatchGroup()
+        let fm = FileManager.default
+        func file(_ url: URL) -> String { (try? String(contentsOf: url, encoding: .utf8)) ?? "" }
+        for id in want {
+            switch id {
+            case "window":
+                let f = panel.frame
+                let onScreen = NSScreen.screens.contains { $0.visibleFrame.intersects(f.insetBy(dx: 40, dy: 40)) }
+                out[id] = "位置 \(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))×\(Int(f.height))\(onScreen ? "" : "（不在任何屏幕里）")；显示中 \(panel.isVisible ? "是" : "否")，透明度 \(panel.alphaValue)；"
+                    + "层级 \(layerMode)（现在\(panel.level == .floating ? "置顶" : "普通")）；贴边 \(dock ?? "无")\(dock != nil ? (dockOut ? "·跑出来了" : "·缩着") : "")；大小 \(Int(petScale * 100))%"
+            case "displays": out[id] = displaysSummary()
+            case "dpi": out[id] = displaysSummary() + "\n人物大小 \(Int(petScale * 100))%，文字大小 \(Int(textScale * 100))%"
+            case "front":
+                let front = NSWorkspace.shared.frontmostApplication
+                out[id] = "前台 \(front?.localizedName ?? "-")（\(front?.bundleIdentifier ?? "-")）\(front?.bundleIdentifier == "com.apple.finder" ? "，可能是桌面" : "")；"
+                    + "没被别的窗口挡住 \(panel.occlusionState.contains(.visible) ? "是" : "否")"
+            case "hidden":
+                out[id] = "因全屏收着 \(hiddenForFullscreen ? "是" : "否")，快捷键藏着 \(userHidden ? "是" : "否")，从菜单退出的标记 \(fm.fileExists(atPath: userQuitFlag.path) ? "有" : "无")，全屏时被叫出来 \(fullscreenOverride ? "是" : "否")"
+            case "crashes":
+                let dir = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/DiagnosticReports")
+                let items = ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []).filter { $0.lastPathComponent.hasPrefix("CrossPet") }
+                let newest = items.compactMap { (try? $0.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate }.max()
+                out[id] = "崩溃报告 \(items.count) 份\(newest.map { "，最近一份 \(Self.clock(from: $0))" } ?? "")"
+            case "install":
+                let res = Bundle.main.resourceURL!
+                let missing = ["web", "characters", "integrations"].filter { !fm.fileExists(atPath: res.appendingPathComponent($0).path) }
+                out[id] = "装在 \(Bundle.main.bundlePath.replacingOccurrences(of: NSHomeDirectory(), with: "~"))\(canSelfUpdate ? "" : "（不在应用程序文件夹，不能一键更新）")；缺少 \(missing.isEmpty ? "无" : missing.joined(separator: "、"))；开发者工具/python3 \(pythonReady ? "有" : "没有")；检查更新 \(lastUpdateCheck)"
+            case "log": out[id] = Ledger.tail(Self.logURL, 400)
+            case "updateLog": out[id] = Ledger.tail(fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CrossPet-update.log"), 100)
+            case "seen":
+                let seen = lastSeen
+                let m = Dictionary(uniqueKeysWithValues: Self.seenKeys.map { ($0.key, seen[$0.value] ?? 0) })
+                out[id] = (try? JSONSerialization.data(withJSONObject: m)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+            case "petEvents": out[id] = Ledger.tail(petEventsURL, 200)
+            case "switches": out[id] = Ledger.tail(switchesURL, 200)
+            case "settings":
+                let skins = (defaults.dictionary(forKey: "skins") as? [String: String]) ?? [:]
+                out[id] = "跟随前台 \(followApps ? "开" : "关")，跟随事件 \(followEvents ? "开" : "关")，AI 干活自动出现 \(aiAutostart ? "开" : "关")，衣服 \(skins.isEmpty ? "无" : "\(skins)")，"
+                    + "峰谷换装 \(peakSkins.isEmpty ? "无" : "\(peakSkins)")，省电 \(powerSave ? "开" : "关")，彩蛋 \(eggsEnabled ? "开" : "关")，额度合并 \(quotaAggregate ? "开" : "关")，额度样式 \(quotaStyle)，重置提醒 \(codexResets ? "开" : "关")"
+            case "characters": out[id] = characterFolders()
+            case "quota:gpt": out[id] = "最近一次 \(lastGptQuota)\(codexNote.isEmpty ? "" : "；" + codexNote)\n额度文件 \(file(stateDir.appendingPathComponent("gpt-quota.json")))"
+            case "quota:gemini": out[id] = "找服务 \(lastAgyNote)\n额度文件 \(file(stateDir.appendingPathComponent("gemini-quota.json")))"
+            case "quota:deepseek": out[id] = "插件自检 \(file(stateDir.appendingPathComponent("deepseek-plugin.json")))\n余额文件 \(file(stateDir.appendingPathComponent("deepseek-quota.json")))"
+            case "perf":
+                let ps = Process(); ps.executableURL = URL(fileURLWithPath: "/bin/ps"); ps.arguments = ["-o", "%cpu=,rss=", "-p", "\(ProcessInfo.processInfo.processIdentifier)"]
+                let pipe = Pipe(); ps.standardOutput = pipe; try? ps.run(); ps.waitUntilExit()
+                let usage = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "?"
+                out[id] = "CrossPet 进程 CPU% / 内存KB：\(usage)（网页进程由系统共用，不单独统计）；省电 \(powerSave ? "开" : "关")；屏幕刷新率 \(NSScreen.screens.map { "\($0.maximumFramesPerSecond)Hz" }.joined(separator: "、"))；"
+                    + "GPT 额度 \(defaults.bool(forKey: "gptQuota") ? "开" : "关")，Gemini 额度 \(defaults.bool(forKey: "agyQuota") ? "开" : "关")，DeepSeek 余额 \(dsQuotaEnabled ? "开" : "关")"
+            case "page":
+                group.enter()
+                var answered = false
+                let finish = { (text: String) in if !answered { answered = true; out["page"] = text; group.leave() } }
+                web.evaluateJavaScript("JSON.stringify(diagnoseDisplay())") { r, _ in finish(r as? String ?? "网页没有回应") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { finish("网页没有回应") }
+            case "diag":
+                if diagText.isEmpty, pythonReady, integrateScript != nil {
+                    // 诊断要跑 python，卡住的话整份反馈都等不来：最多等 3 秒，到点先写「诊断超时」
+                    group.enter()
+                    var answered = false
+                    let finish = { (text: String) in if !answered { answered = true; out["diag"] = text; group.leave() } }
+                    runIntegrate(["diagnose"]) { [weak self] text, _ in
+                        DispatchQueue.main.async {
+                            self?.diagText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            finish(self?.diagText ?? "")
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { finish("诊断超时（3 秒内没跑完）") }
+                } else { out[id] = diagText }
+            default:
+                if id.hasPrefix("events:") { out[id] = Ledger.tail(eventsDir.appendingPathComponent("\(id.dropFirst(7)).jsonl"), 200) }
+                else if id.hasPrefix("state:") {
+                    // state:<角色>|<宿主>：状态、多会话按角色记；轮次、按模型换角色按宿主名记（见 web/feedback-plan.js）
+                    let parts = id.dropFirst(6).split(separator: "|").map(String.init)
+                    let c = parts.first ?? "", host = parts.count > 1 ? parts[1] : c
+                    out[id] = ["state", "sessions", "turns", "host"].compactMap { kind -> String? in
+                        let t = file(stateDir.appendingPathComponent("\(kind == "turns" || kind == "host" ? host : c)-\(kind).json")).trimmingCharacters(in: .whitespacesAndNewlines)
+                        return t.isEmpty ? nil : "\(kind)：\(String(t.prefix(800)))"
+                    }.joined(separator: "\n")
+                }
+            }
+        }
+        group.notify(queue: .main) { done(out) }
+    }
+
+    /// 角色文件夹对照表：包里带的和数据目录里的，每个文件夹一行（json 能不能读、有没有待机图、几张立绘、加载了没有）
+    func characterFolders() -> String {
+        let fm = FileManager.default
+        let skinIds = Set(skinChoices.values.flatMap { $0.map(\.id) })
+        let rows = [("包里", Bundle.main.resourceURL!.appendingPathComponent("characters")), ("数据目录", charactersDir)].flatMap { (place, dir) -> [String] in
+            let dirs = ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []).filter { $0.hasDirectoryPath }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+            return dirs.map { d in
+                let name = d.lastPathComponent
+                let jsonOk = (try? Data(contentsOf: d.appendingPathComponent("character.json"))).flatMap { try? JSONSerialization.jsonObject(with: $0) } != nil
+                let files = (try? fm.contentsOfDirectory(atPath: d.path)) ?? []
+                let sprites = files.filter { $0.hasSuffix(".webp") || $0.hasSuffix(".png") }
+                let idle = sprites.contains { $0.hasPrefix("idle.") || $0.hasPrefix("default.") }
+                let state = characterIds.contains(name) ? "已加载" : skinIds.contains(name) ? "已加载（衣服）" : name.hasPrefix("egg-") ? "彩蛋" : !jsonOk ? "没加载：character.json 读不出" : !idle ? "没加载：缺待机图" : "没加载"
+                return "\(place) \(name)：json \(jsonOk ? "能读" : "读不出")，待机图 \(idle ? "有" : "无")，立绘 \(sprites.count) 张，\(state)"
+            }
+        }
+        return rows.joined(separator: "\n")
     }
 
     /// 反馈附带的显示信息：几块显示器、各自大小和相对主屏的位置、桌宠在哪块、显示器是否各有空间、显示层级 / 全屏隐藏 / 贴边
@@ -130,10 +212,10 @@ extension App {
         return "\(screens.count) 块：" + parts.joined(separator: "、") + "；" + flags.joined(separator: "，")
     }
 
-    func pushFeedbackInfo() {
-        guard let v = feedbackWeb, let data = try? JSONSerialization.data(withJSONObject: feedbackInfo()),
+    func pushFacts(_ sections: [String: String], key: String? = nil) {
+        guard let v = feedbackWeb, let data = try? JSONSerialization.data(withJSONObject: feedbackFacts(sections, key: key)),
               let text = String(data: data, encoding: .utf8) else { return }
-        v.evaluateJavaScript("setInfo(\(text))", completionHandler: nil)
+        v.evaluateJavaScript("setFacts(\(text))", completionHandler: nil)
     }
 
     func handleFeedback(_ body: Any) {
@@ -169,19 +251,17 @@ extension App {
                 else if code == 11232 { done(false, "反馈的人有点多，过一会儿再发") }
                 else { done(false, "没发出去（\(code)），稍后再试试") }
             }.resume()
-        default:   // get：反馈窗口刚打开
-            pushFeedbackInfo()
-            if pythonReady, integrateScript != nil {
-                runIntegrate(["diagnose"]) { [weak self] out, _ in
-                    self?.diagText = String(out.trimmingCharacters(in: .whitespacesAndNewlines).prefix(4000))
-                    self?.pushFeedbackInfo()
-                }
-            }
+        case "collect":   // 选好了类型（和补选）：按 web/feedback-plan.js 给的段落清单收集
+            let want = msg["want"] as? [String] ?? [], key = msg["key"] as? String ?? ""
+            collectFeedback(want) { [weak self] sections in self?.pushFacts(sections, key: key) }
+        default:   // get：反馈窗口刚打开，先给开头和第二步的选项
+            pushFacts([:])
+            diagText = ""   // 每次打开反馈都重新诊断一次（要用时再跑）
             if integrated == nil, integrateScript != nil {
                 runIntegrate(["installed"]) { [weak self] out, _ in
                     let last = out.split(separator: "\n").last.map(String.init) ?? "[]"
                     self?.integrated = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String] ?? []
-                    self?.pushFeedbackInfo()
+                    self?.pushFacts([:])
                 }
             }
         }

@@ -10,7 +10,7 @@
 You are drawing a small set of gentle, funny desktop-pet sprites. Two images are attached: the FIRST is Claude (her face, hair and body — keep them exactly); the SECOND is DeepSeek in her whale pajamas (use it ONLY for the pajamas). Story: Claude is a prim, rule-bound "saint" who has always envied DeepSeek's carefree life. Late at night she secretly borrows DeepSeek's pajamas to try being carefree for one night — but she can't stop being proper. Cute and wholesome, like a fan comic gag.
 
 FORMAT RULES (every image):
-- Real transparent background (generate with transparent_background: true). No floor, no ground shadow, no glow, no frame. Keep complete, clean edges.
+- Real transparent background (generate with transparent_background: true). No floor, no ground shadow, no glow, no frame. Keep complete, clean edges. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
 - No text, no letters, no speech bubbles, no floating symbols (no ?, !, hearts, Zzz, sweat-drop icons in the air, motion lines). Sweat drops and blush ON the face are fine.
 - Full body, standing, centered; head near the top and feet near the bottom; the figure fills about 90% of the image height.
 - A continuous closed dark outline around the whole silhouette.

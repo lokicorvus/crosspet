@@ -6,10 +6,10 @@
 You are drawing desktop-pet sprites for an existing chibi character. The attached image is the ONLY design reference.
 
 FORMAT RULES (every image):
-- Pure flat white background (#FFFFFF). Nothing else: no floor, no cast shadow, no glow, no vignette, no frame.
+- Real transparent background (generate with transparent_background: true). Nothing else: no floor, no cast shadow, no glow, no vignette, no frame. Keep complete, clean edges. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
 - No text, no letters, no speech bubbles, no symbols (no ?, !, hearts, music notes, Zzz, sparkles, sweat-drop icons floating in the air). The app draws all effects itself.
 - Exactly one character, full body, standing, centered, facing the viewer like the reference. Head near the top and feet near the bottom; she fills about 90% of the image height, the same scale and position as the reference.
-- A continuous, closed dark outline around the whole silhouette (hair, horns, ears, wings and tail included), so no white part of her ever touches the white background directly.
+- A continuous, closed dark outline around the whole silhouette (hair, horns, ears, wings and tail included), so the edges stay clean against any background.
 - Same art style as the reference: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact filename given.
 - Change ONLY the expression, the arms/hands, and small props. Hair, accessories, outfit, colors and body features stay exactly as in the reference.
@@ -28,7 +28,7 @@ How she shows emotion: fox body language (ears perk up or flatten, the big tail 
 
 EDGE-PEEK FRAMES: the desktop pet can be parked at the left or right edge of the user's screen. She hides behind the screen edge and peeks in. The app lines up the BORDER of the image with the edge of the screen, so the image border itself is the screen edge she is holding on to.
 
-POSE EXCEPTION to the format rules (for these images only): she is NOT fully visible and NOT centered. The image border cuts straight down through her body; only about 55-65% of her (her face, both eyes, the near shoulder and arm, part of her body and skirt) is inside the picture, the rest is hidden beyond the border. Keep these rules: same scale as the reference (if she were fully visible she would be about 90% of the image height: same head size as the reference), head near the top but with a clear band of white background above her hair (the whole top of her head must be inside the picture), the visible part of her feet / skirt hem near the bottom. The cut along the border is a clean straight cut, no outline along it. Everything else in the format rules still applies (white background elsewhere, closed outline on all other sides, no floating symbols).
+POSE EXCEPTION to the format rules (for these images only): she is NOT fully visible and NOT centered. The image border cuts straight down through her body; only about 55-65% of her (her face, both eyes, the near shoulder and arm, part of her body and skirt) is inside the picture, the rest is hidden beyond the border. Keep these rules: same scale as the reference (if she were fully visible she would be about 90% of the image height: same head size as the reference), head near the top but with a clear band of empty transparent background above her hair (the whole top of her head must be inside the picture), the visible part of her feet / skirt hem near the bottom. The cut along the border is a clean straight cut, no outline along it. Everything else in the format rules still applies (transparent background elsewhere, closed outline on all other sides, no floating symbols).
 
 KEEP IT CUTE: her near hand (and the fingertips of the other hand) grip the very border of the image as if holding the edge of a door frame; her head tilts slightly into the picture; hair, ribbons and tail drape naturally around the edge. NOT falling, NOT climbing; calm and a little playful, like peeking around a corner.
 

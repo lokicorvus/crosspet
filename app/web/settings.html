@@ -32,6 +32,7 @@ h1 { font-size: 15px; margin: 0 0 2px; }
 .news-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--hover); display: flex; align-items: center; justify-content: center; flex: none; }
 .news-item b { display: block; }
 .news-item small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.news-qq { margin-top: 6px; }
 .news-go { margin-left: auto; align-self: center; border: none; background: none; color: var(--accent); padding: 2px 0; white-space: nowrap; font-size: 12px; }
 .news-old { display: flex; justify-content: space-between; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); text-align: left; padding: 8px 14px; }
 .news-more { display: block; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--accent); text-align: right; padding: 8px 14px; font-size: 12px; }
@@ -44,7 +45,12 @@ button { font: inherit; border: 1px solid var(--line); background: var(--field);
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
-.peaksel { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; white-space: nowrap; }
+button.qq-copy { font: inherit; display: inline-block; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--ink); border-radius: 18px; padding: 5px 14px; cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
+button.qq-copy b, button.qq-copy span { display: inline; }
+button.qq-copy b { color: var(--accent); font-size: 1.12em; letter-spacing: .5px; margin: 0 1px; }
+button.qq-copy span { color: var(--muted); font-size: .9em; }
+button.qq-copy:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+button.qq-copy.copied { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--panel)); color: var(--ok); }
 input[type=text], select { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
 input[type=text] { width: 150px; }
 input[type=range] { width: 150px; accent-color: var(--accent); }
@@ -101,10 +107,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 </div>
 
 <div class="card" data-tab="character">
-  <div class="item"><div class="label">当前角色</div>
-    <div class="ctl"><select id="character"></select></div></div>
-  <div class="item"><div class="label">名字<small>留空恢复默认</small></div>
-    <div class="ctl"><input type="text" id="name" maxlength="40"><button id="saveName">保存</button></div></div>
+  <div class="item"><div class="label">换角色、换衣服<small>大立绘挑角色和衣服，改名字、峰谷换装也在那里；右键「换角色…」也能打开</small></div>
+    <div class="ctl"><button class="primary" data-action="characterWindow">打开换角色窗口</button></div></div>
   <div class="item"><div class="label">跟随前台 AI 应用<small>切到哪个 AI 的 App，就换成哪个角色</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="followApps"><span></span></label></div></div>
   <div class="item" data-only="followEvents"><div class="label">跟随 AI 工作事件<small>在终端里用 AI 时，按最近在干活的 AI 换角色</small></div>
@@ -124,9 +128,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="quotaAggregate"><span></span></label></div></div>
   <div class="item"><div class="label">Codex 重置提醒<small>官方提前宣布重置时，GPT 的额度下方多一行；右键「会重置吗？」可以问她。数据来自第三方网站 <button class="srclink" data-action="openCodexResets">codex-resets.com</button>，根据官方推文整理，预测不是 OpenAI 的承诺</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="codexResets"><span></span></label></div></div>
+  <div class="item"><div class="label">额度显示样式<small>额度条：每个额度一条，后面是剩余百分比和重置时间，剩得越少颜色越暖（蓝 → 橙 → 红）。DeepSeek 余额照旧是文字</small></div>
+    <div class="ctl"><div class="seg" id="quotaStyle" data-key="quotaStyle"><button data-v="text">文字</button><button data-v="bars">额度条</button></div></div></div>
   <div class="item"><div class="label">额度栏显示峰谷时段<small>DeepSeek、GLM 的额度下面显示现在是高峰还是空闲（北京时间）。时间条：今天 24 小时，红色高峰、绿色空闲，竖线是现在；文字：只显示「高峰」或「空闲」。按 DeepSeek 官方 API 和 GLM 编程套餐的规则，其他渠道以各自价格为准；法定节假日暂不识别</small></div>
     <div class="ctl"><div class="seg" id="peakStyle" data-key="peakStyle"><button data-v="bar">时间条</button><button data-v="text">文字</button><button data-v="off">关</button></div></div></div>
-  <div id="peakOutfits"></div>
 </div>
 
 <div class="card" data-tab="ai" id="integrateCard">
@@ -152,6 +157,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><button data-action="checkUpdate">检查</button></div></div>
   <div class="item"><div class="label">文件夹<small>换立绘、加角色看「自定义角色」文档</small></div>
     <div class="ctl"><button data-action="openCharacters">角色</button><button data-action="openData">数据和状态</button></div></div>
+  <div class="item"><div class="label">QQ 交流群<small>用着有问题、想要新角色、想先看到新版本，都可以来群里聊</small></div>
+    <div class="ctl" id="qqCtl"></div></div>
   <div class="item"><div class="label">反馈问题<small>点一下哪里要改就行，不用写长文</small></div>
     <div class="ctl"><button data-action="feedback">反馈</button></div></div>
   <div class="item"><div class="label">开发者控制台<small>逐个检查姿态、跑场景演练</small></div>
@@ -163,8 +170,9 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 <script src="text-size.js"></script>
 <script src="plugin-update.js"></script>
 <script src="whats-new.js"></script>
-<script src="peak-hours.js"></script>
+<script src="qq-group.js"></script>
 <script>
+document.getElementById('qqCtl').append(QQGroup.button())
 // 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：页面发 {cmd, ...}，宿主改完设置后调 setState(state) 把最新状态推回来
 const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.settings?.postMessage(msg)
 const $ = id => document.getElementById(id)
@@ -193,14 +201,7 @@ function setState(s) {
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
   for (const b of $('peakStyle').children) b.classList.toggle('on', b.dataset.v === s.peakStyle)
-  const sel = $('character')
-  // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」（值写成 角色|皮肤）
-  sel.replaceChildren(...s.characters.flatMap(c => c.skins
-    ? c.skins.map(k => new Option(`${c.name} · ${k.name}`, `${c.id}|${k.id}`, false, c.id === s.character && k.id === (c.skin || '')))
-    : [new Option(c.name, c.id, false, c.id === s.character)]))
-  renderPeakOutfits(s)
-  const cur = s.characters.find(c => c.id === s.character)
-  if (document.activeElement !== $('name')) { $('name').value = cur?.custom || ''; $('name').placeholder = cur?.defaultName || '' }
+  for (const b of $('quotaStyle').children) b.classList.toggle('on', b.dataset.v === (s.quotaStyle || 'text'))
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
@@ -227,6 +228,7 @@ const NEVER_SEEN = {
   zcode: '新开一个 ZCode 会话试试',
   hermes: '新开一个 Hermes 会话试试',
   qwen: '新开一个 Qwen Code 会话试试',
+  grok: '新开一个 Grok Build 会话试试；在新文件夹里要先用 /hooks-trust 信任这个文件夹（grok -p 不用）',
 }
 const agoText = s => s < 60 ? '刚刚' : s < 3600 ? `${Math.floor(s / 60)} 分钟前` : s < 86400 ? `${Math.floor(s / 3600)} 小时前` : `${Math.floor(s / 86400)} 天前`
 
@@ -259,39 +261,10 @@ function renderIntegrations(list) {
 // 宿主做完一件事后的提示（接入结果、检查更新结果等）
 function notice(text) { toast(text) }
 
-// 按时段换衣服：每个有峰谷规则、又有别的衣服的角色一组「高峰穿 / 空闲穿」。「不换」= 这一边不管（存的时候删掉）；
-// 改了不会马上换，等下一次时段切换（判断在桌宠页面，peak-hours.js）
-function renderPeakOutfits(s) {
-  const box = $('peakOutfits')
-  if (box.contains(document.activeElement)) return
-  const cur = s.peakSkins || {}
-  box.replaceChildren(...Object.entries(PeakHours.RULES).flatMap(([id, rule]) => {
-    const c = s.characters.find(x => x.id === id)
-    if (!c?.skins) return []
-    const item = document.createElement('div'); item.className = 'item'
-    item.innerHTML = `<div class="label">${c.name} 峰谷换装<small>${rule.label}。到点她自己换；时段里你手动换了，等下一段再按这里换。改了这里也是下一段才生效</small></div><div class="ctl peaksel"></div>`
-    for (const [kind, title] of [['peak', '高峰穿'], ['valley', '空闲穿']]) {
-      const sel = document.createElement('select')
-      sel.setAttribute('aria-label', `${c.name}${title}`)
-      const want = cur[id]?.[kind]
-      sel.append(new Option('不换', '-', false, typeof want !== 'string'), ...c.skins.map(k => new Option(k.name, k.id, false, want === k.id)))
-      sel.onchange = () => {
-        const next = JSON.parse(JSON.stringify(state?.peakSkins || {}))
-        const e = next[id] || {}
-        if (sel.value === '-') delete e[kind]; else e[kind] = sel.value
-        if (Object.keys(e).length) next[id] = e; else delete next[id]
-        if (state) state.peakSkins = next
-        post({ cmd: 'set', key: 'peakSkins', value: next })
-      }
-      const lab = document.createElement('label'); lab.textContent = title + ' '; lab.appendChild(sel)
-      item.querySelector('.peaksel').appendChild(lab)
-    }
-    return [item]
-  }))
-}
 for (const el of document.querySelectorAll('input[data-key]')) el.onchange = () => post({ cmd: 'set', key: el.dataset.key, value: el.checked })
 for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
 for (const b of $('peakStyle').children) b.onclick = () => post({ cmd: 'set', key: 'peakStyle', value: b.dataset.v })
+for (const b of $('quotaStyle').children) b.onclick = () => post({ cmd: 'set', key: 'quotaStyle', value: b.dataset.v })
 for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
 // 锁链图标：锁着 = 两节扣在一起；解开 = 断开
 const LINK_ON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1a2.5 2.5 0 01-3.5-3.5l1-1"/></svg>'
@@ -321,13 +294,6 @@ $('textLink').onclick = () => state?.textLinked === false
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
-$('character').onchange = () => {
-  const [id, skin] = $('character').value.split('|')
-  post(skin === undefined ? { cmd: 'set', key: 'character', value: id } : { cmd: 'skin', id, skin })
-}
-const saveName = () => { post({ cmd: 'rename', id: state.character, name: $('name').value.trim() }); $('name').blur(); toast('名字已保存') }
-$('saveName').onclick = saveName
-$('name').onkeydown = e => { if (e.key === 'Enter') saveName() }
 
 // 标签页：记住上次看的是哪一页（每个人自己的小习惯，存不下也没关系）
 function showTab(tab) {
@@ -366,6 +332,7 @@ function renderNews() {
     row.append(el('div', 'news-icon', x.icon))
     const body = el('div'); body.append(el('b', '', x.title), el('small', '', x.text)); row.append(body)
     if (x.go) { const b = el('button', 'news-go', '去设置 ›'); b.onclick = () => goSetting(x.go); row.append(b) }
+    if (x.qq) { const w = el('div', 'news-qq'); w.append(QQGroup.button()); body.append(w) }
     return row
   }
   const versions = WhatsNew.recent(WhatsNew.LIST, state.appVersion)

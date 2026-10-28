@@ -80,6 +80,7 @@ namespace CrossPet
         {
             Directory.CreateDirectory(Characters);
             Directory.CreateDirectory(State);
+            Directory.CreateDirectory(Path.Combine(Data, "events"));   // 钩子 / 插件的事件记录（反馈用）；Claude Code 的 mod 只能写文件、不能建文件夹
             var src = Path.Combine(Install, "characters");
             foreach (var dir in Directory.GetDirectories(src))
             {
@@ -96,6 +97,11 @@ namespace CrossPet
             var hook = Path.Combine(Install, "integrations", "crosspet-hook.py");
             if (File.Exists(hook))
                 try { File.Copy(hook, Path.Combine(Data, "crosspet-hook.py"), true); } catch (Exception e) { Log("同步钩子脚本失败: " + e.Message); }
+            // 只更新已经接入过的 Cursor 桥，不给没装 Cursor 的用户新建这份文件
+            var bridge = Path.Combine(Install, "integrations", "cursor", "crosspet-cursor-bridge.py");
+            var bridgeCopy = Path.Combine(Data, "crosspet-cursor-bridge.py");
+            if (File.Exists(bridge) && File.Exists(bridgeCopy))
+                try { File.Copy(bridge, bridgeCopy, true); } catch (Exception e) { Log("更新 Cursor 桥接脚本失败: " + e.Message); }
             if (!File.Exists(AppMap)) File.Copy(Path.Combine(Install, "apps.json"), AppMap);
             else
             {
@@ -135,6 +141,7 @@ namespace CrossPet
                                                       .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal))
             {
                 var stem = Path.GetFileNameWithoutExtension(f);
+                if (!CardImages.IsSprite(stem)) continue;   // 展示立绘只给设置页的卡片用
                 var url = $"https://{DataHost}/characters/{Uri.EscapeDataString(id)}/{Uri.EscapeDataString(Path.GetFileName(f))}";
                 if (stem == "idle-blink") { blink = url; continue; }
                 if (stem == "idle") blinkBase = url;

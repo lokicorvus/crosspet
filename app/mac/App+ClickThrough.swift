@@ -58,6 +58,7 @@ extension App {
     @objc func setLayer(_ sender: NSMenuItem) {
         guard let mode = sender.representedObject as? String else { return }
         defaults.set(mode, forKey: "layer")
+        appLog("显示层级改成 \(mode)")
         applyLayer()
     }
 

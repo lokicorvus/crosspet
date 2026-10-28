@@ -70,6 +70,30 @@ async function dropSession($: EngineInterface, who: string, sid: string): Promis
   } catch {}
 }
 
+// 事件记录（反馈「AI 干活时她没反应」用）：<数据目录>/events/claude-mod.jsonl，格式和 crosspet-hook.py 一样（见 docs/架构.md「记录」）。
+// 只记事件名、工具名、会话 id 的哈希、结果，不记内容；只留最近 200 行。events 文件夹由桌宠启动时建好
+function shortHash(s: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0 }
+  return h.toString(16).padStart(8, '0').slice(0, 6)
+}
+// 同一个进程里的写入排队（并行的工具调用会同时触发），免得两次整读整写互相覆盖、丢行。
+// 两个 Claude Code 进程同时写还可能丢一两行：引擎没有文件锁，这里接受（只是少几行记录，不会写坏格式以外的东西）
+let ledgerChain: Promise<void> = Promise.resolve()
+function ledger($: EngineInterface, ev: string, tool: string, sid: string, result: string, detail: string): void {
+  ledgerChain = ledgerChain.then(() => writeLedger($, ev, tool, sid, result, detail))
+}
+async function writeLedger($: EngineInterface, ev: string, tool: string, sid: string, result: string, detail: string): Promise<void> {
+  try {
+    const file = `${(await charactersDir($)).replace(/[\\/]characters$/, '')}/events/claude-mod.jsonl`
+    let rows: string[] = []
+    try { rows = (await $.fs.read(file)).split('\n').filter(Boolean) } catch {}
+    rows.push(JSON.stringify({ t: Math.round(Date.now() / 10) / 100, ev, tool: tool.toLowerCase().slice(0, 60), sid: sid ? shortHash(sid) : '', turn: false, result, detail }))
+    if (rows.length > 240) rows = rows.slice(-200)
+    await $.fs.write(file, rows.join('\n') + '\n')
+  } catch {}   // 记录写不了不能影响 Claude
+}
+
 // 写状态；同时按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
 // 同时开着好几个会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
 type State = { pose: string; event: string; tool: string; ts: number }
@@ -79,6 +103,7 @@ async function setState($: EngineInterface, state: State): Promise<void> {
   try { sid = await $.session.id() } catch {}
   const who = actors.get(sid) ?? ID
   await write($, `${who}-state.json`, state)
+  ledger($, state.event, state.tool, sid, 'shown', `${who} ${state.pose}`)   // 不等它写完：记录不该拖慢状态更新
   try {
     const file = `${await stateDir($)}/${who}-sessions.json`
     let known: Record<string, { pose: string; event: string; ts: number }> = {}
@@ -144,7 +169,7 @@ function poseForTool(tool: string): string {
 }
 
 // 各窗口显示「剩余」百分比，只给剩得最少的那个标重置时间
-function quotaOf(limits: Limit[]) {
+export function quotaOf(limits: Limit[]) {
   const shown = limits.filter(l => l.kind === 'five_hour' || l.kind === 'seven_day' || l.kind === 'spend_limit')
   if (shown.length === 0) return null
   const top = shown.reduce((a, b) => (b.percentUsed > a.percentUsed ? b : a))
@@ -159,7 +184,13 @@ function quotaOf(limits: Limit[]) {
     }
     return piece
   })
-  return { text: parts.join(' ｜ '), low: top.percentUsed >= 90 }
+  // 额度条样式（CrossPet 设置里「额度显示样式：额度条」）用的结构化数据：剩余比例 0–1、重置时刻 Unix 秒
+  const bars = shown.map(l => ({
+    label: l.kind === 'five_hour' ? '5小时' : l.kind === 'seven_day' ? '本周' : '花费',
+    left: Math.max(0, 100 - Math.round(l.percentUsed)) / 100,
+    ...(l.resetsAt ? { reset: Math.round(new Date(l.resetsAt).getTime() / 1000) } : {}),
+  }))
+  return { text: parts.join(' ｜ '), low: top.percentUsed >= 90, bars }
 }
 
 export const register: Register = on => {

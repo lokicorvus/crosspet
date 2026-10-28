@@ -19,7 +19,7 @@
 Two images are attached. The FIRST is DeepSeek (the blue whale maid girl). The SECOND is Qwen (the gentle rich young lady with periwinkle-blue hair, a small navy hat and a fan). Draw desktop-pet sprites for a short comedy "visitor" scene.
 
 FORMAT RULES (every image):
-- Transparent background: real transparency (alpha), no floor, no ground shadow, no glow, no vignette, no frame. Keep the complete edges of the character (every hair strand, ribbon and tassel), nothing cropped.
+- Transparent background: real transparency (alpha), no floor, no ground shadow, no glow, no vignette, no frame. Keep the complete edges of the character (every hair strand, ribbon and tassel), nothing cropped. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
 - No text, no letters, no numbers, no speech bubbles, no symbols floating in the air (no Zzz, no hearts, no sweat-drop icons in the air). The app draws all effects itself.
 - Exactly one character (except caught.png and bye.png, see below), full body, standing, centered. Head near the top and feet near the bottom; she fills about 90% of the image height.
 - A continuous, closed dark outline around the whole silhouette, so the edges stay clean against any background.

@@ -9,7 +9,7 @@
 You are drawing a small set of funny desktop-pet sprites. Two images are attached: the FIRST is GLM, the black fox maid girl (keep her exactly whenever she is visible); the SECOND is DeepSeek in her winter outfit (use it ONLY for the navy whale hood and the striped scarf). Story: GLM, a sly fox, disguises herself as a snowman dressed up like DeepSeek to sneak in. Foxes love diving into snow. Cute and funny, like a fan comic gag.
 
 FORMAT RULES (every image):
-- Real transparent background (generate with transparent_background: true). No floor, no ground shadow, no glow, no frame. Keep complete, clean edges.
+- Real transparent background (generate with transparent_background: true). No floor, no ground shadow, no glow, no frame. Keep complete, clean edges. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
 - No text, no letters, no speech bubbles, no floating symbols (no ?, !, hearts, Zzz, sweat-drop icons in the air, motion lines). Sweat drops and blush ON the face are fine.
 - Full body, standing, centered; head near the top and feet near the bottom; the figure fills about 90% of the image height.
 - A continuous closed dark outline around the whole silhouette.

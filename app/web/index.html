@@ -72,7 +72,7 @@ html.frozen *, html.frozen *::before, html.frozen *::after { animation-play-stat
 /* 贴边：缩在屏幕边上时只露半个身子（扒着边缘的立绘，没画时用平常的），额度、名牌、气泡、特效都藏起来 */
 html.tucked #bubble, html.tucked #fx, html.tucked #cards, html.tucked #aura, html.tucked #shadow { visibility: hidden; }
 /* 名牌、额度在最底下：直接拿出版面（只隐藏的话，透明窗口偶尔少擦它们底边那一行，缩进去那一下闪一条横线） */
-html.tucked #caption, html.tucked #quota { display: none; }
+html.tucked #caption, html.tucked #quota { display: none !important; }   /* important：额度条、合并显示的 #quota.bars / .agg 写了 display: grid，选择器更具体，会盖过这条 */
 /* 有贴边立绘时：立绘贴着窗口那条边放，切口就是窗口的边、也就是屏幕边缘。贴边 / 探出来两张换图时窗口不用动，原地淡入淡出 */
 html.tucked-art.tucked-left #wrap { align-items: flex-start; }
 html.tucked-art.tucked-right #wrap { align-items: flex-end; }
@@ -102,6 +102,24 @@ html.no-name #caption { display: none; }
 #quota div { white-space: nowrap; }
 #quota.low { color: #c0392b; background: rgba(255,236,236,.92); }
 #quota .notice { color: #6b4a3a; font-weight: 600; }   /* 重置提醒那一行：不跟着额度紧张变红 */
+/* 额度条样式（quota-bars.js）：每个额度一行——名字、条、剩余百分比、重置时间；条按剩余分三档变色 */
+#quota.bars:not(:empty) { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; text-align: left; min-width: calc(170px * var(--k)); }
+#quota .qbar { display: contents; white-space: nowrap; }   /* 一行四格：名字、条、百分比、时间，各行对齐成表 */
+#quota.bars > div:not(.qbar) { grid-column: 1 / -1; }   /* 文字行（余额）、重置提醒、峰谷条、备注占满一行 */
+#quota .ql { padding-right: calc(4px * var(--k)); white-space: nowrap; }
+#quota .qtrack { min-width: calc(30px * var(--k)); height: calc(5px * var(--k)); border-radius: calc(3px * var(--k)); background: #e4dcd6; overflow: hidden; }
+#quota .qtrack i { display: block; height: 100%; border-radius: inherit; background: var(--bar); }
+#quota .qp { padding-left: calc(4px * var(--k)); font-weight: 700; color: var(--bar); text-align: right; white-space: nowrap; }
+#quota .qt { padding-left: calc(4px * var(--k)); font-size: calc(8.5px * var(--k)); color: #a8958a; white-space: nowrap; }
+#quota .qc.qbarcell { display: flex; align-items: center; gap: calc(3px * var(--k)); }   /* 合并显示里的短条格子 */
+#quota .qc.qbarcell .ql { padding-right: 0; }
+#quota .qc.qbarcell .qtrack { width: calc(34px * var(--k)); min-width: 0; flex: none; }
+#quota.tight .qc.qbarcell .qtrack { width: calc(20px * var(--k)); }   /* 四家都开、并成三格时放不下：条短一点 */
+#quota .qc.qbarcell .qp { padding-left: 0; }
+#quota .ok { --bar: #4f7fd8; }
+#quota .mid { --bar: #e0902f; }
+#quota .low { --bar: #c0392b; }
+#quota .qnote { font-size: calc(8.5px * var(--k)); color: #a8958a; }
 /* 峰谷时段（设置里选款式）。时间条：一天 24 小时，红 = 高峰、绿 = 空闲，竖线 = 现在（北京时间）；颜色要够深，浅色桌面上也看得清 */
 #quota .peak { padding: calc(2px * var(--k)) 0 0; }
 #quota .peakbar { position: relative; width: calc(150px * var(--k)); height: calc(6px * var(--k)); margin: 0 auto; border-radius: calc(3px * var(--k)); overflow: hidden; background: #7cc493; box-shadow: inset 0 0 0 calc(.5px * var(--k)) rgba(74,36,24,.35); }
@@ -187,14 +205,23 @@ html.no-name #caption { display: none; }
 </div>
 <script>
 // 立绘加载失败：告诉 Windows 外壳记进日志（反馈里能看出是哪张图）。macOS 上没有这个通道，不做任何事
-addEventListener('error', e => { if (e.target && e.target.tagName === 'IMG' && e.target.src) window.chrome?.webview?.postMessage({ imageError: e.target.src }) }, true)
+// 同时记下最近 5 次失败的文件名（只要文件名），反馈时 diagnoseDisplay 交出去
+var imageErrors = []
+addEventListener('error', e => {
+  if (!(e.target && e.target.tagName === 'IMG' && e.target.src)) return
+  window.chrome?.webview?.postMessage({ imageError: e.target.src })
+  imageErrors.push({ file: decodeURIComponent(e.target.src.split(/[?#]/)[0].split('/').pop()), t: Math.round(Date.now() / 1000) })
+  if (imageErrors.length > 5) imageErrors.shift()
+}, true)
 </script>
 <script src="effects.js"></script>
 <script src="text-size.js"></script>
 <script src="codex-quota.js"></script>
 <script src="quota-aggregate.js"></script>
+<script src="quota-bars.js"></script>
 <script src="plugin-update.js"></script>
 <script src="stand-in.js"></script>
+<script src="follow-policy.js"></script>
 <script src="codex-resets.js"></script>
 <script src="whats-new.js"></script>
 <script src="peak-hours.js"></script>
@@ -205,6 +232,7 @@ addEventListener('error', e => { if (e.target && e.target.tagName === 'IMG' && e
 //   applyCharState(id, s)   某个 AI 的工作状态（各接入写的 <id>-state.json）
 //   setQuota(id, q)         某个 AI 的额度 / 余额（<id>-quota.json；GPT 走 setCodexQuota，问 Codex 服务）
 //   setQuotaAggregate(on)   额度小窗合并显示各家 AI 的额度（设置里的开关，默认关）
+//   setQuotaStyle(s)        额度怎么显示：'text' 文字（默认）/ 'bars' 额度条（quota-bars.js）
 //   setPeakStyle(s)         额度栏怎么显示峰谷时段：'bar' 时间条（默认）/ 'text' 一行文字 / 'off'（只对 peak-hours.js 里有规则的角色）
 //   setPeakSkins(map)       按时段换衣服的设置 { 角色: { peak: 皮肤, valley: 皮肤 } }（'' = 原版，没写 = 不换）
 //   handleClick(kind)       单击 = pat（摸摸头），右键菜单「戳一下」= poke
@@ -253,6 +281,10 @@ let active = document.getElementById('a'), spare = document.getElementById('b')
 let tucked = null   // 贴边缩着：'left' / 'right'（见「贴边」）
 let tuckedPeek = false   // 缩着时鼠标移上来：探出来、好奇地看着你
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
+let characterGeneration = 0, characterTimer = null, characterTarget = null
+function characterTimeout(fn, ms, owner = charId, generation = characterGeneration) {
+  return setTimeout(() => { if (owner === charId && generation === characterGeneration) fn() }, ms)
+}
 let lastActive = Date.now()
 const charState = {}, quota = {}, seenTool = {}, lastTrouble = {}
 
@@ -268,6 +300,8 @@ function framesFor(p) {
 }
 
 // ---- 画面 ----
+// 没有眨眼图时去掉地址：设成空字符串，浏览器会拿网页自己的地址去当图片加载，日志里多一条误导人的「立绘加载失败: …/index.html」
+function setBlinkSrc(u) { if (u) $('blink').src = u; else $('blink').removeAttribute('src') }
 // 两张图轮流交叉淡入：新图加载好之后再盖上来，旧图淡出，不会出现空白。
 // 每次换图都清掉旧的 onload，回调里再核对一次身份，避免过期回调把两张图的前后顺序搅乱。
 const imgA = $('a'), imgB = $('b')
@@ -302,8 +336,9 @@ setInterval(() => {
 
 // instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入
 function setFx(p, instant) {
-  const fx = $('fx')
+  const fx = $('fx'), owner = charId, poseAt = p, generation = characterGeneration
   const render = () => {
+    if (owner !== charId || generation !== characterGeneration || pose !== poseAt || multi) return
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
     const named = char()?.fx?.[p]
     const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
@@ -442,11 +477,12 @@ function tellReset(data = resetsData) {
   show(a.pose, true)
   say(pickLine(a.key, a.vars))
   clearTimeout(revertTimer)
-  revertTimer = setTimeout(() => { setPose(restPose()); say('') }, 8000)
+  revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, 8000)
 }
 // 右键「会重置吗？」：先想一下，每次都现查（是你点的、不常点，查一次不费事）；这次没查到就照实说连不上，不拿旧结果顶替
 async function askReset() {
-  if (!resetsOn || charId !== 'gpt' || egg) return
+  if (!resetsOn || charId !== 'gpt' || egg || characterTimer) return
+  const generation = characterGeneration
   clearTimeout(revertTimer)
   show('reset_check', true)   // 刷手机查一下（没画就是 thinking）
   say(pick(linesOf('thinking') || ['……']))
@@ -458,7 +494,7 @@ async function askReset() {
     if (resetsOn) { clearTimeout(resetsTimer); resetsTimer = setTimeout(pollResets, r.wait); renderQuota() }   // 问的途中关了开关：不再续上定时
   }
   await new Promise(r => setTimeout(r, Math.max(0, 1200 - (Date.now() - started))))   // 至少想 1.2 秒：一下子就查完、或一下子就连不上时也看得见她在想
-  if (charId === 'gpt' && !egg) tellReset(ok ? resetsData : null)
+  if (charId === 'gpt' && generation === characterGeneration && !egg && !characterTimer) tellReset(ok ? resetsData : null)
 }
 // 主动说一次：只在她是 GPT、闲着时说；不是 GPT 就等 setCharacter 切到 GPT 时再调
 function announceReset() {
@@ -469,7 +505,7 @@ function announceReset() {
   let tries = 0
   const attempt = () => {
     // 等的途中过期了、宣布已经执行了：不说了
-    if (!resetsOn || charId !== 'gpt' || CodexResets.toAnnounce(resetsData, Date.now() / 1000, codexResetSeenAt, resetsTold())?.id !== a.id) { resetsWaiting = false; return }
+    if (!resetsOn || charId !== 'gpt' || $('stage').classList.contains('swap') || CodexResets.toAnnounce(resetsData, Date.now() / 1000, codexResetSeenAt, resetsTold())?.id !== a.id) { resetsWaiting = false; return }
     // 闲着才说：额度紧张时她的待机样子是 tired、闲久了会睡着，这时也算闲着（重置的消息这时最有用）；
     // tired / sleeping 时气泡里一直挂着「额度快用完了」「zZz」这种待机台词，可以直接盖过去，不用等它收起
     const resting = pose === 'idle' || pose === 'tired' || pose === 'sleeping'
@@ -507,6 +543,8 @@ function appendResetNotice(el) {
 // ---- 峰谷时段（peak-hours.js）：额度栏下面画今天的时间条，或者一行文字；按时段换衣服见 checkPeakOutfits ----
 let peakStyle = 'bar', devPeakShift = 0
 const peakNow = () => Date.now() + devPeakShift   // 开发者控制台「峰谷换装」场景会把时间挪到切换点前
+let quotaStyle = 'text'
+function setQuotaStyle(s) { quotaStyle = s === 'bars' ? 'bars' : 'text'; renderQuota() }
 function setPeakStyle(s) { peakStyle = ['bar', 'text', 'off'].includes(s) ? s : 'bar'; renderQuota() }
 function appendPeakBar(el) {
   const rule = peakStyle !== 'off' && window.PeakHours?.RULES[charId]
@@ -575,7 +613,7 @@ function setPeakSkins(map) {
   if (startup) setTimeout(() => checkPeakOutfits(true), 1500); else checkPeakOutfits()
 }
 function peakBusy() {
-  return !!(egg || multi || updatingNow || farewellLine !== null || tucked || aiActivity() || !$('bubble').classList.contains('hide'))
+  return !!(egg || multi || updatingNow || farewellLine !== null || tucked || characterTimer || aiActivity() || !$('bubble').classList.contains('hide'))
 }
 function checkPeakOutfits(startup) {
   if (!peakSkins || !window.PeakHours) return
@@ -628,13 +666,23 @@ function renderQuota() {
   if (quotaAggregate || reactTo) {
     let ids = Object.keys(manifest?.characters || {}).filter(id => !manifest.characters[id].egg)
     if (!quotaAggregate) ids = StandIn.quotaIds(reactTo, charId, ids)
-    QuotaAggregate.render(el, QuotaAggregate.rows(quota, charId, ids, id => manifest?.characters?.[id]?.name || id))
+    QuotaAggregate.render(el, QuotaAggregate.rows(quota, charId, ids, id => manifest?.characters?.[id]?.name || id), undefined, quotaStyle)
     appendResetNotice(el)
     appendPeakBar(el)
     return
   }
-  // 多个额度窗口 / 额度池用「｜」隔开，每个占一行，不在半中间折行
   const q = quota[charId]
+  const bars = quotaStyle === 'bars' && QuotaBars.of(q, Date.now() / 1000)
+  if (bars) {
+    QuotaBars.render(el, bars)
+    el.className = 'bars'   // 不加 low：快用完的那一行自己变红，整块不变红底
+    appendResetNotice(el)
+    appendPeakBar(el)
+    // 底栏高度预算（同 appendPeakBar）：额度条加上重置提醒、峰谷条还是放不下，就这一次按文字画，人物不被顶上去
+    const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--k')) || 1
+    if ($('foot').offsetHeight <= 62 * Math.max(1, k) + 0.5) return
+  }
+  // 多个额度窗口 / 额度池用「｜」隔开，每个占一行，不在半中间折行
   el.replaceChildren(...(q?.text || '').split(/\s*｜\s*/).filter(Boolean).map(t => {
     const line = document.createElement('div'); line.textContent = t; return line
   }))
@@ -664,7 +712,7 @@ function show(p, urgent) {
   if (p === 'idle') p = restPose()   // AI 发来「闲着」（比如 DSH 新会话）时也要看额度：快用完了就是累 / 饿的样子
   const wait = shownAt + DWELL - Date.now()
   clearTimeout(pending)
-  if (!urgent && wait > 0) { pending = setTimeout(() => show(p, true), wait); return }
+  if (!urgent && wait > 0) { pending = characterTimeout(() => show(p, true), wait); return }
   shownAt = Date.now()
   clearTimeout(revertTimer)
   if (p !== pose) {
@@ -672,7 +720,7 @@ function show(p, urgent) {
     const lines = linesOf(p)
     say(lines ? pick(lines) : '')
   }
-  if (TRANSIENT[p]) revertTimer = setTimeout(() => { setPose(restPose()); say('') }, TRANSIENT[p])
+  if (TRANSIENT[p]) revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, TRANSIENT[p])
 }
 
 // ---- 由 Swift 调用 ----
@@ -681,6 +729,9 @@ function init(m) {
   for (const c of Object.values(m.characters))
     for (const list of Object.values(c.poses)) for (const u of list) { const i = new Image(); i.onerror = () => window.chrome?.webview?.postMessage({ imageError: u }); i.src = u }   // 预加载失败也报（页面里的监听收不到）
   // 没有当前角色时取 id 排序后的第一个：macOS 的清单是 Swift 字典序列化出来的，key 顺序每次启动都不同（Windows 本来就是排好序的）
+  // 正在换角色、要换上的那个还在新清单里：让它换完（换衣服时外壳会重新 init）
+  if (characterTarget && manifest.characters[characterTarget]) return
+  if (characterTarget) { ++characterGeneration; clearTimeout(characterTimer); characterTimer = null; characterTarget = null; $('stage').classList.remove('swap') }
   if (!charId || !manifest.characters[charId]) setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
   else { $('caption').textContent = char().name }
 }
@@ -696,39 +747,55 @@ function greetDue(id) {
 
 function setCharacter(id, quiet) {
   if (egg) { clearEggTimers(); egg = null; charId = null }
-  if (!manifest.characters[id] || manifest.characters[id].egg || id === charId) return
+  if (!manifest.characters[id] || manifest.characters[id].egg || id === characterTarget) return
+  if (id === charId && !characterTimer) return
+  const generation = ++characterGeneration
+  clearTimeout(characterTimer)
   // 上一个角色还没跑完的定时动作（听完转思考、工具结束回思考、排队等着换的动作、演完回待机）全部作废：
   // 不然会落到换上来的角色身上——她明明闲着，却突然开始思考 / 写东西（PR #26 @KQYaili 报的「串台」）
   const dropTimers = () => { clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(stuckTimer) }
+  const endMulti = () => {
+    if (!multi) return
+    const m = multi; multi = null
+    clearInterval(m.flipTimer); clearTimeout(m.recheck); clearTimeout(m.chatter); clearTimeout(m.sayTimer)
+    for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on')
+  }
   dropTimers()
-  if (multi) { const m = multi; multi = null; clearInterval(m.flipTimer); clearTimeout(m.recheck); clearTimeout(m.chatter); clearTimeout(m.sayTimer); for (const c of m.cards.values()) c.el.remove(); $('more').classList.remove('on') }
-  setTimeout(refreshMulti, 700)   // 换过去的角色如果也有好几个对话在干活，接着演
-  setTimeout(preloadEdges, 900)
+  characterTarget = id
+  endMulti()
+  characterTimeout(refreshMulti, 700, id, generation)   // 换过去的角色如果也有好几个对话在干活，接着演
+  characterTimeout(preloadEdges, 900, id, generation)
   const stage = $('stage')
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   stage.classList.add('swap')
-  setTimeout(() => {
+  characterTimer = setTimeout(() => {
+    if (generation !== characterGeneration) return
+    characterTimer = null
+    characterTarget = null
+    if (!manifest.characters[id]) { $('stage').classList.remove('swap'); return }
     dropTimers()   // 冒烟这 0.33 秒里，上一个角色的事件可能又排了新的
-    charId = id; pose = null; currentUrl = ''
+    endMulti()
+    lastActive = Date.now()
+    charId = id; pose = null; currentUrl = ''; shownAt = 0
     const c = char()
     applyLook(c)
-    $('blink').src = c.blink || ''
+    setBlinkSrc(c.blink)
     $('caption').textContent = c.name
     const s = charState[id]
     const busy = s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'
     setPose(busy ? s.pose : restPose(), true)
     if (busy) watchStuck()   // 接着演她自己的活：卡住兜底按她自己的时间重新算
-    if (busy && s.pose === 'listening') thinkTimer = setTimeout(() => { if (charId === id) show('thinking') }, LISTEN_TO_THINKING)
+    if (busy && s.pose === 'listening') thinkTimer = characterTimeout(() => show('thinking'), LISTEN_TO_THINKING)
     // 这个时段 / 节日还没打过招呼：演专属的登场动作；打过了就用平常那句（30 分钟冷却）
     if (quiet) say('')
     else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
     renderQuota()
-    if (id === 'gpt') setTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说
+    if (id === 'gpt') characterTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说
     const pend = pendingCelebration[id]
-    if (pend && Date.now() - pend.at < 10 * 60 * 1000) setTimeout(() => celebrate(id, pend.ev), 1200)
+    if (pend && Date.now() - pend.at < 10 * 60 * 1000) characterTimeout(() => celebrate(id, pend.ev), 1200)
     // 新立绘加载好再淡入，避免先看到空白
     const reveal = () => stage.classList.remove('swap')
-    if (active.complete && spare.complete) setTimeout(reveal, 60); else setTimeout(reveal, 160)
+    if (active.complete && spare.complete) characterTimeout(reveal, 60); else characterTimeout(reveal, 160)
   }, 330)
 }
 
@@ -823,7 +890,7 @@ function notifyUpdate(tag) {
   show('update', true)
   say(`有新版本 ${tag} 啦～右键菜单里点「更新」就好`)
   clearTimeout(revertTimer)
-  revertTimer = setTimeout(() => setPose(restPose()), 6500)
+  revertTimer = characterTimeout(() => setPose(restPose()), 6500)
 }
 
 // ---- 贴边 ----
@@ -953,14 +1020,14 @@ function configHealed() {
 // 换了衣服（皮肤）：外壳重新 init 过立绘清单后调它，正在显示的就是这个角色就重新换上
 function refreshLook(id) {
   const ol = outfitLine; outfitLine = null
-  if (charId !== id || egg) return
+  if (charId !== id || egg || (characterTarget && characterTarget !== id)) return
   charId = null; preloaded = null
   setCharacter(id, true)
   // 按时段换的衣服：换好（setCharacter 里冒烟、换图约 0.4 秒）再说换装台词——台词按换上之后的衣服取；
   // 换上的不是要的那件（外壳没换成、这期间你手动换了别的）就不说
   if (ol?.id === id && Date.now() - ol.at < 8000 && (manifest.characters[id]?.skin || '') === ol.skin) {
     const key = ol.key
-    setTimeout(() => { if (charId === id && !egg) { const line = pick(linesOf(key) || ['']); say(line); clearTimeout(outfitSayTimer); outfitSayTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, 6000) } }, 700)
+    characterTimeout(() => { if (charId === id && !egg) { const line = pick(linesOf(key) || ['']); say(line); clearTimeout(outfitSayTimer); outfitSayTimer = characterTimeout(() => { if ($('bubble').textContent === line) say('') }, 6000) } }, 700, id)
   }
 }
 
@@ -978,7 +1045,7 @@ const NOT_WORKING = new Set(['idle', 'sleeping', 'asking', 'tired', 'hungry', 'h
 let stuckTimer = null
 function watchStuck() {
   clearTimeout(stuckTimer)
-  stuckTimer = setTimeout(() => {
+  stuckTimer = characterTimeout(() => {
     if (egg || multi || updatingNow || !pose || NOT_WORKING.has(pose) || pose.startsWith('greet_') || pose.startsWith('fest_')) return
     clearTimeout(thinkTimer)
     show('idle', true)
@@ -1191,17 +1258,36 @@ function endMulti() {
   watchStuck()
 }
 
+// 收到状态后怎么处理的（反馈「AI 干活时她没反应」用）：最近 40 条，只有角色、事件名、姿态和结论，由 diagnoseDisplay 交出去。
+// 结论：shown 演了 / not-current 不是当前角色（只记下状态）/ egg 正在演彩蛋 / multi 正在演多会话 / shaking 正被甩着 / no-pose 没有姿态
+const petVerdicts = []
+function noteVerdict(id, s, verdict) {
+  petVerdicts.push({ t: Math.round(Date.now() / 1000), id, ev: s?.event || '', pose: s?.pose || '', verdict })
+  if (petVerdicts.length > 40) petVerdicts.shift()
+}
+// 反馈时外壳调一次：她现在显示成什么样（只有名字和开关，不含路径）
+function diagnoseDisplay() {
+  const file = img => decodeURIComponent((img.getAttribute('src') || '').split(/[?#]/)[0].split('/').pop())
+  return {
+    char: charId, pose, skin: manifest?.characters?.[charId]?.skin || '',
+    img: { file: file(active), complete: active.complete, w: active.naturalWidth, h: active.naturalHeight },
+    spare: { file: file(spare), complete: spare.complete },
+    swapping: $('stage').classList.contains('swap'), tucked, egg: egg ? egg.host || true : false, pageHidden,
+    imageErrors: imageErrors.slice(), verdicts: petVerdicts.slice(),
+  }
+}
 function applyCharState(id, s) {
   if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
   const own = id                      // 事件原本属于哪家 AI：先按它记下状态，切回那家的角色时看到的才是最新的
   charState[own] = s
   if (standsIn(id)) id = charId       // 代演（reactTo）：别家 AI 的状态当成她自己的（多个会话同时干活时，由 refreshMulti 合并）
   charState[id] = s
-  if (egg) { if (egg.host === own && s.pose && s.pose !== 'idle') endEgg(); return }
-  if (id !== charId || !s.pose) return
+  if (egg) { noteVerdict(own, s, 'egg'); if (egg.host === own && s.pose && s.pose !== 'idle') endEgg(); return }
+  if (id !== charId || !s.pose) { noteVerdict(own, s, s.pose ? 'not-current' : 'no-pose'); return }
   lastActive = Date.now()
-  if (multi) return   // 正在演多会话：她的样子由各对话的状态决定（refreshMulti），这里不动
-  if (Date.now() < shakingUntil && s.event !== 'Stop') return   // 正被甩着：先只记下状态，甩停了 resumeWork 回到最新的活上（不然晕和干活来回闪）
+  if (multi) { noteVerdict(own, s, 'multi'); return }   // 正在演多会话：她的样子由各对话的状态决定（refreshMulti），这里不动
+  if (Date.now() < shakingUntil && s.event !== 'Stop') { noteVerdict(own, s, 'shaking'); return }
+  noteVerdict(own, s, 'shown')   // 正被甩着：先只记下状态，甩停了 resumeWork 回到最新的活上（不然晕和干活来回闪）
   clearTimeout(thinkTimer)
   watchStuck()
   const ev = s.event || ''
@@ -1217,7 +1303,7 @@ function applyCharState(id, s) {
   }
   if (ev === 'PostToolUse' || ev === 'AfterTool' || ev === 'SubagentStop') {
     if (s.pose === 'oops') show('oops')
-    else thinkTimer = setTimeout(() => show('thinking'), BACK_TO_THINKING)
+    else thinkTimer = characterTimeout(() => show('thinking'), BACK_TO_THINKING)
   } else if (ev === 'UserPromptSubmit' || ev === 'BeforeAgent') {
     // 刚出错 / 被打断后你又发了消息（多半是在纠正她）：有 correctedPose 的角色先认个错
     // （Claude 的「You're absolutely right!」）
@@ -1225,11 +1311,11 @@ function applyCharState(id, s) {
     if (sorry && Date.now() - (lastTrouble[id] || 0) < 3 * 60 * 1000) {
       lastTrouble[id] = 0
       show(sorry, true)
-      thinkTimer = setTimeout(() => show('thinking'), DWELL + 500)
+      thinkTimer = characterTimeout(() => show('thinking'), DWELL + 500)
       return
     }
     show('listening', true)
-    thinkTimer = setTimeout(() => show('thinking'), LISTEN_TO_THINKING)
+    thinkTimer = characterTimeout(() => show('thinking'), LISTEN_TO_THINKING)
   } else if (ev === 'Stop' && pendingCelebration[id]?.afterWork && !sulking && !angerLevel(angerNow())) {
     // 干活途中额度刷新了（重置卡 / 换套餐 / 充值）：干完不演普通的开心，演 reset / 吃饭
     clearTimeout(pending)
@@ -1291,7 +1377,7 @@ function quotaEvent(id, q) {
 }
 function celebrate(id, ev) {
   if (standsIn(id)) id = charId   // 代演（reactTo）：她响应的 AI 额度刷新了，她来演
-  if (id !== charId || egg) { pendingCelebration[id] = { ev, at: Date.now() }; return }  // 等切到她时再演
+  if (id !== charId || egg || characterTimer) { pendingCelebration[id] = { ev, at: Date.now() }; return }  // 正在换成别人：等切回她时再演
   // 正在干活：额度记录是 AI 回复的半路写下的，这时演会被紧跟着的干活动作盖掉，看不见——留到这一轮干完（Stop）再演
   if (aiActivity() === 'work') { pendingCelebration[id] = { ev, at: Date.now(), afterWork: true }; return }
   delete pendingCelebration[id]
@@ -1300,7 +1386,7 @@ function celebrate(id, ev) {
   show(p, true)
   say(pick(linesOf(own) || linesOf(p) || ['']))
   clearTimeout(revertTimer)
-  revertTimer = setTimeout(() => { setPose(restPose()); say('') }, 6500)
+  revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, 6500)
 }
 
 // GPT 额度：外壳交来问 Codex 服务得到的原始额度（见 codex-quota.js），排好版再走 setQuota
@@ -1548,7 +1634,7 @@ function eggStep(step) {
   document.documentElement.style.setProperty('--aura', char().aura || '#bcd4ff')
 }
 function playEgg(force) {
-  if (egg || tucked || !charId || char()?.egg) return false   // 缩在边上不演：彩蛋角色没有贴边立绘
+  if (egg || tucked || !charId || char()?.egg || $('stage').classList.contains('swap')) return false   // 缩在边上、正在换角色时不演：彩蛋角色没有贴边立绘
   const eggId = eggFor(charId)
   if (!eggId) return false
   if (!force && pose !== 'idle') return false
@@ -1598,7 +1684,7 @@ function quitEggNow() {
   charId = host; pose = null; currentUrl = ''
   const c = char()
   applyLook(c)
-  $('blink').src = c.blink || ''
+  setBlinkSrc(c.blink)
   $('caption').textContent = c.name
   say('')
   renderQuota()
@@ -1612,7 +1698,7 @@ function endEgg() {
     charId = host; pose = null; currentUrl = ''
     const c = char()
     applyLook(c)
-    $('blink').src = c.blink || ''
+    setBlinkSrc(c.blink)
     $('caption').textContent = c.name
     setPose(restPose(), true); say('')
     renderQuota()

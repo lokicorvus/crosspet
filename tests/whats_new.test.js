@@ -69,3 +69,8 @@ test('真实文案：格式齐全', () => {
   }
   for (let i = 1; i < W.LIST.length; i++) assert.ok(W.newer(W.LIST[i - 1].version, W.LIST[i].version), '从新到旧')
 })
+
+test('峰谷时段那条说明换衣服在「角色」页选（1.3.8 从额度页搬过去了）', () => {
+  const item = W.LIST.flatMap(v => v.items).find(i => i.title === '峰谷时段')
+  assert.match(item.text, /「角色」页/)
+})

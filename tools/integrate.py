@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok
     python3 tools/integrate.py status
 
 原则：
@@ -523,6 +523,15 @@ def remove_link(link: Path) -> None:
             link.unlink()
 
 
+# 合法的版本号（x.y.z，可带 -后缀）。DeepSeek Harness 装 / 更新任何插件时都会校验每个插件 package.json 的版本，
+# 写个不合法的（1.3.8-beta.2 带的 "1.3.8.1"）会把用户装别的插件也拦住
+SEMVER = r"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$"
+
+
+def valid_version(v: str) -> bool:
+    return bool(re.match(SEMVER, v or ""))
+
+
 def deepseek(install: bool) -> None:
     if not DSH_PROFILE.exists():
         print(f"  没找到 {DSH_PROFILE}，请先打开一次 DeepSeek Harness 桌面版"
@@ -543,8 +552,9 @@ def deepseek(install: bool) -> None:
         try:
             ver = re.search(r'PLUGIN_VERSION = "([^"]+)"', (DSH_PLUGIN_DIR / "lib/index.js").read_text(encoding="utf-8")).group(1)
             pj = load_json(DSH_PLUGIN_DIR / "package.json")
-            pj["version"] = ver
-            save_json(DSH_PLUGIN_DIR / "package.json", pj)
+            if valid_version(ver):   # 不合法就不写，留着随包 package.json 里的（测试保证两边一致）
+                pj["version"] = ver
+                save_json(DSH_PLUGIN_DIR / "package.json", pj)
         except Exception:
             pass
         deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR.as_posix()}"
@@ -694,6 +704,36 @@ def qwen(install: bool) -> None:
         remove_hooks(QWEN_SETTINGS)
 
 
+# ---- Grok Build（xAI）----
+# 个人钩子放 ~/.grok/hooks/*.json，格式和 Claude Code 一样（matcher 组 + type: "command"，timeout 单位是秒）。
+# CrossPet 单独占一个文件 crosspet.json：接入就写这个文件，撤销就删掉，不碰用户自己的钩子文件。
+# 它也会读 ~/.claude/settings.json 的钩子：钩子脚本看到 GROK_HOOK_EVENT 时会把那边触发的丢掉（见 crosspet-hook.py）。
+# 新文件夹第一次用要先「信任」（/hooks-trust），之前个人钩子也不跑；grok -p 无界面运行时当作已信任
+GROK_HOME = Path(os.environ.get("GROK_HOME") or HOME / ".grok")
+GROK_HOOKS = GROK_HOME / "hooks" / "crosspet.json"
+
+
+def grok(install: bool) -> None:
+    if install:
+        if not found(GROK_HOME, "Grok Build", ("hooks",)):
+            return
+        if GROK_HOOKS.exists():
+            backup(GROK_HOOKS)
+        save_json(GROK_HOOKS, load_template(REPO / "integrations/grok/hooks.json"))
+        print(f"  已写入 {GROK_HOOKS}")
+        print("  → 新开的 Grok Build 会话生效；在一个文件夹里第一次用时，要先在 Grok 里用 /hooks-trust 信任这个文件夹")
+    elif GROK_HOOKS.exists():
+        GROK_HOOKS.unlink()
+        print(f"  已删除 {GROK_HOOKS}")
+
+
+def has_grok() -> bool:
+    try:
+        return MARK in GROK_HOOKS.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
 # ---- Antigravity ----
 # 它的 hooks.json 是「名字 → 各事件」的格式，CrossPet 只占 "crosspet" 这一项
 ANTIGRAVITY_HOOKS = HOME / ".gemini/config/hooks.json"
@@ -821,7 +861,134 @@ def has_hermes() -> bool:
     return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen}
+# ---- Cursor ----
+# Cursor 的 hooks.json 是扁平的：每个事件直接是命令数组，不是 Codex / Claude 那种 {hooks:[...]} 分组。
+CURSOR_MARK = "crosspet-cursor-bridge.py"
+CURSOR_HOOKS = HOME / ".cursor" / "hooks.json"
+
+
+def load_cursor_template() -> dict:
+    data = load_json(REPO / "integrations/cursor/hooks.json")
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / "integrations/cursor/crosspet-cursor-bridge.py", SUPPORT / "crosspet-cursor-bridge.py")
+    if os.name != "nt":
+        return data
+    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / 'crosspet-cursor-bridge.py')}"
+    original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py"'
+
+    def command(value: str) -> str:
+        if isinstance(value, str) and value.startswith(original):
+            return prefix + value[len(original):]
+        return value
+
+    def adapt(obj):
+        if isinstance(obj, dict):
+            return {key: command(value) if key == "command" else adapt(value) for key, value in obj.items()}
+        if isinstance(obj, list):
+            return [adapt(item) for item in obj]
+        return obj
+    return adapt(data)
+
+
+def cursor_ours(entry) -> bool:
+    return isinstance(entry, dict) and CURSOR_MARK in str(entry.get("command", ""))
+
+
+def cursor_character(entry):
+    """Read only our optional final character argument; do not execute a shell command.
+    没写角色参数（默认）返回空串：认不出的模型由当前角色来演"""
+    match = re.search(r'''crosspet-cursor-bridge\.py["']?(?:\s+(?:"([\w-]+)"|'([\w-]+)'|([\w-]+)))?\s*$''',
+                      str(entry.get("command", "")))
+    return next((arg for arg in match.groups() if arg is not None), "") if match else None
+
+
+def merge_cursor_hooks(target: Path) -> bool:
+    data = load_json(target)
+    if not isinstance(data, dict) or not isinstance(data.setdefault("hooks", {}), dict):
+        print(f"  ！{target} 不是 Cursor 的钩子格式（顶层要是 {{\"hooks\": {{...}}}}），没有改")
+        return False
+    data.setdefault("version", 1)
+    hooks = data["hooks"]
+    old = [entry for entries in hooks.values() if isinstance(entries, list) for entry in entries if cursor_ours(entry)]
+    roles = {cursor_character(entry) for entry in old}
+    if None in roles or len(roles) > 1:
+        print(f"  ！{target} 的 CrossPet 角色参数不一致或命令格式无法识别，保留原配置；请先统一桥接命令末尾的角色 id 后再更新")
+        return False
+    character = next(iter(roles), "")
+    # 先检查新模板会使用的事件，避免发现旧的分组格式时只更新了一半。
+    template_events = load_json(REPO / "integrations/cursor/hooks.json")["hooks"]
+    for event in template_events:
+        current = hooks.get(event, [])
+        if not isinstance(current, list) or any(isinstance(entry, dict) and "hooks" in entry and "command" not in entry for entry in current):
+            print(f"  ！{target} 的 {event} 不是 Cursor 的钩子格式，保留原配置")
+            return False
+    # 退役事件也清理，只移除本桥条目；第三方命令及其它设置原样留下。
+    for event in list(hooks):
+        current = hooks[event]
+        if not isinstance(current, list):
+            continue
+        kept = [entry for entry in current if not cursor_ours(entry)]
+        if kept or kept == current:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+    for event, entries in load_cursor_template()["hooks"].items():
+        for entry in entries:
+            if character:
+                entry["command"] += " " + character
+        hooks[event] = hooks.get(event, []) + entries
+    backup(target)
+    save_json(target, data)
+    print(f"  已写入 {target}")
+    return True
+
+
+def remove_cursor_hooks(target: Path) -> None:
+    if not target.exists():
+        return
+    data = load_json(target)
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        return
+    changed = False
+    for event in list(hooks):
+        current = hooks.get(event)
+        if not isinstance(current, list):
+            continue
+        kept = [entry for entry in current if not cursor_ours(entry)]
+        if kept != current:
+            changed = True
+            if kept:
+                hooks[event] = kept
+            else:
+                del hooks[event]
+    if changed:
+        backup(target)
+        save_json(target, data)
+        print(f"  已从 {target} 移除 CrossPet 钩子")
+
+
+def has_cursor() -> bool:
+    try:
+        hooks = load_json(CURSOR_HOOKS).get("hooks", {})
+    except Exception:
+        return False
+    if not isinstance(hooks, dict):
+        return False
+    return any(cursor_ours(entry) for entries in hooks.values() if isinstance(entries, list) for entry in entries)
+
+
+def cursor(install: bool) -> None:
+    if install:
+        if not found(CURSOR_HOOKS.parent, "Cursor", ("hooks.json",)):
+            return
+        if merge_cursor_hooks(CURSOR_HOOKS):
+            print("  → 新开的 Cursor 对话生效。按当前模型换角色，认不出的由当前角色来演；更新保留已有角色 id")
+    else:
+        remove_cursor_hooks(CURSOR_HOOKS)
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "cursor": cursor, "grok": grok}
 
 
 def has_hooks(p: Path) -> bool:
@@ -846,6 +1013,8 @@ def installed() -> list:
     if has_zcode() and found(ZCODE_HOME, "", ("cli",), quiet=True): result.append("zcode")
     if has_hermes(): result.append("hermes")
     if has_hooks(QWEN_SETTINGS) and found(QWEN_SETTINGS.parent, "", ("settings.json",), quiet=True): result.append("qwen")
+    if has_cursor() and found(CURSOR_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("cursor")
+    if has_grok(): result.append("grok")
     return result
 
 
@@ -879,7 +1048,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "cursor": "cursor", "grok": "grok"}
 
 
 def short(p) -> str:
@@ -1072,6 +1241,8 @@ def diagnose() -> str:
     # 其他
     L.append(f"[Gemini CLI] {file_state(GEMINI_SETTINGS, lambda: has_hooks(GEMINI_SETTINGS))}；最近消息 {seen('gemini')}")
     L.append(f"[Qwen Code] {file_state(QWEN_SETTINGS, lambda: has_hooks(QWEN_SETTINGS))}；最近消息 {seen('qwen')}")
+    L.append(f"[Cursor] {file_state(CURSOR_HOOKS, has_cursor)}；最近消息 {seen('cursor')}")
+    L.append(f"[Grok Build] {file_state(GROK_HOOKS, has_grok)}；最近消息 {seen('grok')}")
     L.append(f"[Antigravity] {file_state(ANTIGRAVITY_HOOKS, has_antigravity)}；最近消息 {seen('antigravity')}")
     for d in workbuddy_dirs():
         if d.exists():
@@ -1123,6 +1294,8 @@ def status() -> None:
     print("ZCode               :", "已接入" if has_zcode() else "未接入")
     print("Hermes Agent        :", "已接入" if has_hermes() else "未接入")
     print("Qwen Code           :", "已接入" if has_hooks(QWEN_SETTINGS) else "未接入")
+    print("Cursor              :", "已接入" if has_cursor() else "未接入")
+    print("Grok Build          :", "已接入" if has_grok() else "未接入")
 
 
 if __name__ == "__main__":

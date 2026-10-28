@@ -4,10 +4,17 @@
 // 设计见 docs/superpowers/specs/2026-10-16-whats-new-design.md；测试 tests/whats_new.test.js
 ;(function (root) {
   const LIST = [
+    { version: '1.3.8', items: [
+      { icon: '😈', title: '新角色：Grok', text: '戴着小王冠、爱查证爱抬杠的哥特小恶魔女王：说话直、敢怼，闲着会把手机怼到你面前「@grok is this true? 真的」。Grok Build 里干活时跟着做动作（在「接入 AI」页接入），别家程序里用 Grok 模型时也自动换成她。还藏着一个彩蛋：DeepSeek 偷戴她的王冠……', go: { tab: 'character' } },
+      { icon: '🔌', title: '接入 Cursor', text: 'Cursor 里干活时她也会跟着动：用 Claude 模型演 Claude、GPT 模型演 GPT……换模型她就换人，Cursor 自家的模型由当前角色来演。在「接入 AI」页点一下 Cursor 就好，新开的对话生效。', go: { tab: 'ai' } },
+      { icon: '🃏', title: '换角色窗口', text: '右键「换角色…」打开一个大窗口：左边是这套衣服的大立绘，下面是她的每套衣服和所有角色，鼠标停在卡片上先预览，点一下就换。改名字、峰谷换装也在这里。', go: { tab: 'character' } },
+      { icon: '📊', title: '额度条', text: '额度可以换成进度条显示：每个额度一条，后面是剩余百分比和重置时间，剩得越少颜色越暖（蓝 → 橙 → 红）。在「额度」页把「额度显示样式」换成「额度条」。', go: { tab: 'quota', key: 'quotaStyle' } },
+      { icon: '💬', title: 'QQ 交流群', text: 'CrossPet 有 QQ 群了！用着有问题、想要新角色、想先看到新版本，都可以来群里聊。点下面的群号就能复制。', qq: true },
+    ] },
     { version: '1.3.7', items: [
       { icon: '🪭', title: '新角色：Qwen（千问）', text: '温柔大方的富家千金：大活干完请你喝奶茶，额度快用完时掏出金卡，闲着会分小礼物给大家。在 Qwen Code 里用千问模型时自动换成她，也可以在「角色」页手动选。千问桌面客户端没有对外接口，她跟不了它干活。', go: { tab: 'character' } },
       { icon: '🔌', title: '接入 Qwen Code', text: '阿里的 Qwen Code 命令行也能接了：她会跟着干活做动作。在「接入 AI」页点一下 Qwen Code 就好，新开的会话生效。这项接入还没在真实的 Qwen Code 里完整测过（干活时的事件要登录才能触发），遇到问题欢迎反馈。', go: { tab: 'ai' } },
-      { icon: '⏰', title: '峰谷时段', text: 'DeepSeek、GLM 的额度下面多了一条今天的时间条：红色高峰、绿色空闲，一眼看出现在贵不贵（嫌看不清可以换成一行文字）。还能选高峰、空闲各穿哪件衣服，到点她自己换。', go: { tab: 'quota', key: 'peakStyle' } },
+      { icon: '⏰', title: '峰谷时段', text: 'DeepSeek、GLM 的额度下面多了一条今天的时间条：红色高峰、绿色空闲，一眼看出现在贵不贵（嫌看不清可以换成一行文字）。还能在「角色」页选高峰、空闲各穿哪件衣服，到点她自己换。', go: { tab: 'quota', key: 'peakStyle' } },
       { icon: '🐳', title: 'DeepSeek 新衣服：睡衣、冬装', text: '两套新皮肤：云朵睡衣（更困、更想躺）和鲸鱼兜帽冬装（怕冷、惦记热乎乎的白饭）。在「角色」页换上；也可以让她空闲时段自动换上睡衣。两套衣服各藏着一个彩蛋：深夜偷穿睡衣的「圣女」Claude，和雪人里的狐狸。', go: { tab: 'character' } },
       { icon: '😴', title: '新彩蛋', text: '千问在场时偶尔会撞见：DeepSeek 把你交代的活偷偷外包给了千问，自己抱着枕头睡大觉。点她一下试试？' },
     ] },

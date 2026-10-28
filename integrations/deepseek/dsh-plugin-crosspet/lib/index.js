@@ -5,7 +5,7 @@
 // - 每 1 分钟查一次余额（发消息、一轮结束时也查，30 秒内只查一次）（有 API Key 用 Key；没有就用 Harness 里登录的账号），写 <状态目录>/deepseek-quota.json
 // - 跟着 AI 出现：Harness 启动、新会话、发消息时，桌宠没开着就把它打开（用户从菜单退出后到 Harness 重开前不管；在设置 / 插件配置 autostart: false 里关掉了也不管）
 // 状态目录默认 /tmp/crosspet，可在插件配置里改 stateDir。插件只观察，不改变 DeepSeek 的任何行为。
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
@@ -16,7 +16,7 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
-const PLUGIN_VERSION = "1.3.5";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件
+const PLUGIN_VERSION = "1.3.9";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 60 * 1000;   // 定时查余额：充了值、没再对话，最多等 1 分钟（以前 10 分钟，用户充值后半天没变）。只是要一次账户余额，不耗 token
 
@@ -42,6 +42,7 @@ function characterFor(provider, model, custom = {}) {
     if (/deepseek/.test(s)) return "deepseek";
     if (/glm|zhipu|bigmodel|chatglm|z-ai|zai-/.test(s)) return "glm";
     if (/qwen|dashscope|bailian|tongyi/.test(s)) return "qwen";
+    if (/grok|x-ai|xai/.test(s)) return "grok";
     if (/claude|anthropic/.test(s)) return "claude";
     if (/gemini|google|vertex/.test(s)) return "gemini";
     if (/gpt|codex|openai|chatgpt|(^|[^a-z])o[1-9]/.test(s)) return "gpt";
@@ -96,6 +97,7 @@ export function apply(ctx, config = {}) {
       seenAt = Date.now();
       mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "seen-deepseek"), String(Math.floor(seenAt / 1000)))).catch(() => {});
     }
+    ledger(event, tool, "shown", `${character} ${pose}`);
     writeJson(`${character}-state.json`, { pose, event, tool, ts: Date.now() / 1000 }).catch((e) =>
       ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`),
     );
@@ -105,6 +107,25 @@ export function apply(ctx, config = {}) {
   // 桌宠在跑时把自己的进程号写在 <状态目录>/pet.pid；从菜单手动退出时在数据目录写 user-quit（Harness 重开或重启电脑后作废），
   // 设置里关掉时写 ai-autostart-off。用独立进程打开（detached），Harness 退出时桌宠不会被一起关掉
   const appData = process.platform === "win32" ? data : join(homedir(), "Library", "Application Support", "CrossPet");
+
+  // ---- 事件记录（反馈「AI 干活时她没反应」用）：数据目录 events/deepseek.jsonl，格式和 crosspet-hook.py 一样（见 docs/架构.md「记录」）。
+  // 只记事件名、工具名、结果，不记消息和工具参数；只留最近 200 行。插件只有一个进程，按顺序排队写就行
+  const ledgerDir = join(config.dataDir || (process.env.CROSSPET_DATA_DIR ? data : appData), "events");
+  let ledgerChain = Promise.resolve();
+  function ledger(ev, tool, result, detail) {
+    const line = JSON.stringify({ t: Math.round(Date.now() / 10) / 100, ev, tool: String(tool || "").toLowerCase().slice(0, 60), sid: "", turn: false, result, detail });
+    const file = join(ledgerDir, `${ID}.jsonl`);
+    ledgerChain = ledgerChain.then(async () => {
+      await mkdir(ledgerDir, { recursive: true });
+      await appendFile(file, line + "\n");
+      const rows = (await readFile(file, "utf8")).split("\n").filter(Boolean);
+      if (rows.length > 240) {
+        const tmp = join(ledgerDir, `.${ID}.${process.pid}.tmp`);
+        await writeFile(tmp, rows.slice(-200).join("\n") + "\n");
+        await rename(tmp, file);
+      }
+    }).catch(() => {});   // 记录写不了不能影响插件本身
+  }
   let lastEnsure = 0;
   function noteAutostart(source, result) {  // 写进 <状态目录>/autostart.txt，排查「为什么没出来」用
     const at = new Date().toLocaleString("zh-CN", { hour12: false });
@@ -342,9 +363,14 @@ export function apply(ctx, config = {}) {
       ctx.logger?.warn?.(`crosspet: 查余额失败 ${String(e?.message ?? e)}`);
     }
   }
+  // 定时查的间隔：插件配置里的 balanceIntervalMs，0 = 不定时查（只在启动、发消息、一轮结束时查），
+  // 不写或写错（不是数、负数）按默认每分钟。常开着 Harness、人又不在时可以调慢或关掉（#29，@mkinnqijn）
+  const every = config.balanceIntervalMs;
+  const balanceInterval = typeof every === "number" && Number.isFinite(every) && every >= 0 ? every : BALANCE_EVERY_MS;
   ctx.effect(() => {
     pollBalance();
-    const timer = setInterval(pollBalance, BALANCE_EVERY_MS);
+    if (balanceInterval === 0) return () => {};
+    const timer = setInterval(pollBalance, balanceInterval);
     return () => clearInterval(timer);
   }, "crosspet: balance timer");
 }

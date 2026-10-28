@@ -16,7 +16,9 @@ extension App {
         ("workbuddy", "WorkBuddy", "按当前模型换角色"),
         ("zcode", "ZCode（智谱）", "按会话的模型换角色"),
         ("hermes", "Hermes Agent", "按当前模型换角色；新开的会话生效"),
+        ("cursor", "Cursor", "按当前模型换角色；认不出的模型由当前角色来演"),
         ("qwen", "Qwen Code（阿里）", "按当前模型换角色；新开的会话生效"),
+        ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
     ]
     var integrateScript: URL? {
         let url = Bundle.main.resourceURL!.appendingPathComponent("tools/integrate.py")
@@ -61,7 +63,7 @@ extension App {
     // 钩子 / 插件每收到一条事件就在状态目录写 seen-<名字>（时间戳）。状态目录 /tmp 重启会清空，所以桌宠把读到的最新时间存进设置。
     // 设置里据此标出「接上了但从没收到过消息」，反馈里也带着
     static let seenKeys = ["claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen"]
+                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "cursor": "cursor", "grok": "grok"]
     var lastSeen: [String: Double] {
         get { (defaults.dictionary(forKey: "seen") as? [String: Double]) ?? [:] }
         set { defaults.set(newValue, forKey: "seen") }
@@ -100,7 +102,7 @@ extension App {
             let healed = (try? JSONSerialization.jsonObject(with: Data(last.utf8))) as? [String] ?? []
             guard !healed.isEmpty else { return }
             self.healTimes.append(Date())
-            NSLog("CrossPet: 接回被冲掉的接入 \(healed)")
+            appLog("接回被冲掉的接入 \(healed)")
             self.js("configHealed()")
             self.refreshIntegrated()
         }
@@ -147,15 +149,15 @@ extension App {
     }
 
     func pushSettings() {
-        guard settingsWeb != nil else { return }
+        guard settingsWeb != nil || charactersWeb != nil else { return }
         // 当前角色以桌宠页面里正在演的为准（启动时外壳会先从 UserDefaults 恢复上次的角色，见 didFinish）
         web.evaluateJavaScript("charId") { [weak self] r, _ in
-            guard let self, let v = self.settingsWeb else { return }
+            guard let self else { return }
             // 只在还不知道当前角色时（刚启动、没存过上次的角色）问页面；换角色有 0.33 秒过渡，过渡中页面里还是旧角色
             if self.currentId == nil, let id = r as? String, self.characterIds.contains(id) { self.currentId = id }
             guard let data = try? JSONSerialization.data(withJSONObject: self.settingsState()),
                   let text = String(data: data, encoding: .utf8) else { return }
-            v.evaluateJavaScript("setState(\(text))", completionHandler: nil)
+            for v in [self.settingsWeb, self.charactersWeb].compactMap({ $0 }) { v.evaluateJavaScript("setState(\(text))", completionHandler: nil) }
         }
     }
 
@@ -207,6 +209,8 @@ extension App {
                 defaults.set(on, forKey: "codexResets"); js("setCodexResets(\(on))")
             case "peakSkins":
                 defaults.set(Self.cleanPeakSkins(value), forKey: "peakSkins"); js("setPeakSkins(\(peakSkinsJSON))")
+            case "quotaStyle":
+                if let s = value as? String, ["text", "bars"].contains(s) { defaults.set(s, forKey: "quotaStyle"); js("setQuotaStyle(\(quote(s)))") }
             case "peakStyle":
                 if let s = value as? String, ["bar", "text", "off"].contains(s) { defaults.set(s, forKey: "peakStyle"); js("setPeakStyle(\(quote(s)))") }
             case "dsQuota":
@@ -223,7 +227,7 @@ extension App {
             case "login":
                 if (value as? Bool ?? false) != (SMAppService.mainApp.status == .enabled) { toggleLogin() }
             case "character":
-                if let id = value as? String, characterIds.contains(id) { switchTo(id) }
+                if let id = value as? String, characterIds.contains(id) { switchTo(id, why: "manual", via: "settings") }
             default: break
             }
             pushSettings()
@@ -232,7 +236,7 @@ extension App {
         case "skin":   // 换衣服：记下来，重新载入立绘；正在显示的就是她的话马上换上
             guard let id = msg["id"] as? String, characterIds.contains(id), let skin = msg["skin"] as? String else { return }
             wear(id, skin)
-            switchTo(id)
+            switchTo(id, why: "skin", via: skin)
             pushSettings()
         case "rename":
             guard let id = msg["id"] as? String, characterIds.contains(id) else { return }
@@ -253,6 +257,7 @@ extension App {
             case "openReleases": NSWorkspace.shared.open(URL(string: "https://github.com/lokicorvus/crosspet/releases")!)
             case "devConsole": openDevConsole()
             case "feedback": openFeedback()
+            case "characterWindow": openCharacterPage()
             default: break
             }
             pushSettings()

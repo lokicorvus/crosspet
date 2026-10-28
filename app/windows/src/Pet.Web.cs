@@ -31,7 +31,7 @@ namespace CrossPet
             try { return web?.CoreWebView2 == null ? "null" : await web.CoreWebView2.ExecuteScriptAsync(code); }
             catch { return "null"; }
         }
-        public void Reload() { ready = false; web?.CoreWebView2?.Reload(); }
+        public void Reload() { ++followEventGeneration; ready = false; web?.CoreWebView2?.Reload(); }
         public static string Q(string s) => Store.Json.Serialize(s);
 
         /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
@@ -43,39 +43,34 @@ namespace CrossPet
             Store.SaveSettings();
             LoadCharacters();
             Js($"init({ManifestJson}); refreshLook({Q(id)})");
+            PushSettings();   // 设置页开着（角色页的衣服卡）时高亮跟着变：按时段自动换衣服也走这里
         }
 
-        void SwitchTo(string id)
+        /// <summary>why：为什么换（front 跟随前台 / event 跟随事件 / manual 菜单或设置 / skin 换衣服），记进换角色记录（反馈「角色换得不对」用）</summary>
+        void SwitchTo(string id, string why, string via = "")
         {
+            ++followEventGeneration;  // 同一个角色也算新的手动选择，不能让旧的异步跟随请求盖回来。
             if (!Characters().Any(c => c.id == id)) return;
+            var skin = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
+            Ledger.Append(SwitchesFile, new Dictionary<string, object> { ["from"] = current ?? "", ["to"] = id, ["skin"] = skin, ["why"] = why, ["via"] = via });
+            if (id != current) Store.Log($"换角色 {current} → {id}（{why}{(via == "" ? "" : " " + via)}）");
             current = id;
             if (dock != null && !dockOut) After(800, ApplyDock);   // 换了角色，切口位置跟着变
             Store.Settings["character"] = id; Store.SaveSettings();
             Js($"setCharacter({Q(id)})");
-            settings?.Push();
+            PushSettings();
         }
 
         /// <summary>读 AI 写来的状态 / 额度文件（state 目录），有变化就交给网页。和 macOS 版 pollStates 一样</summary>
         void Poll()
         {
             if (!ready) return;
+            // 前台换成 / 离开桌面：Win+D「显示桌面」不一定发前台切换事件，这里兜一下（见 ZOrderRule.Top）
+            var shell = Native.ForegroundIsShell();
+            if (shell != frontIsShell) { frontIsShell = shell; ApplyLayer(); }
             // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）里换了模型：
             // 它正在前台的话马上换成那个模型的角色
-            var hostChanged = false;
-            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen" })
-            {
-                try
-                {
-                    var fi = new FileInfo(Path.Combine(Store.State, host + "-host.json"));
-                    if (!fi.Exists) continue;
-                    var stamp = fi.LastWriteTimeUtc.Ticks.ToString();
-                    if (stamps.TryGetValue(host + "-host", out var old) && old == stamp) continue;
-                    if (old != null) hostChanged = true;
-                    stamps[host + "-host"] = stamp;
-                }
-                catch { }
-            }
-            if (hostChanged) FollowForeground();
+            if (HostRoutesChanged()) FollowForeground("host");
             var latestActive = (id: (string)null, ts: 0.0);
             // current：多模型宿主（WorkBuddy）里没有对应角色的模型，由当前角色来演；它只有状态，没有额度
             foreach (var id in Characters().Select(c => c.id).Concat(new[] { "current" }))
@@ -89,16 +84,17 @@ namespace CrossPet
                     var stamp = fi.LastWriteTimeUtc.Ticks + ":" + fi.Length;
                     var key = id + "-" + kind;
                     if (stamps.TryGetValue(key, out var old) && old == stamp) continue;
-                    if (kind == "state" && (DateTime.UtcNow - fi.LastWriteTimeUtc).TotalMinutes > 10) { stamps[key] = stamp; continue; }  // 只认 10 分钟内的
+                    if (kind == "state" && (DateTime.UtcNow - fi.LastWriteTimeUtc).TotalMinutes > 10) { stamps[key] = stamp; NotePet(id, null, "skipped", "stale"); continue; }  // 只认 10 分钟内的
                     var value = Store.ReadJson(file);
                     if (value == null) continue;   // 可能正被另一边写一半，下次再读
                     stamps[key] = stamp;
                     var json = Store.Json.Serialize(value);
                     if (kind == "sessions") { if (!Paused) Js($"setSessions({Q(id)}, {json})"); continue; }
                     dev?.Js($"logEvent({Q(id)}, {Q(kind)}, {json}, {(Paused ? "true" : "false")})");
-                    if (Paused) continue;
+                    if (Paused) { if (kind == "state") NotePet(id, value, "skipped", "paused"); continue; }
                     if (kind == "state")
                     {
+                        NotePet(id, value, "played");   // 交给网页了；网页自己的判断（不是当前角色、正在演彩蛋……）在 diagnoseDisplay 里
                         // 在终端里用 AI 时没有对应的前台程序：跟着最新一条工作事件换角色
                         var pose = value.TryGetValue("pose", out var p) ? p as string : null;
                         var ts = value.TryGetValue("ts", out var t) ? Convert.ToDouble(t) : 0;
@@ -114,7 +110,7 @@ namespace CrossPet
                     }
                     else Js($"setQuota({Q(id)}, {json})");
                 }
-            if (latestActive.id != null && latestActive.id != current && Store.Flag("followEvents")) SwitchTo(latestActive.id);
+            if (latestActive.id != null) _ = FollowEvent(latestActive.id);
             ApplyLayer();
             UpdateDock();
         }

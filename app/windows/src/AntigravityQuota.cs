@@ -23,13 +23,16 @@ namespace CrossPet
             ServerCertificateCustomValidationCallback = (req, cert, chain, errors) => req.RequestUri.Host == "127.0.0.1",
         }) { Timeout = TimeSpan.FromSeconds(5) };
         static int cachedPid, cachedPort;
+        /// <summary>最近一次找服务的结果（反馈「额度不对」用）</summary>
+        public static string LastNote = "还没查过";
 
         public static async Task<Dictionary<string, object>> Read()
         {
             var server = FindServer();
-            if (server == null) return null;
+            if (server == null) { LastNote = $"{DateTime.Now:MM-dd HH:mm} 没找到 Antigravity 的服务进程"; return null; }
             var (pid, token) = server.Value;
             var ports = cachedPid == pid ? new List<int> { cachedPort } : ListeningPorts(pid);
+            LastNote = $"{DateTime.Now:MM-dd HH:mm} 找到服务进程，监听端口 {ports.Count} 个";
             // 每个端口先问「额度汇总」（和 Antigravity 的「View Usage」同一份数据，刚对话完就更新），旧版没有这个接口时退回「用户状态」
             // （里面的额度是缓存，会慢几分钟；2026-10-14 实测 View Usage 已经 98%，用户状态里还是 100%）。和 macOS 版 askAntigravity 一致
             foreach (var port in ports)

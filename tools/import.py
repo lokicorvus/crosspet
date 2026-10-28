@@ -3,6 +3,7 @@
     python3 tools/import.py            # 处理所有角色的 raw/
     python3 tools/import.py gpt        # 只处理某个角色
 处理完会自动修正眨眼帧。raw/ 不会被提交到 git。
+角色页卡片用的 portrait / avatar 不是立绘，跳过，交给 tools/cards.py 按卡片大小缩。
 """
 import subprocess
 import sys
@@ -16,8 +17,10 @@ for raw in sorted(CHARACTERS.glob("*/raw")):
     cid = raw.parent.name
     if only and cid != only:
         continue
-    files = [f for f in sorted(raw.iterdir()) if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}]
+    files = [f for f in sorted(raw.iterdir()) if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+             and f.stem not in ("portrait", "portrait-card", "avatar")]
     for f in files:
         subprocess.run([sys.executable, str(TOOLS / "prepare.py"), str(f), cid, f.stem], check=True)
     if any(f.stem == "idle-blink" for f in files) and (CHARACTERS / cid / "idle.webp").exists():
         subprocess.run([sys.executable, str(TOOLS / "fix_blink.py"), cid], check=True)
+    subprocess.run([sys.executable, str(TOOLS / "cards.py"), cid], check=True)

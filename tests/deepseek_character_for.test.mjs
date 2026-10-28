@@ -13,7 +13,7 @@ async function hostCharacterFor(provider, model, config = {}) {
   const handlers = {}, effects = []
   const ctx = { on(n, f) { (handlers[n] ||= []).push(f) }, inject() { throw new Error('none') }, effect(f) { effects.push(f) },
     logger: { warn() {} }, credentials: { resolve: async () => ({ value: 'sk-test' }) } }
-  apply(ctx, { stateDir, autostart: false, ...config })
+  apply(ctx, { stateDir, dataDir: stateDir, autostart: false, ...config })   // dataDir：事件记录也写进临时目录，别写到真实的数据目录
   for (const h of handlers['session/event'] || []) h({ requestContext: () => ({ provider, model }) }, {})
   await new Promise((r) => setTimeout(r, 50))
   effects.map((f) => f()).forEach((s) => typeof s === 'function' && s())
@@ -30,6 +30,11 @@ test('别家的模型照旧映射，不受千问那条影响', async () => {
   assert.equal(await hostCharacterFor('zhipu', 'glm-4.6'), 'glm')
   assert.equal(await hostCharacterFor('anthropic', 'claude-sonnet-4'), 'claude')
   assert.equal(await hostCharacterFor('', 'gpt-5'), 'gpt')
+})
+test('Grok：模型名或服务商名（xai / x-ai）认出来换成 grok', async () => {
+  for (const [provider, model] of [['', 'grok-4.7'], ['openrouter', 'x-ai/grok-code-fast-2'], ['xai', 'grok-4-fast']]) {
+    assert.equal(await hostCharacterFor(provider, model), 'grok', `${provider}/${model}`)
+  }
 })
 test('认不出的还是由 DeepSeek 自己来演', async () => {
   assert.equal(await hostCharacterFor('some-gateway', 'mystery-model-1'), 'deepseek')

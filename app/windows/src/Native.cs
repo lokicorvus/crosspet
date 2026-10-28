@@ -60,6 +60,7 @@ namespace CrossPet
             return false;
         }
 
+        static readonly uint MyPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
         /// <summary>取消置顶（变成普通窗口，会被别的窗口挡住）</summary>
         /// 取消置顶后系统会把它放在所有普通窗口最前面，还是压在你正在用的窗口上，要等那个窗口再激活一次才盖过来：
         /// 所以再把它挪到当前前台窗口的后面（就像你刚点了一下那个窗口）
@@ -67,7 +68,11 @@ namespace CrossPet
         {
             SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             var front = GetForegroundWindow();
-            if (front != IntPtr.Zero && front != hwnd)
+            if (front == IntPtr.Zero || front == hwnd) return;
+            var root = GetAncestor(front, 2); if (root != IntPtr.Zero) front = root;   // GA_ROOT
+            var cls = new StringBuilder(64); GetClassName(front, cls, 64);
+            GetWindowThreadProcessId(front, out var pid);
+            if (ZOrderRule.TuckBelow(cls.ToString(), pid == MyPid))   // 桌面、任务栏、自己的菜单下面不插（见 ZOrderRule）
                 SetWindowPos(hwnd, front, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
 
@@ -92,7 +97,7 @@ namespace CrossPet
                 front = GetAncestor(front, 2) is var root && root != IntPtr.Zero ? root : front;   // GA_ROOT
                 var cls = new StringBuilder(64); GetClassName(front, cls, 64);
                 var c = cls.ToString();
-                if (c == "Progman" || c == "WorkerW" || c == "Shell_TrayWnd" || c == "Shell_SecondaryTrayWnd") return false;   // 桌面、任务栏
+                if (ZOrderRule.IsShell(c)) return false;   // 桌面、任务栏
                 var mon = MonitorFromWindow(pet, 2);   // MONITOR_DEFAULTTONEAREST
                 if (mon != MonitorFromWindow(front, 2)) return false;   // 全屏的是另一块屏幕
                 var info = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
@@ -108,6 +113,16 @@ namespace CrossPet
 
         public static void MoveTo(IntPtr hwnd, int x, int y) =>
             SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+        /// <summary>前台是不是桌面或任务栏（Win+D、点了桌面空白处）</summary>
+        public static bool ForegroundIsShell()
+        {
+            var front = GetForegroundWindow();
+            if (front == IntPtr.Zero) return false;
+            var root = GetAncestor(front, 2); if (root != IntPtr.Zero) front = root;   // GA_ROOT
+            var cls = new StringBuilder(64); GetClassName(front, cls, 64);
+            return ZOrderRule.IsShell(cls.ToString());
+        }
 
         /// <summary>前台窗口所属程序的文件名（小写，如 codex.exe）；取不到返回空串。只看程序名，不读窗口标题和内容</summary>
         public static string ForegroundExe()

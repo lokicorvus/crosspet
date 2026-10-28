@@ -16,6 +16,18 @@ namespace CrossPet
             return Math.Abs(w1 / expectedW - 1) > 0.02 || Math.Abs(h1 / expectedH - 1) > 0.02;
         }
 
+        /// <summary>换了系统缩放后网页区域还停在旧缩放的像素上（#28：150%→200% 网页 195×271、应为 260×362，正好 150/200；
+        /// 200%→150% 是 346×483，正好 200/150）：ResyncWebForDpi 没对齐成功。这时不该改网页缩放（人物会跟着变大变小），
+        /// 要再让网页控件按新缩放重算一次区域。宽高偏得一样多、而且正好是「旧缩放 ÷ 新缩放」才算</summary>
+        public static bool StuckAtOldDpi(double expectedW, double expectedH, double w, double h, double oldDpi, double newDpi)
+        {
+            if (expectedW <= 0 || expectedH <= 0 || w <= 0 || h <= 0 || oldDpi <= 0 || newDpi <= 0) return false;
+            if (Math.Abs(oldDpi / newDpi - 1) < 0.02) return false;   // 缩放没变
+            double rw = w / expectedW, rh = h / expectedH;
+            if (Math.Abs(rw / rh - 1) > 0.015) return false;
+            return Math.Abs((rw + rh) / 2 / (oldDpi / newDpi) - 1) < 0.02;
+        }
+
         /// <summary>系统缩放被算了两遍时的修正（10-17 反馈：125%、Windows 预览版、WebView2 155，网页 224×298，应为 280×372）：
         /// 网页按「人物大小 × 系统缩放 × 系统缩放」画，宽高都正好小了一个系统缩放倍，气泡被挤出窗口。
         /// 返回网页缩放该乘的系数（给网页的缩放 = 人物大小 × 系数），不用改返回 null。

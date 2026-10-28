@@ -35,7 +35,7 @@ namespace CrossPet
         {
             ["claude-hooks"] = "claude", ["claude-mod"] = "claude-mod", ["codex"] = "gpt", ["deepseek"] = "deepseek", ["gemini"] = "gemini",
             ["antigravity"] = "antigravity", ["workbuddy"] = "workbuddy", ["zcode"] = "zcode", ["hermes"] = "hermes",
-            ["qwen"] = "qwen",
+            ["qwen"] = "qwen", ["cursor"] = "cursor", ["grok"] = "grok",
         };
         static Dictionary<string, object> LastSeen => Store.Settings.TryGetValue("seen", out var v) && v is Dictionary<string, object> d ? d : new Dictionary<string, object>();
         static double? SeenAt(string key) => LastSeen.TryGetValue(key, out var v) ? Convert.ToDouble(v) : (double?)null;
@@ -53,7 +53,7 @@ namespace CrossPet
                 }
                 catch { }
             }
-            if (changed) { Store.Settings["seen"] = seen; Store.SaveSettings(); settings?.Push(); }
+            if (changed) { Store.Settings["seen"] = seen; Store.SaveSettings(); PushSettings(); }
         }
         static double Now => (DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
         static string AgoText(double? ts)
@@ -99,7 +99,7 @@ namespace CrossPet
                 var r = RunIntegrate("installed").output;
                 List<string> list = null;
                 try { list = (Store.Json.DeserializeObject(r.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
-                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); settings?.Push(); done?.Invoke(); });
+                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
             });
             RefreshPlugins();
         }
@@ -114,7 +114,7 @@ namespace CrossPet
                 var (output, code) = RunIntegrate("plugins");
                 var last = (output ?? "").Trim().Split('\n').Last().Trim();
                 try { if (code != 0 || !(Store.Json.DeserializeObject(last) is object[])) return; } catch { return; }
-                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); settings?.Push(); });
+                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
             });
         }
 
@@ -129,7 +129,9 @@ namespace CrossPet
             ("workbuddy", "WorkBuddy", "按当前模型换角色，没有对应角色的模型由当前角色来演"),
             ("zcode", "ZCode（智谱）", "按会话的模型换角色，GLM 角色没装时由当前角色来演"),
             ("hermes", "Hermes Agent", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
+            ("cursor", "Cursor", "按当前模型换角色，认不出的模型由当前角色来演；新开的对话生效"),
             ("qwen", "Qwen Code（阿里）", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
+            ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
         };
 
         public Dictionary<string, object> SettingsState()
@@ -140,21 +142,24 @@ namespace CrossPet
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
-                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave,
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
                 ["hotkeys"] = new[] { new Dictionary<string, object> { ["id"] = "off", ["label"] = "不用快捷键" } }.Concat(HotkeyChoices.Select(h => new Dictionary<string, object> { ["id"] = h.id, ["label"] = h.label })).ToList(), ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c =>
                 {
+                    var info = Store.ReadJson(Path.Combine(Store.Characters, c.id, "character.json"));
                     var d = new Dictionary<string, object>
                     {
                         ["id"] = c.id, ["name"] = c.name,
-                        ["defaultName"] = Store.ReadJson(Path.Combine(Store.Characters, c.id, "character.json"))?["name"] as string ?? c.id,
+                        ["defaultName"] = info?["name"] as string ?? c.id,
+                        ["accent"] = info?["accent"] as string,
+                        ["images"] = CardImages.Of(Store.Characters, c.id, Store.DataHost),   // 角色页卡片图（原版）
                         ["custom"] = Store.Names.TryGetValue(c.id, out var n) ? n as string ?? "" : "",
                     };
                     if (Store.SkinChoices.TryGetValue(c.id, out var skins) && skins.Count > 0)   // 有别的衣服：原版排第一
                     {
-                        var list = new List<object> { new Dictionary<string, object> { ["id"] = "", ["name"] = Store.BaseOutfit.TryGetValue(c.id, out var bo) && bo != null ? bo : "原版" } };
-                        list.AddRange(skins.Select(k => (object)new Dictionary<string, object> { ["id"] = k.id, ["name"] = k.name }));
+                        var list = new List<object> { new Dictionary<string, object> { ["id"] = "", ["name"] = Store.BaseOutfit.TryGetValue(c.id, out var bo) && bo != null ? bo : "原版", ["images"] = d["images"] } };
+                        list.AddRange(skins.Select(k => (object)new Dictionary<string, object> { ["id"] = k.id, ["name"] = k.name, ["images"] = CardImages.Of(Store.Characters, k.id, Store.DataHost) }));
                         d["skins"] = list;
                         d["skin"] = Store.Skins != null && Store.Skins.TryGetValue(c.id, out var cur) ? cur as string ?? "" : "";
                     }
@@ -199,6 +204,9 @@ namespace CrossPet
                         case "whatsNewSeen": if (value is string seen) { Store.Settings["whatsNewSeen"] = seen; Store.SaveSettings(); } break;   // 打开了「新功能」页：小红点消失
                         case "codexResets": Store.Settings["codexResets"] = on; Store.SaveSettings(); Js($"setCodexResets({(on ? "true" : "false")})"); break;
                         case "peakSkins": Store.Settings["peakSkins"] = CleanPeakSkins(value); Store.SaveSettings(); Js($"setPeakSkins({Store.Json.Serialize(PeakSkins)})"); break;
+                        case "quotaStyle":
+                            if (value is string qs && (qs == "text" || qs == "bars")) { Store.Settings["quotaStyle"] = qs; Store.SaveSettings(); Js($"setQuotaStyle({Q(qs)})"); }
+                            break;
                         case "peakStyle":
                             if (value is string ps && (ps == "bar" || ps == "text" || ps == "off")) { Store.Settings["peakStyle"] = ps; Store.SaveSettings(); Js($"setPeakStyle({Q(ps)})"); }
                             break;
@@ -224,12 +232,12 @@ namespace CrossPet
                             break;
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
-                        case "character": if (value is string id) SwitchTo(id); break;
+                        case "character": if (value is string id) SwitchTo(id, "manual", "settings"); break;
                     }
                     break;
                 case "skin":   // 换衣服：记下来，重新载入立绘，并换成这个角色
                     if (msg.TryGetValue("id", out var kid) && kid is string skinId && Characters().Any(x => x.id == skinId) && msg.TryGetValue("skin", out var kv) && kv is string skinName)
-                    { Wear(skinId, skinName); SwitchTo(skinId); }
+                    { Wear(skinId, skinName); SwitchTo(skinId, "skin", skinName); }
                     break;
                 case "rename":
                     if (msg.TryGetValue("id", out var rid) && rid is string cid && Characters().Any(x => x.id == cid))
@@ -258,10 +266,11 @@ namespace CrossPet
                         case "openReleases": Open("https://github.com/lokicorvus/crosspet/releases"); break;
                         case "devConsole": OpenDev(); break;
                         case "feedback": OpenFeedback(); break;
+                        case "characterWindow": OpenCharacterWindow(); break;
                     }
                     break;
             }
-            settings?.Push();
+            PushSettings();
         }
 
         /// <summary>背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off</summary>

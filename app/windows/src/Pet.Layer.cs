@@ -27,7 +27,7 @@ namespace CrossPet
         static string LayerMode => Store.Settings.TryGetValue("layer", out var v) && v is string s && (s == "ai" || s == "normal") ? s : "always";
         static bool HideFullscreen => !(Store.Settings.TryGetValue("hideFullscreen", out var v) && v is bool b && !b);
         readonly Dictionary<string, (string pose, DateTime at)> lastPose = new Dictionary<string, (string, DateTime)>();
-        bool frontIsAI, hiddenForFullscreen;
+        bool frontIsAI, frontIsShell, hiddenForFullscreen;
 
         bool AIActive()
         {
@@ -48,7 +48,7 @@ namespace CrossPet
         {
             if (Window == null || concealed == c) return;
             concealed = c;
-            if (c) { Window.Opacity = 0; if (hwnd != IntPtr.Zero) Native.DropFromTop(hwnd); }
+            if (c) { openMenu?.Close(); Window.Opacity = 0; if (hwnd != IntPtr.Zero) Native.DropFromTop(hwnd); }
             else { Window.Opacity = 1; Raise(); }
             // 藏着时鼠标穿过整个窗口（只靠不透明度 0 点不透，原因见 ConcealStyle.ClickThrough）
             if (hwnd != IntPtr.Zero) Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ConcealStyle.ClickThrough(Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE), c));
@@ -97,7 +97,7 @@ namespace CrossPet
                 Store.Log(hide ? $"全屏中，先藏起来（前台 {Native.ForegroundExe()}）" : "退出全屏，出来了");
                 SetConcealed(hide);
             }
-            var top = LayerMode == "always" || (LayerMode == "ai" && AIActive());
+            var top = ZOrderRule.Top(LayerMode, LayerMode == "ai" && AIActive(), frontIsShell);   // 「跟着 AI」时前台是桌面也置顶（见 ZOrderRule.Top）
             if (Window.Topmost == top || surfacing) return;
             // 原本被别的窗口挡着、要浮上来：先藏起来，换完层级再淡入（没被挡住就直接换，免得闪一下）
             if (top && !hiddenForFullscreen && Native.Covered(hwnd)) { _ = Surface(); return; }

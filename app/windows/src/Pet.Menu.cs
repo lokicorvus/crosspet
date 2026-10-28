@@ -45,22 +45,8 @@ namespace CrossPet
             menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
             if (CodexResets && current == "gpt") menu.Items.Add(Item("会重置吗？", () => Js("askReset()")));   // 只有 GPT 有这个需求
             Sep();
-            var switchTo = new Forms.ToolStripMenuItem("换角色");
-            // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」
-            foreach (var (id, name) in Characters())
-            {
-                var cid = id;
-                if (Store.SkinChoices.TryGetValue(id, out var skins) && skins.Count > 0)
-                {
-                    var worn = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
-                    var baseName = Store.BaseOutfit.TryGetValue(id, out var bo) && bo != null ? bo : "原版";
-                    switchTo.DropDownItems.Add(Item($"{name} · {baseName}", () => { Wear(cid, ""); SwitchTo(cid); }, cid == current && worn == ""));
-                    foreach (var (sid, sname) in skins) { var k = sid; switchTo.DropDownItems.Add(Item($"{name} · {sname}", () => { Wear(cid, k); SwitchTo(cid); }, cid == current && worn == k)); }
-                }
-                else switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid), cid == current));
-            }
-            menu.Items.Add(switchTo);
-            Sep();
+            // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
+            if (Characters().Count > 1) { menu.Items.Add(Item("换角色…", OpenCharacterWindow)); Sep(); }
             var layer = new Forms.ToolStripMenuItem("显示层级");
             foreach (var (mode, title) in new[] { ("always", "始终在最上层"), ("ai", "跟着 AI（用 AI 时才浮在最上层）"), ("normal", "普通窗口（不置顶）") })
             {
@@ -70,7 +56,16 @@ namespace CrossPet
             menu.Items.Add(layer);
             menu.Items.Add(Item("设置…", () => OpenSettings()));
             menu.Items.Add(Item("反馈问题…", OpenFeedback));
-            if (developer) menu.Items.Add(Item("开发者控制台…", OpenDev));
+            if (developer)
+            {
+                menu.Items.Add(Item("开发者控制台…", OpenDev));
+                menu.Items.Add(Item("测试渲染失败并重启…", () =>
+                {
+                    if (MessageBox.Show("这会主动触发渲染失败的恢复流程，桌宠及设置窗口会关闭，然后尝试自动重开。是否继续？",
+                        "CrossPet 开发测试", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                        Program.InjectRenderFailure();
+                }));
+            }
             menu.Items.Add(Item("回到右下角", Recenter));
             menu.Items.Add(Item(HotkeyLabel != null ? $"暂时隐藏（{HotkeyLabel}）" : "暂时隐藏", () => SetUserHidden(true)));
             Sep();

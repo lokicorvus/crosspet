@@ -48,6 +48,7 @@ extension App {
         guard defaults.bool(forKey: "gptQuota") else { return }   // 查的途中关掉了额度显示
         if let rl = rateLimits { codexLast = (rl, Date()); codexNote = "" }
         else if codexLast == nil { codexNote = "问不到 Codex：\(error ?? "原因不明")" }
+        if rateLimits == nil { appLog("GPT 额度查询失败：\(error ?? "原因不明")") }
         let tag = rateLimits != nil ? "Codex 服务，\(String(format: "%.1f", Double(ms) / 1000)) 秒" : "没问到：\(error ?? "原因不明")"
         lastGptQuota = "\(Self.clock()) （\(tag)）" + (codexLast.map { (rateLimits == nil ? "沿用 \(Self.hm($0.at)) 的数：" : "") + CodexQuotaSource.brief($0.rateLimits) } ?? "")
         pushSettings()
@@ -68,10 +69,11 @@ extension App {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             guard let (pid, token) = self.antigravityServer() else {
-                DispatchQueue.main.async { self.js("setQuota('gemini', null)") }
+                DispatchQueue.main.async { self.js("setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程" }
                 return
             }
             let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : self.listeningPorts(pid)
+            DispatchQueue.main.async { self.lastAgyNote = "\(Self.clock()) 找到服务进程，监听端口 \(ports.count) 个" }
             self.askAntigravity(pid: pid, token: token, ports: ports)
         }
     }
@@ -140,38 +142,69 @@ extension App {
     /// 额度汇总或用户状态，哪种都认（汇总优先）
     static func antigravityParse(_ obj: Any) -> [String: Any]? { antigravitySummary(obj) ?? antigravityQuota(obj) }
 
-    /// 额度汇总（RetrieveUserQuotaSummary）：Antigravity 自己分好组（「Gemini Models」「Claude and GPT models」），
-    /// 每组一个或几个窗口（本周 / 今日……）。每个窗口一行；一组只有一个窗口时不写窗口名，和用户状态那条路显示得一样
+    /// 额度汇总（RetrieveUserQuotaSummary）：Antigravity 自己分好组（「Gemini Models」「Claude and GPT models」「Gemini 4 Argon」……），
+    /// 每组一个或几个窗口（5h / 本周 / 今日……）。交出两样东西：
+    /// - text：关闭「合并显示各家额度」时用的，每组一行，一个组只留一个窗口（见下面的挑法），用「｜」隔开
+    /// - bars：结构化的额度条（和别家的 bars 同一个格式）：每个窗口一项 {label, left, reset?, group}，同一个池的窗口挨着排（短窗口在前）。
+    ///   label = 「池名 窗口名」（Gemini 5小时 / Argon 本周 / Claude/GPT 本周）；left 是剩余比例 0–1；reset 是重置时刻（Unix 秒，没有就不写）；
+    ///   group 是池名（额外加的，网页层不用去拆 label）。合并显示怎么排（Gemini + Arg 一行、Agy C/G 另起一行）由网页层按 bars 决定
     static func antigravitySummary(_ obj: Any) -> [String: Any]? {
         guard let groups = ((obj as? [String: Any])?["response"] as? [String: Any])?["groups"] as? [[String: Any]] else { return nil }
         let iso = ISO8601DateFormatter()
-        var rows: [(name: String, left: Double, reset: Date?)] = []
+        let fmt = DateFormatter()
+        typealias Cell = (label: String, left: Double, reset: Date?)
+        func piece(_ c: Cell) -> String {
+            var s = "\(c.label) 剩余 \(Int((c.left * 100).rounded()))%"
+            if let d = c.reset {   // 每行都标重置时间（5h 窗口很快就重置，知道多久能用上比知道还剩多少更有用）
+                fmt.dateFormat = d.timeIntervalSinceNow < 86400 ? "HH:mm" : "M/d"
+                s += " · \(fmt.string(from: d)) 重置"
+            }
+            return s
+        }
+        var rows: [Cell] = []
+        var bars: [[String: Any]] = []
         let sorted = groups.enumerated().sorted { a, b in
             let ga = (a.element["displayName"] as? String ?? "").contains("Gemini") ? 0 : 1, gb = (b.element["displayName"] as? String ?? "").contains("Gemini") ? 0 : 1
             return ga != gb ? ga < gb : a.offset < b.offset
         }.map { $0.element }
         for g in sorted {
             let title = g["displayName"] as? String ?? ""
-            let name = title.contains("Gemini") ? "Gemini" : title.contains("Claude") || title.contains("GPT") ? "Claude/GPT" : title
+            // 只合并普通的两个池；「Gemini 4 Argon」这类独立额度池保留 Antigravity 给的名字，不然会和普通 Gemini 分不出来
+            let isGemini = title.lowercased() == "gemini models", isGPT = !isGemini && (title.contains("Claude") || title.contains("GPT"))
+            let name = isGemini ? "Gemini" : isGPT ? "Claude/GPT" : title
             let buckets = g["buckets"] as? [[String: Any]] ?? []
+            var cands: [(win: String, window: String, left: Double, reset: Date?)] = []
             for b in buckets {
                 // 比例为 0 时会被省略（protobuf 转 JSON 不写默认值）：窗口在、比例不在 = 用完了
                 let left = (b["remainingFraction"] as? NSNumber)?.doubleValue ?? 0
-                let window = ["weekly": "本周", "daily": "今日"][b["window"] as? String ?? ""] ?? (b["displayName"] as? String ?? "")
-                rows.append((buckets.count > 1 ? "\(name) \(window)" : name, left, (b["resetTime"] as? String).flatMap { iso.date(from: $0) }))
+                // 认得的窗口写中文（和 Claude / GPT 的「5小时」「本周」一致）；不认得的先用接口给的名字，再不行用窗口 id，不留空
+                let win = b["window"] as? String ?? ""
+                let window = ["weekly": "本周", "daily": "今日", "5h": "5小时"][win] ?? ((b["displayName"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? win)
+                cands.append((win, window, left, (b["resetTime"] as? String).flatMap { iso.date(from: $0) }))
+            }
+            // 每组在 text 里只留一行：
+            // 有 5h 窗口、且 5h 没满 → 显示 5h（和它的重置时间）；5h 满了 → 显示别的窗口里最紧的（一般是周额度）；
+            // 例外：最紧的窗口 ≤10% 时不管 5h 怎样都显示它，周额度快用完了不能被 5h 盖住。
+            // 一样紧的窗口取重置得更晚的（真正限制你什么时候能继续用的是它），不看接口给的顺序
+            let tightest = cands.reduce(nil as (win: String, window: String, left: Double, reset: Date?)?) { best, c in
+                guard let b = best else { return c }
+                return c.left < b.left || (c.left == b.left && (c.reset ?? .distantPast) > (b.reset ?? .distantPast)) ? c : b
+            }
+            guard let t = tightest else { continue }
+            let five = cands.first { $0.win == "5h" }
+            let pick = t.left > 0.1 && five != nil && five!.left < 1 ? five! : t
+            rows.append((cands.count > 1 ? "\(name) \(pick.window)" : name, pick.left, pick.reset))
+            // bars：每个窗口一项（不只是挑出来的那个），短窗口在前
+            let pool = isGemini ? "Gemini" : isGPT ? "Claude/GPT" : title.replacingOccurrences(of: "^Gemini\\s+(\\d+\\s+)?", with: "", options: .regularExpression)
+            let order = ["5h": 0, "daily": 1, "weekly": 2]
+            for c in cands.sorted(by: { (order[$0.win] ?? 3) < (order[$1.win] ?? 3) }) {
+                var bar: [String: Any] = ["label": "\(pool) \(c.window)", "left": c.left, "group": pool]
+                if let d = c.reset { bar["reset"] = Int(d.timeIntervalSince1970) }
+                bars.append(bar)
             }
         }
         guard !rows.isEmpty else { return nil }
-        let fmt = DateFormatter()
-        let parts = rows.enumerated().map { i, r -> String in
-            var piece = "\(r.name) 剩余 \(Int((r.left * 100).rounded()))%"
-            if i == 0 || r.left <= 0.1, let d = r.reset {   // 重置时间标在第一行和快用完的行上
-                fmt.dateFormat = d.timeIntervalSinceNow < 86400 ? "HH:mm" : "M/d"
-                piece += " · \(fmt.string(from: d)) 重置"
-            }
-            return piece
-        }
-        return ["text": parts.joined(separator: " ｜ "), "low": (rows.map { $0.left }.min() ?? 1) <= 0.1]
+        return ["text": rows.map(piece).joined(separator: " ｜ "), "low": (rows.map { $0.left }.min() ?? 1) <= 0.1, "bars": bars]
     }
 
     /// 用户状态（GetUserStatus，旧版 Antigravity 的退路）：额度按「额度池」共享：Gemini 模型一个池，Claude 和 GPT 模型一个池（Antigravity 的「View Usage」也是这两组）。

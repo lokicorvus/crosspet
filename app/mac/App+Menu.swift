@@ -26,25 +26,8 @@ extension App {
         if codexResets && currentId == "gpt" { add(menu, "会重置吗？", #selector(askReset)) }   // 只有 GPT 有这个需求
         if characterIds.count > 1 {
             menu.addItem(.separator())
-            let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
-            let sub = NSMenu()
-            // 有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」
-            let worn = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
-            for id in characterIds {
-                let name = displayNames[id] ?? id
-                let outfits: [(skin: String, title: String)] = skinChoices[id].map { skins in
-                    [("", "\(name) · \(baseOutfit[id] ?? "原版")")] + skins.map { ($0.id, "\(name) · \($0.name)") }
-                } ?? [("", name)]
-                for o in outfits {
-                    let item = NSMenuItem(title: o.title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
-                    item.representedObject = "\(id)|\(o.skin)"
-                    item.target = self
-                    item.state = id == currentId && (worn[id] ?? "") == o.skin ? .on : .off
-                    sub.addItem(item)
-                }
-            }
-            switchItem.submenu = sub
-            menu.addItem(switchItem)
+            // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
+            add(menu, "换角色…", #selector(openCharacterPage))
         }
         menu.addItem(.separator())
         let layerItem = NSMenuItem(title: "显示层级", action: nil, keyEquivalent: "")
