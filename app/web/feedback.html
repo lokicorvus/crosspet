@@ -13,6 +13,13 @@ html, body { margin: 0; background: var(--bg); }
 body { font: 13px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif; color: var(--ink); padding: 14px 16px 16px; }
 h1 { font-size: 15px; margin: 0 0 2px; }
 .sub { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+.qq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+button.qq-copy { font: inherit; display: inline-block; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--ink); border-radius: 18px; padding: 5px 14px; cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
+button.qq-copy b, button.qq-copy span { display: inline; }
+button.qq-copy b { color: var(--accent); font-size: 1.12em; letter-spacing: .5px; margin: 0 1px; }
+button.qq-copy span { color: var(--muted); font-size: .9em; }
+button.qq-copy:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+button.qq-copy.copied { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--panel)); color: var(--ok); }
 .note { color: var(--muted); font-size: 11px; line-height: 1.55; margin: 0 0 6px; padding: 6px 9px; border-left: 2px solid var(--line); }
 .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
 .chip { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 16px; padding: 5px 12px; cursor: pointer; transition: background .12s, border-color .12s; }
@@ -51,7 +58,8 @@ body.sent .done { display: block; }
 <body>
 <div class="form">
   <h1>反馈问题</h1>
-  <div class="note">每一条反馈我都会认真看 🙏 因为是业余时间一个人维护，修复会跟着版本更新一起发布，可能要等几天；崩溃、打不开这类问题会优先处理。着急的话，也可以先让你常用的 AI 编程助手（Claude Code、Codex 等）帮忙排查一下：让它看看 CrossPet 的日志和接入配置，常常能更快找到原因。也欢迎加 QQ 群 1106613980 一起交流。</div>
+  <div class="note">每一条反馈我都会认真看 🙏 因为是业余时间一个人维护，修复会跟着版本更新一起发布，可能要等几天；崩溃、打不开这类问题会优先处理。着急的话，也可以先让你常用的 AI 编程助手（Claude Code、Codex 等）帮忙排查一下：让它看看 CrossPet 的日志和接入配置，常常能更快找到原因。</div>
+  <div class="qq-row" id="qq">有问题也可以来群里聊：</div>
   <div class="sub">点一点，我们就知道该查哪里。</div>
   <div class="q"><span class="n">1</span>遇到了什么？</div>
   <div class="kinds" id="kinds"></div>
@@ -68,7 +76,9 @@ body.sent .done { display: block; }
 <div class="done"><b>收到啦，谢谢！</b><span>每一条我都会看。窗口可以关掉了。</span></div>
 
 <script src="feedback-plan.js"></script>
+<script src="qq-group.js"></script>
 <script>
+document.getElementById('qq').append(QQGroup.button())
 // 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：
 //   页面 → 外壳：{cmd:'get'}（打开时）；{cmd:'collect', kind, target, want, key}（选好类型和补选时，want 是要收集的段落 id）；{cmd:'send', body}
 //   外壳 → 页面：setFacts(facts)（形状见 feedback-plan.js；收集的结果带回 collect 时的 key）；onSent(ok, message)

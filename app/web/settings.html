@@ -32,6 +32,7 @@ h1 { font-size: 15px; margin: 0 0 2px; }
 .news-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--hover); display: flex; align-items: center; justify-content: center; flex: none; }
 .news-item b { display: block; }
 .news-item small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.news-qq { margin-top: 6px; }
 .news-go { margin-left: auto; align-self: center; border: none; background: none; color: var(--accent); padding: 2px 0; white-space: nowrap; font-size: 12px; }
 .news-old { display: flex; justify-content: space-between; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); text-align: left; padding: 8px 14px; }
 .news-more { display: block; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--accent); text-align: right; padding: 8px 14px; font-size: 12px; }
@@ -44,6 +45,12 @@ button { font: inherit; border: 1px solid var(--line); background: var(--field);
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
+button.qq-copy { font: inherit; display: inline-block; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); color: var(--ink); border-radius: 18px; padding: 5px 14px; cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s; }
+button.qq-copy b, button.qq-copy span { display: inline; }
+button.qq-copy b { color: var(--accent); font-size: 1.12em; letter-spacing: .5px; margin: 0 1px; }
+button.qq-copy span { color: var(--muted); font-size: .9em; }
+button.qq-copy:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+button.qq-copy.copied { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--panel)); color: var(--ok); }
 input[type=text], select { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
 input[type=text] { width: 150px; }
 input[type=range] { width: 150px; accent-color: var(--accent); }
@@ -152,6 +159,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><button data-action="checkUpdate">检查</button></div></div>
   <div class="item"><div class="label">文件夹<small>换立绘、加角色看「自定义角色」文档</small></div>
     <div class="ctl"><button data-action="openCharacters">角色</button><button data-action="openData">数据和状态</button></div></div>
+  <div class="item"><div class="label">QQ 交流群<small>用着有问题、想要新角色、想先看到新版本，都可以来群里聊</small></div>
+    <div class="ctl" id="qqCtl"></div></div>
   <div class="item"><div class="label">反馈问题<small>点一下哪里要改就行，不用写长文</small></div>
     <div class="ctl"><button data-action="feedback">反馈</button></div></div>
   <div class="item"><div class="label">开发者控制台<small>逐个检查姿态、跑场景演练</small></div>
@@ -163,7 +172,9 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 <script src="text-size.js"></script>
 <script src="plugin-update.js"></script>
 <script src="whats-new.js"></script>
+<script src="qq-group.js"></script>
 <script>
+document.getElementById('qqCtl').append(QQGroup.button())
 // 和宿主（macOS 的 WKWebView / Windows 的 WebView2）通信：页面发 {cmd, ...}，宿主改完设置后调 setState(state) 把最新状态推回来
 const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.settings?.postMessage(msg)
 const $ = id => document.getElementById(id)
@@ -323,6 +334,7 @@ function renderNews() {
     row.append(el('div', 'news-icon', x.icon))
     const body = el('div'); body.append(el('b', '', x.title), el('small', '', x.text)); row.append(body)
     if (x.go) { const b = el('button', 'news-go', '去设置 ›'); b.onclick = () => goSetting(x.go); row.append(b) }
+    if (x.qq) { const w = el('div', 'news-qq'); w.append(QQGroup.button()); body.append(w) }
     return row
   }
   const versions = WhatsNew.recent(WhatsNew.LIST, state.appVersion)
