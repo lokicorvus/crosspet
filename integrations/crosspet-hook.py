@@ -278,7 +278,8 @@ if character == "gpt":
     try:
         codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
         cwd = Path(str(event.get("cwd") or "")).resolve() if event.get("cwd") else None
-        if cwd and (cwd == codex_home or codex_home in cwd.parents):
+        project_home = codex_home / ".chatgpt-projects"
+        if cwd and (cwd == codex_home or codex_home in cwd.parents) and project_home not in cwd.parents:
             sys.exit(0)
     except (OSError, ValueError):
         pass
