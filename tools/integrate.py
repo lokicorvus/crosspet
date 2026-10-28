@@ -523,6 +523,15 @@ def remove_link(link: Path) -> None:
             link.unlink()
 
 
+# 合法的版本号（x.y.z，可带 -后缀）。DeepSeek Harness 装 / 更新任何插件时都会校验每个插件 package.json 的版本，
+# 写个不合法的（1.3.8-beta.2 带的 "1.3.8.1"）会把用户装别的插件也拦住
+SEMVER = r"^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$"
+
+
+def valid_version(v: str) -> bool:
+    return bool(re.match(SEMVER, v or ""))
+
+
 def deepseek(install: bool) -> None:
     if not DSH_PROFILE.exists():
         print(f"  没找到 {DSH_PROFILE}，请先打开一次 DeepSeek Harness 桌面版"
@@ -543,8 +552,9 @@ def deepseek(install: bool) -> None:
         try:
             ver = re.search(r'PLUGIN_VERSION = "([^"]+)"', (DSH_PLUGIN_DIR / "lib/index.js").read_text(encoding="utf-8")).group(1)
             pj = load_json(DSH_PLUGIN_DIR / "package.json")
-            pj["version"] = ver
-            save_json(DSH_PLUGIN_DIR / "package.json", pj)
+            if valid_version(ver):   # 不合法就不写，留着随包 package.json 里的（测试保证两边一致）
+                pj["version"] = ver
+                save_json(DSH_PLUGIN_DIR / "package.json", pj)
         except Exception:
             pass
         deps[DSH_PLUGIN_NAME] = f"link:{DSH_PLUGIN_DIR.as_posix()}"

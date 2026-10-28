@@ -335,6 +335,15 @@ class DeepSeekPatchTests(unittest.TestCase):
             integrate.deepseek(install)
         return out.getvalue()
 
+    def test_install_never_writes_an_invalid_plugin_version(self):
+        # package.json 的版本号写错，Harness 装别的插件时会被拦住（1.3.8-beta.2 的 "1.3.8.1"）
+        self.run_dsh(True)
+        ver = integrate.load_json(integrate.DSH_PLUGIN_DIR / 'package.json')['version']
+        self.assertRegex(ver, integrate.SEMVER)
+        self.assertTrue(integrate.valid_version('1.3.9'))
+        for bad in ('1.3.8.1', '1.3', 'v1.3.9', ''):
+            self.assertFalse(integrate.valid_version(bad), bad)
+
     def test_strip_keeps_provider_between_markers(self):
         text = DSH_USER + integrate.DSH_BLOCK.replace(integrate.DSH_BLOCK_END, DSH_PROVIDER + integrate.DSH_BLOCK_END)
         self.assertEqual(integrate.dsh_strip(text), DSH_USER + DSH_PROVIDER)
