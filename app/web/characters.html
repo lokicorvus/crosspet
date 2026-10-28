@@ -84,6 +84,11 @@ const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(m
 const $ = id => document.getElementById(id)
 let state = null
 let peeking = null   // 鼠标停着的卡片：大立绘先预览它，移开恢复
+// 移开不马上恢复：从一张卡挪到另一张时会先离开再进入，马上恢复的话中间会闪一下当前角色（三个来回跳）。
+// 停一会儿还没进别的卡，才换回当前
+let unpeekTimer
+function peekAt(p) { clearTimeout(unpeekTimer); if (peeking !== p) { peeking = p; renderStage() } }
+function unpeekSoon() { clearTimeout(unpeekTimer); unpeekTimer = setTimeout(() => { peeking = null; renderStage() }, 300) }
 
 function toast(text) {
   const t = $('toast'); t.textContent = text; t.classList.add('show')
@@ -139,9 +144,9 @@ function renderCards(s) {
     else b.append(placeholder(c.name))
     if (named) { const n = document.createElement('b'); n.textContent = c.name; b.append(n) }
     if (count > 1) { const n = document.createElement('span'); n.className = 'n'; n.textContent = `${count} 套`; b.append(n) }
-    b.onclick = () => { peeking = null; onClick() }
-    b.onmouseenter = () => { if (!c.on) { peeking = peek; renderStage() } }
-    b.onmouseleave = () => { peeking = null; renderStage() }
+    b.onclick = () => { clearTimeout(unpeekTimer); peeking = null; onClick() }
+    b.onmouseenter = () => peekAt(c.on ? null : peek)   // 停在正穿着的那张上 = 看回当前
+    b.onmouseleave = unpeekSoon
     return b
   }
   $('outfitCards').replaceChildren(...CharacterCards.outfitCards(s.characters, s.character).map(o =>
