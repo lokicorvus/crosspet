@@ -90,7 +90,7 @@ namespace CrossPet
                     CheckZoomSoon();
                     return;
                 }
-                var text = TextScale();
+                var text = WindowsTextScale();
                 var fix = zoomFixes < 3 ? ZoomCheck.Fix(pageW, pageH, w2, h2, dpi, zoomFix, text) : null;
                 Store.Log($"网页大小和画布对不上{(fix == null ? "（只记录）" : "")}：网页 {Math.Round(w2)}×{Math.Round(h2)}，应为 {Math.Round(pageW)}×{Math.Round(pageH)}，缩放 {Num(Math.Round(web.ZoomFactor, 3))}，DPI {Math.Round(dpi * 100)}%，系统文本大小 {Math.Round(text * 100)}%");
                 if (fix == null) return;
@@ -104,7 +104,7 @@ namespace CrossPet
         }
 
         /// <summary>Windows「设置 → 辅助功能 → 文本大小」（1 = 100%，读不到当 100%）。WebView2 会把它算进网页缩放，WPF 不算，见 ZoomCheck.Fix</summary>
-        static double TextScale()
+        static double WindowsTextScale()
         {
             try { return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Accessibility", "TextScaleFactor", 100) is int v && v >= 100 && v <= 300 ? v / 100.0 : 1; }
             catch { return 1; }
