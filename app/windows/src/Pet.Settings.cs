@@ -90,16 +90,24 @@ namespace CrossPet
                     CheckZoomSoon();
                     return;
                 }
-                var fix = zoomFixes < 3 ? ZoomCheck.Fix(pageW, pageH, w2, h2, dpi, zoomFix) : null;
-                Store.Log($"网页大小和画布对不上{(fix == null ? "（只记录）" : "")}：网页 {Math.Round(w2)}×{Math.Round(h2)}，应为 {Math.Round(pageW)}×{Math.Round(pageH)}，缩放 {Num(Math.Round(web.ZoomFactor, 3))}，DPI {Math.Round(dpi * 100)}%");
+                var text = TextScale();
+                var fix = zoomFixes < 3 ? ZoomCheck.Fix(pageW, pageH, w2, h2, dpi, zoomFix, text) : null;
+                Store.Log($"网页大小和画布对不上{(fix == null ? "（只记录）" : "")}：网页 {Math.Round(w2)}×{Math.Round(h2)}，应为 {Math.Round(pageW)}×{Math.Round(pageH)}，缩放 {Num(Math.Round(web.ZoomFactor, 3))}，DPI {Math.Round(dpi * 100)}%，系统文本大小 {Math.Round(text * 100)}%");
                 if (fix == null) return;
                 zoomFixes++; zoomFix = fix.Value;
                 web.ZoomFactor = shownZoom * zoomFix;
                 lastHitRects = null; dockCut.Clear();
-                Store.Log($"系统缩放像是被算了两遍：网页缩放自动改成 {Num(Math.Round(web.ZoomFactor, 3))}（人物大小 {Num(shownZoom)} × {Num(Math.Round(zoomFix, 3))}），再量一次");
+                Store.Log($"网页多算了一遍缩放：网页缩放自动改成 {Num(Math.Round(web.ZoomFactor, 3))}（人物大小 {Num(shownZoom)} × {Num(Math.Round(zoomFix, 3))}），再量一次");
                 CheckZoomSoon();
             }
             catch (Exception e) { Store.Log("检查网页大小出错: " + e.Message); }
+        }
+
+        /// <summary>Windows「设置 → 辅助功能 → 文本大小」（1 = 100%，读不到当 100%）。WebView2 会把它算进网页缩放，WPF 不算，见 ZoomCheck.Fix</summary>
+        static double TextScale()
+        {
+            try { return Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Accessibility", "TextScaleFactor", 100) is int v && v >= 100 && v <= 300 ? v / 100.0 : 1; }
+            catch { return 1; }
         }
 
         /// <summary>系统缩放变了（改了缩放、拖到缩放不同的另一块屏幕）：WebView2CompositionControl 只在自己的大小（DIP）变时
