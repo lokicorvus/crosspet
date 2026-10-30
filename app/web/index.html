@@ -9,7 +9,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 /* 从下往上排：底栏（名牌 + 额度）固定高度贴着窗口底边，人物在它上面，气泡从人物头顶往上长。
    这样名牌开关、额度有几行、台词有多长，人物都不挪位置，额度也不会被长台词挤出窗口
    （Windows 上微软雅黑行高大，之前开着名牌、台词折两三行时额度会被挤出去） */
-#wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100vh; }
+#wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: var(--fit-h, 100vh); }
+#fit { transform-origin: 0 0; }   /* 网页实际拿到的大小和画布对不上时整体等比缩放（见 refit） */
 #wrap > * { flex-shrink: 0; }
 /* 底栏最小高度按 max(1, k)：字比人小时不缩，人物不往下掉 */
 #foot { min-height: calc(62px * max(1, var(--k))); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
@@ -191,7 +192,7 @@ html.no-name #caption { display: none; }
 @keyframes surface { from { opacity: 0; transform: translateY(5%) scale(.97); } to { opacity: 1; transform: none; } }
 </style></head>
 <body>
-<div id="wrap">
+<div id="fit"><div id="wrap">
   <div id="bubble" class="hide"></div>
   <div id="stage">
     <div id="aura"></div><div id="shadow"></div>
@@ -202,7 +203,7 @@ html.no-name #caption { display: none; }
     <div id="poof"><i style="--dx:-60px;--dy:-30px"></i><i style="--dx:55px;--dy:-35px"></i><i style="--dx:-45px;--dy:40px"></i><i style="--dx:50px;--dy:35px"></i><i style="--dx:0;--dy:-60px"></i></div>
   </div>
   <div id="foot"><div id="caption"></div><div id="quota"></div></div>
-</div>
+</div></div>
 <script>
 // 立绘加载失败：告诉 Windows 外壳记进日志（反馈里能看出是哪张图）。macOS 上没有这个通道，不做任何事
 // 同时记下最近 5 次失败的文件名（只要文件名），反馈时 diagnoseDisplay 交出去
@@ -369,8 +370,35 @@ function setShowName(on) { document.documentElement.classList.toggle('no-name', 
 function setSizes(size, textSize, linked) {
   const L = TextSize.layout(size, TextSize.effectiveText(size, textSize, linked))
   document.documentElement.style.setProperty('--k', String(L.k))
+  canvasW = L.w; canvasH = L.h
+  refit()
   return JSON.stringify({ w: L.w, h: L.h, foot: L.foot })
 }
+// ---- 网页自己铺满窗口 ----
+// 外壳按「画布 × 人物大小」设窗口、按人物大小设网页缩放，正常时网页正好是画布大小。Windows 上 WebView2 偶尔多乘一个比例
+// （系统缩放算两遍、换屏后停在旧缩放、系统「文本大小」也算进去……），网页就比画布大或小，气泡和人物被挤出窗口。
+// 与其一种种认原因，不如量自己实际拿到多大：对不上就把整个画面等比缩放、底边居中铺进去。
+// 对外（hitRects、dockCut、handleClick 的坐标）一律用画布坐标，外壳那边的换算不用变；对得上时 fit = 1，什么都不动
+let canvasW = 0, canvasH = 0, fit = 1, fitX = 0, fitY = 0
+function refit() {
+  const box = $('fit'), vw = innerWidth, vh = innerHeight
+  let f = canvasW > 0 && canvasH > 0 && vw > 0 && vh > 0 ? Math.min(vw / canvasW, vh / canvasH) : 1
+  if (Math.abs(f - 1) < 0.015) f = 1   // 取整误差
+  fit = f
+  if (f === 1) {
+    fitX = fitY = 0
+    box.style.width = box.style.height = box.style.transform = ''
+    document.documentElement.style.removeProperty('--fit-h')
+    return
+  }
+  fitX = (vw - canvasW * f) / 2; fitY = vh - canvasH * f   // 左右居中、底边对齐（和平时 #wrap 的排法一样）
+  box.style.width = canvasW + 'px'; box.style.height = canvasH + 'px'
+  box.style.transform = `translate(${fitX}px, ${fitY}px) scale(${f})`
+  document.documentElement.style.setProperty('--fit-h', canvasH + 'px')
+}
+addEventListener('resize', refit)
+// 网页坐标（getBoundingClientRect 量的）→ 画布坐标
+function toCanvas(r) { return { left: (r.left - fitX) / fit, top: (r.top - fitY) / fit, width: r.width / fit, height: r.height / fit } }
 // 背景光晕：'auto'（跟着系统深浅色）/ 'on' / 'off'，由宿主调用
 function setAuraMode(mode) {
   const c = document.documentElement.classList
@@ -390,7 +418,7 @@ function hitRects() {
     if (!el || (id === 'bubble' && el.classList.contains('hide')) || el.classList.contains('hidden')) continue
     const cs = getComputedStyle(el)
     if (cs.display === 'none' || cs.visibility === 'hidden') continue
-    const r = el.getBoundingClientRect()
+    const r = toCanvas(el.getBoundingClientRect())
     if (r.width < 1 || r.height < 1) continue
     out.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8].map(Math.round))
   }
@@ -954,12 +982,12 @@ function preloadEdges() {
   for (const p of ['edge_left', 'edge_right', 'edge_left_peek', 'edge_right_peek', 'idle', 'tired']) for (const u of framesFor(p)) { const i = new Image(); i.src = u }
 }
 // 正在显示的立绘实际画出来的范围（object-fit: contain，按 object-position 对齐）
-function shownRect() {
-  const img = active, r = img.getBoundingClientRect(), nw = img.naturalWidth, nh = img.naturalHeight
+function shownRect() {   // 画布坐标
+  const img = active, r = toCanvas(img.getBoundingClientRect()), nw = img.naturalWidth, nh = img.naturalHeight
   if (!nw || !nh) return null
   const scale = Math.min(r.width / nw, r.height / nh), w = nw * scale, h = nh * scale
   const px = parseFloat(getComputedStyle(img).objectPosition) / 100
-  return { left: r.left + (r.width - w) * (isNaN(px) ? 0.5 : px), top: r.bottom - h, width: w, height: h }
+  return { left: r.left + (r.width - w) * (isNaN(px) ? 0.5 : px), top: r.top + r.height - h, width: w, height: h }
 }
 function dockCut(side) {
   const b = shownRect()
@@ -1420,9 +1448,9 @@ function setQuota(id, q) {
 function handleClick(kind, x, y) {
   const card = $('newsCard')
   if (x != null && y != null && !card.classList.contains('hidden')) {
-    const r = card.getBoundingClientRect()
-    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {   // 点在卡片上：按钮照按钮办，空白处什么都不做（不摸头）
-      const action = document.elementFromPoint(x, y)?.closest('[data-action]')?.dataset.action
+    const r = toCanvas(card.getBoundingClientRect())   // x、y 是画布坐标
+    if (x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height) {   // 点在卡片上：按钮照按钮办，空白处什么都不做（不摸头）
+      const action = document.elementFromPoint(x * fit + fitX, y * fit + fitY)?.closest('[data-action]')?.dataset.action
       if (action === 'news-open') { hideNews(); toShell({ openSettings: 'news' }) }
       else if (action === 'news-close') hideNews()
       return

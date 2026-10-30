@@ -81,7 +81,7 @@ function makePage() {
     closest() { return null }
   }
   const els = {}
-  for (const id of ['wrap', 'bubble', 'stage', 'aura', 'shadow', 'body', 'a', 'b', 'blink', 'fx', 'cards', 'more', 'newsCard', 'newsText', 'poof', 'foot', 'caption', 'quota'])
+  for (const id of ['fit', 'wrap', 'bubble', 'stage', 'aura', 'shadow', 'body', 'a', 'b', 'blink', 'fx', 'cards', 'more', 'newsCard', 'newsText', 'poof', 'foot', 'caption', 'quota'])
     els[id] = new El(['a', 'b', 'blink'].includes(id) ? 'img' : 'div', id)
   els.a.classList.add('on'); els.bubble.classList.add('hide'); els.newsCard.classList.add('hidden')
   els.cards.appendChild(els.more)
