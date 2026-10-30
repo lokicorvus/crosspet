@@ -157,6 +157,13 @@ async function fresh() {
 function assert(c, msg) { if (!c) throw Error(msg) }
 
 const cases = [
+  ['render_recovery_says_why_she_vanished', async e => {
+    e.run(`justRecovered()`)
+    await e.advance(3000)
+    assert(e.state().bubble.includes('重启'), 'no recovery line: ' + e.state().bubble)
+    await e.advance(9000)
+    assert(e.state().bubble === '', 'recovery line stuck: ' + e.state().bubble)
+  }],
   ['async_reset_answer_is_cancelled_after_switching_away_and_back', async e => {
     e.run(`resetsOn=true; devResetsSaved={}; var __resetAnswers=0; tellReset=()=>{__resetAnswers++}; void askReset()`)
     await e.advance(100)

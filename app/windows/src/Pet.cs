@@ -188,7 +188,7 @@ namespace CrossPet
                         if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)}, {Q(last)})");
                     }
                     ready = true;
-                    if (RenderRecovery.Ready()) tray?.ShowBalloonTip(6000, "CrossPet", "上次画面出了问题，现已重新打开。若再次消失，请提交反馈。", Forms.ToolTipIcon.Info);
+                    if (RenderRecovery.Ready()) Js("justRecovered()");   // 渲染出错重启回来：她自己说一声（托盘通知在 Windows 11 上常被收进通知中心）
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
                     After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
                     stamps.Clear();

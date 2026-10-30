@@ -983,6 +983,17 @@ function justUpdated(version, last) {
   }
   queueNews(n, 6000)
 }
+// Windows 渲染出错后自动重启回来（外壳在网页就绪后调）：她说一声，免得以为「无缘无故不见了」（10-29 反馈）。
+// 以前是托盘通知，Windows 11 常常直接收进通知中心，用户看不到
+function justRecovered() {
+  setTimeout(() => {
+    if (egg || farewellLine !== null) return
+    show('oops', true)
+    say('刚才画面出错了，我重启了一下～')
+    clearTimeout(revertTimer)
+    revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, 8000)
+  }, 2500)
+}
 // 等她闲下来再弹：不在彩蛋、AI 没在干活、没在道别 / 更新、没缩在边上；等不到就过一会儿再看，最多等 10 分钟（设置里的小红点还在）
 function queueNews(n, first) {
   let tries = 0
