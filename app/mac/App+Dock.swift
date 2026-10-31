@@ -38,6 +38,7 @@ extension App {
     func updatePageHidden() {
         guard ready else { return }
         js("setPageHidden(\(screensAsleep || userHidden || hiddenForFullscreen || !panel.occlusionState.contains(.visible)))")
+        companions.values.forEach { $0.updatePageHidden() }   // 额外那几只各按自己被没被挡住
         // 藏着 / 屏幕休眠时定时的不查：从那种状态回来时补一次（自带 5 分钟 / 1 分钟间隔，不会多问）
         let away = screensAsleep || userHidden
         if wasAway && !away { refreshCodexQuota(.tick) }
@@ -51,27 +52,32 @@ extension App {
         js("setTucked(null)")
     }
     func checkDock() {
-        guard edgeDockEnabled, let screen = panel.screen ?? NSScreen.main else { return }
-        let f = panel.frame, vf = screen.visibleFrame, reach = f.width * (Self.baseSize.width / pageSize.width) * 0.3   // 按人物那块的宽算：画布因为文字变宽时不该更容易贴边
+        guard edgeDockEnabled, let screen = panel.screen ?? NSScreen.main,
+              let side = Self.dockSide(frame: panel.frame, screen: screen, pageWidth: pageSize.width) else { return }
+        setDock(side)
+    }
+
+    // MARK: 贴边的计算（主桌宠和额外那几只共用，见 Companion.swift）
+
+    /// 松手时贴哪边（nil = 不贴）：窗口中线离可见区边缘不到人物那块宽的 30%。
+    /// 按人物那块的宽算：画布因为文字变宽时不该更容易贴边。另一块屏幕接在这边时不算边缘
+    static func dockSide(frame f: NSRect, screen: NSScreen, pageWidth: CGFloat) -> String? {
         func neighbor(_ left: Bool) -> Bool {
             NSScreen.screens.contains { s in s != screen && s.frame.minY < f.maxY && s.frame.maxY > f.minY &&
                 (left ? abs(s.frame.maxX - screen.frame.minX) < 2 : abs(s.frame.minX - screen.frame.maxX) < 2) }
         }
-        if f.midX - vf.minX < reach, !neighbor(true) { setDock("left") }
-        else if vf.maxX - f.midX < reach, !neighbor(false) { setDock("right") }
+        return dockSide(frame: f, visible: screen.visibleFrame, reach: f.width * (baseSize.width / pageWidth) * 0.3,
+                        leftNeighbor: neighbor(true), rightNeighbor: neighbor(false))
     }
-    func setDock(_ side: String) {
-        dock = side
-        dockedAt = Date()
-        defaults.set(side, forKey: "dock")
-        dockOut = dockBusy
-        applyDock()
+    static func dockSide(frame f: NSRect, visible vf: NSRect, reach: CGFloat, leftNeighbor: Bool, rightNeighbor: Bool) -> String? {
+        if f.midX - vf.minX < reach, !leftNeighbor { return "left" }
+        if vf.maxX - f.midX < reach, !rightNeighbor { return "right" }
+        return nil
     }
-    /// AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来
-    var dockBusy: Bool {
-        let now = Date()
-        return lastPose.values.contains { p in
-            guard p.at > dockedAt else { return false }
+    /// 这些状态里有没有「AI 在干活 / 等你回答 / 刚干完（10 秒内）」：有就跑出来。since 之前的不算（刚拖到边上）
+    static func dockBusy(_ poses: [(pose: String, at: Date)], since: Date, now: Date) -> Bool {
+        poses.contains { p in
+            guard p.at > since else { return false }
             let age = now.timeIntervalSince(p.at)
             switch p.pose {
             case "asking": return age < 600
@@ -81,6 +87,29 @@ extension App {
             }
         }
     }
+    /// 贴着边时窗口的上下：最多往下藏 15%，不出顶
+    static func dockClampY(_ f: NSRect, _ vf: NSRect) -> NSRect {
+        var g = f
+        g.origin.y = min(max(f.origin.y, vf.minY - f.height * 0.15), vf.maxY - f.height)
+        return g
+    }
+    /// 整个窗口靠到屏幕边上（跑出来时、缩进去之前）
+    static func dockEdgeX(_ side: String, width: CGFloat, _ vf: NSRect) -> CGFloat {
+        side == "left" ? vf.minX : vf.maxX - width
+    }
+    /// 缩进去：切口（网页像素）对齐屏幕边缘
+    static func tuckX(_ side: String, cut: Double, zoom: CGFloat, _ vf: NSRect) -> CGFloat {
+        side == "left" ? vf.minX - CGFloat(cut) * zoom : vf.maxX - CGFloat(cut) * zoom
+    }
+    func setDock(_ side: String) {
+        dock = side
+        dockedAt = Date()
+        defaults.set(side, forKey: "dock")
+        dockOut = dockBusy
+        applyDock()
+    }
+    /// AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来
+    var dockBusy: Bool { Self.dockBusy(Array(lastPose.values), since: dockedAt, now: Date()) }
     func updateDock() {
         guard dock != nil else { return }
         let busy = dockBusy
@@ -90,18 +119,17 @@ extension App {
         guard let side = dock, let screen = panel.screen ?? NSScreen.main else { return }
         hitRects = []; hitRectsAt = .distantPast   // 换了样子，可点区域重新量（旧的范围会让她误以为鼠标在身上，来回闪）
         let vf = screen.visibleFrame
-        var f = panel.frame
-        f.origin.y = min(max(f.origin.y, vf.minY - f.height * 0.15), vf.maxY - f.height)
+        let f = Self.dockClampY(panel.frame, vf)
         if dockOut {
             dockTucked = false
             js("setTucked(null)")
-            f.origin.x = side == "left" ? vf.minX : vf.maxX - f.width
-            slide(to: f)
+            var g = f; g.origin.x = Self.dockEdgeX(side, width: f.width, vf)
+            slide(to: g)
             return
         }
         // 窗口还没到边上（刚拖过来松手）：先整个滑到屏幕边缘，滑完再缩进去。一次只做一个动作，不然窗口在滑、人物也在窗口里滑，看着乱
         if !dockTucked {
-            var g = f; g.origin.x = side == "left" ? vf.minX : vf.maxX - f.width
+            var g = f; g.origin.x = Self.dockEdgeX(side, width: f.width, vf)
             if abs(panel.frame.origin.x - g.origin.x) > 1 || abs(panel.frame.origin.y - g.origin.y) > 1 {
                 slide(to: g)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.37) { [weak self] in self?.tuck(side, vf) }
@@ -122,7 +150,7 @@ extension App {
         let place = { [weak self] (cut: Double) in
             guard let self, self.dock == side, !self.dockOut, self.dockHover == peek else { return }
             let zoom = f.width / self.pageSize.width
-            f.origin.x = side == "left" ? vf.minX - CGFloat(cut) * zoom : vf.maxX - CGFloat(cut) * zoom
+            f.origin.x = Self.tuckX(side, cut: cut, zoom: zoom, vf)
             if abs(f.origin.x - self.panel.frame.origin.x) > 1 { self.slide(to: f) }
         }
         if let cut = dockCut[key] { place(cut); return }

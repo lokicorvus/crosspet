@@ -1,0 +1,357 @@
+import Cocoa
+import WebKit
+
+extension App {
+    // MARK: 多桌宠（设置「在干活的 AI 各显示一只」，默认关）
+    // 谁站着、谁走全在主桌宠页面判（app/web/companions.js）；外壳只做系统那一块：
+    //   - 按页面交来的 companions 列表开 / 关额外桌宠的窗口（Companion.swift，同一个进程、同一套网页）
+    //   - 把 <角色>@<客户端>-state.json、按客户端过滤的会话、额度转给对应的那只，前台程序、在跑的 AI 程序告诉主桌宠页面
+    // 开关关着、也没在集合时：不读 @ 状态文件、不发前台 / 在跑的程序，行为和以前一样。
+    // 页面 ↔ 外壳的接口见 .superpowers/sdd/2026-10-31-multi-pets/shell-contract.md；Windows 版（Pet.Companions.cs）照同一份做
+
+    var multiPetsOn: Bool { defaults.bool(forKey: "multiPets") }
+    var petsRest: String { defaults.string(forKey: "petsRest") == "stay" ? "stay" : "auto" }
+    /// 固定主桌宠：""= 跟着规则换；存的角色已经不在了也当没固定
+    var mainPet: String {
+        let v = defaults.string(forKey: "mainPet") ?? ""
+        return characterIds.contains(v) ? v : ""
+    }
+    /// 要不要转发：开关开着，或者正集合着（集合不受开关限制）
+    var companionsForwarding: Bool { multiPetsOn || pageGathering }
+
+    static let claudeDesktopBundle = "com.anthropic.claudefordesktop"
+    /// 算「终端」的程序（设计第二节「什么算在 AI 软件里」）：终端里看不出跑的是谁，由页面按最近有没有命令行客户端干过活判断
+    static let terminalBundles: Set<String> = ["com.apple.Terminal", "com.googlecode.iterm2", "dev.warp.Warp-Stable", "com.mitchellh.ghostty",
+                                               "com.github.wez.wezterm", "net.kovidgoyal.kitty", "org.alacritty", "com.microsoft.VSCode"]
+
+    // MARK: 第一次出现放在哪
+
+    /// 纯计算（tests/companion_place_probe.sh 测），屏幕点、y 向上：count 只额外桌宠各放哪。
+    /// 先排主桌宠左边（由近到远），左边放不下放右边，再放不下往上一排（上面的排里主桌宠正上方先放），还不够往下一排；
+    /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。格子不够（屏幕太小）时剩下的叠在已有的格子上，照样夹在 visible 里
+    static func companionSlots(main: NSRect, count: Int, size: NSSize, visible vf: NSRect) -> [NSRect] {
+        guard count > 0, size.width > 0, size.height > 0 else { return [] }
+        let w = size.width, h = size.height
+        let fits = { (r: NSRect) in r.minX >= vf.minX - 0.01 && r.maxX <= vf.maxX + 0.01 && r.minY >= vf.minY - 0.01 && r.maxY <= vf.maxY + 0.01 }
+        let y0 = min(max(main.minY, vf.minY), max(vf.minY, vf.maxY - h))   // 第一排和主桌宠底边对齐（主桌宠藏出屏幕时夹回来）
+        // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始），排和排之间至少隔一个格子高；
+        // 第一排往上隔的是格子和主桌宠里较高的那个，主桌宠正上方那格才不压着她
+        func row(_ y: CGFloat, center: Bool) -> [NSRect] {
+            var out: [NSRect] = []
+            if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
+            var x = main.minX - w
+            while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
+            x = main.minX + max(w, main.width)
+            while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
+            return out
+        }
+        var cands = row(y0, center: false)
+        var y = y0 + max(h, main.height)
+        while y + h <= vf.maxY + 0.01 { cands += row(y, center: true); y += h }
+        y = y0 - h
+        while y >= vf.minY - 0.01 { cands += row(y, center: true); y -= h }
+        cands = cands.filter { fits($0) && !$0.insetBy(dx: 0.5, dy: 0.5).intersects(main) }
+        var out = Array(cands.prefix(count))
+        // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里
+        let clamp = { (r: NSRect) -> NSRect in
+            NSRect(x: min(max(r.minX, vf.minX), max(vf.minX, vf.maxX - w)), y: min(max(r.minY, vf.minY), max(vf.minY, vf.maxY - h)), width: w, height: h)
+        }
+        var i = 0
+        while out.count < count {
+            let base = cands.isEmpty ? NSRect(x: main.minX - w, y: y0, width: w, height: h) : cands[i % cands.count]
+            let step = CGFloat(i / max(cands.count, 1) + 1) * 24
+            out.append(clamp(base.offsetBy(dx: -step, dy: step)))
+            i += 1
+        }
+        return out
+    }
+
+    /// 新开的那只放哪：记过位置（origin-<key>，还在某块屏幕上）就回到那里；没记过就挑主桌宠旁边第一个空着的格子
+    func companionOrigin(key: String, size: NSSize) -> NSPoint {
+        if let saved = defaults.array(forKey: "origin-\(key)") as? [Double], saved.count == 2 {
+            let r = NSRect(x: saved[0], y: saved[1], width: size.width, height: size.height)
+            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) }) { return r.origin }
+        }
+        let vf = (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
+        let others = (Array(companions.values) + leavingCompanions).map { $0.panel.frame }
+        let slots = Self.companionSlots(main: panel.frame, count: 2 * others.count + 1, size: size, visible: vf)
+        let free = slots.first { s in !others.contains { $0.intersects(s.insetBy(dx: 1, dy: 1)) } }
+        return (free ?? slots.last ?? panel.frame).origin
+    }
+
+    // MARK: 主桌宠页面发来的消息
+
+    /// handlePet 里调：companions / companionLeave / companionCall / eggAllowed / friendship
+    func handleCompanionMessage(_ d: [String: Any]) {
+        if let id = d["companionLeave"] as? String { companionLeave(id) }
+        if let list = d["companions"] as? [[String: Any]] { syncCompanions(list) }
+        if let call = d["companionCall"] as? [String: Any] { companionCall(call) }
+        if let ok = d["eggAllowed"] as? Bool { eggAllowed = ok }
+        if let rows = d["friendship"] as? [Any] { friendshipRows = rows; pushSettings() }
+    }
+
+    /// 按完整列表对齐窗口（按 id）：没有窗口的开；已经不在列表里、也没收到过 companionLeave 的（开关关掉时的 []、页面重载后的完整列表）
+    /// 直接关掉，不留残窗；收到过 companionLeave 的已经挪到 leavingCompanions，在说 bye
+    func syncCompanions(_ list: [[String: Any]]) {
+        var seen = Set<String>()
+        for pet in list {
+            guard let id = pet["id"] as? String, !id.isEmpty, !seen.contains(id),
+                  let ch = pet["character"] as? String, characterIds.contains(ch) else { continue }
+            seen.insert(id)
+            if let c = companions[id] {
+                if c.character == ch { c.update(pet); continue }
+                c.close()   // 同一个 id 换了角色（不该发生）：关掉重开
+            }
+            companions[id] = Companion(app: self, pet: pet)
+        }
+        for (id, c) in companions where !seen.contains(id) { c.close() }
+        refreshGatherState()
+    }
+
+    func companionLeave(_ id: String) {
+        guard let c = companions.removeValue(forKey: id) else { return }
+        leavingCompanions.append(c)
+        c.leave()
+    }
+
+    /// 额度庆祝交给显示这个角色额度的那只演；只认 celebrate
+    func companionCall(_ call: [String: Any]) {
+        guard let id = call["id"] as? String, call["fn"] as? String == "celebrate", let args = call["args"] as? [Any],
+              let c = companions[id], let data = try? JSONSerialization.data(withJSONObject: args),
+              let json = String(data: data, encoding: .utf8) else { return }
+        c.js("celebrate.apply(null, \(json))")
+    }
+
+    func companionClosed(_ c: Companion) {
+        if companions[c.id] === c { companions.removeValue(forKey: c.id) }
+        leavingCompanions.removeAll { $0 === c }
+        refreshGatherState()
+    }
+
+    /// 主桌宠页面重新载入了：集合的记录跟着丢了。开关开着时页面热身完会发完整列表，按它对齐；
+    /// 开关关着时页面不会再发，这里直接把窗口都关掉（回到单只）
+    func companionsMainReloaded() {
+        pageGathering = false
+        guard !multiPetsOn else { return }
+        for c in Array(companions.values) + leavingCompanions { c.close() }
+    }
+
+    /// 页面里还在集合吗（还有没登场的，或站着的里有集合来的）：菜单显示「集合！」还是「解散」，开关关着时要不要转发
+    func refreshGatherState() {
+        guard ready else { pageGathering = false; return }
+        web.evaluateJavaScript("gathered.length > 0 || !!companionsState?.pets.some(p => p.via === 'gather')") { [weak self] r, _ in
+            guard let self else { return }
+            let was = self.companionsForwarding
+            self.pageGathering = r as? Bool ?? false
+            if self.companionsForwarding && !was { self.startForwarding() }
+        }
+    }
+
+    @objc func gatherCompanions() {
+        guard ready else { return }
+        web.evaluateJavaScript("gather()") { [weak self] r, _ in
+            guard let self, r as? Bool == true else { return }
+            let was = self.companionsForwarding
+            self.pageGathering = true
+            if !was { self.startForwarding() }
+        }
+    }
+    @objc func dismissCompanions() {
+        guard ready else { return }
+        web.evaluateJavaScript("dismiss()") { [weak self] _, _ in self?.refreshGatherState() }
+    }
+
+    // MARK: 设置
+
+    /// 三个设置一起推给主桌宠页面（启动、页面重载、设置改变时）
+    func pushMultiPets() {
+        let o: [String: Any] = ["on": multiPetsOn, "rest": petsRest, "mainPet": mainPet]
+        guard let data = try? JSONSerialization.data(withJSONObject: o), let json = String(data: data, encoding: .utf8) else { return }
+        js("setMultiPets(\(json))")
+    }
+
+    /// 设置页 { cmd: 'set', key: multiPets / petsRest / mainPet }（handleSettings 里调）；返回 false = 不是这三个键
+    func setCompanionSetting(_ key: String, _ value: Any?) -> Bool {
+        switch key {
+        case "multiPets":
+            let was = companionsForwarding
+            defaults.set(value as? Bool ?? false, forKey: "multiPets")
+            pushMultiPets()
+            applyMainPet()
+            if companionsForwarding && !was { startForwarding() }
+        case "petsRest":
+            guard let s = value as? String, ["auto", "stay"].contains(s) else { return true }
+            defaults.set(s, forKey: "petsRest")
+            pushMultiPets()
+        case "mainPet":
+            guard let s = value as? String, s.isEmpty || characterIds.contains(s) else { return true }
+            defaults.set(s, forKey: "mainPet")
+            pushMultiPets()
+            applyMainPet()
+        default: return false
+        }
+        return true
+    }
+
+    /// 固定主桌宠由外壳自己生效（页面只记着）：开关开着、固定了某个角色，就把主桌宠换成她
+    func applyMainPet() {
+        let id = mainPet
+        guard multiPetsOn, !id.isEmpty, id != currentId else { return }
+        switchTo(id, why: "manual", via: "mainPet")
+    }
+
+    /// 共用的设置变了，额外那几只跟着（handleSettings 里调）
+    func companionsSettingChanged(_ key: String) {
+        guard !companions.isEmpty else { return }
+        switch key {
+        case "size": companions.values.forEach { $0.applySizes(anchor: .bottom) }
+        case "textSize", "textLinked": companions.values.forEach { $0.applySizes(anchor: .feet) }
+        case "showName", "aura", "powerSave", "quotaStyle", "peakStyle": companionsJS(companionLookJS)
+        case "edgeDock": if !edgeDockEnabled { companions.values.forEach { $0.undock() } }
+        default: break
+        }
+    }
+
+    /// 额外那只的外观设置（共用的那几项）。合并额度表只在主桌宠身上，所以她的关着
+    var companionLookJS: String {
+        "setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setPowerSave(\(powerSave)); setQuotaAggregate(false); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle)))"
+    }
+
+    func companionsJS(_ code: String) { (Array(companions.values) + leavingCompanions).forEach { $0.js(code) } }
+
+    /// 全屏隐藏、快捷键隐藏、显示层级对所有窗口一起生效
+    func syncCompanionWindows() { (Array(companions.values) + leavingCompanions).forEach { $0.syncWithMain() } }
+
+    // MARK: 转发
+
+    /// 开始转发（打开开关、开关关着时开始集合）：@ 状态重新读一遍，前台 / 在跑的程序马上交一次
+    func startForwarding() {
+        for k in stamps.keys where k.contains("@") { stamps[k] = nil }
+        pushForeground()
+        pushRunning(force: true)
+    }
+
+    /// 每次轮询（pollStates）：stateDir 里文件名带 @ 的 -state.json，有变化就交给主桌宠页面（applyClientState）和 key 对得上的那只
+    func pollClientStates() {
+        guard companionsForwarding else { return }
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: stateDir.path)) ?? []
+        for name in names where name.hasSuffix("-state.json") && name.contains("@") {
+            let key = String(name.dropLast("-state.json".count))
+            guard let at = key.firstIndex(of: "@") else { continue }
+            let character = String(key[..<at]), client = String(key[key.index(after: at)...])
+            guard characterIds.contains(character), !client.isEmpty else { continue }
+            let url = stateDir.appendingPathComponent(name)
+            guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
+                  stamp != stamps[key + "-state"] else { continue }
+            stamps[key + "-state"] = stamp
+            if Date().timeIntervalSince(stamp) > 600 { continue }   // 和按角色的一样：只认 10 分钟内的
+            guard let data = try? Data(contentsOf: url), let text = String(data: data, encoding: .utf8),
+                  (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { continue }
+            clientStateSeen.insert(character)
+            clientStates[key] = (text, stamp)
+            if pauseRealEvents { continue }
+            js("applyClientState(\(quote(character)), \(quote(client)), \(text))")
+            for c in companions.values where c.key == key { c.applyState(text, at: stamp) }
+        }
+    }
+
+    /// 按角色的状态（pollStates 读到 <角色>-state.json 时调）：旧钩子没写按客户端的那份时，交给这个角色收编了客户端的那只
+    func noteCharState(_ id: String, _ text: String, _ stamp: Date) {
+        charStates[id] = (text, stamp)
+        guard companionsForwarding, !pauseRealEvents, !clientStateSeen.contains(id) else { return }
+        for c in companions.values where c.character == id && c.client != nil { c.applyState(text, at: stamp) }
+    }
+
+    /// 会话表变了（pollStates 读到 <角色>-sessions.json 时调）：每只拿她自己客户端的那份
+    func noteSessions(_ id: String, _ text: String) {
+        sessionsText[id] = text
+        guard companionsForwarding, !pauseRealEvents else { return }
+        for c in companions.values where c.character == id { c.js("setSessions(\(quote(id)), \(sessionsFor(c)))") }
+    }
+
+    /// 只留她客户端的会话；没写 client 的旧条目按角色名算客户端（和 companions.js 的 clientsOf 一样）。还没收编客户端的集合那只：空的
+    func sessionsFor(_ c: Companion) -> String {
+        guard let client = c.client, let text = sessionsText[c.character], let data = text.data(using: .utf8),
+              let map = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return "{}" }
+        let mine = map.filter { (($0.value as? [String: Any])?["client"] as? String ?? c.character) == client }
+        return (try? JSONSerialization.data(withJSONObject: mine)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
+    /// 额度：主桌宠照旧拿，同时记下；这个角色 quota: true 的那只也拿一份
+    func quotaJS(_ character: String, _ code: String) {
+        js(code)
+        quotaCode[character] = code
+        for c in companions.values where c.character == character && c.quota { c.js(code) }
+    }
+
+    /// 新开的那只页面加载完（或换了客户端）：会话、状态、额度先补一遍
+    func feedCompanion(_ c: Companion) {
+        guard !pauseRealEvents else { return }
+        c.js("setSessions(\(quote(c.character)), \(sessionsFor(c)))")
+        let fresh = { (s: (text: String, at: Date)?) in s.flatMap { Date().timeIntervalSince($0.at) < 600 ? $0 : nil } }
+        if c.client != nil {
+            if let s = fresh(clientStates[c.key]) { c.applyState(s.text, at: s.at) }
+            else if !clientStateSeen.contains(c.character), let s = fresh(charStates[c.character]) { c.applyState(s.text, at: s.at) }
+        }
+        if c.quota { if let code = quotaCode[c.character] { c.js(code) } } else { c.js("setQuota(\(quote(c.character)), null)") }
+    }
+
+    // MARK: 前台程序、在跑的 AI 程序
+
+    /// 前台程序是哪一类：ai（「跟随前台」认得的 AI 程序，Claude 桌面带 client）、terminal、ours（CrossPet 自己的窗口）、other
+    func foregroundInfo(_ app: NSRunningApplication?) -> [String: Any] {
+        guard let app, let bundle = app.bundleIdentifier else { return ["kind": "other"] }
+        if app.processIdentifier == ProcessInfo.processInfo.processIdentifier { return ["kind": "ours"] }
+        if let mapped = appToCharacter[bundle] ?? hostApp(bundle) {
+            var f: [String: Any] = ["kind": "ai", "character": hostCharacter(mapped)]
+            if bundle == Self.claudeDesktopBundle { f["client"] = "claude-desktop" }
+            return f
+        }
+        if Self.terminalBundles.contains(bundle) { return ["kind": "terminal"] }
+        return ["kind": "other"]
+    }
+
+    func pushForeground() {
+        guard ready, companionsForwarding else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: foregroundInfo(NSWorkspace.shared.frontmostApplication)),
+              let json = String(data: data, encoding: .utf8) else { return }
+        js("setForeground(\(json))")
+    }
+
+    /// 有窗口的 AI 程序在跑的「角色@客户端」（「一直留着」时，程序关掉她才走）。
+    /// 程序换成客户端名：Claude 桌面 claude-desktop、Codex codex、Antigravity antigravity、多模型宿主用宿主名，其余用它绑的角色名
+    /// （和钩子写的接入名一致）。同一个程序里可能跑着好几个模型的角色（Codex 接了 DeepSeek 接口就是 deepseek@codex），
+    /// 所以每个客户端都和所有角色配一遍
+    func runningKeys() -> [String] {
+        var clients = Set<String>()
+        for a in NSWorkspace.shared.runningApplications {
+            guard let b = a.bundleIdentifier else { continue }
+            if b == Self.claudeDesktopBundle { clients.insert("claude-desktop") }
+            else if b == "com.openai.codex" { clients.insert("codex") }
+            else if b == "com.google.antigravity" { clients.insert("antigravity") }
+            else if let host = hostApp(b) { clients.insert(host) }
+            else if let ch = appToCharacter[b] { clients.insert(ch) }
+        }
+        return clients.flatMap { cl in characterIds.map { "\($0)@\(cl)" } }.sorted()
+    }
+
+    func pushRunning(force: Bool = false) {
+        guard ready, companionsForwarding else { sentRunning = nil; return }
+        guard let data = try? JSONSerialization.data(withJSONObject: runningKeys()), let json = String(data: data, encoding: .utf8),
+              force || json != sentRunning else { return }
+        sentRunning = json
+        js("setRunning(\(json))")
+    }
+
+    /// 「跟随前台」要换角色：开关开着时先问页面（固定了主桌宠、要换成的已经有一只站着：不换）；still：答复回来时情况还对不对
+    func followForeground(_ id: String, why: String, via: String, still: @escaping () -> Bool = { true }) {
+        guard multiPetsOn else { switchTo(id, why: why, via: via); return }
+        let standing = Array(Set(companions.values.map { $0.character })).sorted()
+        let input: [String: Any] = ["foregroundId": id, "current": currentId as Any? ?? NSNull(), "mainPet": mainPet, "standing": standing]
+        guard let data = try? JSONSerialization.data(withJSONObject: input), let json = String(data: data, encoding: .utf8) else { return }
+        web.evaluateJavaScript("FollowPolicy.foregroundTarget(\(json))") { [weak self] r, _ in
+            guard let self, r as? String == id, id != self.currentId, self.characterIds.contains(id), still() else { return }
+            self.switchTo(id, why: why, via: via)
+        }
+    }
+}

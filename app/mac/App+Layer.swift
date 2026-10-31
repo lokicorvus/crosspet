@@ -30,6 +30,7 @@ extension App {
     func applyLayer() {
         // 每次轮询（0.3 秒）都看：程序一进全屏，窗口列表马上就是全屏后的大小，但「切换空间」的通知要等动画放完才来，
         // 只靠它和每秒一次的检查，她会在全屏动画上露一秒多（闪一下）
+        defer { syncCompanionWindows() }   // 多桌宠：额外那几只的层级、全屏 / 快捷键隐藏跟着主桌宠（每 0.3 秒对一次）
         if userHidden { return }   // 你用快捷键藏起来了：什么都别把她翻出来
         if Date().timeIntervalSince(fullscreenCheckedAt) >= 0.25 { checkFullscreen() }
         if hiddenForFullscreen { return }   // 全屏时收着：别被换层级的逻辑翻出来

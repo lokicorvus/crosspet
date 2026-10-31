@@ -231,6 +231,9 @@ extension App {
             currentId = saved
             js("setCharacter(\(quote(saved)), true)")
         }
+        companionsMainReloaded()   // 开关关着时页面不会再发列表：额外的窗口直接关掉；开着时等页面发完整列表
+        pushMultiPets()
+        applyMainPet()   // 固定了主桌宠：换成她（页面不换，外壳自己换）
         if let side = defaults.string(forKey: "dock"), edgeDockEnabled {   // 上次是贴着边的
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.setDock(side) }
         }
@@ -242,9 +245,10 @@ extension App {
         refreshCodexQuota(.now)
         refreshAntigravityQuota()
         refreshPlugins(tellPet: true)   // 插件旧了：等她闲下来提醒一句
+        if companionsForwarding { startForwarding() }
         if followApps, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
            let id = appToCharacter[front] ?? hostApp(front), characterIds.contains(hostCharacter(id)) {
-            switchTo(hostCharacter(id), why: "startup", via: front)
+            followForeground(hostCharacter(id), why: "startup", via: front)
         }
     }
 

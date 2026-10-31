@@ -15,8 +15,9 @@ final class LocalhostTrust: NSObject, URLSessionDelegate {
 
 /// 控制台页面 → App 的消息通道（单独一个对象，避免 WKUserContentController 强引用 App 造成循环）
 final class DevBridge: NSObject, WKScriptMessageHandler {
-    enum Kind { case dev, settings, feedback, pet }
+    enum Kind { case dev, settings, feedback, pet, companion }
     weak var app: App?
+    weak var companion: Companion?   // kind 是 companion 时：消息是哪只额外桌宠的页面发来的
     let kind: Kind
     init(app: App, kind: Kind) { self.app = app; self.kind = kind }
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -25,6 +26,7 @@ final class DevBridge: NSObject, WKScriptMessageHandler {
         case .settings: app?.handleSettings(message.body)
         case .feedback: app?.handleFeedback(message.body)
         case .pet: app?.handlePet(message.body)
+        case .companion: companion?.handleMessage(message.body)
         }
     }
 }

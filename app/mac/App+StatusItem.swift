@@ -66,6 +66,7 @@ extension App {
         defaults.set(skins, forKey: "skins")
         loadCharacters()
         js("refreshLook(\(quote(id)))")
+        companionsJS("refreshLook(\(quote(id)))")   // 额外那只是这个角色：也换上
         pushSettings()   // 设置页开着（角色页的衣服卡）时高亮跟着变：按时段自动换衣服也走这里
     }
 
@@ -87,12 +88,13 @@ extension App {
         defaults.set(names, forKey: "names")
         loadCharacters()
         js("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
+        companionsJS("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
     }
 
     @objc func toggleAntigravityQuota() {
         let on = !defaults.bool(forKey: "agyQuota")
         defaults.set(on, forKey: "agyQuota")
-        if on { refreshAntigravityQuota() } else { js("setQuota('gemini', null)") }
+        if on { refreshAntigravityQuota() } else { quotaJS("gemini", "setQuota('gemini', null)") }
     }
 
     /// 背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off
@@ -101,12 +103,13 @@ extension App {
         guard let mode = sender.representedObject as? String else { return }
         defaults.set(mode, forKey: "auraMode")
         js("setAuraMode(\(quote(mode)))")
+        companionsJS("setAuraMode(\(quote(mode)))")
     }
 
     @objc func toggleGPTQuota() {
         let on = !defaults.bool(forKey: "gptQuota")
         defaults.set(on, forKey: "gptQuota")
-        if on { refreshCodexQuota(.now) } else { js("setCodexQuota(null)") }
+        if on { refreshCodexQuota(.now) } else { quotaJS("gpt", "setCodexQuota(null)") }
     }
 
     @objc func toggleLogin() {

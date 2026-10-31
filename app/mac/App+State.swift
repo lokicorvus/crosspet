@@ -31,12 +31,19 @@ extension App {
                         latestActive = (id, ts)
                     }
                 }
-                if kind == "sessions" { if !pauseRealEvents { js("setSessions(\(quote(id)), \(text))") }; continue }
+                if kind == "sessions" {
+                    if !pauseRealEvents { js("setSessions(\(quote(id)), \(text))") }
+                    noteSessions(id, text)   // 多桌宠：额外那只拿她客户端的那份
+                    continue
+                }
                 devJS("logEvent(\(quote(id)), \(quote(kind)), \(text), \(pauseRealEvents))")
                 let parsed = kind == "state" ? (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] : nil
                 if pauseRealEvents { if kind == "state" { notePet(id, parsed, "skipped", "paused") }; continue }
                 if kind == "state" { notePet(id, parsed, "played") }   // 交给网页了；网页自己的判断（不是当前角色、正在演彩蛋……）在 diagnoseDisplay 里
-                js(kind == "state" ? "applyCharState(\(quote(id)), \(text))" : "setQuota(\(quote(id)), \(text))")
+                if kind == "state" {
+                    js("applyCharState(\(quote(id)), \(text))")
+                    if id != "current" { noteCharState(id, text, stamp) }
+                } else { quotaJS(id, "setQuota(\(quote(id)), \(text))") }
                 // Codex 回完一轮：额度记录刚写进会话，马上读一次（不然要等每分钟一次的定时刷新）
                 if kind == "state", id == "gpt" {
                     if text.contains("\"event\": \"Stop\"") || text.contains("\"event\":\"Stop\"") {
@@ -48,8 +55,10 @@ extension App {
         }
         // 同角色的新事件也必须撤销更早的异步答复，否则旧请求可能把她切回另一个角色。
         if let id = latestActive.id { followEvent(id) }
+        pollClientStates()   // 多桌宠：按客户端的状态（开关关着、没在集合时直接返回，不读 @ 文件）
         applyLayer()
         updateDock()
+        companions.values.forEach { $0.updateDock() }
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）正在前台、
         // 里面换了模型：马上换成那个模型的角色
         for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "cursor"] {
@@ -60,7 +69,9 @@ extension App {
             guard followApps, !pauseRealEvents, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
                   (appToCharacter[front] ?? hostApp(front)) == host else { continue }
             let id = hostCharacter(host)
-            if id != currentId, characterIds.contains(id) { switchTo(id, why: "host", via: host) }
+            if id != currentId, characterIds.contains(id) {
+                followForeground(id, why: "host", via: host) { NSWorkspace.shared.frontmostApplication?.bundleIdentifier == front }
+            }
         }
     }
 
@@ -74,7 +85,7 @@ extension App {
         let foregroundId = host.map { hostCharacter($0) }
         let currentAt = currentId, apps = followApps, events = followEvents
         let input: [String: Any] = ["eventId": id, "foregroundId": foregroundId as Any? ?? NSNull(),
-                                    "followApps": apps, "followEvents": events, "characters": characterIds]
+                                    "followApps": apps, "followEvents": events, "characters": characterIds, "multiPets": multiPetsOn]
         guard let data = try? JSONSerialization.data(withJSONObject: input), let json = String(data: data, encoding: .utf8) else { return }
         web.evaluateJavaScript("FollowPolicy.eventTarget(\(json))") { [weak self] result, _ in
             // 和 Windows 一致：更新的事件、页面或选择已经到来时，旧答复不能再覆盖它。

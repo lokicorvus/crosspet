@@ -22,7 +22,10 @@ extension App {
         }
         add(menu, "摸摸头", #selector(pat))
         add(menu, "戳一下", #selector(poke))
-        add(menu, "召唤彩蛋", #selector(egg))
+        let eggItem = add(menu, "召唤彩蛋", #selector(egg))
+        if !eggAllowed { eggItem.action = nil }   // 有别的桌宠在场时不演彩蛋（页面发 eggAllowed:false）：没有动作的菜单项自动变灰
+        // 集合不受开关限制，一直在；正集合着时换成「解散」
+        if pageGathering { add(menu, "解散", #selector(dismissCompanions)) } else { add(menu, "集合！", #selector(gatherCompanions)) }
         if codexResets && currentId == "gpt" { add(menu, "会重置吗？", #selector(askReset)) }   // 只有 GPT 有这个需求
         if characterIds.count > 1 {
             menu.addItem(.separator())

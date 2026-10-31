@@ -134,6 +134,7 @@ extension App {
 
     /// 桌宠页面发来的消息：「新功能」卡片点了「去看看」→ 打开设置停在「新功能」页
     func handlePet(_ body: Any) {
+        if let d = body as? [String: Any] { handleCompanionMessage(d) }   // 多桌宠：companions / companionLeave / companionCall / eggAllowed / friendship
         if let d = body as? [String: Any], let tab = d["openSettings"] as? String { if tab == "character" { openCharacterPage() } else { openSettingsAt(tab: tab) } }
         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色
         if let d = body as? [String: Any], let w = d["wear"] as? [String: Any], let id = w["id"] as? String, let skin = w["skin"] as? String,
@@ -183,6 +184,7 @@ extension App {
             "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "codexResets": codexResets, "peakStyle": peakStyle, "quotaStyle": quotaStyle, "peakSkins": peakSkins, "powerSave": powerSave,
             "hideHotkey": hideHotkey, "hotkeyFailed": hotkeyFailed, "hotkeys": [["id": "off", "label": "不用快捷键"]] + Self.hotkeyChoices.map { ["id": $0.id, "label": $0.label] },
             "aiAutostart": aiAutostart,
+            "multiPets": multiPetsOn, "petsRest": petsRest, "mainPet": mainPet, "friendship": friendshipRows,
             "character": currentId ?? characterIds.first ?? "",
             "characters": characterIds.map { id -> [String: Any] in
                 var c: [String: Any] = ["id": id, "name": displayNames[id] ?? id, "defaultName": defaultNames[id] ?? id, "custom": names[id] ?? "",

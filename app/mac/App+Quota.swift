@@ -52,11 +52,11 @@ extension App {
         let tag = rateLimits != nil ? "Codex 服务，\(String(format: "%.1f", Double(ms) / 1000)) 秒" : "没问到：\(error ?? "原因不明")"
         lastGptQuota = "\(Self.clock()) （\(tag)）" + (codexLast.map { (rateLimits == nil ? "沿用 \(Self.hm($0.at)) 的数：" : "") + CodexQuotaSource.brief($0.rateLimits) } ?? "")
         pushSettings()
-        guard let last = codexLast else { js("setCodexQuota(null)"); return }
+        guard let last = codexLast else { quotaJS("gpt", "setCodexQuota(null)"); return }
         var p = CodexQuotaSource.payload(source: rateLimits != nil ? "live" : "stale", rateLimits: last.rateLimits, error: error, ms: ms)
         p["at"] = last.at.timeIntervalSince1970
         guard let d = try? JSONSerialization.data(withJSONObject: p), let arg = String(data: d, encoding: .utf8) else { return }
-        js("setCodexQuota(\(arg))")
+        quotaJS("gpt", "setCodexQuota(\(arg))")   // 额外那只是 GPT、显示额度：也拿一份
     }
 
     // MARK: Gemini 额度（可选，默认关）
@@ -69,7 +69,7 @@ extension App {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
             guard let (pid, token) = self.antigravityServer() else {
-                DispatchQueue.main.async { self.js("setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程" }
+                DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程" }
                 return
             }
             let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : self.listeningPorts(pid)
@@ -135,7 +135,7 @@ extension App {
             }
             self.agyPort = (pid, port)
             guard let json = try? JSONSerialization.data(withJSONObject: q), let arg = String(data: json, encoding: .utf8) else { return }
-            DispatchQueue.main.async { self.js("setQuota('gemini', \(arg))") }
+            DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', \(arg))") }
         }.resume()
     }
 

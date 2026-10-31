@@ -96,6 +96,7 @@ extension App {
               let arg = String(data: json, encoding: .utf8) else { return }
         manifestJSON = arg
         js("init(\(arg))")
+        companionsJS("init(\(arg))")   // 额外那几只也换上新的清单（换衣服、改名后）
         devJS("boot(\(arg))")
         // 刚更新完（上次打开的是别的版本）：让她说一声
         let last = defaults.string(forKey: "lastVersion")
@@ -152,6 +153,7 @@ extension App {
         guard webView === web else { return }
         followEventGeneration &+= 1
         ready = false
+        pageGathering = false   // 页面重载：集合的记录跟着丢了
     }
 
     /// 切到某个 AI 的 App 后，要在它上面停留一会儿才换角色：
@@ -167,12 +169,14 @@ extension App {
         spaceChanged(note)
         guard ready, let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
         pendingSwitch?.cancel()
+        pushForeground()   // 多桌宠：前台是不是 AI 软件 / 终端（开关关着、没在集合时不发）
         guard followApps, let bundle = app.bundleIdentifier, let mapped = appToCharacter[bundle] ?? hostApp(bundle) else { return }
         let id = hostCharacter(mapped)
         guard id != currentId, characterIds.contains(id) else { return }
         let work = DispatchWorkItem { [weak self] in
             guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
-            self?.switchTo(id, why: "front", via: bundle)
+            // 开关开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、她已经有一只站着：不换）；关着时照旧直接换
+            self?.followForeground(id, why: "front", via: bundle) { NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle }
         }
         pendingSwitch = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)

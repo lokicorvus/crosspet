@@ -38,6 +38,7 @@ extension App {
             panel.orderFrontRegardless()
             if layerMode == "normal" { orderBelowFrontWindow() }
         }
+        syncCompanionWindows()   // 一次全藏 / 全叫出来（主桌宠先排好前后，额外那几只排在她后面）
         updatePageHidden()
     }
 
