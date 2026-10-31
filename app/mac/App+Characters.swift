@@ -128,6 +128,7 @@ extension App {
         if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
         if bundle == "dev.zcode.app" { return "zcode" }
         if bundle == "com.todesktop.230313mzl4w4u92" { return "cursor" }
+        if bundle == "io.dsh.desktop" { return "deepseek" }   // DeepSeek Harness Desktop：多模型宿主，按 deepseek-host.json 换角色
         return nil
     }
 
