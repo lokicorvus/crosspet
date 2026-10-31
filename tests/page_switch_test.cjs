@@ -315,6 +315,8 @@ const MULTI_KEYS = ['companions', 'companionLeave', 'companionCall', 'eggAllowed
 const multiMsgs = e => e.msgs().filter(m => MULTI_KEYS.some(k => k in m))
 const companionLists = e => e.msgs().filter(m => 'companions' in m).map(m => m.companions)
 const lastCompanions = e => companionLists(e).slice(-1)[0]
+// companions 消息里带着 gathering（正集合着：外壳菜单显示「解散」）
+const lastGathering = e => e.msgs().filter(m => 'companions' in m).slice(-1)[0]?.gathering
 // 外壳打开开关后先交一轮状态；页面开头等一下再算（见 index.html 的 COMPANIONS_WARMUP）
 async function multiOn(e, main, extra = '') {
   if (main && e.state().charId !== main) { e.run(`setCharacter('${main}', true)`); await e.advance(1000) }
@@ -564,6 +566,8 @@ const multiCases = [
     assert(list.length === 2 && chars.includes('claude') && chars.includes('grok'), `after 1s: ${JSON.stringify(list)}`)
     assert(!chars.includes('gpt') && !chars.includes('egg-gpt'), `main / egg summoned: ${JSON.stringify(list)}`)
     assert(list.every(p => p.id === p.character + '@gather'), `ids: ${JSON.stringify(list)}`)
+    assert(lastGathering(e) === true, `gathering while gathered: ${JSON.stringify(multiMsgs(e).slice(-1))}`)
+    assert(e.msgs().filter(m => 'companions' in m).every(m => typeof m.gathering === 'boolean'), `shape: ${JSON.stringify(multiMsgs(e))}`)
     // 集合来的 Claude 收编了干活的终端：key 换成那个客户端，id 不变（外壳按 id 认窗口）
     e.run(`setSessions('claude', csess(['c1','writing','claude-cli']))`)
     await e.advance(100)
@@ -576,6 +580,8 @@ const multiCases = [
     assert(leaves.length === 1 && leaves[0].msg.companionLeave === 'grok@gather', `dismiss: ${JSON.stringify(leaves)}`)
     const after = lastCompanions(e)
     assert(after.length === 1 && after[0].id === 'claude@gather' && after[0].key === 'claude@claude-cli', `left over: ${JSON.stringify(after)}`)
+    // 解散完：留下的是干活那只，不算集合了（列表没变也要告诉外壳 gathering 变 false）
+    assert(lastGathering(e) === false, `gathering after dismiss: ${JSON.stringify(multiMsgs(e).slice(-3))}`)
   }],
   ['window_ids_stay_unique', async e => {
     // 干活冒出来的 Claude 终端那只被集合接管（id 还是 claude@claude-cli）→ 终端会话结束退回没收编 → 收编桌面 →
@@ -626,6 +632,7 @@ const multiCases = [
     await e.advance(1500)
     let list = lastCompanions(e)
     assert(list && list.length === 2 && list.every(p => p.id.endsWith('@gather')), `gathered: ${JSON.stringify(companionLists(e))}`)
+    assert(lastGathering(e) === true, `gathering while off: ${JSON.stringify(multiMsgs(e).slice(-1))}`)
     assert(e.run(`playEgg(true)`) === false, 'egg next to gathered pets')
     // 集合来的 Claude 收编干活的终端；GPT 主桌宠没占着的 codex 不冒
     e.run(`setSessions('claude', csess(['c1','writing','claude-cli'])); setSessions('gpt', csess(['s1','writing','codex']))`)
@@ -638,6 +645,7 @@ const multiCases = [
     const leaves = e.msgs().filter(m => 'companionLeave' in m).map(m => m.companionLeave)
     assert(leaves.length === 2 && leaves.includes('claude@gather'), `leaves: ${JSON.stringify(leaves)}`)
     assert(lastCompanions(e).length === 0 && e.msgs().filter(m => 'eggAllowed' in m).slice(-1)[0].eggAllowed === true, `after dismiss: ${JSON.stringify(multiMsgs(e))}`)
+    assert(lastGathering(e) === false, `gathering after dismiss while off: ${JSON.stringify(multiMsgs(e).slice(-3))}`)
     const n = multiMsgs(e).length
     await e.advance(30000)
     assert(multiMsgs(e).length === n, `messages after dismiss: ${JSON.stringify(multiMsgs(e).slice(n))}`)

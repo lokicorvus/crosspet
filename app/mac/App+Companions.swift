@@ -67,13 +67,19 @@ extension App {
     }
 
     /// 新开的那只放哪：记过位置（origin-<key>，还在某块屏幕上）就回到那里；没记过就挑主桌宠旁边第一个空着的格子
+    /// 记过的位置夹进那块屏幕的可见区；压着站着的窗口（主桌宠或别的额外那只）就不用它，改挑格子
     func companionOrigin(key: String, size: NSSize) -> NSPoint {
+        let others = (Array(companions.values) + leavingCompanions).map { $0.panel.frame }
         if let saved = defaults.array(forKey: "origin-\(key)") as? [Double], saved.count == 2 {
-            let r = NSRect(x: saved[0], y: saved[1], width: size.width, height: size.height)
-            if NSScreen.screens.contains(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) }) { return r.origin }
+            var r = NSRect(x: saved[0], y: saved[1], width: size.width, height: size.height)
+            if let vf = NSScreen.screens.first(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) })?.visibleFrame {
+                r.origin.x = min(max(r.minX, vf.minX), max(vf.minX, vf.maxX - size.width))
+                r.origin.y = min(max(r.minY, vf.minY), max(vf.minY, vf.maxY - size.height))
+                let busy = ([panel.frame] + others).contains { $0.intersects(r.insetBy(dx: 1, dy: 1)) }
+                if !busy { return r.origin }
+            }
         }
         let vf = (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
-        let others = (Array(companions.values) + leavingCompanions).map { $0.panel.frame }
         let slots = Self.companionSlots(main: panel.frame, count: 2 * others.count + 1, size: size, visible: vf)
         let free = slots.first { s in !others.contains { $0.intersects(s.insetBy(dx: 1, dy: 1)) } }
         return (free ?? slots.last ?? panel.frame).origin
@@ -84,7 +90,13 @@ extension App {
     /// handlePet 里调：companions / companionLeave / companionCall / eggAllowed / friendship
     func handleCompanionMessage(_ d: [String: Any]) {
         if let id = d["companionLeave"] as? String { companionLeave(id) }
-        if let list = d["companions"] as? [[String: Any]] { syncCompanions(list) }
+        if let list = d["companions"] as? [[String: Any]] {
+            // gathering：页面说正集合着（菜单显示「解散」；开关关着时也要转发）
+            let was = companionsForwarding
+            pageGathering = d["gathering"] as? Bool ?? false
+            syncCompanions(list)
+            if companionsForwarding && !was { startForwarding() }
+        }
         if let call = d["companionCall"] as? [String: Any] { companionCall(call) }
         if let ok = d["eggAllowed"] as? Bool { eggAllowed = ok }
         if let rows = d["friendship"] as? [Any] { friendshipRows = rows; pushSettings() }
@@ -105,7 +117,6 @@ extension App {
             companions[id] = Companion(app: self, pet: pet)
         }
         for (id, c) in companions where !seen.contains(id) { c.close() }
-        refreshGatherState()
     }
 
     func companionLeave(_ id: String) {
@@ -125,7 +136,6 @@ extension App {
     func companionClosed(_ c: Companion) {
         if companions[c.id] === c { companions.removeValue(forKey: c.id) }
         leavingCompanions.removeAll { $0 === c }
-        refreshGatherState()
     }
 
     /// 主桌宠页面重新载入了：集合的记录跟着丢了。开关开着时页面热身完会发完整列表，按它对齐；
@@ -136,15 +146,14 @@ extension App {
         for c in Array(companions.values) + leavingCompanions { c.close() }
     }
 
-    /// 页面里还在集合吗（还有没登场的，或站着的里有集合来的）：菜单显示「集合！」还是「解散」，开关关着时要不要转发
-    func refreshGatherState() {
-        guard ready else { pageGathering = false; return }
-        web.evaluateJavaScript("gathered.length > 0 || !!companionsState?.pets.some(p => p.via === 'gather')") { [weak self] r, _ in
-            guard let self else { return }
-            let was = self.companionsForwarding
-            self.pageGathering = r as? Bool ?? false
-            if self.companionsForwarding && !was { self.startForwarding() }
-        }
+    /// 主桌宠页面的网页进程崩了：额外那几只没人管了（不会再收到列表、状态），全部关掉，重新载入主桌宠页面，
+    /// 载入完（didStartProvisionalNavigation / didFinish）照常对齐。开关关着、也没有额外窗口时和以前一样什么都不做
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        guard webView === web, multiPetsOn || !companions.isEmpty || !leavingCompanions.isEmpty else { return }
+        appLog("桌宠页面的网页进程退出了，关掉额外的桌宠、重新载入")
+        for c in Array(companions.values) + leavingCompanions { c.close() }
+        pageGathering = false
+        web.reload()
     }
 
     @objc func gatherCompanions() {
@@ -158,7 +167,7 @@ extension App {
     }
     @objc func dismissCompanions() {
         guard ready else { return }
-        web.evaluateJavaScript("dismiss()") { [weak self] _, _ in self?.refreshGatherState() }
+        js("dismiss()")   // 解散完页面发 gathering: false
     }
 
     // MARK: 设置
@@ -280,8 +289,14 @@ extension App {
     /// 额度：主桌宠照旧拿，同时记下；这个角色 quota: true 的那只也拿一份
     func quotaJS(_ character: String, _ code: String) {
         js(code)
-        quotaCode[character] = code
+        // 按「角色 + 函数」记：GPT 的 setQuota（额度文件）和 setCodexQuota（问 Codex 服务）不互相盖掉
+        let fn = code.prefix { $0 != "(" }
+        quotaCode["\(character)|\(fn)"] = code
         for c in companions.values where c.character == character && c.quota { c.js(code) }
+    }
+    /// 这个角色记下的所有额度调用（新开的那只、额度刚归她时补一遍）
+    func quotaCodes(_ character: String) -> [String] {
+        quotaCode.filter { $0.key.hasPrefix(character + "|") }.sorted { $0.key < $1.key }.map { $0.value }
     }
 
     /// 新开的那只页面加载完（或换了客户端）：会话、状态、额度先补一遍
@@ -293,7 +308,7 @@ extension App {
             if let s = fresh(clientStates[c.key]) { c.applyState(s.text, at: s.at) }
             else if !clientStateSeen.contains(c.character), let s = fresh(charStates[c.character]) { c.applyState(s.text, at: s.at) }
         }
-        if c.quota { if let code = quotaCode[c.character] { c.js(code) } } else { c.js("setQuota(\(quote(c.character)), null)") }
+        if c.quota { quotaCodes(c.character).forEach { c.js($0) } } else { c.js("setQuota(\(quote(c.character)), null)") }
     }
 
     // MARK: 前台程序、在跑的 AI 程序

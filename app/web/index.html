@@ -1399,7 +1399,9 @@ function playCharState(id, s) {
 
 // ---- 多桌宠：在干活的 AI 各显示一只（设置里的开关，默认关）----
 // 谁站着、谁走都在 companions.js 判断；这里只收外壳交来的东西、按时调 decide、把结果告诉外壳：
-//   toShell({ companions: [{ id, key, character, client, quota, label }] })   该站着的额外桌宠。总是完整列表，变了才发
+//   toShell({ companions: [{ id, key, character, client, quota, label }], gathering })   该站着的额外桌宠。总是完整列表，变了才发
+//     gathering  正集合着（还有集合来的，或集合 / 解散正一只只错开）：外壳菜单显示「解散」、开关关着时也转发。
+//                列表没变、只有它变了也发
 //     id     窗口身份，外壳按它管窗口。集合来的那只始终是「<角色>@gather」（收编客户端后 key 会变，id 不变，
 //            不然外壳会关掉重开一只）；干活冒出来的 id = key
 //     key    「<角色>@<客户端>」，位置 / 贴边按它记
@@ -1418,6 +1420,8 @@ let claim = null                 // 主桌宠占着她角色的哪个客户端 {
 let companionsState = null       // decide 上次的 state；pets 里多记一个 id，decide 复制时会带着
 let gathered = [], gatherTimers = []   // 页面重载 / 渲染重启算解散：gathered 丢了，外壳按重载后的完整列表关掉那些窗口
 let sentCompanions = null        // 上次发出去的列表（JSON）；null = 还没发过，所以页面重载后第一次一定发完整列表
+let gatherPending = 0, sentGathering = false   // 集合 / 解散还没轮到的那几步；上次告诉外壳的 gathering
+const gatheringNow = () => gathered.length > 0 || gatherPending > 0
 let eggAllowedSent = true
 let companionsReadyAt = 0
 const clientStateSeen = {}       // 交来过按客户端状态（<角色>@<客户端>-state.json）的角色；旧钩子没有，主桌宠照旧按角色那份演
@@ -1483,10 +1487,10 @@ function setMultiPets(o) {
 }
 // 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
 function stopCompanions() {
-  gatherTimers.forEach(clearTimeout); gatherTimers = []; gathered = []
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; gathered = []; gatherPending = 0
   claim = null; companionsState = null; companionsReadyAt = 0
   for (const k of Object.keys(clientStateSeen)) delete clientStateSeen[k]
-  toShell({ companions: [] }); sentCompanions = null
+  toShell({ companions: [], gathering: false }); sentCompanions = null; sentGathering = false
   if (!eggAllowedSent) { eggAllowedSent = true; toShell({ eggAllowed: true }) }
   resetFriendship()
 }
@@ -1505,10 +1509,12 @@ function applyClientState(character, client, s) {
 // 集合！每个角色各叫一只（不含主桌宠正演着的、彩蛋角色），一只接一只登场
 function gather() {
   if (role !== 'main') return false
-  gatherTimers.forEach(clearTimeout); gatherTimers = []
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
   const main = mainCharacter(), chars = manifest.characters || {}
   const todo = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main && !gathered.includes(id))
+  gatherPending = todo.length
   todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+    gatherPending = Math.max(0, gatherPending - 1)
     if (gathered.includes(id)) return
     gathered = [...gathered, id]
     updateCompanions()
@@ -1517,11 +1523,13 @@ function gather() {
 }
 // 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下；收编的客户端还在干活的那只不走，转成干活那只（decide 里）
 function dismiss() {
-  gatherTimers.forEach(clearTimeout); gatherTimers = []
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
   const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
   gathered = gathered.filter(ch => order.includes(ch))   // 还没登场的不用再叫
   if (!order.length) { updateCompanions(); return }      // 没有站着的（比如还在热身）：直接收尾
+  gatherPending = order.length
   order.forEach((ch, i) => gatherTimers.push(setTimeout(() => {
+    gatherPending = Math.max(0, gatherPending - 1)
     gathered = gathered.filter(x => x !== ch)
     updateCompanions()
   }, i * GATHER_STEP)))
@@ -1556,7 +1564,8 @@ function handOffCelebration(id, ev) {
 }
 // 开关关着、集合的也都走完了：回到单只。空列表没发过就补发一次（彩蛋菜单也恢复），之后不再发
 function windDownCompanions() {
-  if (sentCompanions !== null && sentCompanions !== '[]') toShell({ companions: [] })
+  if (sentCompanions !== null && (sentCompanions !== '[]' || sentGathering)) toShell({ companions: [], gathering: false })
+  sentGathering = false
   if (!eggAllowedSent) { eggAllowedSent = true; toShell({ eggAllowed: true }) }
   companionsState = null; sentCompanions = null; claim = null
   resetFriendship()
@@ -1591,7 +1600,8 @@ function updateCompanions() {
   for (const key of r.leaving) toShell({ companionLeave: prevPets.find(x => x.key === key)?.id || key })
   const list = r.pets.map(p => ({ id: p.id, key: p.key, character: p.character, client: p.client, quota: !!p.quota, label: companionLabel(p, r.pets, main) }))
   const json = JSON.stringify(list), first = sentCompanions === null
-  if (json !== sentCompanions) { sentCompanions = json; toShell({ companions: list }) }
+  const gathering = gatheringNow()
+  if (json !== sentCompanions || gathering !== sentGathering) { sentCompanions = json; sentGathering = gathering; toShell({ companions: list, gathering }) }
   // 第一次（打开开关、页面重载后）也发：外壳菜单里可能还是上一个页面留下的灰
   const eggOk = !list.length
   if (first || eggOk !== eggAllowedSent) { eggAllowedSent = eggOk; toShell({ eggAllowed: eggOk }) }

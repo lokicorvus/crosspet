@@ -33,8 +33,14 @@ final class Companion: NSObject, WKNavigationDelegate {
     var dockEnterAt: Date?, dockLeaveAt: Date?
     var dockCut: [String: Double] = [:]
     private var observers: [NSObjectProtocol] = []
+    private var crashes = 0   // 网页进程崩了几次
 
     var originKey: String { "origin-\(key)" }
+    /// 自动记位置。集合来、还没收编客户端的（<角色>@gather）不记：下次集合要在主桌宠旁边重新排开；你拖过的照样记（DragView）
+    func saveOrigin() {
+        guard !key.hasSuffix("@gather") else { return }
+        defaults.set([panel.frame.minX, panel.frame.minY], forKey: originKey)
+    }
     var dockKey: String { "dock-\(key)" }
 
     /// pet：主桌宠页面 companions 列表里的一项 { id, key, character, client, quota, label }（App.syncCompanions 已检查过 id 和角色）
@@ -58,7 +64,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         web = WKWebView(frame: container.bounds, configuration: config)
         super.init()
         bridge.companion = self
-        defaults.set([panel.frame.minX, panel.frame.minY], forKey: originKey)   // 走了以后这个客户端又干活：回到这里出现
+        saveOrigin()   // 走了以后这个客户端又干活：回到这里出现
 
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -131,9 +137,12 @@ final class Companion: NSObject, WKNavigationDelegate {
         }
     }
     /// 网页进程崩了：重新载入（didFinish 会重新 setRole、补状态）
+    /// 最多重载 3 次：一直崩就关掉（主桌宠页面下次发列表时会重开一只）
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         ready = false
-        if !closed { webView.reload() }
+        guard !closed else { return }
+        crashes += 1
+        if crashes > 3 { close() } else { webView.reload() }
     }
 
     /// 她的页面发来的消息：摸头记给主桌宠页面（友谊记账只在那里做）；道别演完了关窗口
@@ -153,7 +162,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         if newKey != key {
             key = newKey
             (panel.contentView?.subviews.compactMap { $0 as? DragView }.first)?.originKey = originKey
-            defaults.set([panel.frame.minX, panel.frame.minY], forKey: originKey)
+            saveOrigin()
             if let side = dock { defaults.set(side, forKey: dockKey) }
         }
         client = newClient; quota = newQuota; label = newLabel
@@ -161,7 +170,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         if roleChanged { js("setRole('companion', \(roleInfoJSON))") }   // 页面按新的 label 改小字
         if clientChanged { app.feedCompanion(self) }
         else if quotaChanged {
-            if quota, let code = app.quotaCode[character] { js(code) } else if !quota { js("setQuota(\(app.quote(character)), null)") }
+            if quota { app.quotaCodes(character).forEach { js($0) } } else { js("setQuota(\(app.quote(character)), null)") }
         }
     }
 
@@ -239,7 +248,7 @@ final class Companion: NSObject, WKNavigationDelegate {
             self.panel.setFrame(f, display: true)
             self.web.pageZoom = scale
             self.shownFootPt = self.pageFoot * scale
-            if self.dock != nil { self.applyDock() } else { defaults.set([f.minX, f.minY], forKey: self.originKey) }
+            if self.dock != nil { self.applyDock() } else { self.saveOrigin() }
         }
     }
 
