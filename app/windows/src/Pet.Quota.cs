@@ -87,10 +87,10 @@ namespace CrossPet
             var logKey = (rl != null) + "|" + via + "|" + error;
             if (logKey != lastGptLogKey) { lastGptLogKey = logKey; Store.Log("GPT 额度：" + lastGptQuota.Substring(9)); }
             PushSettings();
-            if (codexLast == null) { Js("setCodexQuota(null)"); return; }
+            if (codexLast == null) { QuotaJS("gpt", "setCodexQuota(null)"); return; }
             var p = CodexQuota.Payload(rl != null ? "live" : "stale", codexLast, error, ms);
             p["at"] = new DateTimeOffset(codexLastAt).ToUnixTimeSeconds();
-            Js($"setCodexQuota({Store.Json.Serialize(p)})");
+            QuotaJS("gpt", $"setCodexQuota({Store.Json.Serialize(p)})");   // 多桌宠：额外那只是 GPT、显示额度：也拿一份
         }
         bool askingGemini;
         async Task RefreshGeminiQuota()
@@ -100,7 +100,7 @@ namespace CrossPet
             try
             {
                 var q = await Task.Run(AntigravityQuota.Read);   // 进程查询比较慢，放到后台
-                Js($"setQuota('gemini', {(q == null ? "null" : Store.Json.Serialize(q))})");   // Antigravity 没开就不显示
+                QuotaJS("gemini", $"setQuota('gemini', {(q == null ? "null" : Store.Json.Serialize(q))})");   // Antigravity 没开就不显示
             }
             catch (Exception e) { Store.Log("Gemini 额度: " + e.Message); }
             finally { askingGemini = false; }

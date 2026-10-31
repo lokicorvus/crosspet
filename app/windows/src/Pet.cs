@@ -120,6 +120,7 @@ namespace CrossPet
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), () => { RefreshQuota(); RefreshCodexQuota(CodexWhy.Tick); });
             Every(TimeSpan.FromSeconds(3), WatchClaudeConfig);
+            Every(TimeSpan.FromSeconds(5), () => PushRunning());   // 多桌宠：在跑的 AI 程序（开关关着、没在集合时直接返回）
             // 锁屏时动画全停（看不见还在画，白白耗电）
             SystemEvents.SessionSwitch += (_, e) =>
             {
@@ -161,7 +162,7 @@ namespace CrossPet
                 await web.EnsureCoreWebView2Async(env);
                 var core = web.CoreWebView2;
                 Map(core);
-                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; } };
+                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; pageGathering = false; } };   // 页面重载：集合的记录跟着丢了
                 core.Settings.AreDefaultContextMenusEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
@@ -188,6 +189,10 @@ namespace CrossPet
                         if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)}, {Q(last)})");
                     }
                     ready = true;
+                    // 多桌宠：开关关着时页面不会再发列表，额外的窗口直接关掉；开着时等页面热身完发完整列表再对齐（崩溃恢复、渲染出错重启后也一样）
+                    CompanionsMainReloaded();
+                    PushMultiPets();
+                    ApplyMainPet();   // 固定了主桌宠：换成她（页面不换，外壳自己换）
                     if (RenderRecovery.Ready()) Js("justRecovered()");   // 渲染出错重启回来：她自己说一声（托盘通知在 Windows 11 上常被收进通知中心）
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
                     After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
@@ -196,6 +201,7 @@ namespace CrossPet
                     RefreshQuota();
                     RefreshCodexQuota(CodexWhy.Now);
                     RefreshPlugins(tellPet: true);   // 插件旧了：等她闲下来提醒一句
+                    if (CompanionsForwarding) StartForwarding();
                     FollowForeground("startup");
                 };
                 // 立绘加载失败时网页发消息过来：记进日志（每次启动最多 5 条），反馈里能看出是哪张图、为什么
@@ -204,6 +210,7 @@ namespace CrossPet
                     try
                     {
                         if (!(Store.Json.DeserializeObject(a.WebMessageAsJson) is Dictionary<string, object> m)) return;
+                        HandleCompanionMessage(m);   // 多桌宠：companions / companionLeave / companionCall / eggAllowed / friendship
                         // 「新功能」卡片点了「去看看」：打开设置停在「新功能」页
                         if (m.TryGetValue("openSettings", out var tab) && tab is string t) { if (t == "character") OpenCharacterWindow(); else OpenSettings(t); return; }
                         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色（和 macOS 的 handlePet 一致）
@@ -233,6 +240,7 @@ namespace CrossPet
         {
             Store.Log("WebView2 进程崩溃: " + kind);
             if (kind == CoreWebView2ProcessFailedKind.GpuProcessExited) return;
+            CompanionsMainCrashed();   // 多桌宠：额外那几只全部关掉，页面重新载入完按重新算的完整列表再开，不留残窗
             crashes.RemoveAll(t => (DateTime.UtcNow - t).TotalMinutes > 10);
             if (crashes.Count >= 3) { Store.Log("10 分钟内崩溃太多次，不再自动恢复"); return; }
             crashes.Add(DateTime.UtcNow);
@@ -277,6 +285,7 @@ namespace CrossPet
             characters = chars.Where(kv => !IsEgg(kv.Value))
                               .Select(kv => (kv.Key, (kv.Value as Dictionary<string, object>)?["name"] as string ?? kv.Key)).ToList();
             if (!characters.Any(c => c.id == current)) current = characters.FirstOrDefault().id ?? "claude";
+            CompanionsJs($"init({ManifestJson})");   // 多桌宠：额外那几只也换上新的清单（换衣服、改名后）
         }
         static bool IsEgg(object info) => info is Dictionary<string, object> d && d.TryGetValue("egg", out var e) && e is bool b && b;
         List<(string id, string name)> Characters() => characters;

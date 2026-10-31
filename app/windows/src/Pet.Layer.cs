@@ -54,6 +54,7 @@ namespace CrossPet
             if (hwnd != IntPtr.Zero) Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ConcealStyle.ClickThrough(Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE), c));
             PassThroughBrowserWindows();
             UpdatePageHidden();
+            SyncCompanionWindows();   // 多桌宠：额外那几只一起藏 / 一起出来
         }
 
         /// <summary>网页控件（WebView2CompositionControl）把网页画进我们的窗口，但背后还留着真正的浏览器窗口（msedgewebview2 进程，
@@ -61,17 +62,19 @@ namespace CrossPet
         /// 藏起来后原来那块点不透、拖文件过去变成「复制」（1.3.4 测出来的，macOS 的网页控件没有这个窗口）。
         /// 网页从来不用收鼠标（摸头、拖动、右键都是外壳的 hit 层处理），给它也加上鼠标穿透。
         /// 它属于另一个进程、建好的时间不定：网页加载完、藏起来 / 叫回来时各补一次，加过的不再动</summary>
-        void PassThroughBrowserWindows()
+        void PassThroughBrowserWindows() => PassThroughBrowserWindows(hwnd);
+        /// <summary>target：桌宠窗口（主桌宠，或多桌宠的额外那只：她的网页控件背后也有一个这样的窗口）</summary>
+        internal void PassThroughBrowserWindows(IntPtr target)
         {
-            if (hwnd == IntPtr.Zero || env == null) return;
+            if (target == IntPtr.Zero || env == null) return;
             HashSet<uint> pids;
             try { pids = new HashSet<uint>(env.GetProcessInfos().Select(p => (uint)p.ProcessId)); } catch { return; }
-            Native.GetWindowRect(hwnd, out var me);
+            Native.GetWindowRect(target, out var me);
             int n = 0;
             Native.EnumWindows((h, _) =>
             {
                 // 只动我们自己的 WebView2 进程里、和桌宠窗口重叠的顶层窗口（别的程序也用 msedgewebview2，不能碰）
-                if (h != hwnd && Native.IsWindowVisible(h) && Native.GetWindowThreadProcessId(h, out var pid) != 0 && pids.Contains(pid)
+                if (h != target && Native.IsWindowVisible(h) && Native.GetWindowThreadProcessId(h, out var pid) != 0 && pids.Contains(pid)
                     && Native.GetWindowRect(h, out var r) && r.Left < me.Right && r.Right > me.Left && r.Top < me.Bottom && r.Bottom > me.Top)
                 {
                     int ex = Native.GetWindowLong(h, Native.GWL_EXSTYLE), want = ConcealStyle.ClickThrough(ex, true);
@@ -82,10 +85,25 @@ namespace CrossPet
             if (n > 0) Store.Log($"给网页控件背后的浏览器窗口加上鼠标穿透（{n} 个）");
         }
         /// 置顶（层级要求置顶、又没在隐身时）
-        void Raise() { if (!concealed && Window.Topmost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd); }
-        void UpdatePageHidden() => Js($"setPageHidden({(concealed || sessionLocked ? "true" : "false")})");
+        void Raise()
+        {
+            if (!concealed && Window.Topmost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd);
+            foreach (var c in AllCompanions) c.Raise();   // 多桌宠：额外那几只也回到最上层
+        }
+        void UpdatePageHidden()
+        {
+            Js($"setPageHidden({(concealed || sessionLocked ? "true" : "false")})");
+            foreach (var c in AllCompanions) c.UpdatePageHidden();
+        }
 
+        /// <summary>多桌宠：额外那几只的层级、隐藏跟着主桌宠，每次对完层级（每 0.3 秒一次）同步一遍；没有额外窗口时什么都不做</summary>
         void ApplyLayer()
+        {
+            ApplyMainLayer();
+            SyncCompanionWindows();
+        }
+
+        void ApplyMainLayer()
         {
             if (Window == null || hwnd == IntPtr.Zero) return;
             if (userHidden) return;   // 你用快捷键藏起来了：什么都别把她翻出来

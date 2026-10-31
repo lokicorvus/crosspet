@@ -54,8 +54,8 @@ namespace CrossPet
         }
         static Dictionary<string, object> PeakSkins => CleanPeakSkins(Store.Settings.TryGetValue("peakSkins", out var v) ? v : null);
         static bool DsQuotaEnabled => !(Store.Settings.TryGetValue("dsQuota", out var v) && v is bool b && !b);
-        static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
-        static void After(int ms, Action a)
+        internal static bool EdgeDockEnabled => !(Store.Settings.TryGetValue("edgeDock", out var v) && v is bool b && !b);
+        internal static void After(int ms, Action a)
         {
             var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
             t.Tick += (_, __) => { t.Stop(); a(); };
@@ -73,15 +73,50 @@ namespace CrossPet
         {
             if (!EdgeDockEnabled || hwnd == IntPtr.Zero) return;
             Native.GetWindowRect(hwnd, out var r);
-            int w = r.Right - r.Left, mid = r.Left + w / 2;
-            var scr = Forms.Screen.FromHandle(hwnd);
-            var wa = scr.WorkingArea;
-            double reach = w * (BaseWidth / pageW) * 0.3;   // 按人物那块的宽算：画布因为文字变宽时不该更容易贴边
-            bool Neighbor(bool left) => Forms.Screen.AllScreens.Any(o => !o.Equals(scr) && o.Bounds.Top < r.Bottom && o.Bounds.Bottom > r.Top &&
-                (left ? Math.Abs(o.Bounds.Right - scr.Bounds.Left) < 2 : Math.Abs(o.Bounds.Left - scr.Bounds.Right) < 2));
-            if (mid - wa.Left < reach && !Neighbor(true)) SetDock("left");
-            else if (wa.Right - mid < reach && !Neighbor(false)) SetDock("right");
+            var side = DockSide(r, hwnd, pageW);
+            if (side != null) SetDock(side);
         }
+
+        // ---- 贴边的计算（纯函数）：主桌宠和多桌宠的额外那几只（Companion.cs）共用，和 macOS 的 App+Dock.swift 一一对应 ----
+
+        /// <summary>松手时贴不贴边、贴哪边（null = 不贴）。r：窗口（物理像素）；按人物那块的宽算：画布因为文字变宽时不该更容易贴边；
+        /// 另一块屏幕接在这边时不算边缘</summary>
+        internal static string DockSide(Native.RECT r, System.Drawing.Rectangle wa, System.Drawing.Rectangle screen, IEnumerable<System.Drawing.Rectangle> otherScreens, double pageW)
+        {
+            int w = r.Right - r.Left, mid = r.Left + w / 2;
+            double reach = w * (BaseWidth / pageW) * 0.3;
+            bool Neighbor(bool left) => otherScreens.Any(o => o.Top < r.Bottom && o.Bottom > r.Top &&
+                (left ? Math.Abs(o.Right - screen.Left) < 2 : Math.Abs(o.Left - screen.Right) < 2));
+            if (mid - wa.Left < reach && !Neighbor(true)) return "left";
+            if (wa.Right - mid < reach && !Neighbor(false)) return "right";
+            return null;
+        }
+        /// <summary>窗口所在屏幕上贴不贴边（取屏幕信息的那一层）</summary>
+        internal static string DockSide(Native.RECT r, IntPtr window, double pageW)
+        {
+            var scr = Forms.Screen.FromHandle(window);
+            return DockSide(r, scr.WorkingArea, scr.Bounds, Forms.Screen.AllScreens.Where(o => !o.Equals(scr)).Select(o => o.Bounds), pageW);
+        }
+        /// <summary>贴着边时 AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来。since 之前的状态不算（刚拖到边上先缩进去给个反应）</summary>
+        internal static bool DockBusy(IEnumerable<(string pose, DateTime at)> poses, DateTime since, DateTime now) => poses.Any(p =>
+        {
+            if (p.at <= since) return false;
+            var age = (now - p.at).TotalSeconds;
+            switch (p.pose)
+            {
+                case "asking": return age < 600;
+                case "happy": case "proud": case "oops": case "surprised": return age < 10;
+                case "idle": case "sleeping": case "tired": return false;
+                default: return age < 180;
+            }
+        });
+        /// <summary>贴边时窗口的上边：夹在工作区里，底下至少露出 85%</summary>
+        internal static int DockClampY(int top, int h, System.Drawing.Rectangle wa) => Math.Max(wa.Top, Math.Min(top, wa.Bottom - (int)(h * 0.85)));
+        /// <summary>整个窗口贴到屏幕边缘时的左边</summary>
+        internal static int DockEdgeX(string side, int w, System.Drawing.Rectangle wa) => side == "left" ? wa.Left : wa.Right - w;
+        /// <summary>缩进去时窗口的左边：切口（网页像素 × zoom）对齐屏幕边缘</summary>
+        internal static int TuckX(string side, double cut, double zoom, System.Drawing.Rectangle wa) =>
+            side == "left" ? wa.Left - (int)(cut * zoom) : wa.Right - (int)(cut * zoom);
         void SetDock(string side)
         {
             dock = side;
@@ -91,22 +126,7 @@ namespace CrossPet
             ApplyDock();
         }
         /// <summary>AI 在干活 / 等你回答 / 刚干完（10 秒内）：跑出来</summary>
-        bool DockBusy()
-        {
-            var now = DateTime.UtcNow;
-            return lastPose.Values.Any(p =>
-            {
-                if (p.at <= dockedAt) return false;
-                var age = (now - p.at).TotalSeconds;
-                switch (p.pose)
-                {
-                    case "asking": return age < 600;
-                    case "happy": case "proud": case "oops": case "surprised": return age < 10;
-                    case "idle": case "sleeping": case "tired": return false;
-                    default: return age < 180;
-                }
-            });
-        }
+        bool DockBusy() => DockBusy(lastPose.Values, dockedAt, DateTime.UtcNow);
         void UpdateDock()
         {
             if (dock == null) return;
@@ -122,8 +142,8 @@ namespace CrossPet
             Native.GetWindowRect(hwnd, out var r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top;
             var wa = Forms.Screen.FromHandle(hwnd).WorkingArea;
-            int y = Math.Max(wa.Top, Math.Min(r.Top, wa.Bottom - (int)(h * 0.85)));
-            int edgeX = side == "left" ? wa.Left : wa.Right - w;
+            int y = DockClampY(r.Top, h, wa);
+            int edgeX = DockEdgeX(side, w, wa);
             if (dockOut) { dockTucked = false; Js("setTucked(null)"); Slide(edgeX, y); return; }
             // 窗口还没到边上（刚拖过来松手 / 刚干完活）：先整个滑到屏幕边缘，滑完再缩进去。一次只做一个动作，不然窗口在滑、人物也在窗口里滑，看着乱
             if (!dockTucked && (Math.Abs(r.Left - edgeX) > 1 || Math.Abs(r.Top - y) > 1))
@@ -147,7 +167,7 @@ namespace CrossPet
             }
             if (dock != side || dockOut || dockHover != peek) return;
             double zoom = (double)w / pageW;   // 网页像素 → 物理像素
-            int tx = side == "left" ? wa.Left - (int)(cut * zoom) : wa.Right - (int)(cut * zoom);
+            int tx = TuckX(side, cut, zoom, wa);
             Native.GetWindowRect(hwnd, out var now);
             if (Math.Abs(now.Left - tx) > 1) Slide(tx, y);
         }

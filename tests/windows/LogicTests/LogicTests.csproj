@@ -17,5 +17,6 @@
     <Compile Include="../../../app/windows/src/Ledger.cs" />
     <Compile Include="../../../app/windows/src/RenderRestartState.cs" />
     <Compile Include="../../../app/windows/src/CardImages.cs" />
+    <Compile Include="../../../app/windows/src/CompanionPlace.cs" />
   </ItemGroup>
 </Project>

@@ -22,24 +22,24 @@ namespace CrossPet
     sealed partial class Pet
     {
         // ---------------- 设置窗口（web/settings.html，和 macOS 版共用） ----------------
-        static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
+        internal static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
                                Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
         static bool ShowName => !(Store.Settings.TryGetValue("showName", out var v) && v is bool b && !b);
         static bool EggsEnabled => !(Store.Settings.TryGetValue("eggs", out var v) && v is bool b && !b);
         /// <summary>文字大小（只在解锁时用）和锁：没存过 = 锁着，文字跟着人物，和以前一样</summary>
-        static double TextScale => Store.Settings.TryGetValue("textSize", out var v) && (v is double || v is int || v is decimal) &&
+        internal static double TextScale => Store.Settings.TryGetValue("textSize", out var v) && (v is double || v is int || v is decimal) &&
                                    Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
-        static bool TextLinked => !(Store.Settings.TryGetValue("textLinked", out var v) && v is bool b && !b);
-        static string Num(double d) => d.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        internal static bool TextLinked => !(Store.Settings.TryGetValue("textLinked", out var v) && v is bool b && !b);
+        internal static string Num(double d) => d.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         /// <summary>换大小时窗口锚在哪（和 macOS 的 App.Anchor 一致，那边有测试 tests/window_place_probe.sh）：
         /// Corner = 启动 / 网页重载，存下的位置本来就是这个画布的窗口，左上角不动只换大小（不然解锁的人每次启动都往旁边漂）；
         /// Bottom = 改人物大小，底边中点不动，和以前一样（屏幕上的底栏高 = 62 × 文字大小，没变）；
         /// Feet = 改文字大小，底栏在屏幕上变高 / 变矮多少，窗口底边就往下 / 往上挪多少，人物不动</summary>
-        enum Anchor { Corner, Bottom, Feet }
+        internal enum Anchor { Corner, Bottom, Feet }
 
         /// <summary>纯计算，物理像素、y 向下。oldFoot / newFoot：底栏在屏幕上的高</summary>
-        static (int, int) PlaceWindow(Native.RECT old, int w, int h, double oldFoot, double newFoot, Anchor anchor)
+        internal static (int, int) PlaceWindow(Native.RECT old, int w, int h, double oldFoot, double newFoot, Anchor anchor)
         {
             if (anchor == Anchor.Corner) return (old.Left, old.Top);
             int x = (old.Left + old.Right) / 2 - w / 2;

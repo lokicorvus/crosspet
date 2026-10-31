@@ -32,10 +32,12 @@ namespace CrossPet
             frontIsAI = !string.IsNullOrWhiteSpace(match);
             frontIsShell = Native.ForegroundIsShell();
             ApplyLayer();
+            PushForeground();   // 多桌宠：前台是不是 AI 软件 / 终端（开关关着、没在集合时不发）
             if (!ready || Paused || !Store.Flag("followApps") || exe == "") return;
             if (string.IsNullOrWhiteSpace(match)) return;   // 对照表里没有，或者值留空：这个程序不跟随
             match = HostCharacter(match);
-            if (match != current) SwitchTo(match, why, exe);
+            // 多桌宠开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、她已经有一只站着：不换）；关着时照旧直接换
+            if (match != current) FollowTo(match, why, exe);
         }
 
         async Task FollowEvent(string id)
@@ -48,7 +50,7 @@ namespace CrossPet
             var currentAt = current;
             var apps = Store.Flag("followApps");
             var events = Store.Flag("followEvents");
-            var input = Store.Json.Serialize(new { eventId = id, foregroundId = front, followApps = apps, followEvents = events, characters = Characters().Select(c => c.id).ToArray() });
+            var input = Store.Json.Serialize(new { eventId = id, foregroundId = front, followApps = apps, followEvents = events, characters = Characters().Select(c => c.id).ToArray(), multiPets = MultiPetsOn });
             var allowed = await Eval($"FollowPolicy.eventTarget({input}) === {Q(id)}");
             // 网页答复前可能切了窗口、手动换人或关了跟随；旧请求不能覆盖新选择。
             if (generation != followEventGeneration || !ready || Paused || current != currentAt || Native.ForegroundExe() != exe

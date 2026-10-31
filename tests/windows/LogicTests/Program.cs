@@ -214,6 +214,54 @@ static class Program
         Directory.Delete(cardRoot, true);
         Check("缩放：#28 的 200% 下 195×271 是 0.75 倍，不冒充重复 DPI 的 0.5 倍", ZoomCheck.Off(260, 362, 195, 271, 195, 271)
             && ZoomCheck.Fix(260, 362, 195, 271, 2, 1) == null);
+
+        // 多桌宠：额外那几只第一次出现放在哪（CompanionPlace.Slots，物理像素、y 向下；规则同 macOS 的 companionSlots，
+        // 那边测试 tests/companion_place_probe.sh）。都要整个在可见区里、两两不重叠、不压着主桌宠
+        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis)
+        {
+            var s = CompanionPlace.Slots(main, n, size, vis);
+            if (s.Length != n) return $"只有 {s.Length} 只（要 {n} 只）";
+            bool Over(CompanionPlace.Rect a, CompanionPlace.Rect b) => a.X < b.X + b.W - 0.01 && b.X < a.X + a.W - 0.01 && a.Y < b.Y + b.H - 0.01 && b.Y < a.Y + a.H - 0.01;
+            for (int i = 0; i < n; i++)
+            {
+                var r = s[i];
+                if (r.X < vis.X - 0.01 || r.Y < vis.Y - 0.01 || r.X + r.W > vis.X + vis.W + 0.01 || r.Y + r.H > vis.Y + vis.H + 0.01) return $"第 {i + 1} 只出了可见区：{r.X} {r.Y}";
+                if (Over(r, main)) return $"第 {i + 1} 只压着主桌宠";
+                for (int j = 0; j < i; j++) if (Over(r, s[j])) return $"第 {j + 1} 和第 {i + 1} 只重叠";
+            }
+            return "ok";
+        }
+        CompanionPlace.Rect R(double x, double y, double w, double h) => new CompanionPlace.Rect(x, y, w, h);
+        var pet1 = new CompanionPlace.Size(260, 362);
+        // 1920×1080、任务栏 40：主桌宠在默认位置（右边留 40、底下留 100），叫出 12 只
+        var vis1080 = R(0, 0, 1920, 1040);
+        var mainBR = R(1920 - 260 - 40, 1040 - 362 - 100, 260, 362);
+        var l12 = Layout(mainBR, 12, pet1, vis1080);
+        Check("多桌宠位置：12 只都在可见区里、两两不重叠（" + l12 + "）", l12 == "ok");
+        var first = CompanionPlace.Slots(mainBR, 1, pet1, vis1080);
+        Check("多桌宠位置：第一只紧挨在主桌宠左边、底边对齐", first.Length == 1 && first[0].X == 1620 - 260 && first[0].Y == 578);
+        var seven = CompanionPlace.Slots(mainBR, 7, pet1, vis1080);
+        Check("多桌宠位置：左边排满 6 只后第 7 只往上一排、在主桌宠正上方", seven.Length == 7 && seven[6].X == 1620 && seven[6].Y == 578 - 362);
+        var leftEdge = CompanionPlace.Slots(R(40, 578, 260, 362), 1, pet1, vis1080);
+        Check("多桌宠位置：主桌宠在最左边时放右边", leftEdge.Length == 1 && leftEdge[0].X == 300 && leftEdge[0].Y == 578);
+        // 1280×720 的小屏（任务栏 40）：人物最小（0.6 倍，156×217）时 12 只也都放得下、不重叠
+        var vis720 = R(0, 0, 1280, 680);
+        var small = new CompanionPlace.Size(156, 217);
+        var l720 = Layout(R(1280 - 156 - 40, 680 - 217 - 100, 156, 217), 12, small, vis720);
+        Check("多桌宠位置：1280×720 屏幕上 12 只都在可见区里、两两不重叠（" + l720 + "）", l720 == "ok");
+        // 副屏在左边（负坐标）、主桌宠贴边缩出屏幕一半：照样都在可见区里
+        var lSecond = Layout(R(-1920 - 130, 300, 260, 362), 6, pet1, R(-1920, 0, 1920, 1040));
+        Check("多桌宠位置：副屏 + 主桌宠缩出屏幕（" + lSecond + "）", lSecond == "ok");
+        // 文字放大后画布比人物宽：主桌宠比额外那只宽 / 窄都不重叠
+        var lWide = Layout(R(1500, 600, 348, 341), 8, pet1, vis1080);
+        var lNarrow = Layout(mainBR, 8, new CompanionPlace.Size(348, 341), vis1080);
+        Check("多桌宠位置：主桌宠和额外那只宽窄不同（" + lWide + " / " + lNarrow + "）", lWide == "ok" && lNarrow == "ok");
+        // 默认大小在 1280×720 上放不下 12 只：躲不开重叠，但每只都夹在可见区里
+        var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
+        Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12
+            && crowded.All(r => r.X >= -0.01 && r.Y >= -0.01 && r.X + r.W <= 1280.01 && r.Y + r.H <= 680.01));
+        Check("多桌宠位置：0 只、空尺寸不出错", CompanionPlace.Slots(mainBR, 0, pet1, vis1080).Length == 0
+            && CompanionPlace.Slots(mainBR, 3, new CompanionPlace.Size(0, 0), vis1080).Length == 0);
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

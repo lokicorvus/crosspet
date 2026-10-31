@@ -42,7 +42,11 @@ namespace CrossPet
             }
             menu.Items.Add(Item("摸摸头", () => Js("handleClick('pat')")));
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
-            menu.Items.Add(Item("召唤彩蛋", () => Js("playEgg(true)")));
+            var eggItem = Item("召唤彩蛋", () => Js("playEgg(true)"));
+            eggItem.Enabled = eggAllowed;   // 有别的桌宠在场时不演彩蛋（页面发 eggAllowed:false）
+            menu.Items.Add(eggItem);
+            // 多桌宠：集合不受开关限制，一直在；正集合着时换成「解散」
+            menu.Items.Add(pageGathering ? Item("解散", DismissCompanions) : Item("集合！", GatherCompanions));
             if (CodexResets && current == "gpt") menu.Items.Add(Item("会重置吗？", () => Js("askReset()")));   // 只有 GPT 有这个需求
             Sep();
             // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
