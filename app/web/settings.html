@@ -78,6 +78,20 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .tag.ok { color: var(--ok); }
 .item .label small.warn { color: #c0392b; }
 .hidden { display: none !important; }
+/* 多桌宠（角色页）：开关下面的两个选项缩进一点；单选按钮 */
+.item.sub { padding-left: 28px; }
+.choices { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.choices.stack { flex-direction: column; align-items: flex-start; gap: 3px; margin-top: 4px; }
+.choices label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.choices input[type=radio] { margin: 0; accent-color: var(--accent); }
+.card.dim { opacity: .5; }
+/* 她们的友谊：每对一行名字 + 五颗心；没满的那颗半亮（左半边亮） */
+.friend .label { flex: 1; }
+#friendRows > .item:first-child { border-top: none; }
+.hearts { letter-spacing: 2px; font-size: 14px; white-space: nowrap; }
+.heart { color: var(--line); }
+.heart.full { color: #e0607e; }
+.heart.half { background: linear-gradient(90deg, #e0607e 50%, var(--line) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
 #toast.show { opacity: .92; }
 </style></head>
@@ -115,6 +129,19 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="followEvents"><span></span></label></div></div>
   <div class="item"><div class="label">随机彩蛋<small>偶尔有别的角色冒出来捣乱；关掉后右键「召唤彩蛋」还能手动看</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="eggs"><span></span></label></div></div>
+  <div class="item"><div class="label">在干活的 AI 各显示一只<small>同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="multiPets"><span></span></label></div></div>
+  <div class="item sub" id="mainPetRow"><div class="label">主桌宠</div>
+    <div class="ctl choices"><label><input type="radio" name="mainPet" value="rule">跟着规则换</label>
+      <label><input type="radio" name="mainPet" value="fixed">固定为</label><select id="mainPetSelect" aria-label="固定的主桌宠"></select></div></div>
+  <div class="item sub" id="petsRestRow"><div class="label">她们什么时候去休息
+      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干完活、你离开 AI 软件一会儿后</label>
+        <label><input type="radio" name="petsRest" value="stay">一直留着，直到我让她回去或 AI 程序关掉</label></div></div></div>
+</div>
+
+<div class="card hidden" data-tab="character" id="friendship">
+  <h2>她们的友谊</h2>
+  <div id="friendRows"></div>
 </div>
 
 <div class="card" data-tab="quota">
@@ -214,6 +241,47 @@ function setState(s) {
   gn.textContent = s.gptQuotaNote || '让电脑上的 Codex 自己查用量（不对话、不耗额度，不碰登录凭据）'
   gn.classList.toggle('warn', !!s.gptQuotaNote)
   renderIntegrations(s.integrations)
+  renderMultiPets(s)
+}
+
+// ---- 多桌宠（角色页）：开关关着时两个选项收起；「她们的友谊」开关打开过、又有记录才显示，关着时灰掉 ----
+// 「打开过」记在设置页自己的本机存储里（存不下就只在开着时显示）
+const MULTI_SEEN = 'crosspet-multi-pets-seen'
+function renderMultiPets(s) {
+  const on = !!s.multiPets
+  let seen = on
+  try { if (on) localStorage.setItem(MULTI_SEEN, '1'); else seen = localStorage.getItem(MULTI_SEEN) === '1' } catch {}
+  $('mainPetRow').classList.toggle('hidden', !on)
+  $('petsRestRow').classList.toggle('hidden', !on)
+  // 主桌宠：""= 跟着规则换，否则固定的角色 id；下拉是外壳给的可切换角色（不含彩蛋）。固定的角色不在列表里了也列出来，免得悄悄换掉
+  const main = s.mainPet || '', sel = $('mainPetSelect')
+  if (document.activeElement !== sel) {
+    const chars = (s.characters || []).map(c => [c.id, c.name || c.id])
+    if (main && !chars.some(c => c[0] === main)) chars.push([main, main])
+    sel.replaceChildren(...chars.map(([id, name]) => new Option(name, id, false, id === main)))
+  }
+  for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
+  const rest = s.petsRest === 'stay' ? 'stay' : 'auto'
+  for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
+  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–5、0.5 一档
+  const rows = Array.isArray(s.friendship) ? s.friendship : []
+  $('friendship').classList.toggle('hidden', !seen || !rows.length)
+  $('friendship').classList.toggle('dim', !on)
+  $('friendRows').replaceChildren(...rows.map(friendRow))
+}
+function friendRow(r) {
+  const row = document.createElement('div'); row.className = 'item friend'
+  const name = document.createElement('div'); name.className = 'label friend-name'; name.textContent = r.label
+  const hearts = document.createElement('div'); hearts.className = 'ctl hearts'
+  const h = Math.max(0, Math.min(5, Number(r.hearts) || 0))
+  for (let i = 0; i < 5; i++) {
+    const c = document.createElement('span')
+    c.className = 'heart' + (i < Math.floor(h) ? ' full' : i === Math.floor(h) && h % 1 >= 0.5 ? ' half' : '')
+    c.textContent = '♥'
+    hearts.append(c)
+  }
+  row.append(name, hearts)
+  return row
 }
 
 // 接上了但从没收到过这个 AI 的消息：多半是还没在它里面用过，或者某一步没生效。按 AI 给一句排查提示
@@ -294,6 +362,10 @@ $('textLink').onclick = () => state?.textLinked === false
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
+// 主桌宠：点「固定为」用下拉里选着的角色；换下拉就直接固定为那个角色
+for (const r of document.querySelectorAll('input[name=mainPet]')) r.onchange = () => post({ cmd: 'set', key: 'mainPet', value: r.value === 'fixed' ? $('mainPetSelect').value : '' })
+$('mainPetSelect').onchange = () => post({ cmd: 'set', key: 'mainPet', value: $('mainPetSelect').value })
+for (const r of document.querySelectorAll('input[name=petsRest]')) r.onchange = () => post({ cmd: 'set', key: 'petsRest', value: r.value })
 
 // 标签页：记住上次看的是哪一页（每个人自己的小习惯，存不下也没关系）
 function showTab(tab) {
