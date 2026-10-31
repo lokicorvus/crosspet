@@ -26,7 +26,8 @@
         const client = s.client || character
         const key = character + '@' + client
         const ts = Number(s.ts) || 0
-        const working = !!s.pose && !WORKING_EXCLUDED.has(s.pose) && nowMs - ts * 1000 < STUCK_AFTER
+        // 「等你回答」不受卡住兜底：那是在等你，本来就可能很久（同 index.html）
+        const working = !!s.pose && !WORKING_EXCLUDED.has(s.pose) && (s.pose === 'asking' || nowMs - ts * 1000 < STUCK_AFTER)
         const c = byKey.get(key)
         if (!c) byKey.set(key, { key, character, client, working, lastTs: ts })
         else {

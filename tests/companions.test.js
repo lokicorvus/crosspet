@@ -45,6 +45,11 @@ test('asking 算干活', () => {
   assert.equal(c.working, true)
 })
 
+test('10 分钟前的 asking 还算干活（等你回答不受卡住兜底）', () => {
+  const [c] = C.clientsOf({ gpt: { s: { pose: 'asking', ts: ago(600), client: 'codex' } } }, NOW)
+  assert.equal(c.working, true)
+})
+
 test('4 分钟前的 running 不算干活（3 分钟卡住兜底）', () => {
   const [c] = C.clientsOf({ gpt: { s: { pose: 'running', ts: ago(240), client: 'codex' } } }, NOW)
   assert.equal(c.working, false)
