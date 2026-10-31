@@ -446,6 +446,47 @@ const multiCases = [
     const after = lastCompanions(e)
     assert(after.length === 1 && after[0].id === 'claude@gather' && after[0].key === 'claude@claude-cli', `left over: ${JSON.stringify(after)}`)
   }],
+  ['window_ids_stay_unique', async e => {
+    // 干活冒出来的 Claude 终端那只被集合接管（id 还是 claude@claude-cli）→ 终端会话结束退回没收编 → 收编桌面 →
+    // 终端又开新会话冒出新的一只：新那只的 id 不能和她撞
+    await multiOn(e, 'gpt')
+    e.run(`setSessions('claude', csess(['c1','writing','claude-cli']))`)
+    await e.advance(100)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`setSessions('claude', {})`)
+    await e.advance(100)
+    e.run(`setSessions('claude', csess(['d1','writing','claude-desktop']))`)
+    await e.advance(100)
+    e.run(`setSessions('claude', csess(['d1','writing','claude-desktop'],['c2','writing','claude-cli']))`)
+    await e.advance(100)
+    const list = lastCompanions(e), ids = list.map(p => p.id)
+    assert(list.filter(p => p.character === 'claude').length === 2, `claudes: ${JSON.stringify(list)}`)
+    assert(new Set(ids).size === ids.length, `duplicate ids: ${JSON.stringify(list)}`)
+  }],
+  ['multi_on_while_gathered_and_quick_dismiss', async e => {
+    // 关着时集合了，再打开开关：不等 1.5 秒热身，马上按开着算
+    e.run(`gather()`)
+    await e.advance(1500)
+    const n = companionLists(e).length
+    e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setCharacter('claude', true)`)
+    await e.advance(1000)
+    e.run(`setMultiPets({ on: true, rest: 'auto', mainPet: '' })`)
+    assert(companionLists(e).length > n && lastCompanions(e).some(p => p.key === 'gpt@codex'), `no immediate update: ${JSON.stringify(lastCompanions(e))}`)
+    // 刚打开、还在热身时集合又马上解散：没有可错开的，直接收尾（关着时发空列表、eggAllowed 回 true）
+    const f = await fresh()
+    f.run(`gather(); dismiss()`)
+    await f.advance(100)
+    f.run(`setMultiPets({ on: true, rest: 'auto', mainPet: '' })`)
+    f.run(`gather()`)
+    await f.advance(10)
+    f.run(`dismiss()`)
+    f.run(`setMultiPets({ on: false, rest: 'auto', mainPet: '' })`)
+    await f.advance(30000)
+    assert(!f.errors.length, `page errors: ${JSON.stringify(f.errors)}`)
+    const last = f.msgs().filter(m => 'companions' in m).slice(-1)[0]
+    assert(!last || last.companions.length === 0, `left over: ${JSON.stringify(multiMsgs(f))}`)
+  }],
   ['gather_while_off', async e => {
     // 集合不受开关限制：开关关着也能叫；只是不冒干活的那几只
     e.run(`setCharacter('gpt', true)`)
