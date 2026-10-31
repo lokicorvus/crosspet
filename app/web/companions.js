@@ -93,13 +93,16 @@
   const gatherKey = character => character + '@gather'
 
   // 「让她先回去」：记下送回去的时间，下一次 decide 让她走，直到这个 key 有新一轮的活。
+  // sentHome[key] = { t: 送回去的时间, sawIdle: 之后看到过她不干活（这一轮做完了）}
   // 集合来的那只要送走，调用方同时把她的角色从 gathered 里去掉（decide 里集合来的不看 sentHome）。
   function sendHome(state, key, nowMs) {
-    const s = state || { pets: [], awaySince: null, sentHome: {}, gatherKeys: {} }
-    return { ...s, sentHome: { ...(s.sentHome || {}), [key]: nowMs } }
+    const s = state || { pets: [], awaySince: null, idleSince: {}, sentHome: {}, gatherKeys: {} }
+    return { ...s, sentHome: { ...(s.sentHome || {}), [key]: { t: nowMs, sawIdle: false } } }
   }
 
   // 谁站着、谁走。每次状态变化调一次，返回该站着的 pets（按出现先后）和这次要说 bye 走的 leaving。
+  // 「离开满 LEAVE_AFTER 才走」只在调用时判断：调用方除了状态变化时调，还要定时调（比如每几秒一次），
+  // 不然没有新事件时她会一直不走。
   // 规则见设计第二节：
   // - 主桌宠占着的 claimKey、reactTo 代演的角色（coveredByStandIn）不出现
   // - 额外那只：没占着的客户端干活就出现；auto 下「不干活」和「不在 AI 软件里」同时成立满 LEAVE_AFTER 才走
@@ -115,16 +118,21 @@
     const covered = coveredByStandIn || new Set()
     const list = clients || []
     const byKey = new Map(list.map(c => [c.key, c]))
-    const gatherSet = new Set(gathered || [])
+    // 主桌宠正演着的角色不重复叫
+    const gatherSet = new Set((gathered || []).filter(ch => ch !== mainCharacter))
     const awaySince = inAI ? null : (p.awaySince != null ? p.awaySince : nowMs)
     const leaving = []
 
-    // 送回去的：会话都没了就不用再记（再出现必然是新一轮）；有新一轮的活就放出来
+    // 送回去的：会话都没了就不用再记（再出现必然是新一轮）。
+    // 送回去时这一轮可能还没做完，后面的事件不算新一轮：要先看到她不干活（这一轮做完），再干活才放出来
     const sentHome = {}
-    for (const [key, t] of Object.entries(p.sentHome || {})) {
+    for (const [key, v] of Object.entries(p.sentHome || {})) {
+      const h = typeof v === 'number' ? { t: v, sawIdle: false } : v
       const c = byKey.get(key)
-      if (!c || (c.working && c.lastTs * 1000 > t)) continue
-      sentHome[key] = t
+      if (!c) continue
+      if (!c.working) { sentHome[key] = { t: h.t, sawIdle: true }; continue }
+      if (h.sawIdle && c.lastTs * 1000 > h.t) continue
+      sentHome[key] = { t: h.t, sawIdle: h.sawIdle }
     }
     const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null
 
@@ -135,8 +143,8 @@
     for (const pet of p.pets || []) {
       if (pet.via === 'gather') {
         if (!gatherSet.has(pet.character) || covered.has(pet.character)) { leaving.push(pet.key); continue }
-        // 收编的客户端被主桌宠占了：退回没收编的样子，她还留着
-        if (pet.key === claimKey) kept.push({ ...pet, key: gatherKey(pet.character), client: null })
+        // 收编的客户端被主桌宠占了、或会话全部结束：退回没收编的样子，她还留着，之后能再收编这个角色别的客户端
+        if (pet.client && (pet.key === claimKey || !byKey.has(pet.key))) kept.push({ ...pet, key: gatherKey(pet.character), client: null })
         else kept.push({ ...pet })
         continue
       }

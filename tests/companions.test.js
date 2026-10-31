@@ -295,11 +295,46 @@ test('sentHome 后同一 key 旧会话还在 → 不出现；新一轮 working �
   const b = run({ t: 1000, clients: cl(1000, codexBusy(0)), prev: sent })   // 还是 1 秒前那条
   assert.deepEqual(keys(b), [])
   assert.deepEqual(b.leaving, ['gpt@codex'])
-  const c = run({ t: 5000, clients: cl(5000, codexBusy(0)), prev: b.state })
+  const c = run({ t: 5000, clients: cl(5000, codexDone(5000)), prev: b.state })   // 这一轮做完
   assert.deepEqual(keys(c), [])
-  const d = run({ t: 9000, clients: cl(9000, codexBusy(9000)), prev: c.state })   // 新事件
+  const d = run({ t: 9000, clients: cl(9000, codexBusy(9000)), prev: c.state })   // 新一轮
   assert.deepEqual(keys(d), ['gpt@codex'])
   assert.deepEqual(d.state.sentHome, {})
+})
+
+test('干活中途送回去：这一轮后面的事件不放她回来；Stop 后还不回来；新一轮开始才出现', () => {
+  let r = run({ clients: cl(0, codexBusy(0)) })
+  r = run({ t: 1000, clients: cl(1000, codexBusy(1000)), prev: C.sendHome(r.state, 'gpt@codex', NOW + 1000) })
+  assert.deepEqual(r.leaving, ['gpt@codex'])
+  for (const t of [3000, 6000, 9000, 12_000]) {   // 同一轮里接着来的 PreToolUse / PostToolUse
+    r = run({ t, clients: cl(t, codexBusy(t)), prev: r.state })
+    assert.deepEqual(keys(r), [], String(t))
+  }
+  r = run({ t: 15_000, clients: cl(15_000, codexDone(15_000)), prev: r.state })
+  assert.deepEqual(keys(r), [])
+  r = run({ t: 20_000, clients: cl(20_000, codexBusy(20_000)), prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  assert.deepEqual(r.state.sentHome, {})
+})
+
+test('集合来的收编了 gpt@codex，codex 会话全部结束 → 退回 gpt@gather；gpt 别的客户端干活由她再收编，不多冒一只', () => {
+  let r = run({ gathered: ['gpt'], clients: cl(0, codexBusy(0)) })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  r = run({ t: 1000, gathered: ['gpt'], clients: cl(1000, desktopBusy(1000)), prev: r.state })
+  assert.deepEqual(r.pets.map(p => [p.key, p.client, p.via]), [['gpt@gather', null, 'gather']])
+  assert.deepEqual(r.leaving, [])
+  r = run({ t: 2000, gathered: ['gpt'], clients: cl(2000, sess('gpt', 'chatgpt', 'running', 1, 2000)), prev: r.state })
+  assert.deepEqual(r.pets.map(p => [p.key, p.client, p.via]), [['gpt@chatgpt', 'chatgpt', 'gather']])
+})
+
+test('gathered 里有主桌宠正演着的角色：不叫她', () => {
+  const r = run({ gathered: ['claude', 'gpt'], clients: cl(0, desktopBusy(0), sess('claude', 'claude-cli', 'running', 1)) })
+  assert.deepEqual(r.pets.map(p => [p.key, p.via]), [['gpt@gather', 'gather'], ['claude@claude-cli', 'work']])
+})
+
+test('sendHome 没有 state 时给的初始 state 和 decide 的同一个形状', () => {
+  const s = C.sendHome(null, 'gpt@codex', NOW)
+  assert.deepEqual(Object.keys(s).sort(), ['awaySince', 'gatherKeys', 'idleSince', 'pets', 'sentHome'])
 })
 
 test("集合 ['gpt','deepseek'] → 两只 via:'gather'、client:null；codex 开始干活 → gpt 那只收编为 gpt@codex，只有一只 gpt", () => {
