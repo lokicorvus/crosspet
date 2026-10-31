@@ -158,6 +158,10 @@ static class Program
         try { Directory.Delete(icRoot, true); } catch { }
 
         // 「跟着 AI」取消置顶时插到谁下面（1.3.7 用户反馈：右键几次 / 换角色后她不见了——前台是桌面时被插到了壁纸下面）
+        Check("全屏：任务栏自动隐藏时最大化的普通窗口（有标题栏）不算全屏", ZOrderRule.JustMaximized(true, 0x16CF0000));
+        Check("全屏：最大化的无边框程序（只有可拖边框，如 Electron）不算全屏", ZOrderRule.JustMaximized(true, unchecked((int)0x96040000)));
+        Check("全屏：浏览器 F11 / 视频全屏（去掉了标题栏和边框）算全屏", !ZOrderRule.JustMaximized(false, unchecked((int)0x96000000)));
+        Check("全屏：最大化的无边框弹出窗口（部分游戏、播放器）算全屏", !ZOrderRule.JustMaximized(true, unchecked((int)0x91000000)));
         Check("层级：前台是普通程序，插到它下面", ZOrderRule.TuckBelow("Chrome_WidgetWin_1", false));
         Check("层级：前台是桌面（Progman），不插", !ZOrderRule.TuckBelow("Progman", false));
         Check("层级：前台是桌面（WorkerW），不插", !ZOrderRule.TuckBelow("WorkerW", false));
