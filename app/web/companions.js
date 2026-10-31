@@ -102,7 +102,8 @@
   // 谁站着、谁走。每次状态变化调一次，返回该站着的 pets（按出现先后）和这次要说 bye 走的 leaving。
   // 规则见设计第二节：
   // - 主桌宠占着的 claimKey、reactTo 代演的角色（coveredByStandIn）不出现
-  // - 额外那只：没占着的客户端干活就出现；auto 下不干活、并且离开 AI 软件满 LEAVE_AFTER 才走；
+  // - 额外那只：没占着的客户端干活就出现；auto 下「不干活」和「不在 AI 软件里」同时成立满 LEAVE_AFTER 才走
+  //   （从两者中较晚开始的那一刻起算；停下的时刻按 decide 第一次看到她不干活记，存在 state.idleSince）；
   //   stay 下只在会话全部消失、或有窗口的程序关掉（running 非 null 且不含她）时走
   // - 会话全部消失（上次站着、这次 clients 里没有她的 key；SessionEnd 会从会话表里删掉会话）立刻走
   // - 集合来的每个角色一只，不按上面的规则走，解散（不在 gathered 里）才走；
@@ -128,6 +129,8 @@
     const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null
 
     // 1. 上次站着的：先定谁留谁走
+    // 额外那只停下的时刻：这一次调用才发现她不干活就记成 nowMs（3 分钟兜底判停也一样，不按旧的 lastTs 倒推）
+    const idleSince = {}
     const kept = []
     for (const pet of p.pets || []) {
       if (pet.via === 'gather') {
@@ -140,7 +143,13 @@
       const c = byKey.get(pet.key)
       let go = !c || blocked(c)
       if (!go && rest === 'stay') go = running != null && !isCli(c) && !running.has(pet.key)
-      else if (!go) go = !c.working && awaySince != null && nowMs - awaySince >= LEAVE_AFTER
+      else if (!go && !c.working) {
+        const prevIdle = p.idleSince && p.idleSince[pet.key]
+        idleSince[pet.key] = prevIdle != null ? prevIdle : nowMs
+        // 两条都不满足（不干活、不在 AI 软件里）持续 LEAVE_AFTER：从较晚的那个时刻起算
+        go = awaySince != null && nowMs - Math.max(awaySince, idleSince[pet.key]) >= LEAVE_AFTER
+      }
+      if (go) delete idleSince[pet.key]
       if (go) leaving.push(pet.key)
       else kept.push({ ...pet })
     }
@@ -183,7 +192,7 @@
     const gatherKeys = {}
     for (const pet of kept) if (pet.via === 'gather') gatherKeys[pet.character] = pet.client ? pet.key : null
 
-    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, sentHome, gatherKeys } }
+    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, idleSince, sentHome, gatherKeys } }
   }
 
   const api = {

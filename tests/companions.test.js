@@ -240,6 +240,33 @@ test('走开 50 秒、回到 AI 软件 1 秒、再走开 50 秒 → 还在', () 
   assert.deepEqual(r.leaving, [])
 })
 
+test('走开 5 分钟时她一直在干活、这才停下 → 停下后 59 秒还在，61 秒在 leaving 里', () => {
+  let r = run({ clients: cl(0, codexBusy(0)) })
+  for (let t = 1000; t <= 301_000; t += 60_000) r = run({ t, inAI: false, clients: cl(t, codexBusy(t)), prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  const stopped = cl(301_000, codexDone(301_000))
+  r = run({ t: 301_000, inAI: false, clients: stopped, prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  const at59 = run({ t: 360_000, inAI: false, clients: stopped, prev: r.state })
+  assert.deepEqual(keys(at59), ['gpt@codex'])
+  assert.deepEqual(at59.leaving, [])
+  const at61 = run({ t: 362_000, inAI: false, clients: stopped, prev: at59.state })
+  assert.deepEqual(at61.leaving, ['gpt@codex'])
+})
+
+test('3 分钟卡住兜底让她变成不干活：从发现的那一刻起算 1 分钟，不按旧的 lastTs 立刻走', () => {
+  // 最后一条 running 在 t=0；走开很久；t=181 秒时兜底判成不干活
+  let r = run({ clients: cl(0, codexBusy(0)) })
+  r = run({ t: 1000, inAI: false, clients: cl(1000, codexBusy(0)), prev: r.state })
+  r = run({ t: 120_000, inAI: false, clients: cl(120_000, codexBusy(0)), prev: r.state })
+  r = run({ t: 181_000, inAI: false, clients: cl(181_000, codexBusy(0)), prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  r = run({ t: 240_000, inAI: false, clients: cl(240_000, codexBusy(0)), prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  r = run({ t: 242_000, inAI: false, clients: cl(242_000, codexBusy(0)), prev: r.state })
+  assert.deepEqual(r.leaving, ['gpt@codex'])
+})
+
 test('codex 会话全部消失 → 立刻在 leaving 里', () => {
   const a = run({ clients: cl(0, codexBusy(0)) })
   const b = run({ t: 1000, clients: cl(1000, desktopBusy(1000)), prev: a.state })
