@@ -66,8 +66,9 @@ function makeEnv(html) {
     function currentSessions(){const out={...(sessions[charId]||{})};for(const [host,map]of Object.entries(sessions))if(standsIn(host))Object.assign(out,map);return out}
     function capture(){return {charId,pose,bubble:$('bubble').textContent,fx:$('fx').innerHTML,fxHidden:$('fx').classList.contains('hide'),charState:JSON.parse(JSON.stringify(charState)),history:[...history],effectHistory:[...effectHistory],generation:characterGeneration}}
     function hook(id,p,event,extra={}){applyCharState(id,{pose:p,event,ts:Date.now()/1000,...extra})}
+    function playsByClient(){return false}function updateCompanions(){}
   `
-  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','setCharacter','watchStuck','applyCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
+  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','setCharacter','watchStuck','applyCharState','playCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
   vm.runInContext(setup + '\n' + funcs, context)
   const run = code => vm.runInContext(code, context)
   run(`hook('grok','idle','SessionStart');hook('claude','idle','SessionStart')`)

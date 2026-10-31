@@ -226,6 +226,8 @@ addEventListener('error', e => {
 <script src="codex-resets.js"></script>
 <script src="whats-new.js"></script>
 <script src="peak-hours.js"></script>
+<script src="companions.js"></script>
+<script src="friendship.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -238,6 +240,8 @@ addEventListener('error', e => {
 //   setPeakSkins(map)       按时段换衣服的设置 { 角色: { peak: 皮肤, valley: 皮肤 } }（'' = 原版，没写 = 不换）
 //   handleClick(kind)       单击 = pat（摸摸头），右键菜单「戳一下」= poke
 //   playEgg(force)          彩蛋
+//   多桌宠（设置「在干活的 AI 各显示一只」，默认关）：setRole、setMultiPets、setForeground、setRunning、applyClientState、
+//   gather、dismiss、sendHome、notePat，见下面「多桌宠」一节
 
 const MOTION = {
   idle: 'm-bob', listening: 'm-hop', thinking: 'm-rock', reading: 'm-rock', writing: 'm-bob', running: 'm-quick',
@@ -1164,6 +1168,7 @@ let multi = null             // 正在演：{ side, flipTimer, cards: Map(会话
 function setSessions(id, map) {
   if (id === 'current') id = charId
   sessions[id] = map || {}
+  updateCompanions()   // 先算主桌宠占着哪个客户端，refreshMulti 只演那个客户端的会话
   refreshMulti()
 }
 function sessionKind(e, now) {
@@ -1176,7 +1181,7 @@ function sessionKind(e, now) {
 }
 // 当前角色要演的会话：她自己的，加上她响应的各家 AI 的（会话 id 各家不重复，直接合在一起）
 function currentSessions() {
-  const out = { ...(sessions[charId] || {}) }
+  const out = { ...claimedOnly(charId, sessions[charId] || {}) }
   for (const [host, map] of Object.entries(sessions)) if (standsIn(host)) Object.assign(out, map)
   return out
 }
@@ -1317,6 +1322,11 @@ function diagnoseDisplay() {
 }
 function applyCharState(id, s) {
   if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
+  // 多桌宠打开、这个角色有按客户端的状态：主桌宠改由 applyClientState 只演她占着的那个客户端（按角色的这份谁最后写就是谁的）
+  if (playsByClient(id)) { noteVerdict(id, s, 'by-client'); return }
+  playCharState(id, s)
+}
+function playCharState(id, s) {
   const own = id                      // 事件原本属于哪家 AI：先按它记下状态，切回那家的角色时看到的才是最新的
   charState[own] = s
   if (standsIn(id)) id = charId       // 代演（reactTo）：别家 AI 的状态当成她自己的（多个会话同时干活时，由 refreshMulti 合并）
@@ -1369,6 +1379,160 @@ function applyCharState(id, s) {
   }
 }
 
+// ---- 多桌宠：在干活的 AI 各显示一只（设置里的开关，默认关）----
+// 谁站着、谁走都在 companions.js 判断；这里只收外壳交来的东西、按时调 decide、把结果告诉外壳：
+//   toShell({ companions: [{ id, key, character, client, quota, label }] })   该站着的额外桌宠。总是完整列表，变了才发
+//     id     窗口身份，外壳按它管窗口。集合来的那只始终是「<角色>@gather」（收编客户端后 key 会变，id 不变，
+//            不然外壳会关掉重开一只）；干活冒出来的 id = key
+//     key    「<角色>@<客户端>」，位置 / 贴边按它记
+//     quota  这只显示不显示额度（同一角色只有一只显示）
+//     label  同一个角色站了两只（主桌宠也算）时标「桌面」「终端」，否则 ''
+//   toShell({ companionLeave: id })                              这只说 bye 走（外壳调她页面的 leaveNow）
+//   toShell({ companionCall: { id, fn: 'celebrate', args } })   让那只演（额度庆祝交给显示这个角色额度的那只）
+//   toShell({ eggAllowed })                                      右键「召唤彩蛋」变灰用：有别的桌宠在场时 false
+// 开关关着时这些一律不发、applyClientState 不演，行为和以前一样。这一套只在主桌宠页面（role 'main'）做。
+let role = 'main', roleInfo = null   // 'companion'：额外那只的页面；roleInfo = { character, client, label }
+let multiPets = { on: false, rest: 'auto', mainPet: '' }
+let foreground = null            // 前台 { kind: 'ai' | 'terminal' | 'ours' | 'other', character?, client? }
+let runningKeys = null           // 有窗口的 AI 程序在跑的「角色@客户端」（Set）；null = 外壳还没交，decide 当作不知道
+let claim = null                 // 主桌宠占着她角色的哪个客户端 { key, since }（Companions.mainClaim）
+let companionsState = null       // decide 上次的 state；pets 里多记一个 id，decide 复制时会带着
+let gathered = [], gatherTimers = []
+let sentCompanions = null        // 上次发出去的列表（JSON）；null = 还没发过，所以页面重载后第一次一定发完整列表
+let eggAllowedSent = true
+let companionsReadyAt = 0
+const clientStateSeen = {}       // 交来过按客户端状态（<角色>@<客户端>-state.json）的角色；旧钩子没有，主桌宠照旧按角色那份演
+const patAt = {}                 // 角色 → 最近一次被摸头的时间（友谊记账用）
+// 刚打开开关 / 页面刚重载时，外壳要一会儿才把会话、前台交齐；这时就算，会先发出一个空列表，外壳就会把还该站着的窗口关掉再重开
+const COMPANIONS_WARMUP = 1500
+const GATHER_STEP = 1000         // 集合 / 解散时一只接一只的间隔
+
+const mainCharacter = () => egg ? egg.host : (characterTarget || charId)   // 正在换角色时按要换成的算，演彩蛋时按原来的
+const companionsActive = () => role === 'main' && multiPets.on
+const companionsAround = () => companionsActive() && !!companionsState?.pets.length
+const isCliClient = (character, client) => Companions.CLI_CLIENTS.has(client) || (character === 'claude' && client === 'claude')
+// 主桌宠只演她占着的那个客户端：这个角色有按客户端的状态时，按角色那份（applyCharState）不演
+const playsByClient = id => companionsActive() && !!clientStateSeen[id] && (id === mainCharacter() || standsIn(id))
+// 多会话卡片也只显示主桌宠占着的那个客户端的会话
+function claimedOnly(character, map) {
+  if (!companionsActive() || !claim?.key || !claim.key.startsWith(character + '@')) return map
+  return Object.fromEntries(Object.entries(map).filter(([, e]) => character + '@' + (e?.client || character) === claim.key))
+}
+function companionLabel(p, pets, main) {
+  const same = pets.filter(x => x.character === p.character).length + (p.character === main ? 1 : 0)
+  if (same < 2 || !p.client) return ''
+  return isCliClient(p.character, p.client) ? '终端' : '桌面'
+}
+
+// 由外壳调：这个页面是主桌宠还是额外那只（默认主桌宠）
+function setRole(r, info) {
+  role = r === 'companion' ? 'companion' : 'main'
+  roleInfo = info || null
+}
+// 由外壳调：设置里的开关和两个选项。mainPet（固定主桌宠）由外壳自己换角色、换前台时问 FollowPolicy.foregroundTarget，这里只记着
+function setMultiPets(o) {
+  const was = multiPets.on
+  multiPets = { on: !!o?.on, rest: o?.rest === 'stay' ? 'stay' : 'auto', mainPet: typeof o?.mainPet === 'string' ? o.mainPet : '' }
+  if (role !== 'main') return
+  if (multiPets.on && !was) {
+    companionsReadyAt = Date.now() + COMPANIONS_WARMUP
+    setTimeout(updateCompanions, COMPANIONS_WARMUP)
+  } else if (!multiPets.on && was) stopCompanions()
+  else updateCompanions()
+}
+// 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
+function stopCompanions() {
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; gathered = []
+  claim = null; companionsState = null; companionsReadyAt = 0
+  toShell({ companions: [] }); sentCompanions = null
+  if (!eggAllowedSent) { eggAllowedSent = true; toShell({ eggAllowed: true }) }
+}
+function setForeground(f) { foreground = f && typeof f === 'object' ? { ...f } : null; updateCompanions() }
+function setRunning(keys) { runningKeys = Array.isArray(keys) ? new Set(keys) : null; updateCompanions() }
+// 由外壳调：按客户端的状态（<角色>@<客户端>-state.json，开关打开时才交）。
+// 主桌宠只演她占着的那个客户端；还没占着任何客户端（她这个角色还没有会话）时照旧演。代演（reactTo）的角色各客户端都由她演
+function applyClientState(character, client, s) {
+  if (!companionsActive() || !s || !character || !client) return
+  clientStateSeen[character] = true
+  updateCompanions()
+  const key = character + '@' + client
+  if (character === mainCharacter() ? !claim?.key || claim.key === key : standsIn(character)) playCharState(character, s)
+  else noteVerdict(character, s, 'other-client')
+}
+// 集合！每个角色各叫一只（不含主桌宠正演着的、彩蛋角色），一只接一只登场
+function gather() {
+  if (!companionsActive()) return false
+  gatherTimers.forEach(clearTimeout); gatherTimers = []
+  const main = mainCharacter(), chars = manifest.characters || {}
+  const todo = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main && !gathered.includes(id))
+  todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+    if (!companionsActive() || gathered.includes(id)) return
+    gathered = [...gathered, id]
+    updateCompanions()
+  }, i * GATHER_STEP)))
+  return todo.length > 0
+}
+// 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下
+function dismiss() {
+  gatherTimers.forEach(clearTimeout); gatherTimers = []
+  const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
+  gathered = gathered.filter(ch => order.includes(ch))   // 还没登场的不用再叫
+  if (!companionsActive()) { gathered = []; return }
+  order.forEach((ch, i) => gatherTimers.push(setTimeout(() => {
+    gathered = gathered.filter(x => x !== ch)
+    updateCompanions()
+  }, i * GATHER_STEP)))
+}
+// 「让她先回去」：外壳按窗口的 id 交来（给 key 也认）。集合来的同时从集合里去掉
+function sendHome(k) {
+  if (!companionsActive() || !companionsState) return
+  const p = companionsState.pets.find(x => x.id === k || x.key === k)
+  if (!p) return
+  companionsState = Companions.sendHome(companionsState, p.key, Date.now())
+  if (p.via === 'gather') gathered = gathered.filter(ch => ch !== p.character)
+  updateCompanions()
+}
+// 额外那只被摸了头（外壳转来）：记下时间，友谊记账用
+function notePat(character) { if (role === 'main' && character) patAt[character] = Date.now() }
+// 额度庆祝：这个角色站在额外那只（显示她额度的那只）身上，就交给她演
+function handOffCelebration(id, ev) {
+  if (!companionsActive() || id === mainCharacter() || standsIn(id)) return false
+  const p = companionsState?.pets.find(x => x.character === id && x.quota)
+  if (!p) return false
+  toShell({ companionCall: { id: p.id, fn: 'celebrate', args: [id, ev] } })
+  return true
+}
+function updateCompanions() {
+  if (!companionsActive()) return
+  const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}
+  // 没有立绘的角色（没装 / 彩蛋）开不了窗口，不算
+  const clients = Companions.clientsOf(sessions, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
+  claim = Companions.mainClaim({ mainCharacter: main, foreground, clients, last: claim, nowMs })
+  if (nowMs < companionsReadyAt) return
+  const reactTo = chars[main]?.reactTo
+  const covered = new Set(Object.keys(chars).filter(id => StandIn.covers(reactTo, main, id)))
+  const prevPets = companionsState?.pets || []
+  const r = Companions.decide({
+    nowMs, clients, claimKey: claim.key, mainCharacter: main, inAI: Companions.inAISoftware({ foreground, clients, nowMs }),
+    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState,
+  })
+  r.pets.forEach((p, i) => {
+    if (!p.id) p.id = p.via === 'gather' ? p.character + '@gather' : p.key
+    r.state.pets[i].id = p.id
+  })
+  companionsState = r.state
+  for (const key of r.leaving) toShell({ companionLeave: prevPets.find(x => x.key === key)?.id || key })
+  const list = r.pets.map(p => ({ id: p.id, key: p.key, character: p.character, client: p.client, quota: !!p.quota, label: companionLabel(p, r.pets, main) }))
+  const json = JSON.stringify(list), first = sentCompanions === null
+  if (json !== sentCompanions) { sentCompanions = json; toShell({ companions: list }) }
+  // 第一次（打开开关、页面重载后）也发：外壳菜单里可能还是上一个页面留下的灰
+  const eggOk = !list.length
+  if (first || eggOk !== eggAllowedSent) { eggAllowedSent = eggOk; toShell({ eggAllowed: eggOk }) }
+  if (egg && !eggOk) endEgg()   // 彩蛋正演着时冒出了别的桌宠：马上收掉、换回原来的角色
+}
+// 没有新事件时「离开满 1 分钟才走」也要有人看：每 5 秒算一次（没变不发）
+setInterval(updateCompanions, 5000)
+
 // ---- 额度里的「社区梗」时刻 ----
 // GPT：某个额度窗口在预定重置时间之前突然恢复一大截（官方 reset / 重置卡）→ reset
 // DeepSeek：余额比上次多了（充值）→ feast 大口吃白饭
@@ -1415,6 +1579,7 @@ function quotaEvent(id, q) {
   return ev
 }
 function celebrate(id, ev) {
+  if (handOffCelebration(id, ev)) return   // 这个角色站在额外那只身上：交给她演
   if (standsIn(id)) id = charId   // 代演（reactTo）：她响应的 AI 额度刷新了，她来演
   if (id !== charId || egg || characterTimer) { pendingCelebration[id] = { ev, at: Date.now() }; return }  // 正在换成别人：等切回她时再演
   // 正在干活：额度记录是 AI 回复的半路写下的，这时演会被紧跟着的干活动作盖掉，看不见——留到这一轮干完（Stop）再演
@@ -1674,6 +1839,7 @@ function eggStep(step) {
 }
 function playEgg(force) {
   if (egg || tucked || !charId || char()?.egg || $('stage').classList.contains('swap')) return false   // 缩在边上、正在换角色时不演：彩蛋角色没有贴边立绘
+  if (companionsAround()) return false   // 有别的桌宠在场时不演（几只同框时彩蛋出戏）
   const eggId = eggFor(charId)
   if (!eggId) return false
   if (!force && pose !== 'idle') return false

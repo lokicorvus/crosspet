@@ -104,11 +104,14 @@ function makePage() {
     fetch: () => new Promise(() => {}), AbortController: class { constructor() { this.signal = {} } abort() {} },
     addEventListener() {},
   }
+  // 页面发给外壳的消息（toShell 走 macOS 的 pet 通道）都记下来
+  const shellMsgs = []
+  ctx.webkit = { messageHandlers: { pet: { postMessage: m => shellMsgs.push({ at: clk.now(), msg: JSON.parse(JSON.stringify(m)) }) } } }
   ctx.window = ctx
   ctx.globalThis = ctx
   vm.createContext(ctx)
   vm.runInContext('Math.random = () => 0.99', ctx)   // 不随机出闲时小动作、彩蛋
-  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'peak-hours.js', 'whats-new.js'])
+  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js'])
     vm.runInContext(fs.readFileSync(path.join(WEB, f), 'utf8'), ctx, { filename: f })
   const html = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8').replace(/\r\n/g, '\n')
   const start = html.lastIndexOf('<script>\n'), end = html.lastIndexOf('</script>')
@@ -126,10 +129,13 @@ function makePage() {
     }
     // 钩子写的时间：外壳下一次 0.3 秒轮询才交过来，比现在略早一点
     function hook(id, p, event, extra = {}) { applyCharState(id, { pose: p, event, ts: (Date.now() - 150) / 1000, ...extra }) }
+    // 带客户端的会话：[会话id, 姿态, 客户端, 事件]
+    function csess(...entries) { const o = {}; entries.forEach(([sid, p, client, ev]) => o[sid] = { pose: p, event: ev || 'PreToolUse', ts: (Date.now() - 150) / 1000, ...(client ? { client } : {}) }); return o }
     function sess(...entries) { const o = {}; entries.forEach(([sid, p, ev]) => o[sid] = { pose: p, event: ev || 'PreToolUse', ts: (Date.now() - 150) / 1000 }); return o }
   `)
   run('setPageHidden(true)')   // 特效的逐帧刷新不在这里测
-  return { run, clk, advance: ms => clk.advance(ms), state: () => run('__state()'), says: () => run('__says'), errors: clk.errors }
+  return { run, clk, advance: ms => clk.advance(ms), state: () => run('__state()'), says: () => run('__says'), errors: clk.errors,
+    msgs: () => shellMsgs.map(x => x.msg), shellMsgs }
 }
 
 const POSES = ['idle', 'thinking', 'listening', 'reading', 'writing', 'running', 'happy', 'oops', 'asking', 'busy_left', 'busy_right',
@@ -304,11 +310,187 @@ const cases = [
   }],
 ]
 
+// ---- 多桌宠（主桌宠页面）----
+const MULTI_KEYS = ['companions', 'companionLeave', 'companionCall', 'eggAllowed']
+const multiMsgs = e => e.msgs().filter(m => MULTI_KEYS.some(k => k in m))
+const companionLists = e => e.msgs().filter(m => 'companions' in m).map(m => m.companions)
+const lastCompanions = e => companionLists(e).slice(-1)[0]
+// 外壳打开开关后先交一轮状态；页面开头等一下再算（见 index.html 的 COMPANIONS_WARMUP）
+async function multiOn(e, main, extra = '') {
+  if (main && e.state().charId !== main) { e.run(`setCharacter('${main}', true)`); await e.advance(1000) }
+  e.run(`setRole('main'); setMultiPets({ on: true, rest: 'auto', mainPet: '' }); ${extra}`)
+  await e.advance(2000)
+}
+const multiCases = [
+  ['multi_off_untouched', async e => {
+    // 开关关着：会话、按客户端的状态、前台、集合都来了，也不发任何多桌宠消息，主桌宠照旧演
+    e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setSessions('claude', csess(['c1','reading','claude-cli']))`)
+    e.run(`setForeground({ kind: 'terminal' }); setRunning(['claude@claude-desktop'])`)
+    e.run(`applyClientState('gpt', 'codex', { pose: 'reading', event: 'PreToolUse', ts: Date.now() / 1000 })`)
+    await e.advance(500)
+    assert(e.state().pose !== 'reading', 'applyClientState played while the switch is off')
+    e.run(`hook('gpt','writing','PreToolUse')`)
+    await e.advance(3000)
+    assert(e.state().pose === 'writing', `main pet ignores her own work: ${e.state().pose}`)
+    e.run(`gather()`)
+    await e.advance(20000)
+    assert(e.run(`playEgg(true)`) === true, 'egg blocked while the switch is off')
+    await e.advance(60000)
+    assert(multiMsgs(e).length === 0, `multi-pet messages while off: ${JSON.stringify(multiMsgs(e))}`)
+  }],
+  ['main_emits_companion_for_codex', async e => {
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['c1','idle','claude-desktop','SessionStart'])); setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(100)
+    const list = lastCompanions(e)
+    assert(list && list.length === 1, `companions: ${JSON.stringify(companionLists(e))}`)
+    const p = list[0]
+    assert(p.id === 'gpt@codex' && p.key === 'gpt@codex' && p.character === 'gpt' && p.client === 'codex' && p.quota === true && p.label === '',
+      `entry: ${JSON.stringify(p)}`)
+    assert(e.state().charId === 'claude', 'main pet switched to GPT')
+    // Codex 干完了，你切到浏览器：1 分钟后她走（companionLeave），列表变空
+    e.run(`setSessions('gpt', csess(['s1','happy','codex','Stop'])); setForeground({ kind: 'other' })`)
+    await e.advance(70000)
+    assert(e.msgs().some(m => m.companionLeave === 'gpt@codex'), `no companionLeave: ${JSON.stringify(multiMsgs(e))}`)
+    assert(lastCompanions(e).length === 0, `still listed: ${JSON.stringify(lastCompanions(e))}`)
+    // 列表没变时不重复发
+    const n = companionLists(e).length
+    await e.advance(30000)
+    assert(companionLists(e).length === n, 'unchanged list was re-sent')
+  }],
+  ['main_plays_only_claimed_client', async e => {
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['d1','thinking','claude-desktop'],['c1','writing','claude-cli']))`)
+    await e.advance(3000)
+    let s = e.state()
+    assert(!s.multi && s.cards === 0, `main juggles the other client's sessions: ${JSON.stringify(s)}`)
+    const list = lastCompanions(e)
+    assert(list.length === 1 && list[0].key === 'claude@claude-cli' && list[0].label === '终端' && list[0].quota === false,
+      `companions: ${JSON.stringify(list)}`)
+    e.run(`applyClientState('claude', 'claude-cli', { pose: 'running', event: 'PreToolUse', ts: Date.now() / 1000 })`)
+    e.run(`applyCharState('claude', { pose: 'running', event: 'PreToolUse', ts: Date.now() / 1000 })`)   // 旧的按角色那份：被终端那只写过
+    await e.advance(3000)
+    assert(e.state().pose !== 'running', `main played the terminal client: ${e.state().pose}`)
+    e.run(`applyClientState('claude', 'claude-desktop', { pose: 'reading', event: 'PreToolUse', ts: Date.now() / 1000 })`)
+    await e.advance(3000)
+    assert(e.state().pose === 'reading', `main ignores her claimed client: ${e.state().pose}`)
+  }],
+  ['no_client_files_fallback', async e => {
+    // 旧钩子：会话没有 client、没有 @ 状态文件 → 只有一只 Claude，主桌宠照旧按 <角色>-state.json 演（Review Focus 1）
+    await multiOn(e, 'claude')
+    e.run(`setSessions('claude', sess(['c1','writing'])); hook('claude','writing','PreToolUse')`)
+    await e.advance(3000)
+    assert(e.state().pose === 'writing', `main does not play the old state: ${e.state().pose}`)
+    assert((lastCompanions(e) || []).length === 0, `extra Claude appeared: ${JSON.stringify(lastCompanions(e))}`)
+  }],
+  ['egg_blocked_with_companions', async e => {
+    await multiOn(e, 'gpt')
+    e.run(`setSessions('claude', csess(['c1','writing','claude-cli']))`)
+    await e.advance(500)
+    assert(lastCompanions(e).length === 1, `precondition: ${JSON.stringify(lastCompanions(e))}`)
+    assert(e.msgs().some(m => m.eggAllowed === false), 'no eggAllowed:false')
+    assert(e.run(`playEgg(true)`) === false, 'egg played next to a companion')
+    // 只剩主桌宠：彩蛋照旧；正演着时冒出额外那只：彩蛋收掉、换回原来的角色
+    const f = await fresh()
+    await multiOn(f, 'gpt')
+    assert(f.run(`playEgg(true)`) === true, 'egg blocked with nobody around')
+    await f.advance(3000)
+    assert(f.state().egg, 'egg not playing')
+    f.run(`setSessions('claude', csess(['c1','writing','claude-cli']))`)
+    await f.advance(1500)
+    const s = f.state()
+    assert(!s.egg && s.charId === 'gpt' && s.caption === 'GPT' && !s.stageHidden, `egg not ended: ${JSON.stringify(s)}`)
+    assert(f.msgs().some(m => m.eggAllowed === false), 'no eggAllowed:false')
+    assert(!f.errors.length, `page errors: ${JSON.stringify(f.errors)}`)
+  }],
+  ['reload_resends_full_list', async e => {
+    await multiOn(e, 'claude', `setSessions('gpt', csess(['s1','writing','codex']))`)
+    assert(lastCompanions(e).length === 1, `precondition: ${JSON.stringify(companionLists(e))}`)
+    // 页面重载（Windows 渲染重启）：新页面，外壳重新交一遍；第一次 companions 就是完整列表，没有先发一个空的
+    const f = await fresh()
+    f.run(`setCharacter('claude', true)`)
+    await f.advance(1000)
+    f.run(`setRole('main'); setMultiPets({ on: true, rest: 'auto', mainPet: '' })`)
+    await f.advance(300)
+    f.run(`setSessions('gpt', csess(['s1','writing','codex'])); setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    await f.advance(3000)
+    assert(f.msgs().some(m => m.eggAllowed === false), 'reloaded page did not re-send eggAllowed')
+    const lists = companionLists(f)
+    assert(lists.length >= 1 && lists[0].length === 1 && lists[0][0].id === 'gpt@codex', `first list after reload: ${JSON.stringify(lists)}`)
+    // 列表没变也会定时算一次，但不重复发
+    await f.advance(20000)
+    assert(companionLists(f).length === 1, `re-sent: ${JSON.stringify(companionLists(f))}`)
+  }],
+  ['gather_staggered', async e => {
+    await multiOn(e, 'gpt')
+    e.run(`gather()`)
+    await e.advance(10)
+    let list = lastCompanions(e)
+    assert(list.length === 1, `first one: ${JSON.stringify(list)}`)
+    await e.advance(1000)
+    list = lastCompanions(e)
+    const chars = list.map(p => p.character)
+    assert(list.length === 2 && chars.includes('claude') && chars.includes('grok'), `after 1s: ${JSON.stringify(list)}`)
+    assert(!chars.includes('gpt') && !chars.includes('egg-gpt'), `main / egg summoned: ${JSON.stringify(list)}`)
+    assert(list.every(p => p.id === p.character + '@gather'), `ids: ${JSON.stringify(list)}`)
+    // 集合来的 Claude 收编了干活的终端：key 换成那个客户端，id 不变（外壳按 id 认窗口）
+    e.run(`setSessions('claude', csess(['c1','writing','claude-cli']))`)
+    await e.advance(100)
+    const c = lastCompanions(e).find(p => p.character === 'claude')
+    assert(c && c.id === 'claude@gather' && c.key === 'claude@claude-cli', `adopted: ${JSON.stringify(lastCompanions(e))}`)
+    // 解散：一只只离开
+    e.run(`dismiss()`)
+    await e.advance(3000)
+    const leaves = e.shellMsgs.filter(x => 'companionLeave' in x.msg)
+    assert(leaves.length === 2 && leaves[1].at - leaves[0].at >= 1000, `dismiss: ${JSON.stringify(leaves)}`)
+    assert(leaves.some(x => x.msg.companionLeave === 'claude@gather'), `leave addressed by id: ${JSON.stringify(leaves)}`)
+    // 集合来的都走了；终端那个 Claude 还在干活，按平常的规则冒她自己那只（id = key）
+    const after = lastCompanions(e)
+    assert(after.every(p => !p.id.endsWith('@gather')) && after.length === 1 && after[0].id === 'claude@claude-cli', `left over: ${JSON.stringify(after)}`)
+  }],
+  ['send_home_and_switch_off', async e => {
+    await multiOn(e, 'claude', `setSessions('gpt', csess(['s1','writing','codex']))`)
+    e.run(`sendHome('gpt@codex')`)
+    await e.advance(100)
+    assert(e.msgs().some(m => m.companionLeave === 'gpt@codex') && lastCompanions(e).length === 0, `sendHome: ${JSON.stringify(multiMsgs(e))}`)
+    e.run(`setSessions('grok', csess(['g1','writing','grok']))`)
+    await e.advance(100)
+    assert(lastCompanions(e).length === 1, `grok: ${JSON.stringify(lastCompanions(e))}`)
+    // 关掉开关：发一次空列表让外壳全关，之后不再发
+    e.run(`setMultiPets({ on: false, rest: 'auto', mainPet: '' })`)
+    await e.advance(100)
+    assert(lastCompanions(e).length === 0, 'no empty list on switch off')
+    const n = multiMsgs(e).length
+    e.run(`setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(30000)
+    assert(multiMsgs(e).length === n, `messages after switch off: ${JSON.stringify(multiMsgs(e).slice(n))}`)
+  }],
+  ['quota_celebration_goes_to_the_companion', async e => {
+    await multiOn(e, 'claude', `setSessions('gpt', csess(['s1','writing','codex']))`)
+    const now = e.clk.now() / 1000
+    e.run(`setQuota('gpt', {text:'5h 20%', windows:[{label:'5h', used:80, reset:${now + 3600}}]})`)
+    e.run(`setQuota('gpt', {text:'5h 95%', windows:[{label:'5h', used:5, reset:${now + 3600 + 18000}}]})`)
+    await e.advance(100)
+    const call = e.msgs().find(m => m.companionCall)
+    assert(call && call.companionCall.id === 'gpt@codex' && call.companionCall.fn === 'celebrate' && call.companionCall.args[1] === 'reset',
+      `companionCall: ${JSON.stringify(multiMsgs(e))}`)
+  }],
+]
+const multiNames = new Set(multiCases.map(c => c[0]))
+cases.push(...multiCases)
+
 ;(async () => {
   const failures = []
   for (const [name, fn] of cases) {
     const e = await fresh()
-    try { await fn(e) } catch (err) { failures.push({ name, error: err.message }) }
+    try {
+      await fn(e)
+      // 开关默认关：没打开过的场景一条多桌宠消息都不能有
+      if (!multiNames.has(name) && multiMsgs(e).length) throw Error(`multi-pet messages with the switch off: ${JSON.stringify(multiMsgs(e))}`)
+      if (multiNames.has(name) && e.errors.length) throw Error(`page errors: ${JSON.stringify(e.errors)}`)
+    } catch (err) { failures.push({ name, error: err.message }) }
   }
   console.log(JSON.stringify({ file: path.join(WEB, 'index.html'), passed: cases.length - failures.length, failed: failures.length, failures }, null, 2))
   if (failures.length) process.exitCode = 1
