@@ -4,9 +4,9 @@
 <title>CrossPet 设置</title>
 <style>
 /* 和开发者控制台同一套配色；跟着系统深浅色 */
-:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; }
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; --heart: #e0607e; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; }
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; --heart: #e8708c; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); }
@@ -79,7 +79,7 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .item .label small.warn { color: #c0392b; }
 .hidden { display: none !important; }
 /* 多桌宠（角色页）：开关下面的两个选项缩进一点；单选按钮 */
-.item.sub { padding-left: 28px; }
+.item.indent { padding-left: 28px; }
 .choices { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .choices.stack { flex-direction: column; align-items: flex-start; gap: 3px; margin-top: 4px; }
 .choices label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
@@ -90,8 +90,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 #friendRows > .item:first-child { border-top: none; }
 .hearts { letter-spacing: 2px; font-size: 14px; white-space: nowrap; }
 .heart { color: var(--line); }
-.heart.full { color: #e0607e; }
-.heart.half { background: linear-gradient(90deg, #e0607e 50%, var(--line) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.heart.full { color: var(--heart); }
+.heart.half { background: linear-gradient(90deg, var(--heart) 50%, var(--line) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
 #toast.show { opacity: .92; }
 </style></head>
@@ -131,10 +131,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="eggs"><span></span></label></div></div>
   <div class="item"><div class="label">在干活的 AI 各显示一只<small>同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="multiPets"><span></span></label></div></div>
-  <div class="item sub" id="mainPetRow"><div class="label">主桌宠</div>
+  <div class="item indent" id="mainPetRow"><div class="label">主桌宠</div>
     <div class="ctl choices"><label><input type="radio" name="mainPet" value="rule">跟着规则换</label>
       <label><input type="radio" name="mainPet" value="fixed">固定为</label><select id="mainPetSelect" aria-label="固定的主桌宠"></select></div></div>
-  <div class="item sub" id="petsRestRow"><div class="label">她们什么时候去休息
+  <div class="item indent" id="petsRestRow"><div class="label">她们什么时候去休息
       <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干完活、你离开 AI 软件一会儿后</label>
         <label><input type="radio" name="petsRest" value="stay">一直留着，直到我让她回去或 AI 程序关掉</label></div></div></div>
 </div>
@@ -260,6 +260,8 @@ function renderMultiPets(s) {
     if (main && !chars.some(c => c[0] === main)) chars.push([main, main])
     sel.replaceChildren(...chars.map(([id, name]) => new Option(name, id, false, id === main)))
   }
+  // 下拉是空的（外壳没给角色）：「固定为」点了也只能发 ""，干脆灰掉
+  document.querySelector('input[name=mainPet][value=fixed]').disabled = sel.disabled = !sel.options.length
   for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
   const rest = s.petsRest === 'stay' ? 'stay' : 'auto'
   for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
@@ -271,13 +273,13 @@ function renderMultiPets(s) {
 }
 function friendRow(r) {
   const row = document.createElement('div'); row.className = 'item friend'
-  const name = document.createElement('div'); name.className = 'label friend-name'; name.textContent = r.label
+  const name = document.createElement('div'); name.className = 'label friend-name'; name.textContent = String(r.label ?? '').replace(/\u2665(?!\ufe0e)/g, '\u2665\ufe0e')   // ♥ 后加 U+FE0E：按文字画，别变成 emoji，和右边的心一个样
   const hearts = document.createElement('div'); hearts.className = 'ctl hearts'
   const h = Math.max(0, Math.min(5, Number(r.hearts) || 0))
   for (let i = 0; i < 5; i++) {
     const c = document.createElement('span')
     c.className = 'heart' + (i < Math.floor(h) ? ' full' : i === Math.floor(h) && h % 1 >= 0.5 ? ' half' : '')
-    c.textContent = '♥'
+    c.textContent = '\u2665\ufe0e'   // 同上：按文字画，半颗心的渐变才盖得上
     hearts.append(c)
   }
   row.append(name, hearts)

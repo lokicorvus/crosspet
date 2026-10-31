@@ -200,12 +200,13 @@ const cases = [
     assert(!hidden(p.$('friendship')), '开着、有记录时友谊区该显示')
     const rows = p.$('friendRows').querySelectorAll('.friend')
     assert(rows.length === 2, '该有两行，实际 ' + rows.length)
-    assert(rows[0].querySelector('.friend-name').textContent === 'Claude ♥ GPT' && rows[1].querySelector('.friend-name').textContent === '小鲸 ♥ GPT', '名字不对')
+    const VS15 = '\ufe0e'
+    assert(rows[0].querySelector('.friend-name').textContent === 'Claude ♥' + VS15 + ' GPT' && rows[1].querySelector('.friend-name').textContent === '小鲸 ♥' + VS15 + ' GPT', '名字不对（♥ 后该带 U+FE0E 按文字画）：' + JSON.stringify(rows[0].querySelector('.friend-name').textContent))
     const count = (r, cls) => r.querySelectorAll('.heart' + cls).length
     assert(r0ok(), '第一行心不对')
     function r0ok() { const r = rows[0]; return r.querySelectorAll('.heart').length === 5 && count(r, '.full') === 2 && count(r, '.half') === 1 }
     assert(rows[1].querySelectorAll('.heart').length === 5 && count(rows[1], '.full') === 1 && count(rows[1], '.half') === 0, '第二行心不对')
-    assert(rows[0].querySelectorAll('.heart.full')[0].textContent === '♥', '整颗心用 ♥')
+    assert(rows[0].querySelectorAll('.heart.full')[0].textContent === '♥\ufe0e', '整颗心用 ♥（按文字画）')
     assert(!/\d/.test(p.$('friendRows').textContent), '不显示数字')
   }],
   ['满心 5 颗、0 颗都画五个位置', p => {
@@ -244,6 +245,20 @@ const cases = [
     assert(p.q('input[name=mainPet][value=rule]').checked && !p.q('input[name=mainPet][value=fixed]').checked, '"" 该选中跟着规则换')
     p.push({ multiPets: true })
     assert(p.q('input[name=mainPet][value=rule]').checked, '没推 mainPet 时按跟着规则换')
+  }],
+  ['两个选项行不带 .sub（页头版本号那一行的灰色小字样式）', p => {
+    p.push({ multiPets: true })
+    for (const id of ['mainPetRow', 'petsRestRow']) assert(!p.$(id).classList.contains('sub') && !p.$(id).closest('.sub'), id + ' 撞上了 .sub 样式')
+  }],
+  ['没有角色可选：「固定为」灰掉', p => {
+    p.push({ multiPets: true, characters: [] })
+    assert(p.q('input[name=mainPet][value=fixed]').disabled && p.$('mainPetSelect').disabled, '下拉是空的，「固定为」该灰掉')
+    p.push({ multiPets: true })
+    assert(!p.q('input[name=mainPet][value=fixed]').disabled && !p.$('mainPetSelect').disabled, '有角色时不灰')
+  }],
+  ['心的颜色用页面的配色变量，深浅色各一份', () => {
+    assert(!/\.heart[^{]*\{[^}]*#[0-9a-f]{3,6}/i.test(HTML), '.heart 里不该写死颜色')
+    assert((HTML.match(/--heart:\s*#[0-9a-f]{6}/gi) || []).length === 2, '浅色、深色各该定义一份 --heart')
   }],
   ['主桌宠：固定为某个角色', p => {
     p.push({ multiPets: true, mainPet: 'gpt' })
