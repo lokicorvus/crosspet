@@ -332,8 +332,6 @@ const multiCases = [
     e.run(`hook('gpt','writing','PreToolUse')`)
     await e.advance(3000)
     assert(e.state().pose === 'writing', `main pet ignores her own work: ${e.state().pose}`)
-    e.run(`gather()`)
-    await e.advance(20000)
     assert(e.run(`playEgg(true)`) === true, 'egg blocked while the switch is off')
     await e.advance(60000)
     assert(multiMsgs(e).length === 0, `multi-pet messages while off: ${JSON.stringify(multiMsgs(e))}`)
@@ -440,15 +438,38 @@ const multiCases = [
     await e.advance(100)
     const c = lastCompanions(e).find(p => p.character === 'claude')
     assert(c && c.id === 'claude@gather' && c.key === 'claude@claude-cli', `adopted: ${JSON.stringify(lastCompanions(e))}`)
-    // 解散：一只只离开
+    // 解散：Grok 说 bye 走；Claude 收编的终端还在干活，她不走、不重新冒，窗口 id 不变
     e.run(`dismiss()`)
     await e.advance(3000)
     const leaves = e.shellMsgs.filter(x => 'companionLeave' in x.msg)
-    assert(leaves.length === 2 && leaves[1].at - leaves[0].at >= 1000, `dismiss: ${JSON.stringify(leaves)}`)
-    assert(leaves.some(x => x.msg.companionLeave === 'claude@gather'), `leave addressed by id: ${JSON.stringify(leaves)}`)
-    // 集合来的都走了；终端那个 Claude 还在干活，按平常的规则冒她自己那只（id = key）
+    assert(leaves.length === 1 && leaves[0].msg.companionLeave === 'grok@gather', `dismiss: ${JSON.stringify(leaves)}`)
     const after = lastCompanions(e)
-    assert(after.every(p => !p.id.endsWith('@gather')) && after.length === 1 && after[0].id === 'claude@claude-cli', `left over: ${JSON.stringify(after)}`)
+    assert(after.length === 1 && after[0].id === 'claude@gather' && after[0].key === 'claude@claude-cli', `left over: ${JSON.stringify(after)}`)
+  }],
+  ['gather_while_off', async e => {
+    // 集合不受开关限制：开关关着也能叫；只是不冒干活的那几只
+    e.run(`setCharacter('gpt', true)`)
+    await e.advance(1000)
+    e.run(`setSessions('grok', csess(['g1','writing','grok'])); gather()`)
+    await e.advance(1500)
+    let list = lastCompanions(e)
+    assert(list && list.length === 2 && list.every(p => p.id.endsWith('@gather')), `gathered: ${JSON.stringify(companionLists(e))}`)
+    assert(e.run(`playEgg(true)`) === false, 'egg next to gathered pets')
+    // 集合来的 Claude 收编干活的终端；GPT 主桌宠没占着的 codex 不冒
+    e.run(`setSessions('claude', csess(['c1','writing','claude-cli'])); setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(100)
+    list = lastCompanions(e)
+    assert(list.length === 2 && list.find(p => p.character === 'claude').key === 'claude@claude-cli' && !list.some(p => p.character === 'gpt'), `off + work: ${JSON.stringify(list)}`)
+    // 解散：都走（开关关着不转成干活那只），列表空了发一次空列表，之后不再发
+    e.run(`dismiss()`)
+    await e.advance(3000)
+    const leaves = e.msgs().filter(m => 'companionLeave' in m).map(m => m.companionLeave)
+    assert(leaves.length === 2 && leaves.includes('claude@gather'), `leaves: ${JSON.stringify(leaves)}`)
+    assert(lastCompanions(e).length === 0 && e.msgs().filter(m => 'eggAllowed' in m).slice(-1)[0].eggAllowed === true, `after dismiss: ${JSON.stringify(multiMsgs(e))}`)
+    const n = multiMsgs(e).length
+    await e.advance(30000)
+    assert(multiMsgs(e).length === n, `messages after dismiss: ${JSON.stringify(multiMsgs(e).slice(n))}`)
+    assert(e.run(`playEgg(true)`) === true, 'egg still blocked after dismiss')
   }],
   ['send_home_and_switch_off', async e => {
     await multiOn(e, 'claude', `setSessions('gpt', csess(['s1','writing','codex']))`)

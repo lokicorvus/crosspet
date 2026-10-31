@@ -371,3 +371,33 @@ test('coveredByStandIn 含 gpt → codex 干活不冒', () => {
   const r = run({ coveredByStandIn: new Set(['gpt']), gathered: ['gpt'], clients: cl(0, desktopBusy(0), codexBusy(0)) })
   assert.deepEqual(r.pets, [])
 })
+
+test('解散时收编的客户端还在干活 → 不走，转成 via:work 留着（不 bye、不重新冒）；没在干活的照常走', () => {
+  const a = run({ gathered: ['gpt', 'deepseek'], clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  assert.equal(a.pets[0].key, 'gpt@codex')
+  const b = run({ t: 1000, gathered: [], clients: cl(1000, desktopBusy(1000), codexBusy(1000)), prev: a.state })
+  assert.deepEqual(b.pets.map(p => [p.key, p.client, p.via]), [['gpt@codex', 'codex', 'work']])
+  assert.deepEqual(b.leaving, [a.pets[1].key])
+  assert.deepEqual(b.state.gatherKeys, {})
+})
+
+test('解散时收编的客户端已经停了 → 照常走', () => {
+  const a = run({ gathered: ['gpt'], clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  const b = run({ t: 1000, gathered: [], clients: cl(1000, desktopBusy(1000), codexDone(1000)), prev: a.state })
+  assert.deepEqual(b.pets, [])
+  assert.deepEqual(b.leaving, ['gpt@codex'])
+})
+
+test('workPets:false（开关关着只集合）→ 干活的客户端不冒；集合来的照样收编；已站着的 work 那只走；解散后收编的也走', () => {
+  const r = run({ workPets: false, clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  assert.deepEqual(r.pets, [])
+  const g = run({ workPets: false, gathered: ['gpt'], clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  assert.deepEqual(g.pets.map(p => [p.key, p.via]), [['gpt@codex', 'gather']])
+  const w = run({ clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  const off = run({ t: 1000, workPets: false, clients: cl(1000, desktopBusy(1000), codexBusy(1000)), prev: w.state })
+  assert.deepEqual(off.pets, [])
+  assert.deepEqual(off.leaving, ['gpt@codex'])
+  const d = run({ t: 1000, workPets: false, gathered: [], clients: cl(1000, desktopBusy(1000), codexBusy(1000)), prev: g.state })
+  assert.deepEqual(d.pets, [])
+  assert.deepEqual(d.leaving, ['gpt@codex'])
+})

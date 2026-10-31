@@ -112,8 +112,10 @@
   // - 集合来的每个角色一只，不按上面的规则走，解散（不在 gathered 里）才走；
   //   她的角色有客户端开始干活、而且那个客户端没有自己的那只时，收编它（key / client 换成那个客户端）。
   //   集合来的每个角色只有一只，外壳按角色认她的窗口（收编时 key 变了，窗口和位置不变）
+  // - 解散时收编着的客户端还在干活：她不走，转成干活冒出来的那只（via 'work'）留着，不说 bye 再冒一次
+  // - workPets 为 false（开关关着、只是集合）：不冒干活的那几只，已站着的干活那只走；集合来的照样收编、解散就走
   // - quota：同一角色只有一只为 true；主桌宠是这个角色时都为 false
-  function decide({ nowMs, clients, claimKey, mainCharacter, inAI, rest, gathered, running, coveredByStandIn, prev }) {
+  function decide({ nowMs, clients, claimKey, mainCharacter, inAI, rest, gathered, running, coveredByStandIn, prev, workPets = true }) {
     const p = prev || {}
     const covered = coveredByStandIn || new Set()
     const list = clients || []
@@ -142,14 +144,19 @@
     const kept = []
     for (const pet of p.pets || []) {
       if (pet.via === 'gather') {
-        if (!gatherSet.has(pet.character) || covered.has(pet.character)) { leaving.push(pet.key); continue }
+        if (!gatherSet.has(pet.character) || covered.has(pet.character)) {
+          const c = pet.client && byKey.get(pet.key)
+          if (workPets && c && c.working && !blocked(c)) kept.push({ ...pet, via: 'work' })
+          else leaving.push(pet.key)
+          continue
+        }
         // 收编的客户端被主桌宠占了、或会话全部结束：退回没收编的样子，她还留着，之后能再收编这个角色别的客户端
         if (pet.client && (pet.key === claimKey || !byKey.has(pet.key))) kept.push({ ...pet, key: gatherKey(pet.character), client: null })
         else kept.push({ ...pet })
         continue
       }
       const c = byKey.get(pet.key)
-      let go = !c || blocked(c)
+      let go = !workPets || !c || blocked(c)
       if (!go && rest === 'stay') go = running != null && !isCli(c) && !running.has(pet.key)
       else if (!go && !c.working) {
         const prevIdle = p.idleSince && p.idleSince[pet.key]
@@ -184,7 +191,7 @@
     }
 
     // 4. 新干活的客户端各冒一只
-    for (const c of list) {
+    for (const c of workPets ? list : []) {
       if (!c.working || blocked(c) || taken.has(c.key)) continue
       taken.add(c.key)
       kept.push({ key: c.key, character: c.character, client: c.client, via: 'work', quota: false })

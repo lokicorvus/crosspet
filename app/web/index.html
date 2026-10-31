@@ -1390,7 +1390,8 @@ function playCharState(id, s) {
 //   toShell({ companionLeave: id })                              这只说 bye 走（外壳调她页面的 leaveNow）
 //   toShell({ companionCall: { id, fn: 'celebrate', args } })   让那只演（额度庆祝交给显示这个角色额度的那只）
 //   toShell({ eggAllowed })                                      右键「召唤彩蛋」变灰用：有别的桌宠在场时 false
-// 开关关着时这些一律不发、applyClientState 不演，行为和以前一样。这一套只在主桌宠页面（role 'main'）做。
+// 开关关着时这些一律不发、applyClientState 不演，行为和以前一样；只有你主动「集合」时例外（只叫集合来的，不冒干活的，
+// 解散完发一次空列表就停）。这一套只在主桌宠页面（role 'main'）做。
 let role = 'main', roleInfo = null   // 'companion'：额外那只的页面；roleInfo = { character, client, label }
 let multiPets = { on: false, rest: 'auto', mainPet: '' }
 let foreground = null            // 前台 { kind: 'ai' | 'terminal' | 'ours' | 'other', character?, client? }
@@ -1409,7 +1410,9 @@ const GATHER_STEP = 1000         // 集合 / 解散时一只接一只的间隔
 
 const mainCharacter = () => egg ? egg.host : (characterTarget || charId)   // 正在换角色时按要换成的算，演彩蛋时按原来的
 const companionsActive = () => role === 'main' && multiPets.on
-const companionsAround = () => companionsActive() && !!companionsState?.pets.length
+// 集合不受开关限制：开关关着时只要还有集合来的（或正在走的），也照样算、照样发
+const companionsRunning = () => role === 'main' && (multiPets.on || gathered.length > 0 || !!companionsState?.pets.length)
+const companionsAround = () => role === 'main' && !!companionsState?.pets.length
 const isCliClient = (character, client) => Companions.CLI_CLIENTS.has(client) || (character === 'claude' && client === 'claude')
 // 主桌宠只演她占着的那个客户端：这个角色有按客户端的状态时，按角色那份（applyCharState）不演
 const playsByClient = id => companionsActive() && !!clientStateSeen[id] && (id === mainCharacter() || standsIn(id))
@@ -1437,8 +1440,8 @@ function setMultiPets(o) {
   if (multiPets.on && !was) {
     companionsReadyAt = Date.now() + COMPANIONS_WARMUP
     setTimeout(updateCompanions, COMPANIONS_WARMUP)
-  } else if (!multiPets.on && was) stopCompanions()
-  else updateCompanions()
+  } else if (!multiPets.on && was && !gathered.length) stopCompanions()
+  else updateCompanions()   // 关掉时正集合着：集合来的留着，干活冒出来的走
 }
 // 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
 function stopCompanions() {
@@ -1461,23 +1464,22 @@ function applyClientState(character, client, s) {
 }
 // 集合！每个角色各叫一只（不含主桌宠正演着的、彩蛋角色），一只接一只登场
 function gather() {
-  if (!companionsActive()) return false
+  if (role !== 'main') return false
   gatherTimers.forEach(clearTimeout); gatherTimers = []
   const main = mainCharacter(), chars = manifest.characters || {}
   const todo = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main && !gathered.includes(id))
   todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
-    if (!companionsActive() || gathered.includes(id)) return
+    if (gathered.includes(id)) return
     gathered = [...gathered, id]
     updateCompanions()
   }, i * GATHER_STEP)))
   return todo.length > 0
 }
-// 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下
+// 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下；收编的客户端还在干活的那只不走，转成干活那只（decide 里）
 function dismiss() {
   gatherTimers.forEach(clearTimeout); gatherTimers = []
   const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
   gathered = gathered.filter(ch => order.includes(ch))   // 还没登场的不用再叫
-  if (!companionsActive()) { gathered = []; return }
   order.forEach((ch, i) => gatherTimers.push(setTimeout(() => {
     gathered = gathered.filter(x => x !== ch)
     updateCompanions()
@@ -1485,7 +1487,7 @@ function dismiss() {
 }
 // 「让她先回去」：外壳按窗口的 id 交来（给 key 也认）。集合来的同时从集合里去掉
 function sendHome(k) {
-  if (!companionsActive() || !companionsState) return
+  if (!companionsRunning() || !companionsState) return
   const p = companionsState.pets.find(x => x.id === k || x.key === k)
   if (!p) return
   companionsState = Companions.sendHome(companionsState, p.key, Date.now())
@@ -1496,14 +1498,14 @@ function sendHome(k) {
 function notePat(character) { if (role === 'main' && character) patAt[character] = Date.now() }
 // 额度庆祝：这个角色站在额外那只（显示她额度的那只）身上，就交给她演
 function handOffCelebration(id, ev) {
-  if (!companionsActive() || id === mainCharacter() || standsIn(id)) return false
+  if (!companionsRunning() || id === mainCharacter() || standsIn(id)) return false
   const p = companionsState?.pets.find(x => x.character === id && x.quota)
   if (!p) return false
   toShell({ companionCall: { id: p.id, fn: 'celebrate', args: [id, ev] } })
   return true
 }
 function updateCompanions() {
-  if (!companionsActive()) return
+  if (!companionsRunning()) return
   const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}
   // 没有立绘的角色（没装 / 彩蛋）开不了窗口，不算
   const clients = Companions.clientsOf(sessions, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
@@ -1514,7 +1516,7 @@ function updateCompanions() {
   const prevPets = companionsState?.pets || []
   const r = Companions.decide({
     nowMs, clients, claimKey: claim.key, mainCharacter: main, inAI: Companions.inAISoftware({ foreground, clients, nowMs }),
-    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState,
+    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState, workPets: multiPets.on,
   })
   r.pets.forEach((p, i) => {
     if (!p.id) p.id = p.via === 'gather' ? p.character + '@gather' : p.key
@@ -1529,6 +1531,8 @@ function updateCompanions() {
   const eggOk = !list.length
   if (first || eggOk !== eggAllowedSent) { eggAllowedSent = eggOk; toShell({ eggAllowed: eggOk }) }
   if (egg && !eggOk) endEgg()   // 彩蛋正演着时冒出了别的桌宠：马上收掉、换回原来的角色
+  // 开关关着、解散完了：空列表上面已经发过，回到单只，不再发
+  if (!multiPets.on && !gathered.length && !list.length) { companionsState = null; sentCompanions = null; claim = null }
 }
 // 没有新事件时「离开满 1 分钟才走」也要有人看：每 5 秒算一次（没变不发）
 setInterval(updateCompanions, 5000)
