@@ -1,5 +1,5 @@
 // 多桌宠：按客户端分桌宠、主桌宠占着哪个客户端、你是不是还在 AI 软件里。
-// 纯函数，外壳和页面都不在这里读文件；之后「谁站着、谁离开」（decide）也加在这个文件里。
+// 纯函数，外壳和页面都不在这里读文件；「谁站着、谁离开」（decide）也在这里。
 ;(function (root) {
   // 干活判定沿用主页面的 3 分钟卡住兜底（index.html 的 STUCK_AFTER）
   const STUCK_AFTER = 180_000
@@ -89,10 +89,107 @@
     return (clients || []).some(c => isCli(c) && nowMs - c.lastTs * 1000 < CLI_RECENT)
   }
 
+  // 集合来、还没收编客户端的那只用的 key
+  const gatherKey = character => character + '@gather'
+
+  // 「让她先回去」：记下送回去的时间，下一次 decide 让她走，直到这个 key 有新一轮的活。
+  // 集合来的那只要送走，调用方同时把她的角色从 gathered 里去掉（decide 里集合来的不看 sentHome）。
+  function sendHome(state, key, nowMs) {
+    const s = state || { pets: [], awaySince: null, sentHome: {}, gatherKeys: {} }
+    return { ...s, sentHome: { ...(s.sentHome || {}), [key]: nowMs } }
+  }
+
+  // 谁站着、谁走。每次状态变化调一次，返回该站着的 pets（按出现先后）和这次要说 bye 走的 leaving。
+  // 规则见设计第二节：
+  // - 主桌宠占着的 claimKey、reactTo 代演的角色（coveredByStandIn）不出现
+  // - 额外那只：没占着的客户端干活就出现；auto 下不干活、并且离开 AI 软件满 LEAVE_AFTER 才走；
+  //   stay 下只在会话全部消失、或有窗口的程序关掉（running 非 null 且不含她）时走
+  // - 会话全部消失（上次站着、这次 clients 里没有她的 key；SessionEnd 会从会话表里删掉会话）立刻走
+  // - 集合来的每个角色一只，不按上面的规则走，解散（不在 gathered 里）才走；
+  //   她的角色有客户端开始干活、而且那个客户端没有自己的那只时，收编它（key / client 换成那个客户端）。
+  //   集合来的每个角色只有一只，外壳按角色认她的窗口（收编时 key 变了，窗口和位置不变）
+  // - quota：同一角色只有一只为 true；主桌宠是这个角色时都为 false
+  function decide({ nowMs, clients, claimKey, mainCharacter, inAI, rest, gathered, running, coveredByStandIn, prev }) {
+    const p = prev || {}
+    const covered = coveredByStandIn || new Set()
+    const list = clients || []
+    const byKey = new Map(list.map(c => [c.key, c]))
+    const gatherSet = new Set(gathered || [])
+    const awaySince = inAI ? null : (p.awaySince != null ? p.awaySince : nowMs)
+    const leaving = []
+
+    // 送回去的：会话都没了就不用再记（再出现必然是新一轮）；有新一轮的活就放出来
+    const sentHome = {}
+    for (const [key, t] of Object.entries(p.sentHome || {})) {
+      const c = byKey.get(key)
+      if (!c || (c.working && c.lastTs * 1000 > t)) continue
+      sentHome[key] = t
+    }
+    const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null
+
+    // 1. 上次站着的：先定谁留谁走
+    const kept = []
+    for (const pet of p.pets || []) {
+      if (pet.via === 'gather') {
+        if (!gatherSet.has(pet.character) || covered.has(pet.character)) { leaving.push(pet.key); continue }
+        // 收编的客户端被主桌宠占了：退回没收编的样子，她还留着
+        if (pet.key === claimKey) kept.push({ ...pet, key: gatherKey(pet.character), client: null })
+        else kept.push({ ...pet })
+        continue
+      }
+      const c = byKey.get(pet.key)
+      let go = !c || blocked(c)
+      if (!go && rest === 'stay') go = running != null && !isCli(c) && !running.has(pet.key)
+      else if (!go) go = !c.working && awaySince != null && nowMs - awaySince >= LEAVE_AFTER
+      if (go) leaving.push(pet.key)
+      else kept.push({ ...pet })
+    }
+
+    const taken = new Set(kept.filter(x => x.client).map(x => x.key))
+    const adoptable = character => latest(list.filter(c =>
+      c.character === character && c.working && !blocked(c) && !taken.has(c.key)))
+
+    // 2. 集合来、还没收编的：她的角色有客户端开始干活就收编
+    for (const pet of kept) {
+      if (pet.via !== 'gather' || pet.client) continue
+      const c = adoptable(pet.character)
+      if (c) { pet.key = c.key; pet.client = c.client; taken.add(c.key) }
+    }
+
+    // 3. 新集合来的：这个角色已经有一只额外的站着就直接归她（不重复叫），不然收编在干活的客户端，都没有就空着来
+    for (const character of gatherSet) {
+      if (covered.has(character) || kept.some(x => x.via === 'gather' && x.character === character)) continue
+      const own = kept.find(x => x.via === 'work' && x.character === character)
+      if (own) { own.via = 'gather'; continue }
+      const c = adoptable(character)
+      if (c) taken.add(c.key)
+      kept.push({ key: c ? c.key : gatherKey(character), character, client: c ? c.client : null, via: 'gather', quota: false })
+    }
+
+    // 4. 新干活的客户端各冒一只
+    for (const c of list) {
+      if (!c.working || blocked(c) || taken.has(c.key)) continue
+      taken.add(c.key)
+      kept.push({ key: c.key, character: c.character, client: c.client, via: 'work', quota: false })
+    }
+
+    // 额度：同一角色只有先出现的那只显示；主桌宠是这个角色时都不显示
+    const quotaShown = new Set()
+    for (const pet of kept) {
+      pet.quota = pet.character !== mainCharacter && !quotaShown.has(pet.character)
+      quotaShown.add(pet.character)
+    }
+
+    const gatherKeys = {}
+    for (const pet of kept) if (pet.via === 'gather') gatherKeys[pet.character] = pet.client ? pet.key : null
+
+    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, sentHome, gatherKeys } }
+  }
+
   const api = {
     STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    clientsOf, mainClaim, inAISoftware,
+    clientsOf, mainClaim, inAISoftware, decide, sendHome,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api

@@ -175,3 +175,137 @@ test('ai / ours → 算；other → 不算', () => {
   assert.equal(C.inAISoftware({ foreground: { kind: 'ai', character: 'claude' }, clients: [], nowMs: NOW }), true)
   assert.equal(C.inAISoftware({ foreground: { kind: 'other' }, clients: codexAt(5), nowMs: NOW }), false)
 })
+
+// ---- decide ----
+
+// 一条会话 → clients；t 是相对 NOW 的毫秒（可正可负），sec 是会话距 t 的秒数
+const sess = (character, client, pose, sec, t = 0, event) =>
+  ({ [character]: { [character + client]: { pose, ts: (NOW + t) / 1000 - sec, client, ...(event ? { event } : {}) } } })
+const merge = (...parts) => {
+  const out = {}
+  for (const p of parts) for (const [ch, ss] of Object.entries(p)) out[ch] = { ...(out[ch] || {}), ...ss }
+  return out
+}
+const cl = (t, ...parts) => C.clientsOf(merge(...parts), NOW + t)
+
+function run(input) {
+  return C.decide({
+    claimKey: 'claude@claude-desktop', mainCharacter: 'claude', inAI: true,
+    rest: 'auto', gathered: [], running: null, coveredByStandIn: new Set(), prev: null,
+    ...input,
+    nowMs: NOW + (input.t || 0),
+  })
+}
+const keys = r => r.pets.map(p => p.key)
+
+const desktopBusy = t => sess('claude', 'claude-desktop', 'running', 2, t)
+const codexBusy = t => sess('gpt', 'codex', 'running', 1, t)
+const codexDone = (t, sec = 1) => sess('gpt', 'codex', 'proud', sec, t, 'Stop')
+
+test('Claude 主桌宠占着 desktop，codex 干活 → pets 有 gpt@codex', () => {
+  const r = run({ clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  assert.deepEqual(r.pets, [{ key: 'gpt@codex', character: 'gpt', client: 'codex', via: 'work', quota: true }])
+  assert.deepEqual(r.leaving, [])
+})
+
+test('codex 干完、inAI 为 true 过了 5 分钟 → 还在', () => {
+  const a = run({ clients: cl(0, codexBusy(0)) })
+  const b = run({ t: 300_000, clients: cl(300_000, codexDone(0, 0)), prev: a.state })   // 刚干完
+  const c = run({ t: 600_000, clients: cl(600_000, codexDone(300_000, 0)), prev: b.state })
+  assert.deepEqual(keys(c), ['gpt@codex'])
+  assert.deepEqual(c.leaving, [])
+})
+
+test('inAI 为 false 持续 59 秒 → 还在；61 秒 → 在 leaving 里', () => {
+  const a = run({ clients: cl(0, codexBusy(0)) })
+  const b = run({ t: 1000, inAI: false, clients: cl(1000, codexDone(1000)), prev: a.state })
+  assert.deepEqual(keys(b), ['gpt@codex'])
+  const c59 = run({ t: 60_000, inAI: false, clients: cl(60_000, codexDone(1000)), prev: b.state })
+  assert.deepEqual(keys(c59), ['gpt@codex'])
+  assert.deepEqual(c59.leaving, [])
+  const c61 = run({ t: 62_000, inAI: false, clients: cl(62_000, codexDone(1000)), prev: c59.state })
+  assert.deepEqual(keys(c61), [])
+  assert.deepEqual(c61.leaving, ['gpt@codex'])
+})
+
+test('走开 50 秒、回到 AI 软件 1 秒、再走开 50 秒 → 还在', () => {
+  const done = cl(0, codexDone(0))
+  let r = run({ clients: cl(0, codexBusy(0)) })
+  r = run({ t: 1000, inAI: false, clients: done, prev: r.state })
+  r = run({ t: 51_000, inAI: false, clients: done, prev: r.state })
+  r = run({ t: 51_000, inAI: true, clients: done, prev: r.state })
+  r = run({ t: 52_000, inAI: false, clients: done, prev: r.state })
+  r = run({ t: 102_000, inAI: false, clients: done, prev: r.state })
+  assert.deepEqual(keys(r), ['gpt@codex'])
+  assert.deepEqual(r.leaving, [])
+})
+
+test('codex 会话全部消失 → 立刻在 leaving 里', () => {
+  const a = run({ clients: cl(0, codexBusy(0)) })
+  const b = run({ t: 1000, clients: cl(1000, desktopBusy(1000)), prev: a.state })
+  assert.deepEqual(keys(b), [])
+  assert.deepEqual(b.leaving, ['gpt@codex'])
+})
+
+test("rest:'stay' 时走开 10 分钟 → 还在；running 不含它 → 走", () => {
+  // 主桌宠是 GPT、占着 codex；Claude 桌面（有窗口的程序）冒一只，codex（命令行）不看 running
+  const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
+  const a = run({ ...base, clients: cl(0, desktopBusy(0), sess('gemini', 'gemini', 'running', 1)) })
+  assert.deepEqual(keys(a), ['claude@claude-desktop', 'gemini@gemini'])
+  const idle = t => cl(t, sess('claude', 'claude-desktop', 'proud', 1, 0, 'Stop'), sess('gemini', 'gemini', 'proud', 1, 0, 'Stop'))
+  const b = run({ ...base, t: 1000, inAI: false, clients: idle(1000), prev: a.state })
+  const c = run({ ...base, t: 601_000, inAI: false, clients: idle(601_000), prev: b.state })
+  assert.deepEqual(keys(c), ['claude@claude-desktop', 'gemini@gemini'])
+  assert.deepEqual(c.leaving, [])
+  const d = run({ ...base, t: 602_000, inAI: false, running: new Set(), clients: idle(602_000), prev: c.state })
+  assert.deepEqual(keys(d), ['gemini@gemini'])
+  assert.deepEqual(d.leaving, ['claude@claude-desktop'])
+})
+
+test('sentHome 后同一 key 旧会话还在 → 不出现；新一轮 working → 出现', () => {
+  const a = run({ clients: cl(0, codexBusy(0)) })
+  const sent = C.sendHome(a.state, 'gpt@codex', NOW + 1000)
+  const b = run({ t: 1000, clients: cl(1000, codexBusy(0)), prev: sent })   // 还是 1 秒前那条
+  assert.deepEqual(keys(b), [])
+  assert.deepEqual(b.leaving, ['gpt@codex'])
+  const c = run({ t: 5000, clients: cl(5000, codexBusy(0)), prev: b.state })
+  assert.deepEqual(keys(c), [])
+  const d = run({ t: 9000, clients: cl(9000, codexBusy(9000)), prev: c.state })   // 新事件
+  assert.deepEqual(keys(d), ['gpt@codex'])
+  assert.deepEqual(d.state.sentHome, {})
+})
+
+test("集合 ['gpt','deepseek'] → 两只 via:'gather'、client:null；codex 开始干活 → gpt 那只收编为 gpt@codex，只有一只 gpt", () => {
+  const a = run({ gathered: ['gpt', 'deepseek'], clients: cl(0, desktopBusy(0)) })
+  assert.deepEqual(a.pets.map(p => [p.character, p.client, p.via]), [['gpt', null, 'gather'], ['deepseek', null, 'gather']])
+  const b = run({ t: 1000, gathered: ['gpt', 'deepseek'], clients: cl(1000, desktopBusy(1000), codexBusy(1000)), prev: a.state })
+  assert.deepEqual(b.pets.map(p => [p.key, p.client, p.via]), [['gpt@codex', 'codex', 'gather'], [a.pets[1].key, null, 'gather']])
+  assert.equal(b.pets.filter(p => p.character === 'gpt').length, 1)
+  assert.deepEqual(b.leaving, [])
+  assert.equal(b.state.gatherKeys.gpt, 'gpt@codex')
+})
+
+test("解散（gathered:[]）→ 两只都在 leaving", () => {
+  const a = run({ gathered: ['gpt', 'deepseek'], clients: cl(0, desktopBusy(0)) })
+  const b = run({ t: 1000, gathered: [], clients: cl(1000, desktopBusy(1000)), prev: a.state })
+  assert.deepEqual(b.pets, [])
+  assert.deepEqual(b.leaving, a.pets.map(p => p.key))
+  assert.deepEqual(b.state.gatherKeys, {})
+})
+
+test('主桌宠 Claude 占着 desktop、cli 也在干活 → 冒一只 claude@claude-cli，quota:false', () => {
+  const r = run({ clients: cl(0, desktopBusy(0), sess('claude', 'claude-cli', 'running', 1)) })
+  assert.deepEqual(r.pets, [{ key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', via: 'work', quota: false }])
+})
+
+test('主桌宠是 GPT，两只 Claude → 先出现的那只 quota:true', () => {
+  const base = { mainCharacter: 'gpt', claimKey: 'gpt@codex' }
+  const a = run({ ...base, clients: cl(0, desktopBusy(0)) })
+  const b = run({ ...base, t: 1000, clients: cl(1000, sess('claude', 'claude-cli', 'running', 1, 1000), desktopBusy(1000)), prev: a.state })
+  assert.deepEqual(b.pets.map(p => [p.key, p.quota]), [['claude@claude-desktop', true], ['claude@claude-cli', false]])
+})
+
+test('coveredByStandIn 含 gpt → codex 干活不冒', () => {
+  const r = run({ coveredByStandIn: new Set(['gpt']), gathered: ['gpt'], clients: cl(0, desktopBusy(0), codexBusy(0)) })
+  assert.deepEqual(r.pets, [])
+})
