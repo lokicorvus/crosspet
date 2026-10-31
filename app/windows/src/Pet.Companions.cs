@@ -150,7 +150,11 @@ namespace CrossPet
         void CompanionsMainReloaded()
         {
             pageGathering = false;
-            if (!MultiPetsOn) CloseAllCompanions();
+            if (MultiPetsOn) return;
+            CloseAllCompanions();
+            // 关着开关集合过：页面发过 eggAllowed:false，重新载入后的页面在开关关着时不会再发 true，「召唤彩蛋」会一直灰着。
+            // 窗口都关了、回到单只，这里自己放开（菜单每次打开时重新生成，下次打开就不灰了）
+            eggAllowed = true;
         }
 
         /// <summary>主桌宠的网页 / 浏览器进程崩了（RecoverWeb）：额外那几只没人管了（不会再收到列表、状态；浏览器进程挂了的话
@@ -162,6 +166,7 @@ namespace CrossPet
             Store.Log("桌宠页面的网页进程退出了，关掉额外的桌宠，等页面重新载入后再按列表开");
             CloseAllCompanions();
             pageGathering = false;
+            eggAllowed = true;   // 同 CompanionsMainReloaded：额外的都关了，别让「召唤彩蛋」一直灰着（开关开着时页面重新载入后会再发）
         }
 
         async void GatherCompanions()
@@ -272,7 +277,7 @@ namespace CrossPet
                 clientStates[key] = (json, pose, fi.LastWriteTimeUtc);
                 if (Paused) continue;
                 Js($"applyClientState({Q(character)}, {Q(client)}, {json})");
-                foreach (var c in companions.Values.Where(c => c.Key == key)) c.ApplyState(json, pose, DateTime.UtcNow);
+                foreach (var c in companions.Values.Where(c => c.Key == key)) c.ApplyState(json, pose);
             }
         }
 
@@ -281,7 +286,7 @@ namespace CrossPet
         {
             charStates[id] = (json, pose, at);
             if (!CompanionsForwarding || Paused || clientStateSeen.Contains(id)) return;
-            foreach (var c in companions.Values.Where(c => c.Character == id && c.Client != null)) c.ApplyState(json, pose, DateTime.UtcNow);
+            foreach (var c in companions.Values.Where(c => c.Character == id && c.Client != null)) c.ApplyState(json, pose);
         }
 
         /// <summary>会话表变了（Poll 读到 &lt;角色&gt;-sessions.json 时调）：每只拿她自己客户端的那份</summary>
@@ -320,11 +325,12 @@ namespace CrossPet
         {
             if (Paused) return;
             c.Js($"setSessions({Q(c.Character)}, {SessionsFor(c)})");
+            // at 是状态文件的写入时间，只用来判断新不新（和 Poll 一样只认 10 分钟内的）；她贴边跑不跑出来按交给她的时间算（见 Companion.ApplyState）
             bool Fresh((string json, string pose, DateTime at) s) => (DateTime.UtcNow - s.at).TotalMinutes < 10;
             if (c.Client != null)
             {
-                if (clientStates.TryGetValue(c.Key, out var cs) && Fresh(cs)) c.ApplyState(cs.json, cs.pose, cs.at);
-                else if (!clientStateSeen.Contains(c.Character) && charStates.TryGetValue(c.Character, out var ch) && Fresh(ch)) c.ApplyState(ch.json, ch.pose, ch.at);
+                if (clientStates.TryGetValue(c.Key, out var cs) && Fresh(cs)) c.ApplyState(cs.json, cs.pose);
+                else if (!clientStateSeen.Contains(c.Character) && charStates.TryGetValue(c.Character, out var ch) && Fresh(ch)) c.ApplyState(ch.json, ch.pose);
             }
             if (c.Quota) foreach (var code in QuotaCodes(c.Character)) c.Js(code);
             else c.Js($"setQuota({Q(c.Character)}, null)");

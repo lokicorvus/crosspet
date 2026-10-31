@@ -144,6 +144,9 @@ extension App {
         pageGathering = false
         guard !multiPetsOn else { return }
         for c in Array(companions.values) + leavingCompanions { c.close() }
+        // 关着开关集合过：页面发过 eggAllowed:false，重新载入后的页面在开关关着时不会再发 true，「召唤彩蛋」会一直灰着。
+        // 窗口都关了、回到单只，这里自己放开（菜单每次打开时重新生成）
+        eggAllowed = true
     }
 
     /// 主桌宠页面的网页进程崩了：额外那几只没人管了（不会再收到列表、状态），全部关掉，重新载入主桌宠页面，
@@ -153,6 +156,7 @@ extension App {
         appLog("桌宠页面的网页进程退出了，关掉额外的桌宠、重新载入")
         for c in Array(companions.values) + leavingCompanions { c.close() }
         pageGathering = false
+        eggAllowed = true   // 同 companionsMainReloaded（开关开着时页面重新载入后会再发）
         web.reload()
     }
 

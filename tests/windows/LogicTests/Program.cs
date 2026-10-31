@@ -260,6 +260,8 @@ static class Program
         var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
         Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12
             && crowded.All(r => r.X >= -0.01 && r.Y >= -0.01 && r.X + r.W <= 1280.01 && r.Y + r.H <= 680.01));
+        // 叠放时要错开：不能有两只左上角完全重合（完全盖住就只看得见一只）
+        Check("多桌宠位置：放不下时 12 只左上角两两不重合", crowded.Select(r => (r.X, r.Y)).Distinct().Count() == 12);
         Check("多桌宠位置：0 只、空尺寸不出错", CompanionPlace.Slots(mainBR, 0, pet1, vis1080).Length == 0
             && CompanionPlace.Slots(mainBR, 3, new CompanionPlace.Size(0, 0), vis1080).Length == 0);
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");

@@ -179,7 +179,8 @@ namespace CrossPet
         void HandleMessage(Dictionary<string, object> m)
         {
             if (m.TryGetValue("patted", out var p) && p is bool pb && pb) pet.Js($"notePat({Pet.Q(Character)})");
-            if (m.TryGetValue("gone", out var g) && g is bool gb && gb) Close();
+            // 不能在这个网页控件自己的消息回调里同步 Dispose 它：排到回调返回之后再关（和 ProcessFailed 一样）
+            if (m.TryGetValue("gone", out var g) && g is bool gb && gb) Window.Dispatcher.BeginInvoke(new Action(Close));
         }
 
         /// <summary>列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她</summary>
@@ -227,16 +228,23 @@ namespace CrossPet
             timers.Clear();
             slideTimer?.Stop();
             openMenu?.Close();
-            try { web?.Dispose(); } catch { }
-            web = null;
-            try { Window.Close(); } catch { }
             pet.CompanionClosed(this);
+            // 关窗口可能是从网页控件的回调里来的（她自己的 gone、主桌宠页面的 companions 消息 / 加载完、初始化失败）：
+            // 在回调里同步 Dispose 网页控件不安全，状态先改好（上面），真正的 Dispose 和关窗口排到回调返回之后
+            var w = web; web = null;
+            Window.Opacity = 0;   // 先藏起来，排队这一下也不会看见
+            Window.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { w?.Dispose(); } catch { }
+                try { Window.Close(); } catch { }
+            }));
         }
 
-        /// <summary>她的状态（按客户端的那份；旧钩子时是按角色的那份）</summary>
-        public void ApplyState(string json, string pose, DateTime at)
+        /// <summary>她的状态（按客户端的那份；旧钩子时是按角色的那份）。贴边跑不跑出来按交给她的时间算，
+        /// 和主桌宠一样（Poll 里 lastPose 记的是读到的时间 DateTime.UtcNow，不是文件的写入时间）</summary>
+        public void ApplyState(string json, string pose)
         {
-            if (pose != null) LastPose = (pose, at);
+            if (pose != null) LastPose = (pose, DateTime.UtcNow);
             Js($"applyCharState({Pet.Q(Character)}, {json})");
         }
 
