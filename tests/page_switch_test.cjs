@@ -311,7 +311,7 @@ const cases = [
 ]
 
 // ---- 多桌宠（主桌宠页面）----
-const MULTI_KEYS = ['companions', 'companionLeave', 'companionCall', 'eggAllowed']
+const MULTI_KEYS = ['companions', 'companionLeave', 'companionCall', 'eggAllowed', 'friendship', 'patted', 'gone']
 const multiMsgs = e => e.msgs().filter(m => MULTI_KEYS.some(k => k in m))
 const companionLists = e => e.msgs().filter(m => 'companions' in m).map(m => m.companions)
 const lastCompanions = e => companionLists(e).slice(-1)[0]
@@ -321,7 +321,136 @@ async function multiOn(e, main, extra = '') {
   e.run(`setRole('main'); setMultiPets({ on: true, rest: 'auto', mainPet: '' }); ${extra}`)
   await e.advance(2000)
 }
+// 额外那只（或对照用的主桌宠）的页面：外壳先 setRole 再 init。localStorage 写入、联网都记下来
+async function rolePage(role, m = manifest()) {
+  const e = makePage()
+  e.run(`var __writes = []; { const set = localStorage.setItem; localStorage.setItem = (k, v) => { __writes.push(k); return set(k, v) } }
+         var __fetches = 0; fetch = () => { __fetches++; return new Promise(() => {}) }`)
+  if (role === 'companion') e.run(`setRole('companion', { id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', client: 'codex', label: '终端' })`)
+  e.run(`init(${JSON.stringify(m)})`)
+  await e.advance(1000)
+  return e
+}
+// 第四节那些只该做一次的事挨个来一遍：登场招呼（时段）、换衣服、重置提醒、插件更新、新功能卡片、有新版本、事件、额度
+async function onceOnlyRound(e) {
+  e.run(`setCharacter('gpt')`)
+  await e.advance(1000)
+  e.run(`setPeakSkins({ deepseek: { peak: 'night', valley: '' } }); setCodexResets(true)`)
+  e.run(`setPluginUpdates([{ bundled: '2.0.0', installed: '1.0.0', label: 'Codex' }]); justUpdated('1.3.8', '1.3.6')`)
+  e.run(`hook('gpt','writing','PreToolUse')`)
+  await e.advance(3000)
+  e.run(`hook('gpt','happy','Stop')`)
+  const now = e.clk.now() / 1000
+  e.run(`setQuota('gpt', {text:'5h 20%', windows:[{label:'5h', used:80, reset:${now + 3600}}]})`)
+  e.run(`setQuota('gpt', {text:'5h 95%', windows:[{label:'5h', used:5, reset:${now + 3600 + 18000}}]})`)
+  await e.advance(10 * 60000)
+  e.run(`notifyUpdate('v9.9.9')`)
+  await e.advance(100)
+  return {
+    writes: e.run('__writes'), fetches: e.run('__fetches'), wear: e.msgs().filter(m => m.wear).length,
+    news: e.run(`$('newsText').textContent`), says: e.says().map(x => x.line).join('|'), egg: e.run('playEgg(true)'),
+  }
+}
+const friendStore = e => { const s = e.run(`localStorage.getItem('crosspet-friendship')`); return s ? JSON.parse(s) : {} }
+const friendRows = e => e.msgs().filter(m => 'friendship' in m).map(m => m.friendship).slice(-1)[0]
 const multiCases = [
+  ['companion_does_no_once_only', async e => {
+    const m = manifest()
+    m.characters.gpt.lines.greet_morning = ['早上好']
+    m.characters.deepseek = { name: 'DeepSeek', greeting: 'DS hello', poses: frames('deepseek', POSES) }
+    // 对照：主桌宠页面同样一轮，这些事都会做（测试本身能看出来）
+    const main = await onceOnlyRound(await rolePage('main', m))
+    for (const k of ['crosspet-greeted', 'crosspet-peak-applied', 'crosspet-quota-memory'])
+      assert(main.writes.includes(k), `control: main did not write ${k}: ${JSON.stringify(main.writes)}`)
+    assert(main.fetches > 0 && main.wear > 0 && main.news && main.says.includes('有新版本') && main.says.includes('插件有新版本') && main.egg === true,
+      `control: ${JSON.stringify(main)}`)
+    // 额外那只：一样都不做，也不写 localStorage
+    const c = await rolePage('companion', m)
+    const r = await onceOnlyRound(c)
+    assert(r.writes.length === 0, `companion wrote localStorage: ${JSON.stringify(r.writes)}`)
+    assert(r.fetches === 0, 'companion fetched codex-resets')
+    assert(r.wear === 0, 'companion changed outfits')
+    assert(!r.news, `companion showed the news card: ${r.news}`)
+    assert(!r.says.includes('有新版本') && !r.says.includes('插件有新版本') && !r.says.includes('早上好'), `companion said once-only lines: ${r.says}`)
+    assert(r.egg === false && !c.state().egg, 'companion played an egg')
+    // 事件、摸头、气泡照常
+    c.run(`hook('gpt','writing','PreToolUse')`)
+    await c.advance(3000)
+    assert(c.state().pose === 'writing', `companion ignores her events: ${c.state().pose}`)
+    c.run(`handleClick('pat')`)
+    await c.advance(100)
+    assert(c.state().pose === 'pat', `companion not patted: ${c.state().pose}`)
+    assert(c.msgs().filter(m => m.patted === true).length === 1, `no patted message: ${JSON.stringify(c.msgs())}`)
+    assert(!c.msgs().some(m => 'companions' in m || 'friendship' in m), `companion did main-page work: ${JSON.stringify(c.msgs())}`)
+    assert(c.run(`$('caption').dataset.label`) === '终端', 'client label not shown under the name')
+    assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
+  }],
+  ['companion_leave_now', async e => {
+    const c = await rolePage('companion')
+    c.run(`setCharacter('gpt', true)`)
+    await c.advance(1000)
+    c.run(`leaveNow()`)
+    await c.advance(100)
+    const line = c.state().bubble
+    assert(line, 'no bye line')
+    assert(!c.msgs().some(m => m.gone), 'gone before the bye line was shown')
+    c.run(`say('别的话'); leaveNow()`)   // 道别时别的话盖不掉；再调一次也只走一次
+    assert(c.state().bubble === line, `bye line replaced: ${c.state().bubble}`)
+    await c.advance(3000)
+    assert(c.msgs().filter(m => m.gone === true).length === 1, `gone: ${JSON.stringify(c.msgs())}`)
+    assert(c.state().stageHidden, 'still visible after poof')
+    assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
+  }],
+  ['friendship_together_ten_minutes', async e => {
+    e.run(`pageHidden = false`)   // 测试页默认按「窗口看不见」跑（不画特效）；在场要看得见。直接改变量，不开逐帧刷新
+    e.run(`gather()`)
+    await e.advance(1500)
+    await e.advance(8 * 60000)
+    assert(!friendStore(e)['gpt+grok']?.points, `points before 10 minutes: ${JSON.stringify(friendStore(e))}`)
+    await e.advance(2 * 60000)
+    const s = friendStore(e)
+    assert(s['gpt+grok']?.points === 1 && s['claude+gpt']?.points === 1 && s['claude+grok']?.points === 1, `after 10 minutes: ${JSON.stringify(s)}`)
+    const rows = friendRows(e)
+    assert(rows && rows.length === 3 && rows.some(r => r.label === 'GPT ♥ Grok'), `rows: ${JSON.stringify(rows)}`)
+    // 只在变化时发
+    const n = e.msgs().filter(m => 'friendship' in m).length
+    await e.advance(60000)
+    assert(e.msgs().filter(m => 'friendship' in m).length === n, 'unchanged rows were re-sent')
+    // 窗口藏起来（锁屏 / 全屏隐藏）时不算在场
+    e.run(`pageHidden = true`)
+    await e.advance(10 * 60000)
+    assert(friendStore(e)['gpt+grok'].points === 1, `counted while hidden: ${JSON.stringify(friendStore(e))}`)
+    // 坏掉的存储：当成空的，照样记
+    e.run(`localStorage.setItem('crosspet-friendship', '{oops')`)
+    e.run(`pageHidden = false`)
+    await e.advance(10 * 60000)
+    assert(friendStore(e)['gpt+grok']?.points === 1, `corrupt store: ${JSON.stringify(friendStore(e))}`)
+  }],
+  ['friendship_cowork_cofinish_pats', async e => {
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['d1','writing','claude-desktop'])); setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(100)
+    assert(lastCompanions(e).length === 1, `precondition: ${JSON.stringify(lastCompanions(e))}`)
+    assert(friendStore(e)['claude+gpt']?.points === 3, `cowork: ${JSON.stringify(friendStore(e))}`)
+    await e.advance(30000)
+    assert(friendStore(e)['claude+gpt'].points === 3, 'cowork counted twice within 10 minutes')
+    // 前后脚干完（5 分钟内）
+    e.run(`setSessions('gpt', csess(['s1','happy','codex','Stop']))`)
+    await e.advance(60000)
+    e.run(`setSessions('claude', csess(['d1','happy','claude-desktop','Stop']))`)
+    await e.advance(100)
+    assert(friendStore(e)['claude+gpt'].points === 5, `cofinish: ${JSON.stringify(friendStore(e))}`)
+    // 5 分钟内分别摸了两只（额外那只由外壳转 notePat，主桌宠是自己被点）
+    e.run(`notePat('gpt')`)
+    await e.advance(1000)
+    e.run(`handleClick('pat')`)
+    await e.advance(100)
+    assert(friendStore(e)['claude+gpt'].points === 7, `pats: ${JSON.stringify(friendStore(e))}`)
+    // 同角色不算、只有一只时不记
+    e.run(`notePat('claude')`)
+    assert(Object.keys(friendStore(e)).length === 1, `extra pairs: ${JSON.stringify(friendStore(e))}`)
+  }],
   ['multi_off_untouched', async e => {
     // 开关关着：会话、按客户端的状态、前台、集合都来了，也不发任何多桌宠消息，主桌宠照旧演
     e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setSessions('claude', csess(['c1','reading','claude-cli']))`)
@@ -333,8 +462,10 @@ const multiCases = [
     await e.advance(3000)
     assert(e.state().pose === 'writing', `main pet ignores her own work: ${e.state().pose}`)
     assert(e.run(`playEgg(true)`) === true, 'egg blocked while the switch is off')
+    e.run(`notePat('claude'); handleClick('pat')`)
     await e.advance(60000)
     assert(multiMsgs(e).length === 0, `multi-pet messages while off: ${JSON.stringify(multiMsgs(e))}`)
+    assert(!e.run(`localStorage.getItem('crosspet-friendship')`), 'friendship recorded with a single pet')
   }],
   ['main_emits_companion_for_codex', async e => {
     await multiOn(e, 'claude')
