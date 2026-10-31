@@ -15,6 +15,20 @@
   // 跑在终端里的客户端
   const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'grok'])
 
+  // 一轮结束（Stop / SessionEnd）不管什么姿态都不算干活：被打断、出错收尾时钩子会写 oops / surprised + Stop。
+  // 一轮中途的 oops（比如 PostToolUseFailure）还算干活。
+  // 「等你回答」不受 3 分钟卡住兜底（同 index.html），但最多算 CLI_RECENT：终端关掉不发 SessionEnd 时不至于一直站着。
+  function isWorking(s, ageMs) {
+    if (!s.pose || WORKING_EXCLUDED.has(s.pose)) return false
+    if (s.event === 'Stop' || s.event === 'SessionEnd') return false
+    return ageMs < (s.pose === 'asking' ? CLI_RECENT : STUCK_AFTER)
+  }
+
+  // 命令行客户端；没有 client 的旧 Claude 条目（claude@claude）按设计算 claude-cli
+  function isCli(c) {
+    return CLI_CLIENTS.has(c.client) || (c.character === 'claude' && c.client === 'claude')
+  }
+
   // sessionsByChar: { 角色: { 会话 id: { pose, event, ts(秒), client? } } }
   // 同一个「角色@客户端」的会话并成一只：任一会话在干活就算干活，lastTs 取最新。
   // 旧条目没有 client 时客户端就用角色名（claude@claude）。
@@ -26,8 +40,7 @@
         const client = s.client || character
         const key = character + '@' + client
         const ts = Number(s.ts) || 0
-        // 「等你回答」不受卡住兜底：那是在等你，本来就可能很久（同 index.html）
-        const working = !!s.pose && !WORKING_EXCLUDED.has(s.pose) && (s.pose === 'asking' || nowMs - ts * 1000 < STUCK_AFTER)
+        const working = isWorking(s, nowMs - ts * 1000)
         const c = byKey.get(key)
         if (!c) byKey.set(key, { key, character, client, working, lastTs: ts })
         else {
@@ -59,7 +72,7 @@
     const fg = foreground || {}
     let pick = null
     if (fg.kind === 'ai' && fg.client) pick = mine.find(c => c.client === fg.client) || null
-    else if (fg.kind === 'terminal') pick = latest(mine.filter(c => CLI_CLIENTS.has(c.client)))
+    else if (fg.kind === 'terminal') pick = latest(mine.filter(isCli))
     if (!pick) pick = latest(mine)
 
     const key = pick ? pick.key : null
@@ -73,7 +86,7 @@
     const kind = foreground && foreground.kind
     if (kind === 'ai' || kind === 'ours') return true
     if (kind !== 'terminal') return false
-    return (clients || []).some(c => CLI_CLIENTS.has(c.client) && nowMs - c.lastTs * 1000 < CLI_RECENT)
+    return (clients || []).some(c => isCli(c) && nowMs - c.lastTs * 1000 < CLI_RECENT)
   }
 
   const api = {

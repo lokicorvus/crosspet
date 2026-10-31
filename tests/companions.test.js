@@ -45,9 +45,18 @@ test('asking 算干活', () => {
   assert.equal(c.working, true)
 })
 
-test('10 分钟前的 asking 还算干活（等你回答不受卡住兜底）', () => {
-  const [c] = C.clientsOf({ gpt: { s: { pose: 'asking', ts: ago(600), client: 'codex' } } }, NOW)
-  assert.equal(c.working, true)
+test('asking 不受 3 分钟兜底，但最多算 10 分钟：9 分钟前算干活，11 分钟前不算', () => {
+  const at = sec => C.clientsOf({ gpt: { s: { pose: 'asking', ts: ago(sec), client: 'codex' } } }, NOW)[0].working
+  assert.equal(at(9 * 60), true)
+  assert.equal(at(11 * 60), false)
+})
+
+test('一轮结束（Stop / SessionEnd）不管什么姿态都不算干活；中途出错的 oops 还算', () => {
+  const w = s => C.clientsOf({ claude: { s: { ts: ago(5), client: 'claude-cli', ...s } } }, NOW)[0].working
+  assert.equal(w({ pose: 'surprised', event: 'Stop' }), false)
+  assert.equal(w({ pose: 'oops', event: 'Stop' }), false)
+  assert.equal(w({ pose: 'running', event: 'SessionEnd' }), false)
+  assert.equal(w({ pose: 'oops', event: 'PostToolUseFailure' }), true)
 })
 
 test('4 分钟前的 running 不算干活（3 分钟卡住兜底）', () => {
@@ -87,6 +96,12 @@ test('前台是普通程序：占着最近有事件的那个', () => {
 test('前台是终端：取这个角色最近干过活的命令行客户端', () => {
   const clients = desktopCli({ ts: ago(1) }, { ts: ago(30) })
   const r = C.mainClaim({ mainCharacter: 'claude', foreground: { kind: 'terminal' }, clients, last: null, nowMs: NOW })
+  assert.equal(r.key, 'claude@claude-cli')
+})
+
+test('前台是 AI 但没给 client：取最近有事件的那个', () => {
+  const clients = desktopCli({ ts: ago(30) }, { ts: ago(1) })
+  const r = C.mainClaim({ mainCharacter: 'claude', foreground: { kind: 'ai' }, clients, last: null, nowMs: NOW })
   assert.equal(r.key, 'claude@claude-cli')
 })
 
@@ -147,6 +162,12 @@ test('终端在前台、9 分钟前 codex 干过活 → 算；11 分钟 → 不�
 test('终端在前台、只有 claude-desktop 干过活 → 不算', () => {
   const clients = C.clientsOf({ claude: { a: { pose: 'running', ts: ago(5), client: 'claude-desktop' } } }, NOW)
   assert.equal(C.inAISoftware({ foreground: { kind: 'terminal' }, clients, nowMs: NOW }), false)
+})
+
+test('终端在前台、没有 client 的旧 Claude 条目 5 分钟前有事件 → 算（按 claude-cli）', () => {
+  const clients = C.clientsOf({ claude: { s: { pose: 'proud', event: 'Stop', ts: ago(300) } } }, NOW)
+  assert.equal(clients[0].key, 'claude@claude')
+  assert.equal(C.inAISoftware({ foreground: { kind: 'terminal' }, clients, nowMs: NOW }), true)
 })
 
 test('ai / ours → 算；other → 不算', () => {
