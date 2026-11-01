@@ -277,7 +277,8 @@ test('codex 会话全部消失 → 立刻在 leaving 里', () => {
 test("rest:'stay' 时走开 10 分钟 → 还在；running 不含它 → 走", () => {
   // 主桌宠是 GPT、占着 codex；Claude 桌面（有窗口的程序）冒一只，codex（命令行）不看 running
   const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
-  const a = run({ ...base, clients: cl(0, desktopBusy(0), sess('gemini', 'gemini', 'running', 1)) })
+  // 外壳认得 Claude 桌面：开始时 running 里有她（之后没了才算程序关掉）
+  const a = run({ ...base, running: new Set(['claude@claude-desktop']), clients: cl(0, desktopBusy(0), sess('gemini', 'gemini', 'running', 1)) })
   assert.deepEqual(keys(a), ['claude@claude-desktop', 'gemini@gemini'])
   const idle = t => cl(t, sess('claude', 'claude-desktop', 'proud', 1, 0, 'Stop'), sess('gemini', 'gemini', 'proud', 1, 0, 'Stop'))
   const b = run({ ...base, t: 1000, inAI: false, clients: idle(1000), prev: a.state })
@@ -404,9 +405,9 @@ test('workPets:false（开关关着只集合）→ 干活的客户端不冒；�
 
 test("rest:'stay'、running 不含她但还在干活：只走一次，之后不再冒出来（不会 bye / 再冒循环）", () => {
   const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
-  const a = run({ ...base, clients: cl(0, desktopBusy(0)) })
+  const a = run({ ...base, running: new Set(['gpt@codex', 'claude@claude-desktop']), clients: cl(0, desktopBusy(0)) })
   assert.deepEqual(keys(a), ['claude@claude-desktop'])
-  const running = new Set(['gpt@codex'])
+  const running = new Set(['gpt@codex'])   // Claude 桌面关掉了
   const b = run({ ...base, t: 1000, running, clients: cl(1000, desktopBusy(1000)), prev: a.state })
   assert.deepEqual(keys(b), [])
   assert.deepEqual(b.leaving, ['claude@claude-desktop'])
@@ -415,6 +416,36 @@ test("rest:'stay'、running 不含她但还在干活：只走一次，之后不�
   assert.deepEqual(c.leaving, [])
   const d = run({ ...base, t: 7000, running, clients: cl(7000, desktopBusy(7000)), prev: c.state })
   assert.deepEqual(keys(d), [])
+  assert.deepEqual(d.leaving, [])
+})
+
+test("rest:'stay'：外壳认不出的有窗口的程序（从没在 running 里出现过）干活 → 出现，之后一直留着（只看 SessionEnd）", () => {
+  const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
+  const running = new Set(['gpt@codex'])
+  const a = run({ ...base, running, clients: cl(0, desktopBusy(0)) })
+  assert.deepEqual(keys(a), ['claude@claude-desktop'])
+  const idle = t => cl(t, sess('claude', 'claude-desktop', 'proud', 1, 0, 'Stop'))
+  const b = run({ ...base, t: 1000, running, inAI: false, clients: idle(1000), prev: a.state })
+  const c = run({ ...base, t: 601_000, running, inAI: false, clients: idle(601_000), prev: b.state })
+  assert.deepEqual(keys(c), ['claude@claude-desktop'])
+  assert.deepEqual(c.leaving, [])
+  // 会话全部结束（SessionEnd 删掉）才走
+  const d = run({ ...base, t: 602_000, running, clients: cl(602_000), prev: c.state })
+  assert.deepEqual(keys(d), [])
+  assert.deepEqual(d.leaving, ['claude@claude-desktop'])
+})
+
+test("rest:'stay'：程序关掉走了之后再打开、又干活 → 再出现", () => {
+  const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
+  const open = new Set(['gpt@codex', 'claude@claude-desktop']), closed = new Set(['gpt@codex'])
+  const a = run({ ...base, running: open, clients: cl(0, desktopBusy(0)) })
+  const b = run({ ...base, t: 1000, running: closed, clients: cl(1000, desktopBusy(1000)), prev: a.state })
+  assert.deepEqual(b.leaving, ['claude@claude-desktop'])
+  const c = run({ ...base, t: 6000, running: closed, clients: cl(6000, desktopBusy(6000)), prev: b.state })
+  assert.deepEqual(keys(c), [])
+  assert.deepEqual(c.leaving, [])
+  const d = run({ ...base, t: 9000, running: open, clients: cl(9000, desktopBusy(9000)), prev: c.state })
+  assert.deepEqual(keys(d), ['claude@claude-desktop'])
   assert.deepEqual(d.leaving, [])
 })
 

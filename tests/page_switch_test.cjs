@@ -223,6 +223,17 @@ const cases = [
     s = e.state()
     assert(s.bubble === 'Claude hello' && !/^busy_/.test(s.pose), `Claude's greeting was cut by GPT's cards: ${JSON.stringify(s)}`)
   }],
+  ['current_sessions_join_own_sessions', async e => {
+    // Cursor 这类多模型宿主的 current 会话：和她自己的会话一起演，谁也不盖掉谁（先到后到都一样）
+    e.run(`setSessions('gpt', sess(['s1','writing'])); setSessions('current', sess(['x1','reading']))`)
+    await e.advance(2000)
+    let s = e.state()
+    assert(s.multi && s.cards === 2, `current overwrote GPT's own sessions: ${JSON.stringify(s)}`)
+    e.run(`setSessions('gpt', sess(['s1','running']))`)   // 下一次轮询她自己的会话：current 那张还在
+    await e.advance(500)
+    s = e.state()
+    assert(s.multi && s.cards === 2, `own sessions overwrote current: ${JSON.stringify(s)}`)
+  }],
   ['restored_listening_moves_on_to_thinking', async e => {
     e.run(`hook('claude','listening','UserPromptSubmit'); setCharacter('claude')`)   // Windows 跟着最新的事件换角色
     await e.advance(5000)
@@ -585,6 +596,16 @@ const multiCases = [
     e.run(`applyCharState('current', { pose: 'writing', event: 'PreToolUse', ts: Date.now() / 1000 })`)
     await e.advance(500)
     assert(e.state().pose === 'writing', `current swallowed with the switch on: ${e.state().pose}`)
+  }],
+  ['current_sessions_no_extra_pet', async e => {
+    // 开关开着：current 会话（client 是 cursor）不算主桌宠角色的另一个客户端，不冒一只永远没状态的；由主桌宠演
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['d1','writing','claude-desktop'])); setSessions('current', csess(['x1','reading','cursor']))`)
+    await e.advance(3000)
+    assert((lastCompanions(e) || []).length === 0, `extra pet for current: ${JSON.stringify(lastCompanions(e))}`)
+    const s = e.state()
+    assert(s.multi && s.cards === 2, `main does not show current sessions: ${JSON.stringify(s)}`)
   }],
   ['no_client_files_fallback', async e => {
     // 旧钩子：会话没有 client、没有 @ 状态文件 → 只有一只 Claude，主桌宠照旧按 <角色>-state.json 演（Review Focus 1）

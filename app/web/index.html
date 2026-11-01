@@ -1194,13 +1194,14 @@ applyFxRate()
 // 外壳把 <角色>-sessions.json（{会话id: {pose, event, ts}}）交过来。两个以上同时在干活时她「手忙脚乱」：
 // 左右两帧来回切（busy_left / busy_right；三个以上换更崩溃的 swamped_*），每个对话一张小卡片演它正在做的事，
 // 她转向哪边，哪边的卡片就亮。干完的卡片打绿勾、出错的变红抖一下，停几秒后消失；有对话在等你回答时她换成「等你回答」
-const sessions = {}         // 角色 → {会话id: {pose, event, ts}}
+// sessions.current 是多模型宿主（Cursor 等）认不出角色的那些模型的会话（current-sessions.json），不改名、单独放：
+// 它们归主桌宠演（设计第一节），不算主桌宠角色的另一个客户端，不进多桌宠的判断，也不盖掉她自己的会话
+const sessions = {}         // 角色（或 'current'）→ {会话id: {pose, event, ts}}
 const SESSION_DONE_SHOW = 4  // 干完 / 出错的卡片停几秒
 const SESSION_FLIP = 1500    // 左右两帧多久换一次
 let multi = null             // 正在演：{ side, flipTimer, cards: Map(会话id → {el, pose, shownAt, pending}), order: [会话id] }
 
 function setSessions(id, map) {
-  if (id === 'current') id = charId
   sessions[id] = map || {}
   updateCompanions()   // 先算主桌宠占着哪个客户端，refreshMulti 只演那个客户端的会话
   refreshMulti()
@@ -1213,11 +1214,12 @@ function sessionKind(e, now) {
   if (e.pose === 'idle' || e.pose === 'sleeping') return null
   return age < STUCK_AFTER / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
 }
-// 当前角色要演的会话：她自己的，加上她响应的各家 AI 的（会话 id 各家不重复，直接合在一起）
+// 当前角色要演的会话：她自己的，加上她响应的各家 AI 的，再加上 current 的（会话 id 各家不重复，直接合在一起）。
+// current 的整个归主桌宠，不按她占着的客户端筛
 function currentSessions() {
   const out = { ...claimedOnly(charId, sessions[charId] || {}) }
-  for (const [host, map] of Object.entries(sessions)) if (standsIn(host)) Object.assign(out, map)
-  return out
+  for (const [host, map] of Object.entries(sessions)) if (host !== 'current' && standsIn(host)) Object.assign(out, map)
+  return Object.assign(out, sessions.current || {})
 }
 function refreshMulti() {
   const map = currentSessions(), now = Date.now() / 1000
@@ -1595,7 +1597,9 @@ function updateCompanions() {
   if (!companionsRunning()) { if (role === 'main' && !multiPets.on && sentCompanions !== null) windDownCompanions(); return }
   const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}
   // 没有立绘的角色（没装 / 彩蛋）开不了窗口，不算
-  const clients = Companions.clientsOf(sessions, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
+  // current 的会话不按角色分，归主桌宠演，不进判断（不会冒出一只主桌宠角色、永远没有状态的）
+  const { current: _current, ...byChar } = sessions
+  const clients = Companions.clientsOf(byChar, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
   claim = Companions.mainClaim({ mainCharacter: main, foreground, clients, last: claim, nowMs })
   if (nowMs < companionsReadyAt) return
   const reactTo = chars[main]?.reactTo

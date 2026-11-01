@@ -110,7 +110,7 @@
   // - 主桌宠占着的 claimKey、reactTo 代演的角色（coveredByStandIn）不出现
   // - 额外那只：没占着的客户端干活就出现；auto 下「不干活」和「不在 AI 软件里」同时成立满 LEAVE_AFTER 才走
   //   （从两者中较晚开始的那一刻起算；停下的时刻按 decide 第一次看到她不干活记，存在 state.idleSince）；
-  //   stay 下只在会话全部消失、或有窗口的程序关掉（running 非 null 且不含她）时走
+  //   stay 下只在会话全部消失、或有窗口的程序关掉（在 running 里见过、现在不含她；记在 state.runningSeen）时走
   // - 会话全部消失（上次站着、这次 clients 里没有她的 key；SessionEnd 会从会话表里删掉会话）立刻走
   // - 集合来的每个角色一只，不按上面的规则走，解散（不在 gathered 里）才走；
   //   她的角色有客户端开始干活、而且那个客户端没有自己的那只时，收编它（key / client 换成那个客户端）。
@@ -139,8 +139,13 @@
       if (h.sawIdle && c.lastTs * 1000 > h.t) continue
       sentHome[key] = { t: h.t, sawIdle: h.sawIdle }
     }
-    // stay 下有窗口的程序关掉了（running 非 null 且不含她）：也算挡住，不然第 1 步刚让她走、第 4 步看她还在干活又冒出来
-    const programClosed = c => rest === 'stay' && running != null && !isCli(c) && !running.has(c.key)
+    // 外壳只报它认得的程序：在 running 里见过的 key 才知道她的程序开没开着。见过一次就一直记着（走了也不删：
+    // 删了下一轮就成了「没见过」，她还在干活又会冒出来）；程序再打开时 key 回到 running，自然不算关掉
+    const runningSeen = new Set(p.runningSeen || [])
+    if (running != null) for (const key of running) runningSeen.add(key)
+    // stay 下有窗口的程序关掉了（见过、现在 running 里没有）：也算挡住，不然第 1 步刚让她走、第 4 步看她还在干活又冒出来。
+    // 从没见过的（外壳认不出的程序）和命令行一样只看 SessionEnd
+    const programClosed = c => rest === 'stay' && running != null && !isCli(c) && runningSeen.has(c.key) && !running.has(c.key)
     const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null || programClosed(c)
 
     // 1. 上次站着的：先定谁留谁走
@@ -212,7 +217,7 @@
     const gatherKeys = {}
     for (const pet of kept) if (pet.via === 'gather') gatherKeys[pet.character] = pet.client ? pet.key : null
 
-    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, idleSince, sentHome, gatherKeys } }
+    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, idleSince, sentHome, gatherKeys, runningSeen: [...runningSeen] } }
   }
 
   const api = {
