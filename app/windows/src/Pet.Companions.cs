@@ -23,7 +23,8 @@ namespace CrossPet
         bool pageGathering;          // 页面说正集合着（companions 消息里的 gathering）：菜单显示「解散」，开关关着时也转发
         bool eggAllowed = true;      // 有别的桌宠在场时页面发 false：「召唤彩蛋」变灰
         object friendshipRows;       // 主桌宠页面最后一次发来的友谊行，推给设置页
-        readonly Dictionary<string, string> quotaCode = new Dictionary<string, string>();   // 「角色|函数名」→ 最后一次额度调用
+        readonly Dictionary<string, (long seq, string code)> quotaCode = new Dictionary<string, (long seq, string code)>();   // 「角色|函数名」→ 最后一次额度调用和它的先后序号
+        long quotaSeq;
         readonly Dictionary<string, (string json, string pose, DateTime at)> clientStates = new Dictionary<string, (string, string, DateTime)>();
         readonly Dictionary<string, (string json, string pose, DateTime at)> charStates = new Dictionary<string, (string, string, DateTime)>();
         readonly HashSet<string> clientStateSeen = new HashSet<string>();   // 读到过按客户端状态的角色（之后不再把按角色的那份给额外那只）
@@ -313,12 +314,12 @@ namespace CrossPet
         {
             Js(code);
             var paren = code.IndexOf('(');
-            quotaCode[character + "|" + (paren < 0 ? code : code.Substring(0, paren))] = code;
+            quotaCode[character + "|" + (paren < 0 ? code : code.Substring(0, paren))] = (++quotaSeq, code);
             foreach (var c in companions.Values.Where(c => c.Character == character && c.Quota)) c.Js(code);
         }
-        /// <summary>这个角色记下的所有额度调用（新开的那只、额度刚归她时补一遍）</summary>
+        /// <summary>这个角色记下的所有额度调用（新开的那只、额度刚归她时补一遍）：按主桌宠收到的先后补，不按函数名排</summary>
         internal IEnumerable<string> QuotaCodes(string character) =>
-            quotaCode.Where(kv => kv.Key.StartsWith(character + "|", StringComparison.Ordinal)).OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => kv.Value).ToList();
+            quotaCode.Where(kv => kv.Key.StartsWith(character + "|", StringComparison.Ordinal)).OrderBy(kv => kv.Value.seq).Select(kv => kv.Value.code).ToList();
 
         /// <summary>新开的那只页面加载完（或换了客户端）：会话、状态、额度先补一遍</summary>
         internal void FeedCompanion(Companion c)

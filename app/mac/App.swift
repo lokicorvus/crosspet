@@ -137,7 +137,8 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var clientStates: [String: (text: String, at: Date)] = [:]   // key → 最后一次按客户端的状态（新开的窗口先演上）
     var charStates: [String: (text: String, at: Date)] = [:]     // 角色 → 最后一次按角色的状态（旧钩子没有按客户端的那份时给额外那只）
     var sessionsText: [String: String] = [:]  // 角色 → 最后一次的会话表（按客户端过滤后给额外那只）
-    var quotaCode: [String: String] = [:]     // 角色 → 最后一次给主桌宠的额度调用（显示额度的那只照样来一遍）
+    var quotaCode: [String: (seq: Int, code: String)] = [:]   // 「角色|函数名」→ 最后一次给主桌宠的额度调用和它的先后序号（显示额度的那只照样来一遍）
+    var quotaSeq = 0
     var sentRunning: String?
 
     // 反馈问题 用的

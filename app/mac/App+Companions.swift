@@ -295,12 +295,13 @@ extension App {
         js(code)
         // 按「角色 + 函数」记：GPT 的 setQuota（额度文件）和 setCodexQuota（问 Codex 服务）不互相盖掉
         let fn = code.prefix { $0 != "(" }
-        quotaCode["\(character)|\(fn)"] = code
+        quotaSeq += 1
+        quotaCode["\(character)|\(fn)"] = (quotaSeq, code)
         for c in companions.values where c.character == character && c.quota { c.js(code) }
     }
-    /// 这个角色记下的所有额度调用（新开的那只、额度刚归她时补一遍）
+    /// 这个角色记下的所有额度调用（新开的那只、额度刚归她时补一遍）：按主桌宠收到的先后补，不按函数名排
     func quotaCodes(_ character: String) -> [String] {
-        quotaCode.filter { $0.key.hasPrefix(character + "|") }.sorted { $0.key < $1.key }.map { $0.value }
+        quotaCode.filter { $0.key.hasPrefix(character + "|") }.map { $0.value }.sorted { $0.seq < $1.seq }.map { $0.code }
     }
 
     /// 新开的那只页面加载完（或换了客户端）：会话、状态、额度先补一遍
