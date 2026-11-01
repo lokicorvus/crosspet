@@ -74,3 +74,12 @@ test('峰谷时段那条说明换衣服在「角色」页选（1.3.8 从额度�
   const item = W.LIST.flatMap(v => v.items).find(i => i.title === '峰谷时段')
   assert.match(item.text, /「角色」页/)
 })
+
+test('多桌宠那条：在下一版里，「去设置 ›」跳到「角色」页的开关', () => {
+  const v = W.LIST.find(v => v.items.some(i => i.title === '多桌宠'))
+  assert.ok(v, '有「多桌宠」这一条')
+  assert.ok(W.newer(v.version, '1.3.8'), v.version)
+  const item = v.items.find(i => i.title === '多桌宠')
+  assert.deepStrictEqual(item.go, { tab: 'character', key: 'multiPets' })
+  assert.match(item.text, /集合/)
+})
