@@ -395,6 +395,9 @@ const multiCases = [
     await c.advance(100)
     const line = c.state().bubble
     assert(line, 'no bye line')
+    assert(/m-bob|m-leave/.test(c.run(`$('body').className`)), `no bye motion: ${c.run(`$('body').className`)}`)
+    await c.advance(500)
+    assert(c.run(`$('body').className`) === 'm-leave', `no leave motion before the poof: ${c.run(`$('body').className`)}`)
     assert(!c.msgs().some(m => m.gone), 'gone before the bye line was shown')
     c.run(`say('别的话'); leaveNow()`)   // 道别时别的话盖不掉；再调一次也只走一次
     assert(c.state().bubble === line, `bye line replaced: ${c.state().bubble}`)
@@ -453,6 +456,70 @@ const multiCases = [
     e.run(`notePat('claude')`)
     assert(Object.keys(friendStore(e)).length === 1, `extra pairs: ${JSON.stringify(friendStore(e))}`)
   }],
+  ['cofinish_same_pair_not_repeated', async e => {
+    // 前后脚干完记过一次后，这一对的「干完时间」清掉：同一对在 5 分钟内不能再靠一个人干完反复 +2
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['d1','writing','claude-desktop'])); setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(100)
+    const base = friendStore(e)['claude+gpt'].points
+    e.run(`setSessions('gpt', csess(['s1','happy','codex','Stop']))`)
+    await e.advance(30000)
+    e.run(`setSessions('claude', csess(['d1','happy','claude-desktop','Stop']))`)
+    await e.advance(100)
+    assert(friendStore(e)['claude+gpt'].points === base + 2, `cofinish: ${JSON.stringify(friendStore(e))}`)
+    e.run(`setSessions('gpt', csess(['s1','writing','codex']))`)
+    await e.advance(30000)
+    e.run(`setSessions('gpt', csess(['s1','happy','codex','Stop']))`)
+    await e.advance(100)
+    assert(friendStore(e)['claude+gpt'].points === base + 2, `cofinish repeated: ${JSON.stringify(friendStore(e))}`)
+  }],
+  ['friendship_rows_sent_after_init', async e => {
+    // 重启后开关关着：主桌宠页面 init 完把存着的友谊交一次给外壳（设置页显示灰的列表）；额外那只不发
+    const seeded = page => page.run(`localStorage.setItem('crosspet-friendship', JSON.stringify(Friendship.award({}, 'claude', 'gpt', 'cofinish', Date.now())))`)
+    const f = makePage()
+    seeded(f)
+    f.run(`init(${JSON.stringify(manifest())})`)
+    await f.advance(1000)
+    const sent = f.msgs().filter(m => 'friendship' in m)
+    assert(sent.length === 1 && sent[0].friendship.length === 1 && sent[0].friendship[0].label.includes('Claude'), `main: ${JSON.stringify(sent)}`)
+    f.run(`init(${JSON.stringify(manifest())})`)   // 换衣服时外壳会重新 init：不重复发
+    await f.advance(1000)
+    assert(f.msgs().filter(m => 'friendship' in m).length === 1, `re-sent on re-init: ${JSON.stringify(f.msgs())}`)
+    const g = makePage()   // 存储是空的：不发
+    g.run(`init(${JSON.stringify(manifest())})`)
+    await g.advance(1000)
+    assert(!g.msgs().some(m => 'friendship' in m), `empty store sent: ${JSON.stringify(g.msgs())}`)
+    const c = makePage()
+    seeded(c)
+    c.run(`setRole('companion', { id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', client: 'codex', label: '' })`)
+    c.run(`init(${JSON.stringify(manifest())})`)
+    await c.advance(1000)
+    assert(!c.msgs().some(m => 'friendship' in m), `companion sent friendship: ${JSON.stringify(c.msgs())}`)
+  }],
+  ['companion_first_character_gets_entrance', async e => {
+    // 额外那只的角色正好是清单里排第一的（claude）：init 不能先悄悄换上她，让外壳的 setCharacter 成了空操作、没有噗和招呼
+    const c = makePage()
+    c.run(`setRole('companion', { id: 'claude@claude-cli', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', label: '' })`)
+    c.run(`var __poofs = 0; { const p = $('poof'), add = p.classList.add.bind(p.classList); p.classList.add = (...a) => { if (a.includes('go')) __poofs++; return add(...a) } }`)
+    c.run(`init(${JSON.stringify(manifest())}); setCharacter('claude')`)
+    await c.advance(1000)
+    assert(c.state().charId === 'claude', `charId: ${c.state().charId}`)
+    assert(c.run('__poofs') >= 1, 'no poof for the first character')
+    assert(c.says().some(x => x.line === 'Claude hello'), `no greeting: ${JSON.stringify(c.says())}`)
+    assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
+  }],
+  ['send_home_prefers_window_id', async e => {
+    // 窗口 id 和别的那只的 key 撞了（集合接管后 id 留着旧 key）：先按 id 认
+    await multiOn(e, 'gpt')
+    e.run(`var __sent = []; { const sh = Companions.sendHome; Companions.sendHome = (s, k, t) => { __sent.push(k); return sh(s, k, t) } }`)
+    e.run(`companionsState = { pets: [
+      { id: 'claude@claude-cli#2', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', via: 'work', quota: false },
+      { id: 'claude@claude-cli', key: 'claude@claude-desktop', character: 'claude', client: 'claude-desktop', via: 'gather', quota: true },
+    ], awaySince: null, idleSince: {}, sentHome: {}, gatherKeys: {} }`)
+    e.run(`sendHome('claude@claude-cli')`)
+    assert(JSON.stringify(e.run('__sent')) === '["claude@claude-desktop"]', `sent home: ${JSON.stringify(e.run('__sent'))}`)
+  }],
   ['multi_off_untouched', async e => {
     // 开关关着：会话、按客户端的状态、前台、集合都来了，也不发任何多桌宠消息，主桌宠照旧演
     e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setSessions('claude', csess(['c1','reading','claude-cli']))`)
@@ -507,6 +574,17 @@ const multiCases = [
     e.run(`applyClientState('claude', 'claude-desktop', { pose: 'reading', event: 'PreToolUse', ts: Date.now() / 1000 })`)
     await e.advance(3000)
     assert(e.state().pose === 'reading', `main ignores her claimed client: ${e.state().pose}`)
+  }],
+  ['unknown_model_current_played_by_main', async e => {
+    // 多模型宿主里没有对应角色的模型（current-state.json）：开关开着、主桌宠的角色已有按客户端的状态时也由主桌宠演（设计第一节）
+    await multiOn(e, 'claude')
+    e.run(`setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    e.run(`setSessions('claude', csess(['d1','idle','claude-desktop']))`)
+    e.run(`applyClientState('claude', 'claude-desktop', { pose: 'idle', event: 'Stop', ts: Date.now() / 1000 })`)
+    await e.advance(3000)
+    e.run(`applyCharState('current', { pose: 'writing', event: 'PreToolUse', ts: Date.now() / 1000 })`)
+    await e.advance(500)
+    assert(e.state().pose === 'writing', `current swallowed with the switch on: ${e.state().pose}`)
   }],
   ['no_client_files_fallback', async e => {
     // 旧钩子：会话没有 client、没有 @ 状态文件 → 只有一只 Claude，主桌宠照旧按 <角色>-state.json 演（Review Focus 1）

@@ -776,8 +776,24 @@ function init(m) {
   // 正在换角色、要换上的那个还在新清单里：让它换完（换衣服时外壳会重新 init）
   if (characterTarget && manifest.characters[characterTarget]) return
   if (characterTarget) { ++characterGeneration; clearTimeout(characterTimer); characterTimer = null; characterTarget = null; $('stage').classList.remove('swap') }
-  if (!charId || !manifest.characters[charId]) setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
-  else { $('caption').textContent = char().name }
+  if (!charId || !manifest.characters[charId]) {
+    // 额外那只：直接换上外壳要的角色、不 quiet（噗一下、说登场招呼）。不能先悄悄换上排第一的：
+    // 她正好是排第一的那个时，外壳接着的 setCharacter(同一个) 就成了空操作，没有噗也没有招呼
+    const want = role === 'companion' && roleInfo?.character
+    if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want)
+    else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
+  } else { $('caption').textContent = char().name }
+  sendStoredFriendship()
+}
+// 主桌宠页面第一次 init 完：存着友谊就交一次给外壳（不管开关开没开），重启后开关关着设置页也能显示灰的列表。额外那只不发
+let storedFriendshipSent = false
+function sendStoredFriendship() {
+  if (role !== 'main' || storedFriendshipSent) return
+  storedFriendshipSent = true
+  const store = friendStoreRead()
+  if (!Object.keys(store).length) return
+  const names = Object.fromEntries(Object.entries(manifest.characters || {}).map(([id, c]) => [id, c.name]))
+  toShell({ friendship: Friendship.rows(store, names) })
 }
 
 // 登场台词冷却：同一个角色 30 分钟内只打一次招呼，在几个 AI 的 App 之间来回切时不用每次都听「XX 来了」
@@ -1339,7 +1355,9 @@ function diagnoseDisplay() {
   }
 }
 function applyCharState(id, s) {
-  if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
+  // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由主桌宠（当前角色）来演。
+  // 要先于 playsByClient 判断：外壳不转发 current@* 文件，换成角色名再判会被当成「改由按客户端那份演」吞掉（设计第一节：未知模型算主桌宠占着的客户端）
+  if (id === 'current') { playCharState(charId, s); return }
   // 多桌宠打开、这个角色有按客户端的状态：主桌宠改由 applyClientState 只演她占着的那个客户端（按角色的这份谁最后写就是谁的）
   if (playsByClient(id)) { noteVerdict(id, s, 'by-client'); return }
   playCharState(id, s)
@@ -1435,7 +1453,7 @@ const companionsActive = () => role === 'main' && multiPets.on
 // 集合不受开关限制：开关关着时只要还有集合来的（或正在走的），也照样算、照样发
 const companionsRunning = () => role === 'main' && (multiPets.on || gathered.length > 0 || !!companionsState?.pets.length)
 const companionsAround = () => role === 'main' && !!companionsState?.pets.length
-const isCliClient = (character, client) => Companions.CLI_CLIENTS.has(client) || (character === 'claude' && client === 'claude')
+const isCliClient = (character, client) => Companions.isCli({ character, client })
 // 主桌宠只演她占着的那个客户端：这个角色有按客户端的状态时，按角色那份（applyCharState）不演
 const playsByClient = id => companionsActive() && !!clientStateSeen[id] && (id === mainCharacter() || standsIn(id))
 // 多会话卡片也只显示主桌宠占着的那个客户端的会话
@@ -1450,6 +1468,8 @@ function companionLabel(p, pets, main) {
 }
 
 // 由外壳调：这个页面是主桌宠还是额外那只（默认主桌宠）
+// 外壳必须在 init 之前调 setRole('companion', …)：init 按 role 决定换上哪个角色、要不要交存着的友谊，
+// 晚了页面会按主桌宠演登场招呼、写共用的 crosspet-greeted
 // 额外那只（'companion'）：info = { id, key, character, client, label }；只显示、不做只该做一次的事（各函数开头 role !== 'main' 就返回），
 // 不写 localStorage；摸头、红温、气泡照常。label 显示在名字下面
 function setRole(r, info) {
@@ -1463,9 +1483,9 @@ let leavingNow = false
 function leaveNow() {
   if (leavingNow) return
   leavingNow = true
-  clearTimeout(thinkTimer); clearTimeout(pending); clearTimeout(revertTimer); clearTimeout(stuckTimer)
-  farewellLine = pick(linesOf('bye') || ['拜拜～']) || '拜拜～'   // 道别时别的话盖不掉（见 say）
-  say(farewellLine)
+  clearTimeout(pending); clearTimeout(revertTimer)
+  // 和从菜单退出一样：收起多会话卡片、挥手（bye 姿态）、最后转身走开，再冒烟。道别时别的话盖不掉（见 say）
+  farewell(pick(linesOf('bye') || ['拜拜～']) || '拜拜～', LEAVE_BYE_MS)
   setTimeout(() => {
     $('bubble').classList.add('hide')
     const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
@@ -1537,7 +1557,8 @@ function dismiss() {
 // 「让她先回去」：外壳按窗口的 id 交来（给 key 也认）。集合来的同时从集合里去掉
 function sendHome(k) {
   if (!companionsRunning() || !companionsState) return
-  const p = companionsState.pets.find(x => x.id === k || x.key === k)
+  // 先按窗口 id 认，认不到再按 key：集合接管后 id 留着旧 key，可能正好是别的那只的 key
+  const p = companionsState.pets.find(x => x.id === k) || companionsState.pets.find(x => x.key === k)
   if (!p) return
   companionsState = Companions.sendHome(companionsState, p.key, Date.now())
   if (p.via === 'gather') gathered = gathered.filter(ch => ch !== p.character)
@@ -1663,7 +1684,9 @@ function noteFriendshipWork(clients, nowMs) {
     if (!friendWorking[ch] || working.includes(ch)) continue
     const partners = Object.keys(finishedAt).filter(o => o !== ch && nowMs - finishedAt[o] <= Friendship.COFINISH_MS)
     finishedAt[ch] = nowMs
-    if (partners.length) friendAward(partners.map(o => [ch, o]), 'cofinish')
+    if (!partners.length) continue
+    friendAward(partners.map(o => [ch, o]), 'cofinish')
+    for (const o of [ch, ...partners]) delete finishedAt[o]   // 记过的清掉（同 notePat）：同一对不能靠一个人反复干完一直 +2
   }
   for (const k of Object.keys(friendWorking)) delete friendWorking[k]
   for (const ch of present) friendWorking[ch] = working.includes(ch)

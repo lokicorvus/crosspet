@@ -401,3 +401,37 @@ test('workPets:false（开关关着只集合）→ 干活的客户端不冒；�
   assert.deepEqual(d.pets, [])
   assert.deepEqual(d.leaving, ['gpt@codex'])
 })
+
+test("rest:'stay'、running 不含她但还在干活：只走一次，之后不再冒出来（不会 bye / 再冒循环）", () => {
+  const base = { rest: 'stay', mainCharacter: 'gpt', claimKey: 'gpt@codex' }
+  const a = run({ ...base, clients: cl(0, desktopBusy(0)) })
+  assert.deepEqual(keys(a), ['claude@claude-desktop'])
+  const running = new Set(['gpt@codex'])
+  const b = run({ ...base, t: 1000, running, clients: cl(1000, desktopBusy(1000)), prev: a.state })
+  assert.deepEqual(keys(b), [])
+  assert.deepEqual(b.leaving, ['claude@claude-desktop'])
+  const c = run({ ...base, t: 2000, running, clients: cl(2000, desktopBusy(2000)), prev: b.state })
+  assert.deepEqual(keys(c), [])
+  assert.deepEqual(c.leaving, [])
+  const d = run({ ...base, t: 7000, running, clients: cl(7000, desktopBusy(7000)), prev: c.state })
+  assert.deepEqual(keys(d), [])
+  assert.deepEqual(d.leaving, [])
+})
+
+test("rest:'stay'：没有 client 的旧 gpt@gpt 算命令行，不看 running", () => {
+  const base = { rest: 'stay', mainCharacter: 'claude', claimKey: 'claude@claude-desktop' }
+  const old = t => ({ gpt: { s: { pose: 'running', ts: (NOW + t) / 1000 - 1 } } })
+  const a = run({ ...base, running: new Set(), clients: cl(0, old(0)) })
+  assert.deepEqual(keys(a), ['gpt@gpt'])
+  const b = run({ ...base, t: 1000, running: new Set(), clients: cl(1000, old(1000)), prev: a.state })
+  assert.deepEqual(keys(b), ['gpt@gpt'])
+  assert.deepEqual(b.leaving, [])
+})
+
+test('isCli：hermes 和各角色没有 client 的旧条目按默认接入算；claude-desktop / cursor 不算', () => {
+  assert.equal(C.CLI_CLIENTS.has('hermes'), true)
+  for (const ch of ['claude', 'gpt', 'deepseek', 'gemini', 'qwen', 'grok']) assert.equal(C.isCli({ character: ch, client: ch }), true, ch)
+  assert.equal(C.isCli({ character: 'claude', client: 'claude-desktop' }), false)
+  assert.equal(C.isCli({ character: 'claude', client: 'cursor' }), false)
+  assert.equal(C.isCli({ character: 'glm', client: 'glm' }), false)
+})

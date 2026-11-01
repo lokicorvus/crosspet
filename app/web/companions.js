@@ -13,7 +13,10 @@
   // 这些姿态不算干活；「等你回答」（asking）算
   const WORKING_EXCLUDED = new Set(['idle', 'sleeping', 'happy', 'proud', 'tired'])
   // 跑在终端里的客户端
-  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'grok'])
+  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'grok', 'hermes'])
+  // 没有 client 的旧条目（key 是 角色@角色）：这些角色默认接入的是命令行客户端
+  // （claude → Claude Code 命令行、gpt → codex，其余同名命令行）
+  const LEGACY_CLI_CHARACTERS = new Set(['claude', 'gpt', 'deepseek', 'gemini', 'qwen', 'grok'])
 
   // 一轮结束（Stop / SessionEnd）不管什么姿态都不算干活：被打断、出错收尾时钩子会写 oops / surprised + Stop。
   // 一轮中途的 oops（比如 PostToolUseFailure）还算干活。
@@ -24,9 +27,9 @@
     return ageMs < (s.pose === 'asking' ? CLI_RECENT : STUCK_AFTER)
   }
 
-  // 命令行客户端；没有 client 的旧 Claude 条目（claude@claude）按设计算 claude-cli
+  // 命令行客户端；没有 client 的旧条目（客户端就是角色名，比如 claude@claude、gpt@gpt）按角色默认接入的那个算
   function isCli(c) {
-    return CLI_CLIENTS.has(c.client) || (c.character === 'claude' && c.client === 'claude')
+    return CLI_CLIENTS.has(c.client) || (c.client === c.character && LEGACY_CLI_CHARACTERS.has(c.character))
   }
 
   // sessionsByChar: { 角色: { 会话 id: { pose, event, ts(秒), client? } } }
@@ -136,7 +139,9 @@
       if (h.sawIdle && c.lastTs * 1000 > h.t) continue
       sentHome[key] = { t: h.t, sawIdle: h.sawIdle }
     }
-    const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null
+    // stay 下有窗口的程序关掉了（running 非 null 且不含她）：也算挡住，不然第 1 步刚让她走、第 4 步看她还在干活又冒出来
+    const programClosed = c => rest === 'stay' && running != null && !isCli(c) && !running.has(c.key)
+    const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null || programClosed(c)
 
     // 1. 上次站着的：先定谁留谁走
     // 额外那只停下的时刻：这一次调用才发现她不干活就记成 nowMs（3 分钟兜底判停也一样，不按旧的 lastTs 倒推）
@@ -157,8 +162,8 @@
       }
       const c = byKey.get(pet.key)
       let go = !workPets || !c || blocked(c)
-      if (!go && rest === 'stay') go = running != null && !isCli(c) && !running.has(pet.key)
-      else if (!go && !c.working) {
+      // stay 下不按「不干活、不在 AI 软件里」走（程序关掉已经算进 blocked）
+      if (!go && rest !== 'stay' && !c.working) {
         const prevIdle = p.idleSince && p.idleSince[pet.key]
         idleSince[pet.key] = prevIdle != null ? prevIdle : nowMs
         // 两条都不满足（不干活、不在 AI 软件里）持续 LEAVE_AFTER：从较晚的那个时刻起算
@@ -213,7 +218,7 @@
   const api = {
     STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    clientsOf, mainClaim, inAISoftware, decide, sendHome,
+    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api
