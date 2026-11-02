@@ -195,25 +195,28 @@ const cases = [
     assert(sw(p).checked, '开关该是开的')
     assert(!hidden(p.$('mainPetRow')) && !hidden(p.$('petsRestRow')), '开着时两个选项该显示')
   }],
-  ['友谊两行：每行名字 + 五颗心，x.5 才有半颗心', p => {
-    p.push({ multiPets: true, friendship: ROWS })
+  ['友谊两行：两个头像框、名字和关系、10 颗像素心（半档 = 一颗）', p => {
+    p.push({ multiPets: true, friendship: ROWS, characters: [{ id: 'claude', name: 'Claude', images: { avatar: 'file:///c/avatar.webp' } }, { id: 'gpt', name: 'GPT', images: { idle: 'file:///g/idle.webp' } }] })
     assert(!hidden(p.$('friendship')), '开着、有记录时友谊区该显示')
     const rows = p.$('friendRows').querySelectorAll('.friend')
     assert(rows.length === 2, '该有两行，实际 ' + rows.length)
-    const VS15 = '\ufe0e'
-    assert(rows[0].querySelector('.friend-name').textContent === 'Claude ♥' + VS15 + ' GPT' && rows[1].querySelector('.friend-name').textContent === '小鲸 ♥' + VS15 + ' GPT', '名字不对（♥ 后该带 U+FE0E 按文字画）：' + JSON.stringify(rows[0].querySelector('.friend-name').textContent))
-    const count = (r, cls) => r.querySelectorAll('.heart' + cls).length
-    assert(r0ok(), '第一行心不对')
-    function r0ok() { const r = rows[0]; return r.querySelectorAll('.heart').length === 5 && count(r, '.full') === 2 && count(r, '.half') === 1 }
-    assert(rows[1].querySelectorAll('.heart').length === 5 && count(rows[1], '.full') === 1 && count(rows[1], '.half') === 0, '第二行心不对')
-    assert(rows[0].querySelectorAll('.heart.full')[0].textContent === '♥\ufe0e', '整颗心用 ♥（按文字画）')
+    const name = r => r.querySelector('.friend-name').textContent
+    assert(name(rows[0]) === 'Claude & GPT好朋友' && name(rows[1]) === '小鲸 & GPT认识了', '名字 / 关系不对（名字用 label，改过的名字也跟着）：' + JSON.stringify([name(rows[0]), name(rows[1])]))
+    const faces = rows[0].querySelectorAll('.friend-face')
+    assert(faces.length === 2, '每行两个头像框')
+    assert(faces[0].querySelector('img').getAttribute('src') === 'file:///c/avatar.webp' || faces[0].querySelector('img').src === 'file:///c/avatar.webp', '有探头头像用头像')
+    assert((faces[1].querySelector('img').src || faces[1].querySelector('img').getAttribute('src')) === 'file:///g/idle.webp', '没有头像退到待机图')
+    assert(!rows[1].querySelectorAll('.friend-face')[0].querySelector('img'), '外壳没给图的角色只留空框')
+    const on = r => r.querySelectorAll('.pixel-heart.on').length
+    assert(rows[0].querySelectorAll('.pixel-heart').length === 10 && on(rows[0]) === 5, '2.5 该是 10 颗里亮 5 颗')
+    assert(rows[1].querySelectorAll('.pixel-heart').length === 10 && on(rows[1]) === 2, '1 该是亮 2 颗')
     assert(!/\d/.test(p.$('friendRows').textContent), '不显示数字')
   }],
-  ['满心 5 颗、0 颗都画五个位置', p => {
+  ['满心、半颗都画 10 个位置', p => {
     p.push({ multiPets: true, friendship: [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 5 }, { a: 'claude', b: 'deepseek', label: 'Claude ♥ 小鲸', hearts: 0.5 }] })
     const rows = p.$('friendRows').querySelectorAll('.friend')
-    assert(rows[0].querySelectorAll('.heart.full').length === 5 && rows[0].querySelectorAll('.heart.half').length === 0, '5 颗心该全满')
-    assert(rows[1].querySelectorAll('.heart.full').length === 0 && rows[1].querySelectorAll('.heart.half').length === 1 && rows[1].querySelectorAll('.heart').length === 5, '0.5 该是一颗半心')
+    assert(rows[0].querySelectorAll('.pixel-heart.on').length === 10 && rows[0].textContent.includes('挚友'), '5 该是 10 颗全亮、挚友')
+    assert(rows[1].querySelectorAll('.pixel-heart.on').length === 1 && rows[1].querySelectorAll('.pixel-heart').length === 10, '0.5 该是亮 1 颗')
   }],
   ['没有记录：整块不显示', p => {
     p.push({ multiPets: true, friendship: [] })

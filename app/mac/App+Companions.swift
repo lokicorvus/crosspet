@@ -179,12 +179,12 @@ extension App {
         c.leave()
     }
 
-    /// 额度庆祝交给显示这个角色额度的那只演；只认 celebrate
+    /// 主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）；别的不认
     func companionCall(_ call: [String: Any]) {
-        guard let id = call["id"] as? String, call["fn"] as? String == "celebrate", let args = call["args"] as? [Any],
+        guard let id = call["id"] as? String, let fn = call["fn"] as? String, ["celebrate", "chat"].contains(fn), let args = call["args"] as? [Any],
               let c = companions[id], let data = try? JSONSerialization.data(withJSONObject: args),
               let json = String(data: data, encoding: .utf8) else { return }
-        c.js("celebrate.apply(null, \(json))")
+        c.js("\(fn).apply(null, \(json))")
     }
 
     func companionClosed(_ c: Companion) {

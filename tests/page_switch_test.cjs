@@ -111,7 +111,7 @@ function makePage() {
   ctx.globalThis = ctx
   vm.createContext(ctx)
   vm.runInContext('Math.random = () => 0.99', ctx)   // 不随机出闲时小动作、彩蛋
-  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js'])
+  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js', 'pair-chat.js'])
     vm.runInContext(fs.readFileSync(path.join(WEB, f), 'utf8'), ctx, { filename: f })
   const html = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8').replace(/\r\n/g, '\n')
   const start = html.lastIndexOf('<script>\n'), end = html.lastIndexOf('</script>')
@@ -441,6 +441,46 @@ const multiCases = [
     e.run(`pageHidden = false`)
     await e.advance(10 * 60000)
     assert(friendStore(e)['gpt+grok']?.points === 1, `corrupt store: ${JSON.stringify(friendStore(e))}`)
+  }],
+  ['pair_chat_gather', async e => {
+    e.run(`pageHidden = false; Math.random = () => 0`)   // 掷骰子都取 0：第一对（claude+gpt）、第一档第一段
+    e.run(`globalThis.__said = []; { const o = say; say = l => { if (l) __said.push(l); return o(l) } }`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    const calls = () => e.msgs().filter(m => m.companionCall?.fn === 'chat')
+    await e.advance(65000)
+    const [[w1, l1], [w2, l2]] = e.run(`PairChat.LINES['claude+gpt'][0][0]`)
+    const main = e.run(`mainCharacter()`)
+    // 一句由额外那只说（外壳转 companionCall），一句由主桌宠自己说，先后隔 REPLY_MS
+    const [other, own, otherLine, ownLine] = w1 === main ? [w2, w1, l2, l1] : [w1, w2, l1, l2]
+    assert(own === main, `precondition: main ${main} not in claude+gpt`)
+    const otherId = e.run(`companionsState.pets.find(p => p.character === '${other}').id`)
+    assert(calls().length === 1 && calls()[0].companionCall.id === otherId && calls()[0].companionCall.args[0] === otherLine, `companion line: ${JSON.stringify(calls())}`)
+    assert(e.run(`__said`).includes(ownLine), `main line: ${JSON.stringify(e.run(`__said`))}`)
+    await e.advance(7000)
+    assert(e.state().bubble !== ownLine, 'own line not cleared')
+    // 12 分钟内不再说；之后再说时换一段
+    await e.advance(10 * 60000)
+    assert(calls().length === 1, `chatted again too soon: ${calls().length}`)
+    await e.advance(3 * 60000)
+    const later = e.msgs().filter(m => m.companionCall?.fn === 'chat').length + (e.state().bubble ? 1 : 0)
+    assert(later >= 1, 'no second chat')
+    // 主桌宠在干活：她不说（也不挑她）
+    e.run(`hook('${main}','writing','PreToolUse')`)
+    await e.advance(100)
+    e.run(`chat('不该说')`)
+    assert(e.state().bubble !== '不该说', 'chatted while working')
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
+  ['companion_chat_line', async e => {
+    const c = await rolePage('companion')
+    c.run(`setCharacter('gpt', true)`)
+    await c.advance(1000)
+    c.run(`chat('一起喝茶？')`)
+    assert(c.state().bubble === '一起喝茶？', `companion bubble: ${c.state().bubble}`)
+    await c.advance(6500)
+    assert(c.state().bubble !== '一起喝茶？', 'companion chat not cleared')
+    assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
   }],
   ['friendship_cowork_cofinish_pats', async e => {
     await multiOn(e, 'claude')

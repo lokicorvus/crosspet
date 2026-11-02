@@ -142,12 +142,12 @@ namespace CrossPet
             c.Leave();
         }
 
-        /// <summary>额度庆祝交给显示这个角色额度的那只演；只认 celebrate</summary>
+        /// <summary>主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）；别的不认</summary>
         void CompanionCall(Dictionary<string, object> call)
         {
-            if (!(call.TryGetValue("id", out var iv) && iv is string id) || !(call.TryGetValue("fn", out var fn) && fn as string == "celebrate")
+            if (!(call.TryGetValue("id", out var iv) && iv is string id) || !(call.TryGetValue("fn", out var fv) && fv is string fn && (fn == "celebrate" || fn == "chat"))
                 || !(call.TryGetValue("args", out var av) && av is object[] args) || !companions.TryGetValue(id, out var c)) return;
-            c.Js($"celebrate.apply(null, {Store.Json.Serialize(args)})");
+            c.Js($"{fn}.apply(null, {Store.Json.Serialize(args)})");
         }
 
         internal void CompanionClosed(Companion c)

@@ -4,9 +4,9 @@
 <title>CrossPet 设置</title>
 <style>
 /* 和开发者控制台同一套配色；跟着系统深浅色 */
-:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; --heart: #e0607e; }
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; --heart: #e0303f; --heart-line: #5a1f1f; --heart-empty: #d9cfc4; --heart-empty-hi: #ebe3da; --frame: #a9744a; --frame-hi: #e7c59a; --face-bg: #f3e6d2; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; --heart: #e8708c; }
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; --heart: #ee3d4c; --heart-line: #1c0f0f; --heart-empty: #4a403a; --heart-empty-hi: #574c45; --frame: #8a5c38; --frame-hi: #b98b5e; --face-bg: #3a302a; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); }
@@ -85,13 +85,26 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .choices label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 .choices input[type=radio] { margin: 0; accent-color: var(--accent); }
 .card.dim { opacity: .5; }
-/* 她们的友谊：每对一行名字 + 五颗心；没满的那颗半亮（左半边亮） */
-.friend .label { flex: 1; }
+/* 她们的友谊：仿星露谷的好感度——左边两只的头像框，右边名字、关系，下面一排 10 颗像素心（亮的是红心，没到的是暗的空心） */
 #friendRows > .item:first-child { border-top: none; }
-.hearts { letter-spacing: 2px; font-size: 14px; white-space: nowrap; }
-.heart { color: var(--line); }
-.heart.full { color: var(--heart); }
-.heart.half { background: linear-gradient(90deg, var(--heart) 50%, var(--line) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.friend { gap: 12px; }
+.friend-faces { display: flex; flex: none; }
+.friend-face { width: 38px; height: 38px; box-sizing: border-box; border: 2px solid var(--frame); border-radius: 3px; background: var(--face-bg);
+  overflow: hidden; box-shadow: inset 0 0 0 1px var(--frame-hi); }
+.friend-face + .friend-face { margin-left: -6px; }
+.friend-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; transform: scale(1.35); transform-origin: 50% 85%; display: block; }
+.friend-text { flex: 1; min-width: 0; }
+.friend-name { font-weight: 600; }
+.friend-name small { font-weight: normal; color: var(--muted); margin-left: 6px; }
+.pixel-hearts { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+/* 一颗心三层，形状都是 HEART_PIXELS 生成的遮罩（--heart-o / --heart-f / --heart-s，脚本里设），颜色用配色变量，深浅色都跟着变 */
+.pixel-heart { position: relative; width: 18px; height: 16px; flex: none; background: var(--heart-line);
+  -webkit-mask: var(--heart-o) 0 0 / 100% 100% no-repeat; mask: var(--heart-o) 0 0 / 100% 100% no-repeat; }
+.pixel-heart::before, .pixel-heart::after { content: ''; position: absolute; inset: 0; }
+.pixel-heart::before { background: var(--heart-empty); -webkit-mask: var(--heart-f) 0 0 / 100% 100% no-repeat; mask: var(--heart-f) 0 0 / 100% 100% no-repeat; }
+.pixel-heart::after { background: var(--heart-empty-hi); -webkit-mask: var(--heart-s) 0 0 / 100% 100% no-repeat; mask: var(--heart-s) 0 0 / 100% 100% no-repeat; }
+.pixel-heart.on::before { background: var(--heart); }
+.pixel-heart.on::after { background: #fff; opacity: .75; }
 #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
 #toast.show { opacity: .92; }
 </style></head>
@@ -265,24 +278,61 @@ function renderMultiPets(s) {
   for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
   const rest = s.petsRest === 'stay' ? 'stay' : 'auto'
   for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
-  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–5、0.5 一档
+  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–5、0.5 一档，这里画成 10 颗整心（半档 = 一颗）
   const rows = Array.isArray(s.friendship) ? s.friendship : []
   $('friendship').classList.toggle('hidden', !seen || !rows.length)
   $('friendship').classList.toggle('dim', !on)
+  friendFaces = Object.fromEntries((s.characters || []).map(c => [c.id, { name: c.name || c.id, src: c.images?.avatar || c.images?.idle || '' }]))
   $('friendRows').replaceChildren(...rows.map(friendRow))
+}
+let friendFaces = {}
+// 关系称呼：和台词分档一样（0–3 / 4–7 / 8–10 颗心）
+const FRIEND_TIERS = [[8, '挚友'], [4, '好朋友'], [1, '认识了'], [0, '刚见面']]
+// 像素心（9×8 格，自己画的）：o 描边，f 填色，s 左上角的高光；画成遮罩见 heartMasks
+const HEART_PIXELS = [
+  '.oo...oo.',
+  'osfo.offo',
+  'osffffffo',
+  'offfffffo',
+  '.offfffo.',
+  '..offfo..',
+  '...ofo...',
+  '....o....',
+]
+// 每种格子各生成一张遮罩：描边 o 是整颗心的外形（o、f、s 都算），f 填色区（含高光那格），s 高光
+;(function heartMasks() {
+  const svg = keep => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 8' shape-rendering='crispEdges'>${
+    HEART_PIXELS.flatMap((line, y) => [...line].map((c, x) => keep.includes(c) ? `<rect x='${x}' y='${y}' width='1' height='1'/>` : '')).join('')}</svg>`)}")`
+  const root = document.documentElement.style
+  root.setProperty('--heart-o', svg('ofs')); root.setProperty('--heart-f', svg('fs')); root.setProperty('--heart-s', svg('s'))
+})()
+function pixelHeart(on) {
+  const c = document.createElement('span'); c.className = 'pixel-heart' + (on ? ' on' : '')
+  return c
+}
+function friendFace(id) {
+  const box = document.createElement('div'); box.className = 'friend-face'
+  const f = friendFaces[id]
+  if (f?.src) { const img = document.createElement('img'); img.src = f.src; img.alt = f.name; box.append(img) }
+  box.title = f?.name || id
+  return box
 }
 function friendRow(r) {
   const row = document.createElement('div'); row.className = 'item friend'
-  const name = document.createElement('div'); name.className = 'label friend-name'; name.textContent = String(r.label ?? '').replace(/\u2665(?!\ufe0e)/g, '\u2665\ufe0e')   // ♥ 后加 U+FE0E：按文字画，别变成 emoji，和右边的心一个样
-  const hearts = document.createElement('div'); hearts.className = 'ctl hearts'
-  const h = Math.max(0, Math.min(5, Number(r.hearts) || 0))
-  for (let i = 0; i < 5; i++) {
-    const c = document.createElement('span')
-    c.className = 'heart' + (i < Math.floor(h) ? ' full' : i === Math.floor(h) && h % 1 >= 0.5 ? ' half' : '')
-    c.textContent = '\u2665\ufe0e'   // 同上：按文字画，半颗心的渐变才盖得上
-    hearts.append(c)
-  }
-  row.append(name, hearts)
+  const faces = document.createElement('div'); faces.className = 'friend-faces'
+  faces.append(friendFace(r.a), friendFace(r.b))
+  const n = Math.round(Math.max(0, Math.min(5, Number(r.hearts) || 0)) * 2)
+  const text = document.createElement('div'); text.className = 'friend-text'
+  const name = document.createElement('div'); name.className = 'friend-name'
+  // 名字用 rows 里的 label（「A ♥ B」，带你改过的名字），拆不开再退到角色名 / id
+  const [na, nb] = String(r.label ?? '').split(' \u2665 ')
+  name.textContent = `${nb ? na : friendFaces[r.a]?.name || r.a} & ${nb || friendFaces[r.b]?.name || r.b}`
+  const tier = document.createElement('small'); tier.textContent = FRIEND_TIERS.find(([min]) => n >= min)[1]
+  name.append(tier)
+  const hearts = document.createElement('div'); hearts.className = 'pixel-hearts'; hearts.title = `${n} / 10`
+  for (let i = 0; i < 10; i++) hearts.append(pixelHeart(i < n))
+  text.append(name, hearts)
+  row.append(faces, text)
   return row
 }
 

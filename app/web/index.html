@@ -232,6 +232,7 @@ addEventListener('error', e => {
 <script src="peak-hours.js"></script>
 <script src="companions.js"></script>
 <script src="friendship.js"></script>
+<script src="pair-chat.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -1714,6 +1715,40 @@ setInterval(() => {
   if (due.length) friendAward(due, 'together')
   else if (sentFriendship === null) sendFriendship()
 }, FRIEND_TICK)
+
+// ---- 每对台词（台词和挑法在 pair-chat.js）----
+// 多桌宠在跑、两只都在场又都闲着时，隔一阵子（至少 12 分钟、每分钟掷一次）挑一对一问一答；按这一对的心数分档说不同的话。
+// 主桌宠自己说走 chat()，额外那只说交给外壳转（companionCall，fn = chat）。只由主桌宠页面挑，额外那只只管说
+let pairChatAt = 0
+const pairChatRecent = []
+function tryPairChat() {
+  if (role !== 'main' || !friendshipOn() || pageHidden || egg) return
+  const store = friendStoreRead(), nowMs = Date.now()
+  const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
+  if (aiActivity()) busy.push(mainCharacter())
+  const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
+                             hearts10: key => Math.round(Friendship.hearts(store[key]?.points || 0) * 2) })
+  if (!got) return
+  pairChatAt = nowMs
+  pairChatRecent.push(got.id)
+  if (pairChatRecent.length > 12) pairChatRecent.shift()
+  got.lines.forEach(([who, line], i) => setTimeout(() => chatAs(who, line), i * PairChat.REPLY_MS))
+}
+function chatAs(character, line) {
+  if (!friendshipOn()) return
+  if (character === mainCharacter()) { chat(line); return }
+  const p = companionsState?.pets.find(x => x.character === character)
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line] } })
+}
+// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）
+let chatTimer = null
+function chat(line) {
+  if (egg || farewellLine !== null || aiActivity() || typeof line !== 'string') return
+  say(line)
+  clearTimeout(chatTimer)
+  chatTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, 6000)
+}
+setInterval(tryPairChat, FRIEND_TICK)
 
 // ---- 额度里的「社区梗」时刻 ----
 // GPT：某个额度窗口在预定重置时间之前突然恢复一大截（官方 reset / 重置卡）→ reset
