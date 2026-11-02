@@ -1,0 +1,40 @@
+{
+ "about": "pop：pop · 彩蛋·登场；pretend：pretend · 彩蛋·装模作样；caught：caught · 彩蛋·被识破；bye：bye · 彩蛋·道别；escape：escape · 彩蛋·溜走",
+ "items": [
+  {
+   "char": "egg-gemini-yarn",
+   "pose": "pop",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "egg-gemini-yarn",
+   "pose": "pretend",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "egg-gemini-yarn",
+   "pose": "caught",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "egg-gemini-yarn",
+   "pose": "bye",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "egg-gemini-yarn",
+   "pose": "escape",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  }
+ ]
+}
