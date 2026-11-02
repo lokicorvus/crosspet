@@ -45,29 +45,46 @@ extension App {
         let y0 = min(max(main.minY, vf.minY), max(vf.minY, vf.maxY - h))   // 第一排和主桌宠底边对齐（主桌宠藏出屏幕时夹回来）
         // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始）；
         // tuck：上下排可以压着的那截（0 = 整窗口不重叠）。往上一排压着第一排和主桌宠的气泡空白，主桌宠正上方那格才不压着她
+        func row(_ y: CGFloat, center: Bool) -> [NSRect] {
+            var out: [NSRect] = []
+            if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
+            var x = main.minX - w
+            while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
+            x = main.minX + max(w, main.width)
+            while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
+            return out
+        }
+        func keep(_ cands: [NSRect], tuck: CGFloat) -> [NSRect] {
+            let mainBody = body(main, tuck: tuck > 0 ? main.height * bubbleShare : 0)
+            return cands.filter { fits($0) && !body($0, tuck: tuck).insetBy(dx: 0.5, dy: 0.5).intersects(mainBody) }
+        }
+        // 第一排和主桌宠底边对齐，往上、往下各排几排
         func layout(tuck: CGFloat) -> [NSRect] {
             let mainTuck = tuck > 0 ? main.height * bubbleShare : 0, pitch = h - tuck
-            func row(_ y: CGFloat, center: Bool) -> [NSRect] {
-                var out: [NSRect] = []
-                if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
-                var x = main.minX - w
-                while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
-                x = main.minX + max(w, main.width)
-                while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
-                return out
-            }
             var cands = row(y0, center: false)
             var y = max(y0 + pitch, main.minY + main.height - mainTuck)
             while y + h <= vf.maxY + 0.01 { cands += row(y, center: true); y += pitch }
             y = y0 - pitch
             while y >= vf.minY - 0.01 { cands += row(y, center: true); y -= pitch }
-            let mainBody = body(main, tuck: mainTuck)
-            return cands.filter { fits($0) && !body($0, tuck: tuck).insetBy(dx: 0.5, dy: 0.5).intersects(mainBody) }
+            return keep(cands, tuck: tuck)
         }
+        // 主桌宠在屏幕中间时，和她对齐往上、往下都差一点排不下第二排：改成从屏幕底边（或顶边）开始一排一排排，
+        // 压着主桌宠的格子去掉（11-02：以前这时后几只错开叠在前几只上）
+        func grid(tuck: CGFloat, fromTop: Bool) -> [NSRect] {
+            let pitch = h - tuck
+            var cands: [NSRect] = [], y = fromTop ? vf.maxY - h : vf.minY
+            while y >= vf.minY - 0.01 && y + h <= vf.maxY + 0.01 {
+                cands += row(y, center: true)
+                y += fromTop ? -pitch : pitch
+            }
+            return keep(cands, tuck: tuck)
+        }
+        let tight = h * bubbleShare
         var cands = layout(tuck: 0)
-        if cands.count < count {
-            let tight = layout(tuck: h * bubbleShare)
-            if tight.count > cands.count { cands = tight }
+        for next in [{ layout(tuck: tight) }, { grid(tuck: 0, fromTop: false) }, { grid(tuck: tight, fromTop: false) },
+                     { grid(tuck: 0, fromTop: true) }, { grid(tuck: tight, fromTop: true) }] where cands.count < count {
+            let more = next()
+            if more.count > cands.count { cands = more }
         }
         var out = Array(cands.prefix(count))
         // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里

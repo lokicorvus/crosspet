@@ -263,6 +263,9 @@ static class Program
         var lLaptop = Layout(R(1164, 38, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true);
         var lLaptop3 = Layout(R(1164, 38, 310, 431), 3, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859));
         Check("多桌宠位置：笔记本屏幕上 6 只压着气泡空白排两排（" + lLaptop + " / " + lLaptop3 + "）", lLaptop == "ok" && lLaptop3 == "ok");
+        // 主桌宠在屏幕中间（11-02 截图）：和她底边对齐往上、往下都差一点排不下第二排，以前后 3 只错开叠在前 3 只上
+        var lMid = string.Join(" / ", new[] { 151, 251, 351 }.Select(y => Layout(R(1164, y, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true)));
+        Check("多桌宠位置：主桌宠在屏幕中间也排得下两排（" + lMid + "）", lMid == "ok / ok / ok");
         // 默认大小在 1280×720 上放不下 12 只：躲不开重叠，但每只都夹在可见区里
         var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
         Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12

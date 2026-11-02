@@ -57,6 +57,11 @@ check_layout wider-companion 1620 100 260 362 8 348 341 0 0 1920 1055
 # 6 只要压着气泡空白排成两排，人物不重叠（以前后 3 只叠在前 3 只上）
 SHARE=$(awk 'BEGIN { print 59 / 362 }')
 check_layout laptop-two-rows 1164 513 310 431 6 310 431 0 85 1512 859
+# 主桌宠在屏幕中间偏下（11-02 截图）：和她底边对齐往上、往下都差一点排不下第二排，以前后 3 只错开 24 点叠在前 3 只上；
+# 现在改按屏幕底边 / 顶边对齐排两排
+check_layout laptop-middle-300 1164 300 310 431 6 310 431 0 85 1512 859
+check_layout laptop-middle-200 1164 200 310 431 6 310 431 0 85 1512 859
+check_layout laptop-middle-400 1164 400 310 431 6 310 431 0 85 1512 859
 SHARE=0
 check_layout laptop-three-fit 1164 513 310 431 3 310 431 0 85 1512 859
 # 屏幕太小放不下：只要求都在可见区里（重叠躲不开）

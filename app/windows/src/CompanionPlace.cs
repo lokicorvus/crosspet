@@ -8,7 +8,8 @@ namespace CrossPet
     /// 规则和 macOS 的 App.companionSlots 一样（那边 y 向上，测试 tests/companion_place_probe.sh）：
     /// 先排主桌宠左边（由近到远），左边放不下放右边，再放不下往上一排（上面的排里主桌宠正上方先放），还不够往下一排；
     /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。
-    /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠，再不够才叠着放。
+    /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠；
+    /// 主桌宠在屏幕中间、和她对齐排不下第二排时，改从屏幕底边（再不行顶边）开始排，再不够才叠着放。
     /// 格子不够（屏幕太小）时剩下的错开叠在已有的格子上，照样夹在 visible 里。
     /// 自己定义 Rect / Size：LogicTests 跑在 macOS 的 .NET 8 上，没有 WPF 的 System.Windows.Rect</summary>
     static class CompanionPlace
@@ -47,28 +48,44 @@ namespace CrossPet
             double top0 = Math.Min(Math.Max(main.Bottom - h, vy), Math.Max(vy, vb - h));
             // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始）；
             // tuck：上下排可以压着的那截（0 = 整窗口不重叠）。往上一排压着第一排和主桌宠的气泡空白，主桌宠正上方那格才不压着她
+            List<Rect> Row(double y, bool center)
+            {
+                var o = new List<Rect>();
+                if (center) o.Add(new Rect(main.X, y, w, h));
+                for (var x = main.X - w; x >= vx - 0.01; x -= w) o.Add(new Rect(x, y, w, h));
+                for (var x = main.X + Math.Max(w, main.W); x + w <= vr + 0.01; x += w) o.Add(new Rect(x, y, w, h));
+                return o;
+            }
+            List<Rect> Keep(List<Rect> c, double tuck)
+            {
+                var mainBody = Body(main, tuck > 0 ? main.H * BubbleShare : 0);
+                return c.Where(r => Fits(r) && !Body(r, tuck).Intersects(mainBody, 0.5)).ToList();
+            }
+            // 第一排和主桌宠底边对齐，往上、往下各排几排
             List<Rect> Layout(double tuck)
             {
                 double mainTuck = tuck > 0 ? main.H * BubbleShare : 0, pitch = h - tuck;
-                List<Rect> Row(double y, bool center)
-                {
-                    var o = new List<Rect>();
-                    if (center) o.Add(new Rect(main.X, y, w, h));
-                    for (var x = main.X - w; x >= vx - 0.01; x -= w) o.Add(new Rect(x, y, w, h));
-                    for (var x = main.X + Math.Max(w, main.W); x + w <= vr + 0.01; x += w) o.Add(new Rect(x, y, w, h));
-                    return o;
-                }
                 var c = Row(top0, false);
                 for (var y = Math.Min(top0 + tuck, main.Y + mainTuck) - h; y >= vy - 0.01; y -= pitch) c.AddRange(Row(y, true));
                 for (var y = top0 + pitch; y + h <= vb + 0.01; y += pitch) c.AddRange(Row(y, true));
-                var mainBody = Body(main, mainTuck);
-                return c.Where(r => Fits(r) && !Body(r, tuck).Intersects(mainBody, 0.5)).ToList();
+                return Keep(c, tuck);
             }
-            var cands = Layout(0);
-            if (cands.Count < count)
+            // 主桌宠在屏幕中间时，和她对齐往上、往下都差一点排不下第二排：改成从屏幕底边（或顶边）开始一排一排排，
+            // 压着主桌宠的格子去掉（11-02：以前这时后几只错开叠在前几只上）
+            List<Rect> Grid(double tuck, bool fromTop)
             {
-                var tight = Layout(h * BubbleShare);
-                if (tight.Count > cands.Count) cands = tight;
+                double pitch = h - tuck;
+                var c = new List<Rect>();
+                for (var y = fromTop ? vy : vb - h; y >= vy - 0.01 && y + h <= vb + 0.01; y += fromTop ? pitch : -pitch) c.AddRange(Row(y, true));
+                return Keep(c, tuck);
+            }
+            var tight = h * BubbleShare;
+            var cands = Layout(0);
+            foreach (var next in new Func<List<Rect>>[] { () => Layout(tight), () => Grid(0, false), () => Grid(tight, false), () => Grid(0, true), () => Grid(tight, true) })
+            {
+                if (cands.Count >= count) break;
+                var more = next();
+                if (more.Count > cands.Count) cands = more;
             }
             var output = cands.Take(count).ToList();
             // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里
