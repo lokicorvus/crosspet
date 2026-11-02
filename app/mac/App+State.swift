@@ -73,10 +73,14 @@ extension App {
         let host = front.flatMap { appToCharacter[$0] ?? hostApp($0) }
         let foregroundId = host.map { hostCharacter($0) }
         let currentAt = currentId, apps = followApps, events = followEvents
+        // 当前角色最近的姿态：她还在干活（20 秒内）就不让别的 AI 抢，判断在 follow-policy.js
+        let mine = currentAt.flatMap { lastPose[$0] }
         let input: [String: Any] = ["eventId": id, "foregroundId": foregroundId as Any? ?? NSNull(),
-                                    "followApps": apps, "followEvents": events, "characters": characterIds]
+                                    "followApps": apps, "followEvents": events, "characters": characterIds,
+                                    "currentPose": mine?.pose as Any? ?? NSNull(),
+                                    "currentAge": mine.map { Date().timeIntervalSince($0.at) } as Any? ?? NSNull()]
         guard let data = try? JSONSerialization.data(withJSONObject: input), let json = String(data: data, encoding: .utf8) else { return }
-        web.evaluateJavaScript("FollowPolicy.eventTarget(\(json))") { [weak self] result, _ in
+        web.evaluateJavaScript("FollowPolicy.eventSkip(\(json)) || 'ok'") { [weak self] result, _ in
             // 和 Windows 一致：更新的事件、页面或选择已经到来时，旧答复不能再覆盖它。
             guard let self else { return }
             guard self.followEventGeneration == generation, self.ready, !self.web.isLoading,
@@ -86,7 +90,7 @@ extension App {
             let currentHost = front.flatMap { self.appToCharacter[$0] ?? self.hostApp($0) }
             guard currentHost == host, currentHost.map({ self.hostCharacter($0) }) == foregroundId,
                   self.characterIds.contains(id) else { self.notePet(id, nil, "skipped", "answer-stale"); return }
-            guard result as? String == id else { self.notePet(id, nil, "skipped", "front-ai"); return }
+            guard let verdict = result as? String, verdict == "ok" else { self.notePet(id, nil, "skipped", result as? String ?? "policy"); return }
             guard id != self.currentId else { return }
             self.switchTo(id, why: "event")
         }

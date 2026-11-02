@@ -48,12 +48,15 @@ namespace CrossPet
             var currentAt = current;
             var apps = Store.Flag("followApps");
             var events = Store.Flag("followEvents");
-            var input = Store.Json.Serialize(new { eventId = id, foregroundId = front, followApps = apps, followEvents = events, characters = Characters().Select(c => c.id).ToArray() });
-            var allowed = await Eval($"FollowPolicy.eventTarget({input}) === {Q(id)}");
+            // 当前角色最近的姿态：她还在干活（20 秒内）就不让别的 AI 抢，判断在 follow-policy.js
+            var mine = currentAt != null && lastPose.TryGetValue(currentAt, out var lp) ? lp : ((string pose, DateTime at)?)null;
+            var input = Store.Json.Serialize(new { eventId = id, foregroundId = front, followApps = apps, followEvents = events, characters = Characters().Select(c => c.id).ToArray(),
+                                                   currentPose = mine?.pose, currentAge = mine.HasValue ? (DateTime.UtcNow - mine.Value.at).TotalSeconds : (double?)null });
+            var verdict = await Eval($"FollowPolicy.eventSkip({input}) || 'ok'");
             // 网页答复前可能切了窗口、手动换人或关了跟随；旧请求不能覆盖新选择。
             if (generation != followEventGeneration || !ready || Paused || current != currentAt || Native.ForegroundExe() != exe
                 || Store.Flag("followApps") != apps || Store.Flag("followEvents") != events || ForegroundCharacter(exe) != front) { NotePet(id, null, "skipped", "answer-stale"); return; }
-            if (allowed != "true") { NotePet(id, null, "skipped", "front-ai"); return; }
+            if (verdict != Q("ok")) { NotePet(id, null, "skipped", verdict.Trim('"')); return; }
             if (id != current) SwitchTo(id, "event");
         }
 
