@@ -305,10 +305,28 @@ def check_image(path, cid, pose_name, batch=None, st=None):
 
 # ---------------- 对比页 ----------------
 
+def thumb(batch, p):
+    """验收页用的小图：裁到人物外框（和导入后一样，不然原画布四周的空白会让新画的看着比已导入的小一圈），缩到 480 高。
+    按原图路径和修改时间缓存在 缩略图/ 里"""
+    from PIL import Image
+    import hashlib
+    p = Path(p)
+    key = hashlib.md5(f"{p.resolve()}|{p.stat().st_mtime_ns}".encode()).hexdigest()[:16]
+    out = batch_dir(batch) / "缩略图" / f"{p.stem}-{key}.webp"
+    if not out.exists():
+        out.parent.mkdir(exist_ok=True)
+        im = Image.open(p).convert("RGBA")
+        box = im.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox()   # 不算几乎透明的毛边
+        im = im.crop(box) if box else im
+        im.thumbnail((480, 480), Image.LANCZOS)
+        im.save(out, "WEBP", quality=88)
+    return out
+
+
 def write_sheet(batch, st):
     d = batch_dir(batch)
     def src(p):
-        return os.path.relpath(p, d) if p and Path(p).exists() else None
+        return os.path.relpath(thumb(batch, p), d) if p and Path(p).exists() else None
     def fig(title, p, extra="", cls=""):
         inner = f'<img src="{src(p)}" loading="lazy">' if src(p) else "<span>没有</span>"
         return f'<figure class="{cls}"><div class="pic">{inner}</div><figcaption>{title}</figcaption>{extra}</figure>'
@@ -366,7 +384,7 @@ button.ok {{ background: #e8f6ee; border-color: #8fd1a8; }} button.bad {{ backgr
 </style>
 <h1>验收 · {batch}</h1>
 <div id="bar"><button class="act ok" data-act="passall" data-key="">全部通过（{todo} 张待验收的）</button><span id="msg"></span></div>
-<p>棋盘格是透明的地方。每个姿态左边是画过的每一版（新的在左），蓝框那版是导入用的，点别的版本下面的「用这版」换；后面浅一点的是现在用的、底图和待机图。
+<p>每张都裁到了人物外框、缩成一样高（和导入后在桌面上一样），大小可以直接比。棋盘格是透明的地方。每个姿态左边是画过的每一版（新的在左），蓝框那版是导入用的，点别的版本下面的「用这版」换；后面浅一点的是现在用的、底图和待机图。
 图一张都不会删。</p>
 <p class="cmdhint">这页要用 <code>python3 tools/art.py review {batch}</code> 打开按钮才能用（直接双击打开只能看）。</p>
 {''.join(cards)}
