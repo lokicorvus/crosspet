@@ -256,6 +256,7 @@ const MOTION = {
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
+  roll_call: 'm-hop',   // 集合点名举手答「到！」
   // 甩她 / 红温
   annoyed: 'm-rock', puffed: 'm-jolt', redhot: 'm-angry', sulk: 'm-slow', dizzy: 'm-dizzy', coaxed: 'm-sway', forgiven: 'm-hop',
   // 按时段 / 节日打招呼
@@ -275,7 +276,7 @@ const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry:
   busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
   annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
-  annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000 }
+  annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000, roll_call: 6000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
@@ -852,7 +853,7 @@ function setCharacter(id, quiet) {
     // 集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
     const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
     if (quiet) say('')
-    else if (roll) { if (!busy) show('proud', true); say(`${c.name}到！`) }   // show 会按 TRANSIENT 回到常态
+    else if (roll) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }   // 有举手答到的专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态
     else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
     renderQuota()
     if (id === 'gpt') characterTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说

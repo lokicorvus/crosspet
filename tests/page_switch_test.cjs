@@ -534,6 +534,15 @@ const multiCases = [
       assert(c.state().pose === 'idle', `${id} did not settle: ${c.state().pose}`)
       assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
     }
+    // 画了举手答到的专属图（roll_call）就用它
+    const r = makePage(), m = manifest()
+    m.characters.claude.poses.roll_call = m.characters.claude.poses.idle
+    r.run(`setRole('companion', { id: 'claude@gather', key: 'claude@gather', character: 'claude', client: null, label: '' })`)
+    r.run(`init(${JSON.stringify(m)}); setCharacter('claude')`)
+    await r.advance(1000)
+    assert(r.state().pose === 'roll_call', `roll_call pose: ${r.state().pose}`)
+    await r.advance(7000)
+    assert(r.state().pose === 'idle', `roll_call did not settle: ${r.state().pose}`)
     const w = makePage()
     w.run(`setRole('companion', { id: 'claude@claude-cli', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', label: '' })`)
     w.run(`init(${JSON.stringify(manifest())}); setCharacter('claude')`)
