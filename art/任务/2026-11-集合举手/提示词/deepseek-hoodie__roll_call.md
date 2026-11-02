@@ -1,0 +1,43 @@
+# DeepSeek · Claude 卫衣 · roll_call · 集合点名「到！」
+
+- 保存到：`art/任务/2026-11-集合举手/成品/deepseek-hoodie__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 附件（按顺序附上）：
+  1. `characters/deepseek-hoodie/idle.webp`（设计参考）
+  2. `characters/deepseek-hoodie/portrait.webp`（设计参考）
+
+## 提示词
+
+```text
+You are drawing desktop-pet sprites for an existing chibi character. The attached images are the ONLY design reference.
+
+FORMAT RULES (every image):
+- Real transparent background (generate with transparent_background: true). Nothing else: no floor, no cast shadow, no glow, no vignette, no frame. Keep complete, clean edges. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
+- No text, no letters, no speech bubbles, no symbols (no ?, !, hearts, music notes, Zzz, sparkles, sweat-drop icons floating in the air). The app draws all effects itself.
+- Exactly one character, full body, standing, centered, facing the viewer like the reference. Head near the top and feet near the bottom; she fills about 90% of the image height, the same scale and position as the reference.
+- A continuous, closed dark outline around the whole silhouette (hair, horns, ears, wings and tail included), so the edges stay clean against any background.
+- Same art style as the reference: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
+- Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
+- Change ONLY the expression, the arms/hands, and small props. Hair, accessories, outfit, colors and body features stay exactly as in the reference.
+
+ROLL-CALL FRAME: all the desktop pets are being gathered, and each one answers the roll call by raising a hand and calling out "Here!".
+- One hand raised in a lively "Here!" gesture: the arm bent at the elbow, the hand open with the palm toward the viewer or a small salute. The raised hand reaches at most the height of the top of her head; it must NEVER go higher than the highest point of her hair, ears, horns, hat or hood, so the scale stays identical to the reference.
+- The other arm stays natural and close to her body (holding her usual prop if she has one).
+- Mouth open as if calling out "Here!", bright eyes looking at the viewer. Do NOT write the word: no text, no speech bubble.
+- Standing, full body, centered, feet near the bottom, same scale as the reference.
+
+CHARACTER LOCK — DeepSeek in her cozy "Claude hoodie" outfit: an alternate skin of DeepSeek, the blue whale girl (anime-girl personification of DeepSeek). She is wearing a hoodie with a "Claude" name badge, which is the joke and the charm.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (body from DeepSeek, outfit from the hoodie design):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top. Big round bright-blue eyes, pink blush.
+- Dark navy whale-fin ears on both sides of her head. NO maid headdress in this outfit.
+- An orange eight-pointed asterisk hair clip (a sunburst "✳" shape) on her right side (viewer's right), in place of her usual blue bow.
+- An oversized cream / off-white zip-up hoodie, hood down behind her neck, long sleeves that cover the back of her hands; an orange ribbon bow at the collar and orange drawstrings; an orange "✳" asterisk embroidered on each sleeve; a small round cookie-like flower patch on the front pocket.
+- An orange lanyard with a small rectangular name badge on her chest that reads "Claude". This badge is the ONLY text allowed in the image; if the word cannot be drawn cleanly, leave the badge blank instead of writing anything else.
+- A short orange-tan pleated skirt with a white frilly hem; cream knit leg warmers with a small flower patch; tan mary-jane shoes.
+- Her big dark-navy whale tail curling out from behind her on the viewer's right.
+Palette: navy-to-blue hair and tail, cream hoodie, warm orange accents. Keep it soft and cozy.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot; long hoodie sleeves flop around.
+
+POSE (roll_call): One long hoodie sleeve shot up eagerly so the sleeve flops down over her hand, the other fist at her side; big open grin, ahoge straight up, tail wagging.
+Save as: deepseek-hoodie__roll_call.png
+```
