@@ -26,31 +26,23 @@ extension App {
         if codexResets && currentId == "gpt" { add(menu, "会重置吗？", #selector(askReset)) }   // 只有 GPT 有这个需求
         if characterIds.count > 1 {
             menu.addItem(.separator())
-            // 右键直接换（用户要回来的）：一个角色一项；有别的衣服的角色再展开一层选衣服，名单不会一长串。
+            // 右键直接换（用户要回来的）：一项一套，有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」。
             // 最下面「看图选…」打开角色窗口（卡片墙）
             let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
             let sub = NSMenu()
             let worn = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
             for id in characterIds {
                 let name = displayNames[id] ?? id
-                let item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
-                item.state = id == currentId ? .on : .off
-                if let skins = skinChoices[id], !skins.isEmpty {
-                    let outfits = NSMenu()
-                    for (skin, title) in [("", baseOutfit[id] ?? "原版")] + skins.map({ ($0.id, $0.name) }) {
-                        let o = NSMenuItem(title: title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
-                        o.representedObject = "\(id)|\(skin)"
-                        o.target = self
-                        o.state = id == currentId && (worn[id] ?? "") == skin ? .on : .off
-                        outfits.addItem(o)
-                    }
-                    item.submenu = outfits
-                } else {
-                    item.action = #selector(switchCharacter(_:))
+                let outfits: [(skin: String, title: String)] = skinChoices[id].flatMap { $0.isEmpty ? nil : $0 }.map { skins in
+                    [("", "\(name) · \(baseOutfit[id] ?? "原版")")] + skins.map { ($0.id, "\(name) · \($0.name)") }
+                } ?? [("", name)]
+                for o in outfits {
+                    let item = NSMenuItem(title: o.title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
+                    item.representedObject = "\(id)|\(o.skin)"
                     item.target = self
-                    item.representedObject = "\(id)|"
+                    item.state = id == currentId && (worn[id] ?? "") == o.skin ? .on : .off
+                    sub.addItem(item)
                 }
-                sub.addItem(item)
             }
             sub.addItem(.separator())
             add(sub, "看图选…", #selector(openCharacterPage))
