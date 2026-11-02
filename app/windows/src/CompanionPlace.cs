@@ -39,6 +39,14 @@ namespace CrossPet
             return new Rect(r.X, r.Y + t, r.W, r.H - t);
         }
 
+        /// <summary>还空着的格子（互相之间也不重叠，后面一只一只放进去不会叠）</summary>
+        public static List<Rect> FreeSlots(IEnumerable<Rect> slots, IEnumerable<Rect> taken)
+        {
+            var used = taken.ToList(); var o = new List<Rect>();
+            foreach (var s in slots) if (!used.Any(t => Body(t).Intersects(Body(s), 1))) { o.Add(s); used.Add(s); }
+            return o;
+        }
+
         public static Rect[] Slots(Rect main, int count, Size size, Rect visible)
         {
             if (count <= 0 || size.W <= 0 || size.H <= 0) return new Rect[0];

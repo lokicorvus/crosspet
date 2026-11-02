@@ -20,6 +20,7 @@ namespace CrossPet
         /// <summary>站着的额外桌宠，按页面给的 id 管（集合来的收编客户端后 key 变、id 不变）</summary>
         internal readonly Dictionary<string, Companion> companions = new Dictionary<string, Companion>();
         readonly List<Companion> leavingCompanions = new List<Companion>();   // 收到 companionLeave、正在说 bye 的
+        int companionTarget;         // 这一轮页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（CompanionOrigin）
         bool pageGathering;          // 页面说正集合着（companions 消息里的 gathering）：菜单显示「解散」，开关关着时也转发
         bool eggAllowed = true;      // 有别的桌宠在场时页面发 false：「召唤彩蛋」变灰
         object friendshipRows;       // 主桌宠页面最后一次发来的友谊行，推给设置页
@@ -56,13 +57,21 @@ namespace CrossPet
         // ---------------- 第一次出现放在哪 ----------------
 
         /// <summary>新开的那只放哪（物理像素）：记过位置（origin-&lt;key&gt;，还在某块屏幕上）就回到那里，夹进那块屏幕的工作区；
-        /// 压着站着的窗口（主桌宠或别的额外那只）就不用它，改挑主桌宠旁边第一个空着的格子（CompanionPlace.Slots）</summary>
+        /// 压着站着的窗口（主桌宠或别的额外那只），或者占了后面几只要用的格子（剩下的不够放），就不用它，改挑主桌宠旁边第一个空着的格子（CompanionPlace.Slots）。
+        /// 格子按这一轮一共要站几只（companionTarget）排：以前按已经站着几只排，前后两套格子对不上就叠在一起了（11-02，同 Mac）</summary>
         internal (int x, int y) CompanionOrigin(string key, int w, int h)
         {
             var others = AllCompanions.Select(c => c.Frame).Where(f => f.HasValue).Select(f => f.Value).ToList();
             Native.GetWindowRect(hwnd, out var m);
             var main = new CompanionPlace.Rect(m.Left, m.Top, m.Right - m.Left, m.Bottom - m.Top);
             CompanionPlace.Rect Box(System.Drawing.Rectangle r) => new CompanionPlace.Rect(r.Left, r.Top, r.Width, r.Height);
+            var wa = Box(Forms.Screen.FromHandle(hwnd).WorkingArea);
+            var size = new CompanionPlace.Size(w, h);
+            var total = Math.Max(companionTarget, others.Count + 1);
+            var planned = CompanionPlace.Slots(main, total, size, wa);
+            var slots = planned.Concat(CompanionPlace.Slots(main, 2 * others.Count + 1, size, wa)).ToArray();
+            // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
+            bool Clear(CompanionPlace.Rect s, IEnumerable<CompanionPlace.Rect> taken) => !taken.Any(o => CompanionPlace.Body(s).Intersects(CompanionPlace.Body(o), 1));
             if (Store.Settings.TryGetValue("origin-" + key, out var pos) && pos is Dictionary<string, object> p && p.ContainsKey("x") && p.ContainsKey("y"))
             {
                 var r = new CompanionPlace.Rect(Convert.ToDouble(p["x"]), Convert.ToDouble(p["y"]), w, h);
@@ -71,13 +80,11 @@ namespace CrossPet
                 if (scr != null)
                 {
                     r = CompanionPlace.Clamp(r, Box(scr.WorkingArea));
-                    if (!new[] { main }.Concat(others).Any(o => CompanionPlace.Body(r).Intersects(CompanionPlace.Body(o), 1))) return ((int)r.X, (int)r.Y);
+                    var left = CompanionPlace.FreeSlots(planned, others.Concat(new[] { r })).Count;
+                    if (Clear(r, new[] { main }.Concat(others)) && left >= total - others.Count - 1) return ((int)r.X, (int)r.Y);
                 }
             }
-            var wa = Box(Forms.Screen.FromHandle(hwnd).WorkingArea);
-            var slots = CompanionPlace.Slots(main, 2 * others.Count + 1, new CompanionPlace.Size(w, h), wa);
-            // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
-            var free = slots.Cast<CompanionPlace.Rect?>().FirstOrDefault(s => !others.Any(o => CompanionPlace.Body(s.Value).Intersects(CompanionPlace.Body(o), 1)));
+            var free = slots.Cast<CompanionPlace.Rect?>().FirstOrDefault(s => Clear(s.Value, others));
             var pick = free ?? (slots.Length > 0 ? slots[slots.Length - 1] : main);
             return ((int)Math.Round(pick.X), (int)Math.Round(pick.Y));
         }
@@ -107,6 +114,7 @@ namespace CrossPet
         void SyncCompanions(object[] list)
         {
             var seen = new HashSet<string>();
+            companionTarget = list.Length;
             foreach (var item in list)
             {
                 if (!(item is Dictionary<string, object> info) || !(info.TryGetValue("id", out var iv) && iv is string id) || id == "" || seen.Contains(id)

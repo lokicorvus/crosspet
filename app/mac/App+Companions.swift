@@ -102,23 +102,39 @@ extension App {
     }
 
     /// 新开的那只放哪：记过位置（origin-<key>，还在某块屏幕上）就回到那里；没记过就挑主桌宠旁边第一个空着的格子
-    /// 记过的位置夹进那块屏幕的可见区；压着站着的窗口（主桌宠或别的额外那只）就不用它，改挑格子
+    /// 记过的位置夹进那块屏幕的可见区；压着站着的窗口（主桌宠或别的额外那只），或者占了后面几只要用的格子（剩下的不够放），就不用它，改挑格子。
+    /// 格子按这一轮一共要站几只（companionTarget）排：以前按已经站着几只排，前几只排在主桌宠那一排、后几只换成贴屏幕底边的排法，两套格子对不上就叠在一起了（11-02）
     func companionOrigin(key: String, size: NSSize) -> NSPoint {
         let others = (Array(companions.values) + leavingCompanions).map { $0.panel.frame }
-        if let saved = defaults.array(forKey: "origin-\(key)") as? [Double], saved.count == 2 {
-            var r = NSRect(x: saved[0], y: saved[1], width: size.width, height: size.height)
-            if let vf = NSScreen.screens.first(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) })?.visibleFrame {
-                r.origin.x = min(max(r.minX, vf.minX), max(vf.minX, vf.maxX - size.width))
-                r.origin.y = min(max(r.minY, vf.minY), max(vf.minY, vf.maxY - size.height))
-                let busy = ([panel.frame] + others).contains { Self.body($0).intersects(Self.body(r).insetBy(dx: 1, dy: 1)) }
-                if !busy { return r.origin }
+        var saved: NSRect?
+        if let o = defaults.array(forKey: "origin-\(key)") as? [Double], o.count == 2 {
+            var r = NSRect(x: o[0], y: o[1], width: size.width, height: size.height)
+            if let svf = NSScreen.screens.first(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) })?.visibleFrame {
+                r.origin.x = min(max(r.minX, svf.minX), max(svf.minX, svf.maxX - size.width))
+                r.origin.y = min(max(r.minY, svf.minY), max(svf.minY, svf.maxY - size.height))
+                saved = r
             }
         }
         let vf = (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
-        let slots = Self.companionSlots(main: panel.frame, count: 2 * others.count + 1, size: size, visible: vf)
+        return Self.companionPick(main: panel.frame, others: others, saved: saved, total: companionTarget, size: size, visible: vf).origin
+    }
+
+    /// 纯计算（tests/companion_place_probe.sh 的 seq 测）：others 是已经站着的，saved 是记过、已经夹进屏幕的位置
+    static func companionPick(main: NSRect, others: [NSRect], saved: NSRect?, total target: Int, size: NSSize, visible vf: NSRect) -> NSRect {
+        let total = max(target, others.count + 1)
+        let planned = companionSlots(main: main, count: total, size: size, visible: vf)
+        let slots = planned + companionSlots(main: main, count: 2 * others.count + 1, size: size, visible: vf)
         // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
-        let free = slots.first { s in !others.contains { Self.body($0).intersects(Self.body(s).insetBy(dx: 1, dy: 1)) } }
-        return (free ?? slots.last ?? panel.frame).origin
+        let clear = { (s: NSRect, taken: [NSRect]) in !taken.contains { body($0).intersects(body(s).insetBy(dx: 1, dy: 1)) } }
+        if let r = saved, clear(r, [main] + others), freeSlots(planned, taken: others + [r]).count >= total - others.count - 1 { return r }
+        return slots.first { clear($0, others) } ?? slots.last ?? main
+    }
+
+    /// 还空着的格子（互相之间也不重叠，后面一只一只放进去不会叠）
+    static func freeSlots(_ slots: [NSRect], taken: [NSRect]) -> [NSRect] {
+        var used = taken, out: [NSRect] = []
+        for s in slots where !used.contains(where: { body($0).intersects(body(s).insetBy(dx: 1, dy: 1)) }) { out.append(s); used.append(s) }
+        return out
     }
 
     // MARK: 主桌宠页面发来的消息
@@ -142,6 +158,7 @@ extension App {
     /// 直接关掉，不留残窗；收到过 companionLeave 的已经挪到 leavingCompanions，在说 bye
     func syncCompanions(_ list: [[String: Any]]) {
         var seen = Set<String>()
+        companionTarget = list.count
         for pet in list {
             guard let id = pet["id"] as? String, !id.isEmpty, !seen.contains(id),
                   let ch = pet["character"] as? String, characterIds.contains(ch) else { continue }

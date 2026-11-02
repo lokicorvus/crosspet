@@ -6,8 +6,9 @@ set -eu
 cd "$(dirname "$0")/.."
 BIN=build/CrossPet.app/Contents/MacOS/CrossPet
 fail=0
+MODE=--companion-place-probe
 run() {   # 和 window_place_probe.sh 一样 5 秒超时：参数不认识时 App 会当成正常启动，别真开出一只桌宠来
-  perl -e 'alarm 5; exec @ARGV' "$BIN" --companion-place-probe "$@" 2>/dev/null || true
+  perl -e 'alarm 5; exec @ARGV' "$BIN" "$MODE" "$@" 2>/dev/null || true
 }
 # 名字 主桌宠(4) 几只 宽 高 可见区(4)：几只都要有、都在可见区里、两两不重叠、不压主桌宠
 # SHARE=59/362：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
@@ -62,6 +63,13 @@ check_layout laptop-two-rows 1164 513 310 431 6 310 431 0 85 1512 859
 check_layout laptop-middle-300 1164 300 310 431 6 310 431 0 85 1512 859
 check_layout laptop-middle-200 1164 200 310 431 6 310 431 0 85 1512 859
 check_layout laptop-middle-400 1164 400 310 431 6 310 431 0 85 1512 859
+# 一只一只放（11-02 第二次截图）：以前每只按已经站着几只排格子，前 3 只在主桌宠那排、后 3 只换成贴屏幕底边的排法，对不上就叠了；
+# 记过的位置（拖过的）占了后面要用的格子也不用
+MODE=--companion-seq-probe
+check_layout seq-middle 1146 381 310 431 6 310 431 0 83 1512 874
+check_layout seq-saved 1146 381 310 431 6 310 431 0 83 1512 874 60 245 463 198 964 513
+check_layout seq-saved-few 1146 381 310 431 3 310 431 0 83 1512 874 463 198 60 245
+MODE=--companion-place-probe
 SHARE=0
 check_layout laptop-three-fit 1164 513 310 431 3 310 431 0 85 1512 859
 # 屏幕太小放不下：只要求都在可见区里（重叠躲不开）
