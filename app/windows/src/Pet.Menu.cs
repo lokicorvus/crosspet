@@ -49,7 +49,7 @@ namespace CrossPet
             menu.Items.Add(pageGathering ? Item("解散", DismissCompanions) : Item("集合！", GatherCompanions));
             if (CodexResets && current == "gpt") menu.Items.Add(Item("会重置吗？", () => Js("askReset()")));   // 只有 GPT 有这个需求
             Sep();
-            // 右键直接换（用户要回来的）：一个角色一项；有别的衣服的角色再展开一层选衣服，名单不会一长串。
+            // 右键直接换（用户要回来的）：一项一套，有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」。
             // 最下面「看图选…」打开角色窗口（卡片墙）
             if (Characters().Count > 1)
             {
@@ -61,10 +61,8 @@ namespace CrossPet
                     {
                         var worn = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
                         var baseName = Store.BaseOutfit.TryGetValue(id, out var bo) && bo != null ? bo : "原版";
-                        var outfits = new Forms.ToolStripMenuItem(name) { Checked = cid == current };
-                        outfits.DropDownItems.Add(Item(baseName, () => { Wear(cid, ""); SwitchTo(cid, "skin", ""); }, cid == current && worn == ""));
-                        foreach (var (sid, sname) in skins) { var k = sid; outfits.DropDownItems.Add(Item(sname, () => { Wear(cid, k); SwitchTo(cid, "skin", k); }, cid == current && worn == k)); }
-                        switchTo.DropDownItems.Add(outfits);
+                        switchTo.DropDownItems.Add(Item($"{name} · {baseName}", () => { Wear(cid, ""); SwitchTo(cid, "skin", ""); }, cid == current && worn == ""));
+                        foreach (var (sid, sname) in skins) { var k = sid; switchTo.DropDownItems.Add(Item($"{name} · {sname}", () => { Wear(cid, k); SwitchTo(cid, "skin", k); }, cid == current && worn == k)); }
                     }
                     else switchTo.DropDownItems.Add(Item(name, () => SwitchTo(cid, "manual", "menu"), cid == current));
                 }
