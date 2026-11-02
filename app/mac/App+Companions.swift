@@ -26,31 +26,49 @@ extension App {
 
     // MARK: 第一次出现放在哪
 
+    /// 窗口最上面这一截是给气泡留的空白（画布 362 里的 59；字放大时这一截占得只会更多），人物不在里面
+    static let bubbleShare: CGFloat = 59.0 / 362.0
+    /// 窗口去掉顶上气泡那截：人物和名牌、额度所在的部分（y 向上，去掉的是上边）
+    static func body(_ r: NSRect, tuck: CGFloat? = nil) -> NSRect {
+        NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height - (tuck ?? r.height * bubbleShare))
+    }
+
     /// 纯计算（tests/companion_place_probe.sh 测），屏幕点、y 向上：count 只额外桌宠各放哪。
     /// 先排主桌宠左边（由近到远），左边放不下放右边，再放不下往上一排（上面的排里主桌宠正上方先放），还不够往下一排；
-    /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。格子不够（屏幕太小）时剩下的叠在已有的格子上，照样夹在 visible 里
+    /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。
+    /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠，再不够才叠着放。
+    /// 格子不够（屏幕太小）时剩下的叠在已有的格子上，照样夹在 visible 里
     static func companionSlots(main: NSRect, count: Int, size: NSSize, visible vf: NSRect) -> [NSRect] {
         guard count > 0, size.width > 0, size.height > 0 else { return [] }
         let w = size.width, h = size.height
         let fits = { (r: NSRect) in r.minX >= vf.minX - 0.01 && r.maxX <= vf.maxX + 0.01 && r.minY >= vf.minY - 0.01 && r.maxY <= vf.maxY + 0.01 }
         let y0 = min(max(main.minY, vf.minY), max(vf.minY, vf.maxY - h))   // 第一排和主桌宠底边对齐（主桌宠藏出屏幕时夹回来）
-        // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始），排和排之间至少隔一个格子高；
-        // 第一排往上隔的是格子和主桌宠里较高的那个，主桌宠正上方那格才不压着她
-        func row(_ y: CGFloat, center: Bool) -> [NSRect] {
-            var out: [NSRect] = []
-            if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
-            var x = main.minX - w
-            while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
-            x = main.minX + max(w, main.width)
-            while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
-            return out
+        // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始）；
+        // tuck：上下排可以压着的那截（0 = 整窗口不重叠）。往上一排压着第一排和主桌宠的气泡空白，主桌宠正上方那格才不压着她
+        func layout(tuck: CGFloat) -> [NSRect] {
+            let mainTuck = tuck > 0 ? main.height * bubbleShare : 0, pitch = h - tuck
+            func row(_ y: CGFloat, center: Bool) -> [NSRect] {
+                var out: [NSRect] = []
+                if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
+                var x = main.minX - w
+                while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
+                x = main.minX + max(w, main.width)
+                while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
+                return out
+            }
+            var cands = row(y0, center: false)
+            var y = max(y0 + pitch, main.minY + main.height - mainTuck)
+            while y + h <= vf.maxY + 0.01 { cands += row(y, center: true); y += pitch }
+            y = y0 - pitch
+            while y >= vf.minY - 0.01 { cands += row(y, center: true); y -= pitch }
+            let mainBody = body(main, tuck: mainTuck)
+            return cands.filter { fits($0) && !body($0, tuck: tuck).insetBy(dx: 0.5, dy: 0.5).intersects(mainBody) }
         }
-        var cands = row(y0, center: false)
-        var y = y0 + max(h, main.height)
-        while y + h <= vf.maxY + 0.01 { cands += row(y, center: true); y += h }
-        y = y0 - h
-        while y >= vf.minY - 0.01 { cands += row(y, center: true); y -= h }
-        cands = cands.filter { fits($0) && !$0.insetBy(dx: 0.5, dy: 0.5).intersects(main) }
+        var cands = layout(tuck: 0)
+        if cands.count < count {
+            let tight = layout(tuck: h * bubbleShare)
+            if tight.count > cands.count { cands = tight }
+        }
         var out = Array(cands.prefix(count))
         // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里
         let clamp = { (r: NSRect) -> NSRect in
@@ -75,13 +93,14 @@ extension App {
             if let vf = NSScreen.screens.first(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) })?.visibleFrame {
                 r.origin.x = min(max(r.minX, vf.minX), max(vf.minX, vf.maxX - size.width))
                 r.origin.y = min(max(r.minY, vf.minY), max(vf.minY, vf.maxY - size.height))
-                let busy = ([panel.frame] + others).contains { $0.intersects(r.insetBy(dx: 1, dy: 1)) }
+                let busy = ([panel.frame] + others).contains { Self.body($0).intersects(Self.body(r).insetBy(dx: 1, dy: 1)) }
                 if !busy { return r.origin }
             }
         }
         let vf = (panel.screen ?? NSScreen.main)?.visibleFrame ?? panel.frame
         let slots = Self.companionSlots(main: panel.frame, count: 2 * others.count + 1, size: size, visible: vf)
-        let free = slots.first { s in !others.contains { $0.intersects(s.insetBy(dx: 1, dy: 1)) } }
+        // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
+        let free = slots.first { s in !others.contains { Self.body($0).intersects(Self.body(s).insetBy(dx: 1, dy: 1)) } }
         return (free ?? slots.last ?? panel.frame).origin
     }
 

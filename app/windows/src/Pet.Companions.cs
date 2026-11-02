@@ -71,12 +71,13 @@ namespace CrossPet
                 if (scr != null)
                 {
                     r = CompanionPlace.Clamp(r, Box(scr.WorkingArea));
-                    if (!new[] { main }.Concat(others).Any(o => o.Intersects(r, 1))) return ((int)r.X, (int)r.Y);
+                    if (!new[] { main }.Concat(others).Any(o => CompanionPlace.Body(r).Intersects(CompanionPlace.Body(o), 1))) return ((int)r.X, (int)r.Y);
                 }
             }
             var wa = Box(Forms.Screen.FromHandle(hwnd).WorkingArea);
             var slots = CompanionPlace.Slots(main, 2 * others.Count + 1, new CompanionPlace.Size(w, h), wa);
-            var free = slots.Cast<CompanionPlace.Rect?>().FirstOrDefault(s => !others.Any(o => s.Value.Intersects(o, 1)));
+            // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
+            var free = slots.Cast<CompanionPlace.Rect?>().FirstOrDefault(s => !others.Any(o => CompanionPlace.Body(s.Value).Intersects(CompanionPlace.Body(o), 1)));
             var pick = free ?? (slots.Length > 0 ? slots[slots.Length - 1] : main);
             return ((int)Math.Round(pick.X), (int)Math.Round(pick.Y));
         }

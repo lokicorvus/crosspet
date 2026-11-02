@@ -217,17 +217,19 @@ static class Program
 
         // 多桌宠：额外那几只第一次出现放在哪（CompanionPlace.Slots，物理像素、y 向下；规则同 macOS 的 companionSlots，
         // 那边测试 tests/companion_place_probe.sh）。都要整个在可见区里、两两不重叠、不压着主桌宠
-        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis)
+        // bodies：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
+        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis, bool bodies = false)
         {
             var s = CompanionPlace.Slots(main, n, size, vis);
+            CompanionPlace.Rect B(CompanionPlace.Rect r) => bodies ? CompanionPlace.Body(r) : r;
             if (s.Length != n) return $"只有 {s.Length} 只（要 {n} 只）";
             bool Over(CompanionPlace.Rect a, CompanionPlace.Rect b) => a.X < b.X + b.W - 0.01 && b.X < a.X + a.W - 0.01 && a.Y < b.Y + b.H - 0.01 && b.Y < a.Y + a.H - 0.01;
             for (int i = 0; i < n; i++)
             {
                 var r = s[i];
                 if (r.X < vis.X - 0.01 || r.Y < vis.Y - 0.01 || r.X + r.W > vis.X + vis.W + 0.01 || r.Y + r.H > vis.Y + vis.H + 0.01) return $"第 {i + 1} 只出了可见区：{r.X} {r.Y}";
-                if (Over(r, main)) return $"第 {i + 1} 只压着主桌宠";
-                for (int j = 0; j < i; j++) if (Over(r, s[j])) return $"第 {j + 1} 和第 {i + 1} 只重叠";
+                if (Over(B(r), B(main))) return $"第 {i + 1} 只压着主桌宠";
+                for (int j = 0; j < i; j++) if (Over(B(r), B(s[j]))) return $"第 {j + 1} 和第 {i + 1} 只重叠";
             }
             return "ok";
         }
@@ -256,6 +258,11 @@ static class Program
         var lWide = Layout(R(1500, 600, 348, 341), 8, pet1, vis1080);
         var lNarrow = Layout(mainBR, 8, new CompanionPlace.Size(348, 341), vis1080);
         Check("多桌宠位置：主桌宠和额外那只宽窄不同（" + lWide + " / " + lNarrow + "）", lWide == "ok" && lNarrow == "ok");
+        // 笔记本屏幕（可见区高 859，两排整窗口要 862）、主桌宠在右上：整窗口只排得下一排 3 格；
+        // 6 只要压着气泡空白排成两排，人物不重叠（以前后 3 只叠在前 3 只上）
+        var lLaptop = Layout(R(1164, 38, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true);
+        var lLaptop3 = Layout(R(1164, 38, 310, 431), 3, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859));
+        Check("多桌宠位置：笔记本屏幕上 6 只压着气泡空白排两排（" + lLaptop + " / " + lLaptop3 + "）", lLaptop == "ok" && lLaptop3 == "ok");
         // 默认大小在 1280×720 上放不下 12 只：躲不开重叠，但每只都夹在可见区里
         var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
         Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12

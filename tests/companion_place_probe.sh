@@ -10,20 +10,22 @@ run() {   # 和 window_place_probe.sh 一样 5 秒超时：参数不认识时 Ap
   perl -e 'alarm 5; exec @ARGV' "$BIN" --companion-place-probe "$@" 2>/dev/null || true
 }
 # 名字 主桌宠(4) 几只 宽 高 可见区(4)：几只都要有、都在可见区里、两两不重叠、不压主桌宠
+# SHARE=59/362：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
+SHARE=0
 check_layout() {
   name=$1; shift
   count=$5; mx=$1; my=$2; mw=$3; mh=$4; vx=$8; vy=$9; vw=${10}; vh=${11}
   out=$(run "$@")
-  verdict=$(printf '%s\n' "$out" | awk -v n="$count" -v mx="$mx" -v my="$my" -v mw="$mw" -v mh="$mh" \
+  verdict=$(printf '%s\n' "$out" | awk -v s="$SHARE" -v n="$count" -v mx="$mx" -v my="$my" -v mw="$mw" -v mh="$mh" \
       -v vx="$vx" -v vy="$vy" -v vw="$vw" -v vh="$vh" '
     BEGIN { k = 0 }
-    NF == 4 { x[k] = $1; y[k] = $2; w[k] = $3; h[k] = $4; k++ }
+    NF == 4 { x[k] = $1; y[k] = $2; w[k] = $3; H[k] = $4; h[k] = $4 * (1 - s); k++ }
     function over(ax, ay, aw, ah, bx, by, bw, bh) { return ax < bx + bw - 0.01 && bx < ax + aw - 0.01 && ay < by + bh - 0.01 && by < ay + ah - 0.01 }
     END {
       if (k != n) { print "只有 " k + 0 " 只（要 " n " 只）"; exit }
       for (i = 0; i < k; i++) {
-        if (x[i] < vx - 0.01 || y[i] < vy - 0.01 || x[i] + w[i] > vx + vw + 0.01 || y[i] + h[i] > vy + vh + 0.01) { print "第 " i + 1 " 只出了可见区：" x[i] " " y[i]; exit }
-        if (over(x[i], y[i], w[i], h[i], mx, my, mw, mh)) { print "第 " i + 1 " 只压着主桌宠：" x[i] " " y[i]; exit }
+        if (x[i] < vx - 0.01 || y[i] < vy - 0.01 || x[i] + w[i] > vx + vw + 0.01 || y[i] + H[i] > vy + vh + 0.01) { print "第 " i + 1 " 只出了可见区：" x[i] " " y[i]; exit }
+        if (over(x[i], y[i], w[i], h[i], mx, my, mw, mh * (1 - s))) { print "第 " i + 1 " 只压着主桌宠：" x[i] " " y[i]; exit }
         for (j = 0; j < i; j++) if (over(x[i], y[i], w[i], h[i], x[j], y[j], w[j], h[j])) { print "第 " j + 1 " 和第 " i + 1 " 只重叠"; exit }
       }
       print "ok"
@@ -51,6 +53,12 @@ check_layout second-screen -2050 400 260 362 6 260 362 -1920 80 1920 1000
 # 文字放大后画布比人物宽（每只比主桌宠窄 / 宽）：也不重叠
 check_layout wider-main 1500 100 348 341 8 260 362 0 0 1920 1055
 check_layout wider-companion 1620 100 260 362 8 348 341 0 0 1920 1055
+# 笔记本屏幕（可见区高 859，两排整窗口要 862）、主桌宠在右上：整窗口只排得下一排 3 格；
+# 6 只要压着气泡空白排成两排，人物不重叠（以前后 3 只叠在前 3 只上）
+SHARE=$(awk 'BEGIN { print 59 / 362 }')
+check_layout laptop-two-rows 1164 513 310 431 6 310 431 0 85 1512 859
+SHARE=0
+check_layout laptop-three-fit 1164 513 310 431 3 310 431 0 85 1512 859
 # 屏幕太小放不下：只要求都在可见区里（重叠躲不开）
 out=$(run 1100 100 260 362 20 260 362 0 0 1440 875)
 bad=$(printf '%s\n' "$out" | awk 'NF == 4 { k++; if ($1 < -0.01 || $2 < -0.01 || $1 + $3 > 1440.01 || $2 + $4 > 875.01) b++ } END { if (k != 20) print "只有 " k + 0 " 只"; else if (b) print b " 只出了可见区"; else print "ok" }')
