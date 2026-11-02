@@ -1,6 +1,6 @@
 # DeepSeek · 冬装 · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/deepseek-winter__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/deepseek-winter__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-winter/idle.webp`（设计参考）
   2. `characters/deepseek-winter/portrait.webp`（设计参考）
@@ -39,5 +39,5 @@ Palette: deep navy and white with pale-blue accents and tiny snowflakes. Warm an
 How she shows emotion: with her whole body. Tail wags, droops or flicks; the hood's water-spout puff bounces; the pom-poms swing; the scarf ends flutter.
 
 POSE (roll_call): One round white mitten raised high-ish (never above the hood's water spout), the other mitten at her scarf; big open grin, cheeks rosy from the cold, pom-poms swinging.
-Save as: deepseek-winter__roll_call.png
+Save as: deepseek-winter__roll_call__vN.png
 ```

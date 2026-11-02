@@ -1,6 +1,6 @@
 # DeepSeek · 毛衣 · busy_left · 忙碌（朝左）
 
-- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__busy_left.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__busy_left__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-knit/idle.webp`（设计参考）
 
@@ -46,5 +46,5 @@ How she shows emotion: with her whole body. Tail wags, droops or flicks; the aho
 TWO-FRAME PAIR: this image is the first of a left/right pair ("busy_right.png" will be drawn later as an edit of this one). Make the pose clearly directional toward the viewer's LEFT, so the partner can turn the other way. "left" and "right" mean the viewer's left and right.
 
 POSE (busy_left): Hectic but cheerful: turned toward the viewer's LEFT, hugging a small stack of papers in one arm and grabbing a sheet that is slipping off on the left side, while her other hand holds a second small stack against her hip. Determined eyes, a small open 'wah!' mouth, ahoge bent into a spiral, sleeves flopping, tail swishing.
-Save as: deepseek-knit__busy_left.png
+Save as: deepseek-knit__busy_left__vN.png
 ```

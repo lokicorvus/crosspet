@@ -4,12 +4,13 @@
     python3 tools/art.py new <批次> <姿态...> [--chars a,b]   出题：每个角色 × 姿态一份提示词，生成 任务.md
     python3 tools/art.py check <批次>                          检查 成品/ 里画好的图，更新状态，生成 对比.html
     python3 tools/art.py pass <批次> <角色:姿态 | all>...      验收通过（all = 所有「待验收」的）
-    python3 tools/art.py redo <批次> <角色:姿态> "原因"        退回重画：原因写进那份提示词，旧图挪到 成品/退回/
+    python3 tools/art.py redo <批次> <角色:姿态> "原因"        退回重画：原因写进那份提示词，下次画存成新的一版
     python3 tools/art.py import <批次>                         把「通过」的存档到 art/原图/，处理成 characters/<角色>/<姿态>.webp
     python3 tools/art.py status [批次]                         看进度
 
 角色 = art/角色/<id>.md（角色锁定、参考图、每个姿态她自己的动作），姿态 = art/姿态/<姿态>.md（用途、拼哪几段规则、成对和底图），
 规则段落 = art/规则/*.txt。一张图一份提示词；成对的（busy_left → busy_right）后画的那张拿先画好的当底图改，不镜像翻转。
+成品/ 里每画一次存一版（<角色>__<姿态>__v1.png、v2……），旧的不覆盖不挪走；不要的版本 loki 自己删，检查、对比、导入都用剩下的最新一版。
 """
 import json
 import os
@@ -88,8 +89,25 @@ def batch_dir(name):
     return ART / "任务" / name
 
 
+def versions(batch, cid, pose):
+    """成品里这张的所有版本，旧的在前：[(版本号, 路径)]。没带版本号的老文件（2026-11-02 以前）算 v0"""
+    d = batch_dir(batch) / "成品"
+    out = [(0, d / f"{cid}__{pose}.png")] if (d / f"{cid}__{pose}.png").exists() else []
+    for f in d.glob(f"{cid}__{pose}__v*.png"):
+        m = re.fullmatch(rf"{re.escape(cid)}__{re.escape(pose)}__v(\d+)\.png", f.name)
+        if m:
+            out.append((int(m.group(1)), f))
+    return sorted(out)
+
+
 def done_path(batch, cid, pose):
-    return batch_dir(batch) / "成品" / f"{cid}__{pose}.png"
+    """这张现在算数的那版：剩下的最新一版；还没画是 None"""
+    vs = versions(batch, cid, pose)
+    return vs[-1][1] if vs else None
+
+
+def done_pattern(batch, cid, pose):
+    return batch_dir(batch) / "成品" / f"{cid}__{pose}__vN.png"
 
 
 def archive_latest(cid, pose):
@@ -122,10 +140,15 @@ def rel(p):
     return str(Path(p).resolve().relative_to(ROOT))
 
 
+def rel_any(p):
+    """还不存在的文件（vN 占位）也能写成相对路径"""
+    return str(Path(p).relative_to(ROOT)) if Path(p).is_absolute() else str(p)
+
+
 def base_source(batch, st, cid, base_pose):
     """底图：同一批里有就用这批画好的（先画），没有就用现在用的那张"""
     if any(i["char"] == cid and i["pose"] == base_pose for i in st["items"]):
-        return done_path(batch, cid, base_pose), True
+        return done_path(batch, cid, base_pose) or done_pattern(batch, cid, base_pose), True
     return existing_image(cid, base_pose), False
 
 
@@ -138,21 +161,25 @@ def write_prompt(batch, st, item):
     attach = []
     if pose["base"]:
         src, in_batch = base_source(batch, st, ch["id"], pose["base"])
-        attach.append((src, f"底图：{pose['base']}" + ("（本批先画好的那张）" if in_batch else "（现在用的那张）")))
+        if in_batch:   # 底图会换版本（loki 删掉不要的），附件写成「最新的一版」，画的时候再看是哪个文件
+            src = done_pattern(batch, ch["id"], pose["base"])
+        attach.append((src, f"底图：{pose['base']}" + ("（本批画好的那张：成品里版本号最大的那个文件）" if in_batch else "（现在用的那张）")))
         if side and "探头" not in pose["rules"]:   # 眨眼也拿底图改，但不是左右成对
             blocks.append(rule("成对-后画", SIDE=side, OTHER=other, BASE=f"{pose['base']}.png"))
     elif pose["partner"]:
         blocks.append(rule("成对-先画", SIDE=side, PARTNER=f"{pose['partner']}.png"))
     for r in ch["refs"]:
         attach.append((ROOT / r, "设计参考"))
-    out = done_path(batch, ch["id"], pose["pose"])
+    out = done_pattern(batch, ch["id"], pose["pose"])
     blocks.append(f"POSE ({pose['pose']}): {action_line(ch, pose)}\nSave as: {out.name}")
     md = [f"# {ch['name']} · {pose['title']}", "",
-          f"- 保存到：`{rel(out)}`（PNG，透明背景，生图时开 `transparent_background: true`）",
+          f"- 保存到：`{rel(out)}`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。"
+          "**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）",
           "- 附件（按顺序附上）："]
     for i, (p, why) in enumerate(attach, 1):
-        ok = "" if p and Path(p).exists() else "　⚠️ 文件还不存在：先画它"
-        md.append(f"  {i}. `{rel(p) if p else '（没有）'}`（{why}）{ok}")
+        exists = p and (Path(p).exists() or (Path(p).name.endswith("__vN.png") and any(Path(p).parent.glob(Path(p).name.replace("vN", "v*")))))
+        ok = "" if exists else "　⚠️ 文件还不存在：先画它"
+        md.append(f"  {i}. `{rel_any(p) if p else '（没有）'}`（{why}）{ok}")
     if item.get("notes"):
         md += ["", "## 上次退回的原因（这次一定要改掉）", ""] + [f"- {n}" for n in item["notes"]]
     md += ["", "## 提示词", "", "```text", "\n\n".join(blocks), "```", ""]
@@ -231,8 +258,11 @@ def check_image(path, cid, pose_name, batch=None, st=None):
     edge = "贴边" in pose["rules"] or "探头" in pose["rules"]
     if edge:
         side = pose["side"]
-        near, far = (m[t:b + 1, 0], r >= W - 2) if side == "left" else (m[t:b + 1, -1], l <= 1)
-        if near.mean() < 0.15:
+        # 切口不一定正好压在边框上：差几十像素的透明缝导入时会裁掉（prepare.py 裁到人物外框），只要切口是一条直的、离边框不远
+        solid = np.where(m[t:b + 1].mean(0) > 0.15)[0]   # 身体盖住一成半以上高度的列：切口就是最靠边的那一列
+        gap = W if not len(solid) else (solid[0] if side == "left" else W - 1 - solid[-1])
+        far = (r >= W - 2) if side == "left" else (l <= 1)
+        if gap > W * 0.06:
             out.append({"level": "fail", "msg": f"{'左' if side == 'left' else '右'}边框没从她身上切过去（贴边图要贴着{'左' if side == 'left' else '右'}边）"})
         if far:
             out.append({"level": "fail", "msg": f"另一边（{'右' if side == 'left' else '左'}边）也贴着边框了：方向可能画反了"})
@@ -273,7 +303,9 @@ def write_sheet(batch, st):
     cards = []
     for i in st["items"]:
         cid, pose = i["char"], i["pose"]
-        pics = [("新画的", done_path(batch, cid, pose)), ("现在用的", CHARACTERS / cid / f"{pose}.webp")]
+        vs = versions(batch, cid, pose)
+        pics = [(f"v{v}" + ("（导入用这版）" if n == len(vs) - 1 else ""), f) for n, (v, f) in reversed(list(enumerate(vs)))] or [("还没画", None)]
+        pics.append(("现在用的", CHARACTERS / cid / f"{pose}.webp"))
         spec = read_pose(pose, cid)
         if spec["base"]:
             pics.append((f"底图 {spec['base']}", base_source(batch, st, cid, spec["base"])[0]))
@@ -302,7 +334,8 @@ ul {{ padding-left: 18px; }} li.fail {{ color: #c0392b; }} li.warn {{ color: #b9
 code {{ display: block; font-size: 12px; color: #777; user-select: all; }}
 </style>
 <h1>对比 · {batch}</h1>
-<p>棋盘格是透明的地方。左边是新画的，旁边是现在用的、底图（成对的先画那张）和待机图，看大小、方向、细节对不对。</p>
+<p>棋盘格是透明的地方。左边是画过的每一版（最新的在最左，导入用它），后面是现在用的、底图和待机图。
+不喜欢最新那版、想用早一点的：去 成品/ 里把不要的版本删掉，再跑一次 check 刷新这页。</p>
 {''.join(cards)}
 """
     (d / "对比.html").write_text(html)
@@ -350,13 +383,17 @@ def cmd_check(args):
     batch = args[0]
     st = load(batch)
     for i in st["items"]:
-        p = done_path(batch, i["char"], i["pose"])
-        if not p.exists() or i["state"] in ("通过", "已导入"):
+        vs = versions(batch, i["char"], i["pose"])
+        if not vs or i["state"] in ("通过", "已导入"):
             continue
+        if i["state"] == "退回" and vs[-1][0] <= i.get("rejected", -1):
+            continue   # 退回后还没画新的一版
+        p = vs[-1][1]
         i["checks"] = check_image(p, i["char"], i["pose"], batch, st)
+        i["version"] = vs[-1][0]
         bad = [c["msg"] for c in i["checks"] if c["level"] == "fail"]
         i["state"] = "机检不过" if bad else "待验收"
-        print(f"{i['char']}:{i['pose']}  {i['state']}  " + "；".join(c["msg"] for c in i["checks"]))
+        print(f"{i['char']}:{i['pose']}  v{vs[-1][0]}  {i['state']}  " + "；".join(c["msg"] for c in i["checks"]))
     save(batch, st)
     write_sheet(batch, st)
     print(f"对比页：{rel(batch_dir(batch) / '对比.html')}")
@@ -367,7 +404,7 @@ def cmd_pass(args):
     st = load(batch)
     picked = [i for i in st["items"] if i["state"] == "待验收"] if keys == ["all"] else [find(st, k) for k in keys]
     for i in picked:
-        if not done_path(batch, i["char"], i["pose"]).exists():
+        if not done_path(batch, i["char"], i["pose"]):
             sys.exit(f"{i['char']}:{i['pose']} 还没画")
         i["state"] = "通过"
     save(batch, st)
@@ -381,12 +418,8 @@ def cmd_redo(args):
     batch, key, why = args[0], args[1], " ".join(args[2:])
     st = load(batch)
     i = find(st, key)
-    p = done_path(batch, i["char"], i["pose"])
-    if p.exists():
-        old = p.parent / "退回"
-        old.mkdir(exist_ok=True)
-        n = len(list(old.glob(f"{p.stem}-*.png"))) + 1
-        shutil.move(p, old / f"{p.stem}-{n}.png")
+    vs = versions(batch, i["char"], i["pose"])
+    i["rejected"] = vs[-1][0] if vs else -1   # 这一版及以前的都不算数了，等新的一版；旧图留在成品里
     i["notes"].append(why)
     i["state"] = "退回"
     i["checks"] = []
@@ -404,7 +437,11 @@ def cmd_import(args):
         if i["state"] != "通过":
             continue
         cid, pose = i["char"], i["pose"]
-        src = done_path(batch, cid, pose)
+        vs = versions(batch, cid, pose)
+        if not vs:
+            print(f"{cid}:{pose} 成品里一版都没有了，跳过")
+            continue
+        src = vs[-1][1]
         d = ART / "原图" / cid / pose
         d.mkdir(parents=True, exist_ok=True)
         v = len(list(d.glob("v*.png"))) + 1
@@ -417,7 +454,8 @@ def cmd_import(args):
         subprocess.run([sys.executable, str(ROOT / "tools" / "prepare.py"), str(keep), cid, pose], check=True, env=env)
         i["state"] = "已导入"
         n += 1
-        print(f"{cid}:{pose} → characters/{cid}/{pose}.webp（原图存档 {rel(keep)}）")
+        more = f"，成品里还有 {len(vs) - 1} 版没删，用的是最新的" if len(vs) > 1 else ""
+        print(f"{cid}:{pose} v{vs[-1][0]} → characters/{cid}/{pose}.webp（原图存档 {rel(keep)}{more}）")
         if pose in ("idle", "idle-blink"):
             blinks.add(cid)
     for cid in blinks:   # 眨眼帧只留眼睛那块，免得眨眼时全身抖一下

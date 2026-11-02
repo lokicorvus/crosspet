@@ -1,6 +1,6 @@
 # 千问 Qwen · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/qwen__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/qwen__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/qwen/idle.webp`（设计参考）
   2. `docs/prompts/ref-qwen.webp`（设计参考）
@@ -40,5 +40,5 @@ Palette: periwinkle blue, dark navy, white and soft gold. Keep it elegant; no ot
 How she shows emotion: gracefully, mostly with the fan. Laughing = fan raised to cover her mouth with smiling closed eyes; thinking = closed fan tapping her chin; shy = fan hiding the lower half of her face; pleased = fan opened with a gentle flourish; upset = fan snapped shut. Expressions are bright and open (like the reference's happy open-mouth smile), but always gentle and lady-like, never loud.
 
 POSE (roll_call): The closed fan held in one hand at her chest, the other hand raised gracefully, fingers together; a warm open-mouthed smile, braid and tassels swaying.
-Save as: qwen__roll_call.png
+Save as: qwen__roll_call__vN.png
 ```

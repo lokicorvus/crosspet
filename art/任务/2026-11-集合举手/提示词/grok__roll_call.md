@@ -1,6 +1,6 @@
 # Grok · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/grok__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/grok__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/grok/idle.webp`（设计参考）
   2. `docs/prompts/ref-grok.webp`（设计参考）
@@ -41,5 +41,5 @@ Palette: black, gold and deep red, with golden-blonde hair and bright-blue eyes.
 How she shows emotion: a fang-showing grin or a cheeky wink with her tongue out; the twin-tails and bat-wing bows perk up when happy and droop when sad; hands on her hips when she is cocky, arms crossed when she is defiant, hugging herself when she is hurt or sleepy.
 
 POSE (roll_call): A cocky two-finger salute from the brow, the other hand on her hip; a fang-showing grin and a wink, twin-tails and bat-wing bows perked up.
-Save as: grok__roll_call.png
+Save as: grok__roll_call__vN.png
 ```

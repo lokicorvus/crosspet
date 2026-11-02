@@ -1,6 +1,6 @@
 # DeepSeek · 毛衣 · delegating · 派小帮手
 
-- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__delegating.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__delegating__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-knit/idle.webp`（设计参考）
 
@@ -34,5 +34,5 @@ Palette: navy-to-blue hair and tail, cream-white knits, navy tartan. Soft, warm,
 How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; the beret's pom-pom swings; the long sweater sleeves flop around.
 
 POSE (delegating): She is handing out work to her little helpers. (Exception to "exactly one character": besides her, draw two or three tiny helpers, each about the size of her hand, fully inside the image and touching her or each other.) Her helpers are tiny round knitted whale plushies (cream and navy yarn), each carrying a sheet of paper on its back. She cheers them on with both sleeve-covered fists raised, big grin, tail wagging.
-Save as: deepseek-knit__delegating.png
+Save as: deepseek-knit__delegating__vN.png
 ```

@@ -1,6 +1,6 @@
 # GLM · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/glm__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/glm__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/glm/idle.webp`（设计参考）
   2. `characters/glm/portrait.webp`（设计参考）
@@ -38,5 +38,5 @@ The "Z" charms and the "Z" emblem are part of her design: keep them exactly, but
 How she shows emotion: fox body language (ears perk up or flatten, the big tail swishes slyly or wraps around her), the sleep mask (pulled down over her eyes = "anonymous mode" disguise or sleeping), the bells, and a sly closed-eye fox smile or a playful wink.
 
 POSE (roll_call): Her book held against her side with one arm, the other hand raised with one finger up as if bidding at an auction; a sly closed-eye fox smile, ears perked, bells jingling.
-Save as: glm__roll_call.png
+Save as: glm__roll_call__vN.png
 ```

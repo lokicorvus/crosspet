@@ -1,6 +1,6 @@
 # Gemini · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/gemini__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/gemini__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/gemini/idle.webp`（设计参考）
   2. `docs/prompts/ref-gemini.webp`（设计参考）
@@ -38,5 +38,5 @@ Keep exactly:
 How she shows emotion: cat body language. Ears perk up or flatten, tail puffs, curls or swishes; cat-like poses (paw hands, stretching like a cat). The ":3" smile is her default.
 
 POSE (roll_call): A paw-hand raised beside her head like a beckoning cat, the other paw at her chest; ":3" mouth open in a cheerful call, ears perked straight up, tail curled.
-Save as: gemini__roll_call.png
+Save as: gemini__roll_call__vN.png
 ```

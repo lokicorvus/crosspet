@@ -1,6 +1,6 @@
 # GPT · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/gpt__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/gpt__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/gpt/idle.webp`（设计参考）
   2. `docs/prompts/ref-gpt.webp`（设计参考）
@@ -39,5 +39,5 @@ Palette: almost entirely white and pale lavender; keep it soft, NEVER add strong
 How she shows emotion: through wings and tail (wings spread when happy or proud, droop when tired, tail curls or flicks) and very small facial changes. Even "happy" is a confident small smile, not a wide grin.
 
 POSE (roll_call): One hand raised elegantly with relaxed fingers, the other resting at her waist; a calm, confident small smile, wings lifted a little, tail tip curling.
-Save as: gpt__roll_call.png
+Save as: gpt__roll_call__vN.png
 ```

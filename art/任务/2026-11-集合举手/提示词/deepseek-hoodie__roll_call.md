@@ -1,6 +1,6 @@
 # DeepSeek · Claude 卫衣 · roll_call · 集合点名「到！」
 
-- 保存到：`art/任务/2026-11-集合举手/成品/deepseek-hoodie__roll_call.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-集合举手/成品/deepseek-hoodie__roll_call__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-hoodie/idle.webp`（设计参考）
   2. `characters/deepseek-hoodie/portrait.webp`（设计参考）
@@ -39,5 +39,5 @@ Palette: navy-to-blue hair and tail, cream hoodie, warm orange accents. Keep it 
 How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot; long hoodie sleeves flop around.
 
 POSE (roll_call): One long hoodie sleeve shot up eagerly so the sleeve flops down over her hand, the other fist at her side; big open grin, ahoge straight up, tail wagging.
-Save as: deepseek-hoodie__roll_call.png
+Save as: deepseek-hoodie__roll_call__vN.png
 ```

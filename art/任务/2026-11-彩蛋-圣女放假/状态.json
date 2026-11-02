@@ -4,37 +4,62 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "pop",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ]
   },
   {
    "char": "egg-deepseek-bedtime",
    "pose": "pretend",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ]
   },
   {
    "char": "egg-deepseek-bedtime",
    "pose": "caught",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ]
   },
   {
    "char": "egg-deepseek-bedtime",
    "pose": "bye",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ]
   },
   {
    "char": "egg-deepseek-bedtime",
    "pose": "escape",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ]
   }
  ]
 }

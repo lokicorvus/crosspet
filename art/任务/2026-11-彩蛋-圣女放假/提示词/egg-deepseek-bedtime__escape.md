@@ -1,6 +1,6 @@
 # 彩蛋 · 睡衣 DeepSeek 来找圣女 Claude · escape · 彩蛋·溜走
 
-- 保存到：`art/任务/2026-11-彩蛋-圣女放假/成品/egg-deepseek-bedtime__escape.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-彩蛋-圣女放假/成品/egg-deepseek-bedtime__escape__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-pajamas/idle.webp`（设计参考）
   2. `characters/deepseek-pajamas/portrait.webp`（设计参考）
@@ -37,5 +37,5 @@ How she shows emotion: with her whole body. Tail wags, droops or flicks; the aho
 SCENE: Saint Claude (the THIRD attached reference) has been strict and formal all day. DeepSeek sneaks over at bedtime to get her to relax. Claude herself never appears in these images. Only two of Claude's things may appear, copied exactly from the third reference: her golden laurel crown, and her rolled parchment scroll with the red wax seal. Do not copy anything else from Claude (no robe, no orange hair, no Claude face).
 
 POSE (escape): Curled up asleep and cosy, lying on her side on the fluffy pillow, a big yawn, eyes closed; the unrolled red-sealed scroll is draped over her tummy like a little blanket; tail curled around her. She is still fully inside the image, with the same head size as the reference.
-Save as: egg-deepseek-bedtime__escape.png
+Save as: egg-deepseek-bedtime__escape__vN.png
 ```

@@ -1,6 +1,6 @@
 # DeepSeek · 毛衣 · bye · 道别
 
-- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__bye.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__bye__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
   1. `characters/deepseek-knit/idle.webp`（设计参考）
 
@@ -34,5 +34,5 @@ Palette: navy-to-blue hair and tail, cream-white knits, navy tartan. Soft, warm,
 How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; the beret's pom-pom swings; the long sweater sleeves flop around.
 
 POSE (bye): Saying goodbye before heading out: body turned slightly to one side as if about to walk off, face still toward the viewer, waving big with one sleeve-covered hand, the other hand holding the strap of her whale bag, tail wagging.
-Save as: deepseek-knit__bye.png
+Save as: deepseek-knit__bye__vN.png
 ```

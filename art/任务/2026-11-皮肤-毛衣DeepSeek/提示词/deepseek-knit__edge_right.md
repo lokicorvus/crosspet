@@ -1,8 +1,8 @@
 # DeepSeek · 毛衣 · edge_right · 贴边（右）
 
-- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__edge_right.png`（PNG，透明背景，生图时开 `transparent_background: true`）
+- 保存到：`art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__edge_right__vN.png`：N 换成下一个没用过的数字（还没有就是 v1，已经有 v1、v2 就存 v3）。**每画一次都存新的一版，不要覆盖、删除、挪走旧的**（PNG，透明背景，生图时开 `transparent_background: true`）
 - 附件（按顺序附上）：
-  1. `art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__edge_left.png`（底图：edge_left（本批先画好的那张））　⚠️ 文件还不存在：先画它
+  1. `art/任务/2026-11-皮肤-毛衣DeepSeek/成品/deepseek-knit__edge_left__vN.png`（底图：edge_left（本批画好的那张：成品里版本号最大的那个文件））
   2. `characters/deepseek-knit/idle.webp`（设计参考）
 
 ## 提示词
@@ -46,5 +46,5 @@ TWO-FRAME PAIR (very important): this image is the RIGHT partner of "edge_left.p
 - "left" and "right" always mean the viewer's left and right.
 
 POSE (edge_right): Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression.
-Save as: deepseek-knit__edge_right.png
+Save as: deepseek-knit__edge_right__vN.png
 ```

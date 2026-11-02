@@ -4,317 +4,587 @@
   {
    "char": "deepseek-knit",
    "pose": "idle-blink",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "listening",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "thinking",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "reading",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "writing",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "running",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "searching",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "asking",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "happy",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "oops",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "sleeping",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "surprised",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "delegating",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "drawing",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "proud",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "pat",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "tired",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "hum",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "stretch",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "yawn",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "compact",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "update",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "bye",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "pout",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "eat",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "slack",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "swim",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "deepthink",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "feast",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "annoyed",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "puffed",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "redhot",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "sulk",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "dizzy",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "coaxed",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "forgiven",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "busy_left",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "swamped_left",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_left",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
   },
   {
    "char": "deepseek-knit",
    "pose": "busy_right",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "swamped_right",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_left_peek",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_right",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_right_peek",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
   }
  ]
 }
