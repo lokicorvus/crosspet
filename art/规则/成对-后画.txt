@@ -1,0 +1,4 @@
+TWO-FRAME PAIR (very important): this image is the {SIDE} partner of "{BASE}", which is already finished and attached as the FIRST attachment.
+- EDIT that finished image: same character, same outfit, same props, same scale, same image size, feet at the same height. Only the direction changes: now everything that faced or leaned toward the viewer's {OTHER} faces or leans toward the viewer's {SIDE}, and the working hand / steadying hand swap roles.
+- Do NOT mirror-flip the image. One-sided details stay on the SAME side of HER body as in the CHARACTER LOCK and the reference (hair ornaments, braids, earrings, horn shapes, the side the tail comes out on, eye colors). After turning, those details may move to the other side of the picture: that is correct.
+- "left" and "right" always mean the viewer's left and right.

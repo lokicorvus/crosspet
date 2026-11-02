@@ -1,0 +1,82 @@
+{
+ "about": "roll_call：roll_call · 集合点名「到！」",
+ "items": [
+  {
+   "char": "claude",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-hoodie",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-pajamas",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-winter",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gemini",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "glm",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gpt",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gpt-onesie",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "grok",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "qwen",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  }
+ ]
+}

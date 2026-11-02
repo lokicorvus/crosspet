@@ -1,0 +1,1 @@
+BLINK FRAME: this image is an EDIT of the attached base image (the first attachment). Change ONLY the eyes to softly closed: gentle curved closed eyes with the same eyelashes. Everything else (pose, scale, position, hair, outfit, colors, mouth, tail, every prop) must stay pixel-identical, because the app swaps this frame in for a split second to make her blink.

@@ -1,0 +1,10 @@
+You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
+
+FORMAT RULES (every image):
+- Real transparent background (generate with transparent_background: true). No floor, no ground shadow, no glow, no frame. Keep complete, clean edges. If an attached reference image has a plain white background, that is only because it was made before transparent output was available: do NOT copy the white background.
+- No text, no letters, no speech bubbles, no floating symbols (no ?, !, hearts, Zzz, sweat-drop icons in the air, motion lines). Sweat drops and blush ON the face are fine.
+- Exactly one character, full body, centered; head near the top and feet near the bottom; she fills about 90% of the image height, the same scale as the reference, with a clear band of empty background above the highest point of her head (hats, crowns and ahoge included).
+- Props she carries must TOUCH her or her hands; nothing floats detached in the air (the app deletes detached pieces).
+- A continuous closed dark outline around the whole silhouette.
+- Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
+- Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
