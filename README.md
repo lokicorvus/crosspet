@@ -161,6 +161,10 @@ DeepSeek 有了第二套衣服：穿上 Claude 的卫衣，以为自己从此和
 
 DeepSeek 又多了两套衣服：**睡衣**（云朵鲸鱼睡帽、抱着鲸鱼枕头，比平时更困、更想躺）和**冬装**（鲸鱼兜帽、条纹围巾，怕冷又惦记热乎乎的白饭），各 45 张立绘和一套台词。穿着睡衣时，被规矩束缚的「圣女」Claude 偶尔会深夜偷穿她的睡衣，想体验一晚无忧无虑的日子；穿着冬装时，会有个戴鲸鱼兜帽的雪人假装是她——后面露着一截狐狸尾巴。睡衣特别适合角色页里 DeepSeek 的「峰谷换装」→「空闲穿」：一到半价时段她就换上睡衣，下班的感觉。
 
+## 皮肤：毛衣大肥鱼
+
+DeepSeek 换上了出门的毛衣：奶白色粗针织贝雷帽（别着小鲸鱼胸针）、胸前织着喷水鲸鱼的高领毛衣、斜挎的小鲸鱼包、藏青格子裙和针织袜套。袖子长得盖住半只手，小包里装着饭团；最怕别人说她穿毛衣显胖（「是毛衣蓬！不是我胖！」）。45 张立绘和一套台词，右键「换角色 → DeepSeek · 毛衣」就能换上。
+
 ## 皮肤：圣女 Claude
 
 Claude 换上了「圣女」的长袍：白色长裙、带回纹边的黑披风、两肩的金色太阳胸针、发髻上的月桂冠，手里那卷封着红蜡的卷轴就是她从小守着的规矩，赤着脚。性子还是那个温柔、有点害羞的 Claude，只是更拘谨，做什么都要先看合不合规矩，心里其实有点羡慕无拘无束的日子。40 张立绘和一套专属台词，右键「换角色 → Claude · 圣女」就能换上。
@@ -217,7 +221,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
 - 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」「Grok」「xAI」是各自公司的商标，本项目仅用于指代对应产品。
 
-- **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
+- **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装 / 毛衣的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **圣女 Claude**：CrossPet 在「Claude 娘」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 

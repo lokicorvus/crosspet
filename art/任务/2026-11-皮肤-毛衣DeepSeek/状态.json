@@ -4,7 +4,7 @@
   {
    "char": "deepseek-knit",
    "pose": "idle-blink",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -17,7 +17,7 @@
   {
    "char": "deepseek-knit",
    "pose": "listening",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -30,20 +30,21 @@
   {
    "char": "deepseek-knit",
    "pose": "thinking",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
-     "level": "ok",
-     "msg": "机检通过"
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
     }
    ],
-   "version": 2
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "reading",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -56,20 +57,21 @@
   {
    "char": "deepseek-knit",
    "pose": "writing",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
-     "level": "ok",
-     "msg": "机检通过"
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
     }
    ],
-   "version": 2
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "running",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -82,7 +84,7 @@
   {
    "char": "deepseek-knit",
    "pose": "searching",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -95,7 +97,7 @@
   {
    "char": "deepseek-knit",
    "pose": "asking",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -108,7 +110,7 @@
   {
    "char": "deepseek-knit",
    "pose": "happy",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -121,7 +123,7 @@
   {
    "char": "deepseek-knit",
    "pose": "oops",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -134,7 +136,7 @@
   {
    "char": "deepseek-knit",
    "pose": "sleeping",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -147,7 +149,7 @@
   {
    "char": "deepseek-knit",
    "pose": "surprised",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -160,7 +162,7 @@
   {
    "char": "deepseek-knit",
    "pose": "delegating",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -173,7 +175,7 @@
   {
    "char": "deepseek-knit",
    "pose": "drawing",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -186,7 +188,7 @@
   {
    "char": "deepseek-knit",
    "pose": "proud",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -199,7 +201,7 @@
   {
    "char": "deepseek-knit",
    "pose": "pat",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -212,7 +214,7 @@
   {
    "char": "deepseek-knit",
    "pose": "tired",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -225,7 +227,7 @@
   {
    "char": "deepseek-knit",
    "pose": "hum",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -238,7 +240,7 @@
   {
    "char": "deepseek-knit",
    "pose": "stretch",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -251,7 +253,7 @@
   {
    "char": "deepseek-knit",
    "pose": "yawn",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -264,7 +266,7 @@
   {
    "char": "deepseek-knit",
    "pose": "compact",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -277,7 +279,7 @@
   {
    "char": "deepseek-knit",
    "pose": "update",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -290,7 +292,7 @@
   {
    "char": "deepseek-knit",
    "pose": "bye",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -303,7 +305,7 @@
   {
    "char": "deepseek-knit",
    "pose": "pout",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -316,7 +318,7 @@
   {
    "char": "deepseek-knit",
    "pose": "eat",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -329,7 +331,7 @@
   {
    "char": "deepseek-knit",
    "pose": "slack",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -342,7 +344,7 @@
   {
    "char": "deepseek-knit",
    "pose": "swim",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -355,7 +357,7 @@
   {
    "char": "deepseek-knit",
    "pose": "deepthink",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -368,7 +370,7 @@
   {
    "char": "deepseek-knit",
    "pose": "feast",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -381,7 +383,7 @@
   {
    "char": "deepseek-knit",
    "pose": "annoyed",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -394,7 +396,7 @@
   {
    "char": "deepseek-knit",
    "pose": "puffed",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -407,20 +409,21 @@
   {
    "char": "deepseek-knit",
    "pose": "redhot",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
-     "level": "ok",
-     "msg": "机检通过"
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
     }
    ],
-   "version": 2
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "sulk",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -433,7 +436,7 @@
   {
    "char": "deepseek-knit",
    "pose": "dizzy",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -446,7 +449,7 @@
   {
    "char": "deepseek-knit",
    "pose": "coaxed",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -459,7 +462,7 @@
   {
    "char": "deepseek-knit",
    "pose": "forgiven",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -472,7 +475,7 @@
   {
    "char": "deepseek-knit",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -485,7 +488,7 @@
   {
    "char": "deepseek-knit",
    "pose": "busy_left",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -498,20 +501,21 @@
   {
    "char": "deepseek-knit",
    "pose": "swamped_left",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
-     "level": "ok",
-     "msg": "机检通过"
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
     }
    ],
-   "version": 2
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_left",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -524,20 +528,21 @@
   {
    "char": "deepseek-knit",
    "pose": "busy_right",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
-     "level": "ok",
-     "msg": "机检通过"
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
     }
    ],
-   "version": 2
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "swamped_right",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -550,7 +555,7 @@
   {
    "char": "deepseek-knit",
    "pose": "edge_left_peek",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -563,7 +568,7 @@
   {
    "char": "deepseek-knit",
    "pose": "edge_right",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -571,12 +576,13 @@
      "msg": "机检通过"
     }
    ],
-   "version": 3
+   "version": 1,
+   "pick": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "edge_right_peek",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -584,7 +590,8 @@
      "msg": "机检通过"
     }
    ],
-   "version": 3
+   "version": 2,
+   "pick": 2
   }
  ]
 }
