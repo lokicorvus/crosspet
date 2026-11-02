@@ -4,37 +4,67 @@
   {
    "char": "egg-gemini-yarn",
    "pose": "pop",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "egg-gemini-yarn",
    "pose": "pretend",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "egg-gemini-yarn",
    "pose": "caught",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "egg-gemini-yarn",
    "pose": "bye",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "egg-gemini-yarn",
    "pose": "escape",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   }
  ]
 }

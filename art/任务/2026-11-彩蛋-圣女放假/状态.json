@@ -4,7 +4,7 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "pop",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -16,7 +16,7 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "pretend",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -28,7 +28,7 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "caught",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -40,7 +40,7 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "bye",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -52,7 +52,7 @@
   {
    "char": "egg-deepseek-bedtime",
    "pose": "escape",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
