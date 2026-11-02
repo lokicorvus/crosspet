@@ -41,8 +41,10 @@ def read_character(cid):
     }
 
 
-def read_pose(pose):
-    p = ART / "姿态" / f"{pose}.md"
+def read_pose(pose, cid=""):
+    """彩蛋角色（egg-…）的 pop / pretend / caught / bye / escape 用 姿态/彩蛋/ 里的（bye 和普通角色的道别同名）"""
+    egg = ART / "姿态" / "彩蛋" / f"{pose}.md"
+    p = egg if cid.startswith("egg-") and egg.exists() else ART / "姿态" / f"{pose}.md"
     if not p.exists():
         sys.exit(f"没有姿态 {pose}（art/姿态/{pose}.md）")
     t = p.read_text()
@@ -128,13 +130,10 @@ def base_source(batch, st, cid, base_pose):
 
 
 def write_prompt(batch, st, item):
-    ch, pose = read_character(item["char"]), read_pose(item["pose"])
+    ch, pose = read_character(item["char"]), read_pose(item["pose"], item["char"])
     side = (pose["side"] or "").upper()
     other = {"LEFT": "RIGHT", "RIGHT": "LEFT"}.get(side, "")
-    blocks = [rule("通用")]
-    for r in pose["rules"]:
-        if r != "通用":
-            blocks.append(rule(r, SIDE=side))
+    blocks = [rule(r, SIDE=side) for r in pose["rules"]]   # 照姿态写的顺序拼；彩蛋不用「通用」，用自己那段
     blocks.append(ch["lock"])
     attach = []
     if pose["base"]:
@@ -213,7 +212,7 @@ def iou(a, b):
 def check_image(path, cid, pose_name, batch=None, st=None):
     """返回 [{level: ok/warn/fail, msg}]"""
     import numpy as np
-    pose = read_pose(pose_name)
+    pose = read_pose(pose_name, cid)
     out = []
     has_alpha, m = mask_of(path)
     H, W = m.shape
@@ -275,7 +274,7 @@ def write_sheet(batch, st):
     for i in st["items"]:
         cid, pose = i["char"], i["pose"]
         pics = [("新画的", done_path(batch, cid, pose)), ("现在用的", CHARACTERS / cid / f"{pose}.webp")]
-        spec = read_pose(pose)
+        spec = read_pose(pose, cid)
         if spec["base"]:
             pics.append((f"底图 {spec['base']}", base_source(batch, st, cid, spec["base"])[0]))
         pics.append(("待机", CHARACTERS / cid / "idle.webp"))
@@ -323,12 +322,12 @@ def cmd_new(args):
     if (batch_dir(batch) / "状态.json").exists():
         sys.exit(f"批次 {batch} 已经有了")
     chars = chars or shipped_characters()
-    specs = [read_pose(p) for p in poses]
-    # 先画底图那张：同一批里有底图的排在底图后面
-    order = sorted(specs, key=lambda s: 1 if s["base"] in poses else 0)
-    items = [{"char": c, "pose": s["pose"], "state": "待画", "notes": [], "checks": []} for c in chars for s in order]
     for c in chars:
         read_character(c)
+    specs = [read_pose(p, chars[0]) for p in poses]
+    # 先画底图那张：同一批里有底图的排在底图后面
+    items = [{"char": c, "pose": s["pose"], "state": "待画", "notes": [], "checks": []}
+             for c in chars for s in sorted((read_pose(p, c) for p in poses), key=lambda s: 1 if s["base"] in poses else 0)]
     batch_dir(batch).mkdir(parents=True)
     (batch_dir(batch) / "成品").mkdir()
     about = "；".join(f"{s['pose']}：{s['title']}" for s in specs)
@@ -412,7 +411,7 @@ def cmd_import(args):
         keep = d / f"v{v}.png"
         shutil.copy2(src, keep)
         env = dict(os.environ)
-        for kv in read_pose(pose)["import"].split():
+        for kv in read_pose(pose, cid)["import"].split():
             k, _, val = kv.partition("=")
             env[k] = val
         subprocess.run([sys.executable, str(ROOT / "tools" / "prepare.py"), str(keep), cid, pose], check=True, env=env)
