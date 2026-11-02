@@ -34,7 +34,7 @@ def read_character(cid):
     t = p.read_text()
     meta = dict(re.findall(r"^(角色 id|基于|参考图): *(.+)$", t, re.M))
     lock = re.search(r"## 角色锁定\s*```text\n(.*?)\n```", t, re.S).group(1).strip()
-    lines = dict(re.findall(r"^- ([a-z_0-9]+): *(.+)$", t.split("## 动作", 1)[1], re.M))
+    lines = dict(re.findall(r"^- ([a-z_0-9-]+): *(.+)$", t.split("## 动作", 1)[1], re.M))
     return {
         "id": cid, "name": t.splitlines()[0].lstrip("# ").strip(), "base": meta.get("基于"),
         "refs": [r.strip() for r in meta.get("参考图", "").split(",") if r.strip()], "lock": lock, "lines": lines,
@@ -139,7 +139,7 @@ def write_prompt(batch, st, item):
     if pose["base"]:
         src, in_batch = base_source(batch, st, ch["id"], pose["base"])
         attach.append((src, f"底图：{pose['base']}" + ("（本批先画好的那张）" if in_batch else "（现在用的那张）")))
-        if "探头" not in pose["rules"]:
+        if side and "探头" not in pose["rules"]:   # 眨眼也拿底图改，但不是左右成对
             blocks.append(rule("成对-后画", SIDE=side, OTHER=other, BASE=f"{pose['base']}.png"))
     elif pose["partner"]:
         blocks.append(rule("成对-先画", SIDE=side, PARTNER=f"{pose['partner']}.png"))
@@ -251,7 +251,7 @@ def check_image(path, cid, pose_name, batch=None, st=None):
         if abs(diff) > 0.1 and not edge:
             out.append({"level": "warn", "msg": f"人物比待机图{'大' if diff > 0 else '小'} {abs(round(diff * 100))}%（桌面上会忽大忽小）"})
     # 成对：后画的那张要和先画的那张方向相反，但不能是直接镜像
-    if pose["base"] and not edge and batch:
+    if pose["base"] and pose["side"] and not edge and batch:
         bsrc, _ = base_source(batch, st, cid, pose["base"])
         if bsrc and bsrc.exists():
             _, bm = mask_of(bsrc)
@@ -399,7 +399,7 @@ def cmd_redo(args):
 def cmd_import(args):
     batch = args[0]
     st = load(batch)
-    n = 0
+    n, blinks = 0, set()
     for i in st["items"]:
         if i["state"] != "通过":
             continue
@@ -418,6 +418,11 @@ def cmd_import(args):
         i["state"] = "已导入"
         n += 1
         print(f"{cid}:{pose} → characters/{cid}/{pose}.webp（原图存档 {rel(keep)}）")
+        if pose in ("idle", "idle-blink"):
+            blinks.add(cid)
+    for cid in blinks:   # 眨眼帧只留眼睛那块，免得眨眼时全身抖一下
+        if (CHARACTERS / cid / "idle.webp").exists() and (CHARACTERS / cid / "idle-blink.webp").exists():
+            subprocess.run([sys.executable, str(ROOT / "tools" / "fix_blink.py"), cid], check=True)
     save(batch, st)
     write_sheet(batch, st)
     print(f"导入 {n} 张")

@@ -1,0 +1,320 @@
+{
+ "about": "idle-blink：idle-blink · 待机·眨眼；listening：listening · 倾听；thinking：thinking · 思考；reading：reading · 读文件；writing：writing · 写代码；running：running · 跑命令；searching：searching · 搜索；asking：asking · 等你回答；happy：happy · 完成；oops：oops · 出错；sleeping：sleeping · 睡着；surprised：surprised · 吓一跳；delegating：delegating · 派小帮手；drawing：drawing · 画图；proud：proud · 大活完成；pat：pat · 摸头；tired：tired · 额度快用完；hum：hum · 哼歌；stretch：stretch · 伸懒腰；yawn：yawn · 打哈欠；compact：compact · 压缩上下文；update：update · 有更新；bye：bye · 道别；pout：pout · 被叫胖（DeepSeek）；eat：eat · 吃饭（DeepSeek）；slack：slack · 摸鱼（DeepSeek）；swim：swim · 游泳（DeepSeek）；deepthink：deepthink · 深度思考（DeepSeek）；feast：feast · 大餐（DeepSeek）；annoyed：annoyed · 红温①不耐烦；puffed：puffed · 红温②鼓腮；redhot：redhot · 红温③红温；sulk：sulk · 红温④闹别扭；dizzy：dizzy · 红温·晕；coaxed：coaxed · 红温⑤被哄；forgiven：forgiven · 红温⑥原谅；roll_call：roll_call · 集合点名「到！」；busy_left：busy_left · 忙碌（朝左）；busy_right：busy_right · 忙碌（朝右）；swamped_left：swamped_left · 手忙脚乱（朝左）；swamped_right：swamped_right · 手忙脚乱（朝右）；edge_left：edge_left · 贴边（左）；edge_left_peek：edge_left_peek · 探头（左）；edge_right：edge_right · 贴边（右）；edge_right_peek：edge_right_peek · 探头（右）",
+ "items": [
+  {
+   "char": "deepseek-knit",
+   "pose": "idle-blink",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "listening",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "thinking",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "reading",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "writing",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "running",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "searching",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "asking",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "happy",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "oops",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "sleeping",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "surprised",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "delegating",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "drawing",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "proud",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "pat",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "tired",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "hum",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "stretch",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "yawn",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "compact",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "update",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "bye",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "pout",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "eat",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "slack",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "swim",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "deepthink",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "feast",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "annoyed",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "puffed",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "redhot",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "sulk",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "dizzy",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "coaxed",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "forgiven",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "roll_call",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "busy_left",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "swamped_left",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "edge_left",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "busy_right",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "swamped_right",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "edge_left_peek",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "edge_right",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "edge_right_peek",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  }
+ ]
+}
