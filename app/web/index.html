@@ -49,6 +49,7 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
   opacity: 0; transition: opacity .35s ease; }
 #body img.on { opacity: 1; }
 #body img#blink { transition: none; }
+#body img:not([src]), #body img[src=""] { visibility: hidden; }   /* 还没换上立绘：WebKit 会给没图的 img 画一圈灰框（额外那只刚开窗口时闪一下） */
 #fx { position: absolute; inset: 0; transition: opacity .3s; pointer-events: none; }
 /* 闲着久了：身边的特效淡出（见「特效省电」） */
 #fx.rest { opacity: 0; transition: opacity 1.2s; }
