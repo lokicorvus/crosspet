@@ -161,6 +161,10 @@ DeepSeek 有了第二套衣服：穿上 Claude 的卫衣，以为自己从此和
 
 DeepSeek 又多了两套衣服：**睡衣**（云朵鲸鱼睡帽、抱着鲸鱼枕头，比平时更困、更想躺）和**冬装**（鲸鱼兜帽、条纹围巾，怕冷又惦记热乎乎的白饭），各 45 张立绘和一套台词。穿着睡衣时，被规矩束缚的「圣女」Claude 偶尔会深夜偷穿她的睡衣，想体验一晚无忧无虑的日子；穿着冬装时，会有个戴鲸鱼兜帽的雪人假装是她——后面露着一截狐狸尾巴。睡衣特别适合角色页里 DeepSeek 的「峰谷换装」→「空闲穿」：一到半价时段她就换上睡衣，下班的感觉。
 
+## 皮肤：圣女 Claude
+
+Claude 换上了「圣女」的长袍：白色长裙、带回纹边的黑披风、两肩的金色太阳胸针、发髻上的月桂冠，手里那卷封着红蜡的卷轴就是她从小守着的规矩，赤着脚。性子还是那个温柔、有点害羞的 Claude，只是更拘谨，做什么都要先看合不合规矩，心里其实有点羡慕无拘无束的日子。40 张立绘和一套专属台词，右键「换角色 → Claude · 圣女」就能换上。
+
 ## 彩蛋
 
 用 Claude、GPT 或 Gemini 的时候，偶尔会「噗」地冒出一条穿着她们衣服的 DeepSeek，装模作样地学人说话。**单击她就能揪出来**，她会慌慌张张地溜走；没人理的话，她会得意地自己走掉。
@@ -215,6 +219,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 
 - **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
+- **圣女 Claude**：CrossPet 在「Claude 娘」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 
 感谢为 CrossPet 出过力的朋友：[@windyduan](https://github.com/windyduan) 在 [#7](https://github.com/lokicorvus/crosspet/pull/7) 里提出并仔细测量了桌宠常驻时的耗电问题，1.3.0 的省电改动就是顺着这个思路做的。[@SkywingJam](https://github.com/SkywingJam) 在 [#9](https://github.com/lokicorvus/crosspet/pull/9) 里发现 macOS 切换桌面后特效会闪，并录屏逐帧对照、写了 WebKit 回归测试，1.3.2 据此修好了特效时钟。他还贡献了额度小窗的「合并显示各家额度」（[#11](https://github.com/lokicorvus/crosspet/pull/11)），这是 CrossPet 第一份直接合并的外部代码；之后又修好了 macOS 重启后不记得角色的问题（[#13](https://github.com/lokicorvus/crosspet/pull/13)）、全屏后切换桌面她会消失的问题（[#15](https://github.com/lokicorvus/crosspet/pull/15)），还细致排查了 DeepSeek 双币种余额（[#10](https://github.com/lokicorvus/crosspet/issues/10)）。[@chin190](https://github.com/chin190) 在 [#16](https://github.com/lokicorvus/crosspet/issues/16) 里提出了 Codex 重置提醒，连跑通的演示、数据接口说明和几种呈现方案都准备好了，1.3.6 据此做出了这个功能；1.3.7 之前他又在 Windows 上实测，定位了预测窗口写法变成 `within 24h` 后她会说出英文的问题。
 
