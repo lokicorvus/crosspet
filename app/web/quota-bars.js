@@ -64,7 +64,6 @@
   function render(el, result) {
     const div = (cls, text) => { const d = document.createElement('div'); if (cls) d.className = cls; if (text != null) d.textContent = text; return d }
     const span = (cls, text) => { const s = document.createElement('span'); s.className = cls; if (text != null) s.textContent = text; return s }
-    const timed = result.rows.some(r => r.when)   // 有一行带重置时间就每行都留出那一格，几根条才对得齐
     el.replaceChildren(...result.rows.map(r => {
       if (r.kind === 'text') return div(r.low ? 'low' : '', r.text)
       const row = div('qbar ' + r.level)
@@ -72,7 +71,8 @@
       fill.style.width = r.pct + '%'
       track.append(fill)
       row.append(span('ql', r.label), track, span('qp', r.pct + '%'))
-      if (timed) row.append(span('qt', r.when || ''))
+      // 时间格每行都要有（没有时间就留空格子）：额度表是固定四列的网格，少一格下一行的名字就会挤进这一行的第四列
+      row.append(span('qt', r.when || ''))
       return row
     }))
     if (result.note) el.append(div('qnote', result.note))
