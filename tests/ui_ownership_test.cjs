@@ -60,6 +60,7 @@ function makeEnv(html) {
     function say(line){$('bubble').textContent=line||'';if(line)$('bubble').classList.remove('hide');else $('bubble').classList.add('hide')}
     function applyLook(){} function renderQuota(){} function preloadEdges(){} function clearEggTimers(){}
     function timeGreet(){return false}function greetDue(){return true}function announceReset(){}
+    const role='main',roleInfo=null
     function angerLevel(){return null}function angerNow(){return 0}function react(){}
     function celebrate(id){if(id===charId)show('happy',true)}
     function refreshMulti(){refreshes.push({at:Date.now(),charId,map:currentSessions()})}

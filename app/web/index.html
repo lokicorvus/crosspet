@@ -848,7 +848,10 @@ function setCharacter(id, quiet) {
     if (busy) watchStuck()   // 接着演她自己的活：卡住兜底按她自己的时间重新算
     if (busy && s.pose === 'listening') thinkTimer = characterTimeout(() => show('thinking'), LISTEN_TO_THINKING)
     // 这个时段 / 节日还没打过招呼：演专属的登场动作；打过了就用平常那句（30 分钟冷却）
+    // 集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
+    const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
     if (quiet) say('')
+    else if (roll) { if (!busy) show('proud', true); say(`${c.name}到！`) }   // show 会按 TRANSIENT 回到常态
     else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
     renderQuota()
     if (id === 'gpt') characterTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说

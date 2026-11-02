@@ -520,6 +520,26 @@ const multiCases = [
     assert(c.says().some(x => x.line === 'Claude hello'), `no greeting: ${JSON.stringify(c.says())}`)
     assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
   }],
+  ['gather_entrance_is_uniform', async e => {
+    // 集合来的（id 是 <角色>@gather，重号的带 #n）：不管哪个角色、招呼冷却没冷却，都演同一个得意动作、说「（名字）到！」；
+    // 干活来的照旧说自己的招呼
+    for (const [id, ch, name] of [['claude@gather', 'claude', 'Claude'], ['gpt@gather#2', 'gpt', 'GPT']]) {
+      const c = makePage()
+      c.run(`setRole('companion', { id: '${id}', key: '${ch}@gather', character: '${ch}', client: null, label: '' })`)
+      c.run(`init(${JSON.stringify(manifest())}); setCharacter('${ch}')`)
+      await c.advance(1000)
+      assert(c.says().some(x => x.line === `${name}到！`), `${id} says: ${JSON.stringify(c.says())}`)
+      assert(c.state().pose === 'proud', `${id} pose: ${c.state().pose}`)
+      await c.advance(7000)
+      assert(c.state().pose === 'idle', `${id} did not settle: ${c.state().pose}`)
+      assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
+    }
+    const w = makePage()
+    w.run(`setRole('companion', { id: 'claude@claude-cli', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', label: '' })`)
+    w.run(`init(${JSON.stringify(manifest())}); setCharacter('claude')`)
+    await w.advance(1000)
+    assert(!w.says().some(x => x.line.endsWith('到！')), `work pet says: ${JSON.stringify(w.says())}`)
+  }],
   ['send_home_prefers_window_id', async e => {
     // 窗口 id 和别的那只的 key 撞了（集合接管后 id 留着旧 key）：先按 id 认
     await multiOn(e, 'gpt')
