@@ -26,8 +26,36 @@ extension App {
         if codexResets && currentId == "gpt" { add(menu, "会重置吗？", #selector(askReset)) }   // 只有 GPT 有这个需求
         if characterIds.count > 1 {
             menu.addItem(.separator())
-            // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
-            add(menu, "换角色…", #selector(openCharacterPage))
+            // 右键直接换（用户要回来的）：一个角色一项；有别的衣服的角色再展开一层选衣服，名单不会一长串。
+            // 最下面「看图选…」打开角色窗口（卡片墙）
+            let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            let worn = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
+            for id in characterIds {
+                let name = displayNames[id] ?? id
+                let item = NSMenuItem(title: name, action: nil, keyEquivalent: "")
+                item.state = id == currentId ? .on : .off
+                if let skins = skinChoices[id], !skins.isEmpty {
+                    let outfits = NSMenu()
+                    for (skin, title) in [("", baseOutfit[id] ?? "原版")] + skins.map({ ($0.id, $0.name) }) {
+                        let o = NSMenuItem(title: title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
+                        o.representedObject = "\(id)|\(skin)"
+                        o.target = self
+                        o.state = id == currentId && (worn[id] ?? "") == skin ? .on : .off
+                        outfits.addItem(o)
+                    }
+                    item.submenu = outfits
+                } else {
+                    item.action = #selector(switchCharacter(_:))
+                    item.target = self
+                    item.representedObject = "\(id)|"
+                }
+                sub.addItem(item)
+            }
+            sub.addItem(.separator())
+            add(sub, "看图选…", #selector(openCharacterPage))
+            switchItem.submenu = sub
+            menu.addItem(switchItem)
         }
         menu.addItem(.separator())
         let layerItem = NSMenuItem(title: "显示层级", action: nil, keyEquivalent: "")

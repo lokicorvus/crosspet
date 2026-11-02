@@ -58,6 +58,22 @@ extension App {
     @objc func egg() { js("playEgg(true)") }
     @objc func askReset() { js("askReset()") }
 
+    /// 右键「换角色」里点的那项：representedObject 是「角色|衣服」（衣服空 = 没有别的衣服，或原版）
+    @objc func switchCharacter(_ sender: NSMenuItem) {
+        guard let v = sender.representedObject as? String else { return }
+        let parts = v.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+        guard let id = parts.first, characterIds.contains(id) else { return }
+        let skin = parts.count > 1 ? parts[1] : ""
+        if skinChoices[id]?.isEmpty == false {
+            guard skin.isEmpty || skinChoices[id]?.contains(where: { $0.id == skin }) == true else { return }
+            wear(id, skin)
+            switchTo(id, why: "skin", via: skin)
+        } else {
+            switchTo(id, why: "manual", via: "menu")
+        }
+        pushSettings()
+    }
+
     /// 换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上
     func wear(_ id: String, _ skin: String) {
         var skins = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
