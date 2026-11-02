@@ -31,7 +31,7 @@ How she shows emotion: with her whole body. Tail wags, droops or flicks; the aho
 - thinking: One sleeve-covered finger on her cheek, eyes looking up and to the side, a puzzled little frown, ahoge bent into a question curl.
 - reading: Reading a small open book held in both sleeve-covered hands, intent, tail swaying.
 - writing: Writing with a white feather quill in a small notebook, focused, tiny smile, tongue poking out a little.
-- running: Determined and busy: pushing her long sweater sleeves up her forearms, one small fist raised ("let's do this!"), leaning into motion, the beret's pom-pom swinging.
+- running: Getting down to work, standing in place: pushing her long sweater sleeves up her forearms, one small fist raised ("let's do this!"), a determined grin, tail perked up.
 - searching: Holding a round brass magnifying glass up to one eye, curious, the other hand on her whale bag.
 - asking: Leaning forward eagerly with both hands held out, each holding a small card (two choices), big hopeful eyes, tail wagging impatiently.
 - happy: A happy little hop with both arms raised beside her head (hands no higher than the top of her head, sleeves flopping), eyes closed in a big smile, mouth open, tail flicking up.

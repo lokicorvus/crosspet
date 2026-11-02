@@ -1,0 +1,33 @@
+{
+ "about": "running：running · 跑命令",
+ "items": [
+  {
+   "char": "claude-saint",
+   "pose": "running",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "running",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "grok",
+   "pose": "running",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-winter",
+   "pose": "running",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  }
+ ]
+}
