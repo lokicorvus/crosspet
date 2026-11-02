@@ -20,6 +20,7 @@ namespace CrossPet
         /// <summary>站着的额外桌宠，按页面给的 id 管（集合来的收编客户端后 key 变、id 不变）</summary>
         internal readonly Dictionary<string, Companion> companions = new Dictionary<string, Companion>();
         readonly List<Companion> leavingCompanions = new List<Companion>();   // 收到 companionLeave、正在说 bye 的
+        int companionExpected;
         int companionTarget;         // 这一轮页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（CompanionOrigin）
         bool pageGathering;          // 页面说正集合着（companions 消息里的 gathering）：菜单显示「解散」，开关关着时也转发
         bool eggAllowed = true;      // 有别的桌宠在场时页面发 false：「召唤彩蛋」变灰
@@ -101,6 +102,8 @@ namespace CrossPet
                 // gathering：页面说正集合着（菜单显示「解散」；开关关着时也要转发）
                 var was = CompanionsForwarding;
                 pageGathering = m.TryGetValue("gathering", out var g) && g is bool gb && gb;
+                // 集合时最后一共几只（还没登场的也算上）
+                companionExpected = m.TryGetValue("expected", out var ex) ? Convert.ToInt32(ex) : 0;
                 SyncCompanions(list);
                 if (CompanionsForwarding && !was) StartForwarding();
             }
@@ -114,7 +117,7 @@ namespace CrossPet
         void SyncCompanions(object[] list)
         {
             var seen = new HashSet<string>();
-            companionTarget = list.Length;
+            companionTarget = Math.Max(list.Length, companionExpected);
             foreach (var item in list)
             {
                 if (!(item is Dictionary<string, object> info) || !(info.TryGetValue("id", out var iv) && iv is string id) || id == "" || seen.Contains(id)

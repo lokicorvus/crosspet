@@ -131,6 +131,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var companions: [String: Companion] = [:]
     var leavingCompanions: [Companion] = []   // 收到 companionLeave、正在说 bye 的（等 gone 或 3 秒后关）
     var pageGathering = false                 // 主桌宠页面里正集合着（菜单显示「解散」；开关关着时也转发前台 / 在跑的程序）
+    var companionExpected = 0
     var companionTarget = 0                   // 这一轮主桌宠页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（companionOrigin）
     var eggAllowed = true                     // 有别的桌宠在场时页面发 false：右键「召唤彩蛋」变灰
     var friendshipRows: [Any] = []            // 主桌宠页面最后一次发来的友谊行，设置页显示

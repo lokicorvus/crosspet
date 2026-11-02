@@ -1632,7 +1632,8 @@ function updateCompanions() {
   const list = r.pets.map(p => ({ id: p.id, key: p.key, character: p.character, client: p.client, quota: !!p.quota, label: companionLabel(p, r.pets, main) }))
   const json = JSON.stringify(list), first = sentCompanions === null
   const gathering = gatheringNow()
-  if (json !== sentCompanions || gathering !== sentGathering) { sentCompanions = json; sentGathering = gathering; toShell({ companions: list, gathering }) }
+  // expected：集合是一只接一只登场的，告诉外壳这一轮最后一共几只，第一只就按总数排格子（不然前几只排成一排、后几只换排法就叠了）
+  if (json !== sentCompanions || gathering !== sentGathering) { sentCompanions = json; sentGathering = gathering; toShell({ companions: list, gathering, expected: list.length + gatherPending }) }
   // 第一次（打开开关、页面重载后）也发：外壳菜单里可能还是上一个页面留下的灰
   const eggOk = !list.length
   if (first || eggOk !== eggAllowedSent) { eggAllowedSent = eggOk; toShell({ eggAllowed: eggOk }) }

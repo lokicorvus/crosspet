@@ -146,6 +146,7 @@ extension App {
             // gathering：页面说正集合着（菜单显示「解散」；开关关着时也要转发）
             let was = companionsForwarding
             pageGathering = d["gathering"] as? Bool ?? false
+            companionExpected = d["expected"] as? Int ?? 0   // 集合时最后一共几只（还没登场的也算上）
             syncCompanions(list)
             if companionsForwarding && !was { startForwarding() }
         }
@@ -158,7 +159,7 @@ extension App {
     /// 直接关掉，不留残窗；收到过 companionLeave 的已经挪到 leavingCompanions，在说 bye
     func syncCompanions(_ list: [[String: Any]]) {
         var seen = Set<String>()
-        companionTarget = list.count
+        companionTarget = max(list.count, companionExpected)
         for pet in list {
             guard let id = pet["id"] as? String, !id.isEmpty, !seen.contains(id),
                   let ch = pet["character"] as? String, characterIds.contains(ch) else { continue }
