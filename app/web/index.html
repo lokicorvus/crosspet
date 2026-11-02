@@ -112,6 +112,7 @@ html.no-name #caption { display: none; }
 #quota .qtrack i { display: block; height: 100%; border-radius: inherit; background: var(--bar); }
 #quota .qp { padding-left: calc(4px * var(--k)); font-weight: 700; color: var(--bar); text-align: right; white-space: nowrap; }
 #quota .qt { padding-left: calc(4px * var(--k)); font-size: calc(8.5px * var(--k)); color: #a8958a; white-space: nowrap; }
+#quota .qt:empty { padding-left: 0; }   /* 都没有重置时间时，第四列空着、不占地方 */
 #quota .qc.qbarcell { display: flex; align-items: center; gap: calc(3px * var(--k)); }   /* 合并显示里的短条格子 */
 #quota .qc.qbarcell .ql { padding-right: 0; }
 #quota .qc.qbarcell .qtrack { width: calc(34px * var(--k)); min-width: 0; flex: none; }
