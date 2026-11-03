@@ -825,8 +825,12 @@ function arrivalGreeting(id, c, busy) {
 // 由外壳调（额外那只，屏幕外备好的窗口挪到位置了）：和换角色一样噗一下出来、说登场招呼
 function arriveNow() {
   if (!document.body.classList.contains('parked')) return
+  // 先不带过渡直接藏好再放出整页：#stage 有淡出过渡，带着过渡的话会先看到她站着、淡出、再噗出来（1.3.9-test.12 看到的闪一下）
   const stage = $('stage')
+  stage.style.transition = 'none'
   stage.classList.add('swap')
+  void stage.offsetWidth
+  stage.style.transition = ''
   document.body.classList.remove('parked')
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   setTimeout(() => {
