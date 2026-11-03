@@ -476,10 +476,19 @@ const multiCases = [
     const c = await rolePage('companion')
     c.run(`setCharacter('gpt', true)`)
     await c.advance(1000)
+    const before = c.state().pose
     c.run(`chat('一起喝茶？')`)
     assert(c.state().bubble === '一起喝茶？', `companion bubble: ${c.state().bubble}`)
+    assert(c.state().pose === before, `no look given but pose changed: ${c.state().pose}`)
     await c.advance(6500)
     assert(c.state().bubble !== '一起喝茶？', 'companion chat not cleared')
+    // 带立绘：说的时候换上，6 秒后回到常态
+    c.run(`chat('好耶 :3', 'happy')`)
+    assert(c.state().pose === 'happy', `chat look: ${c.state().pose}`)
+    await c.advance(6500)
+    assert(c.state().pose !== 'happy', `chat look not reverted: ${c.state().pose}`)
+    c.run(`chat('乱写的', 'nope')`)
+    assert(c.state().pose !== 'nope', 'unknown look applied')
     assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
   }],
   ['friendship_cowork_cofinish_pats', async e => {

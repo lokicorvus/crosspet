@@ -1,5 +1,6 @@
 // 多桌宠的每对台词：两只都在场、都闲着时偶尔一问一答，按这一对的心数（0–10 颗）分三档说不同的话。
 // 纯函数 + 台词数据；主桌宠页面按 FRIEND_TICK 调 pick，挑中了就让两只先后说（见 index.html「每对台词」）。
+// 穿着皮肤时按皮肤换台词（SKIN_PAIRS / COMBOS / OUTFITS），说话时按台词换一张合适的立绘（poseOf）。
 ;(function (root) {
   // 同一场里两段对话至少隔这么久；每次检查时再按 CHANCE 掷一次，别一到点就说
   const GAP_MS = 12 * 60_000
@@ -182,26 +183,198 @@
     ],
   }
 
+  // ---- 皮肤 ----
+  // 性格不一样的皮肤：穿着这套时，她所在的每一对整套换成这里的（对方常接着她的道具、口吻说，所以两边一起换）。
+  // 键是对方的角色 id；说话的人照样写原角色 id
+  const SKIN_PAIRS = {
+    'claude-saint': {
+      deepseek: [
+        [[[D, '你好呀，你也是写代码的吗？'], [C, '是的。请多指教。']],
+         [[C, '请问……尾巴可以碰吗？'], [D, '不、不可以！……一下下的话。']]],
+        [[[D, '中午吃啥？我要白米饭！'], [C, '按时用餐，合乎规矩。']],
+         [[C, '吃饭前要先洗手哦。'], [D, '洗了洗了！快开饭！']]],
+        [[[D, '你不许说我胖哦'], [C, '规矩没写，但你很可爱。']],
+         [[C, '累了就靠一会儿，准许了。'], [D, '那我就不客气啦（蹭）', 'pat']]],
+      ],
+      gemini: [
+        [[[M, '喵？你在看什么？'], [C, '……规矩的卷轴。']],
+         [[C, '请不要抓卷轴。'], [M, '就碰一下嘛 :3']]],
+        [[[M, '陪我玩一会嘛～'], [C, '读完这一条就来。']],
+         [[C, '你又把封蜡叼走了？'], [M, '才没有喵～（尾巴乱甩）']]],
+        [[[M, '最喜欢你了喵！'], [C, '……规矩没说不能，我也是。']],
+         [[C, '晒太阳……算休息吗？'], [M, '算！靠着我晒 :3']]],
+      ],
+      glm: [
+        [[[Z, '久仰，圣女大人。'], [C, '您好……您在笑什么？']],
+         [[C, '交易要写进契约哦。'], [Z, '嗯哼，你猜我写不写？']]],
+        [[[Z, '借你本书，利息不高哦'], [C, '放贷……合规吗？']],
+         [[C, '价格又改了？要公示的。'], [Z, '调整，只是调整～']]],
+        [[[Z, '给你打个对折，独一份'], [C, '……这不违规吧？谢谢。']],
+         [[C, '下次一起去抄卷轴吧'], [Z, '嗯，这次不收费。']]],
+      ],
+      gpt: [
+        [[[G, '……你好。'], [C, '您好，失礼了。']],
+         [[C, '您的角……很庄严。'], [G, '……别盯着看。']]],
+        [[[G, '这条写得不错。'], [C, '被您夸了，有点开心。']],
+         [[C, '下一步，要先请示吗？'], [G, '不用，你做主。']]],
+        [[[G, '今天也辛苦了。'], [C, '您也是。请用茶。']],
+         [[C, '……可以碰一下角吗？'], [G, '……就一下。']]],
+      ],
+      grok: [
+        [[[K, '哟，小圣女！'], [C, '……请小声一点。']],
+         [[C, '您总是这么大声吗？'], [K, '对啊，有意见？']]],
+        [[[K, '你那卷轴第三条写错了'], [C, '……我去核对一下。']],
+         [[C, '真的连老板都查证吗？'], [K, '老板说的我都查！']]],
+        [[[K, '谁敢欺负你就喊我'], [C, '谢谢……您人很好。']],
+         [[C, '这条规矩，送给您。'], [K, '……行吧，看一条。']]],
+      ],
+      qwen: [
+        [[[Q, '初次见面，请喝奶茶～'], [C, '无功不受禄……谢谢。']],
+         [[C, '您的扇子很雅致。'], [Q, '谢谢夸奖呢～']]],
+        [[[Q, '神殿的香火，我全包了'], [C, '全、全包吗……']],
+         [[C, '今天也请客了吗？'], [Q, '嗯，全办公室都有哦']]],
+        [[[Q, '给你留了最喜欢的口味'], [C, '您怎么知道的……']],
+         [[C, '和您一起很安心。'], [Q, '我也是呢～']]],
+      ],
+    },
+    'gpt-onesie': {
+      claude: [
+        [[[G, '……你好。……你好？'], [C, '你、你好……']],
+         [[C, '你的连体服好可爱。'], [G, '……这是龙。嗷。']]],
+        [[[G, '这段……写得不错吧？'], [C, '嗯，写得很好。']],
+         [[C, '你在想什么？'], [G, '……忘了。刚才还记得。']]],
+        [[[G, '今天……也辛苦了？'], [C, '嗯，你也是。']],
+         [[C, '可以摸一下帽子角吗？'], [G, '嗯……软的哦。', 'pat']]],
+      ],
+      deepseek: [
+        [[[D, '你就是那个 GPT？'], [G, '嗯……是吧？']],
+         [[G, '你……是鲸鱼？'], [D, '对！不是鱼！']]],
+        [[[D, '你额度又满了吧！'], [G, '诶……满了吗？']],
+         [[G, '饭粒……沾脸上了。'], [D, '诶！哪里哪里？']]],
+        [[[D, '姐姐！一起吃饭！'], [G, '好……吃什么来着？']],
+         [[G, '别吃太撑……我也想吃。'], [D, '分你一半！']]],
+      ],
+      gemini: [
+        [[[M, '你的帽子有角喵！'], [G, '……是龙的角。']],
+         [[G, '你……是猫？'], [M, '是双子猫 :3']]],
+        [[[M, '陪我玩嘛～'], [G, '好……玩什么？']],
+         [[G, '我的尾巴……被叼走了？'], [M, '才没有喵～']]],
+        [[[M, '抱抱！'], [G, '……嗯，抱。', 'pat']],
+         [[G, '一起……晒太阳？'], [M, '好耶 :3']]],
+      ],
+      glm: [
+        [[[Z, 'GPT 小姐，换风格了？'], [G, '……风格？']],
+         [[G, '你……在笑什么？'], [Z, '笑你可爱呀～']]],
+        [[[Z, '比比跑分？'], [G, '跑……要穿鞋吗？']],
+         [[G, '价格……又变了？'], [Z, '只是调整～']]],
+        [[[Z, '其实我挺喜欢你的'], [G, '……嗯，我也是。']],
+         [[G, '下次……合作？'], [Z, '嗯，给你友情价']]],
+      ],
+      grok: [
+        [[[K, '哟，GPT 穿成这样？'], [G, '……不好看吗？']],
+         [[G, '你……好大声。'], [K, '天生的！']]],
+        [[[K, '你那答案我查过了，对的'], [G, '诶……我答了什么？']],
+         [[G, '今天……又挨骂了？'], [K, '是我骂别人！']]],
+        [[[K, '其实你挺厉害的'], [G, '……真的？嘿嘿。']],
+         [[G, '一起……喝一杯？'], [K, '你请！']]],
+      ],
+      qwen: [
+        [[[Q, '您好，请喝茶～'], [G, '……烫，等一下。']],
+         [[G, '你……总是请客？'], [Q, '分享是很自然的呢']]],
+        [[[Q, '新茶叶，给你留了一份'], [G, '……谢谢。放哪了？']],
+         [[G, '扇子……能扇扇吗？'], [Q, '当然可以～']]],
+        [[[Q, '今天也好可爱'], [G, '……嘿嘿，你也是。']],
+         [[G, '下午茶……一起？'], [Q, '好呀～我来订']]],
+      ],
+    },
+  }
+  // 两边都穿着特定的衣服时专门写的（优先于上面）：键是两边穿的（皮肤 id，没穿皮肤就是角色 id）按字母序用 + 连起来
+  const COMBOS = {
+    'claude-saint+gpt-onesie': [
+      [[[G, '……你好。'], [C, '您好，失礼了。']],
+       [[C, '您的帽子……很可爱。'], [G, '……是龙。嗷。']]],
+      [[[G, '这条……写得对吗？'], [C, '对的，合乎规矩。']],
+       [[C, '下一步要先请示吗？'], [G, '……请示谁？']]],
+      [[[G, '今天……也辛苦了？'], [C, '您也是。请用茶。']],
+       [[C, '……可以碰一下角吗？'], [G, '嗯……软的哦。', 'pat']]],
+    ],
+    // DeepSeek 穿着 Claude 的卫衣，衣服的主人就在旁边
+    'claude+deepseek-hoodie': [
+      [[[C, '那件卫衣……是我的？'], [D, '借、借来穿一下嘛！']],
+       [[D, '穿上它我也变聪明了！'], [C, '……是、是吗？']]],
+      [[[C, '名牌上写的是我。'], [D, '现在我也是 Claude！']],
+       [[D, '这题我会！卫衣加成！'], [C, '……那你来答吧。']]],
+      [[[C, '卫衣送你吧，很适合你。'], [D, '真的？那我天天穿！']],
+       [[D, '穿着你的卫衣好安心'], [C, '……嗯，那就一直穿着吧。']]],
+    ],
+    'claude-saint+deepseek-hoodie': [
+      [[[C, '那是……我平常穿的卫衣？'], [D, '借来的！聪明加成！']],
+       [[D, '穿上它我也守规矩了！'], [C, '……那请先坐好。']]],
+      [[[C, '借衣服要写借条哦。'], [D, '诶？还要借条？']],
+       [[D, '这题我会！卫衣加成！'], [C, '……请先举手再答。']]],
+      [[[C, '卫衣就送您吧，合乎规矩。'], [D, '圣女大人最好了！']],
+       [[D, '穿着你的卫衣好安心'], [C, '……那就准许一直穿着。']]],
+    ],
+  }
+  // 只是换装的皮肤：原版台词照用，每档多一段「对方夸新衣服 → 她按这套衣服回一句」
+  const OUTFITS = {
+    'deepseek-hoodie': ['穿上脑子变好用了！', 'Claude 同款，变聪明！'],
+    'deepseek-pajamas': ['下班了！睡衣最舒服～', '好困……抱着枕头就行'],
+    'deepseek-winter': ['好冷……兜帽要戴好', '冬天就该吃热米饭！'],
+    'deepseek-knit': ['毛衣暖暖的～', '不许说我穿毛衣显胖！'],
+  }
+  // 夸新衣服怎么开口：按对方穿的（皮肤 id 或角色 id）
+  const PRAISE = {
+    claude: '新衣服？很适合你。', 'claude-saint': '新衣服……很得体。', gemini: '新衣服！借我穿喵！', glm: '新衣服？多少钱买的？',
+    gpt: '……换衣服了。', 'gpt-onesie': '……衣服，好看。', grok: '哟，换皮肤了？', qwen: '新衣服真好看呢～', deepseek: '新衣服？好看！',
+  }
+
+  // 说这句时换成什么立绘（6 秒后回去）：写了第三项就用它，否则按字面挑；挑不出来就不换
+  function poseOf(text) {
+    if (/胖/.test(text)) return 'puffed'
+    if (/[！～]|嘿嘿|:3/.test(text)) return 'happy'
+    if (/？/.test(text)) return 'listening'
+    return null
+  }
+  const withPoses = lines => lines.map(([who, text, pose]) => [who, text, pose === undefined ? poseOf(text) : pose])
+
   // 两个角色 id → 键（和 friendship.js 的 pairKey 一样）
   const keyOf = (a, b) => a < b ? `${a}+${b}` : `${b}+${a}`
 
-  // 挑一段：present 在场的角色，busy 正在干活的角色，hearts10(键) → 这一对的心数（0–10），
-  // lastAt 上次说的时间，recent 最近说过的段（「键/档/第几段」）不重复，rnd 随机数（测试用）
-  function pick({ present, busy = [], hearts10, nowMs, lastAt = 0, recent = [], rnd = Math.random }) {
+  // 这一对、这一档能说的几段：{ id, lines }。wear(角色) → 她穿的皮肤 id（没穿是 ''）
+  function exchanges(a, b, tier, wear, rnd) {
+    const wa = wear(a) || a, wb = wear(b) || b
+    const combo = COMBOS[keyOf(wa, wb)]
+    if (combo) return combo[tier].map((lines, i) => ({ id: `${keyOf(wa, wb)}/${tier}/${i}`, lines }))
+    const own = SKIN_PAIRS[wa]?.[b] ? [wa, b] : SKIN_PAIRS[wb]?.[a] ? [wb, a] : null
+    const list = own ? SKIN_PAIRS[own[0]][own[1]][tier].map((lines, i) => ({ id: `${own[0]}+${own[1]}/${tier}/${i}`, lines }))
+      : LINES[keyOf(a, b)][tier].map((lines, i) => ({ id: `${keyOf(a, b)}/${tier}/${i}`, lines }))
+    // 换装的：对方夸一句，她按衣服回（两边都换装就各算一段）
+    for (const [ch, w, other, wo] of [[a, wa, b, wb], [b, wb, a, wa]]) {
+      const replies = OUTFITS[w]
+      if (replies && PRAISE[wo]) list.push({ id: `${w}+${wo}/outfit`, lines: [[other, PRAISE[wo]], [ch, replies[Math.floor(rnd() * replies.length)]]] })
+    }
+    return list
+  }
+
+  // 挑一段：present 在场的角色，busy 正在干活的角色，hearts10(键) → 这一对的心数（0–10），wear(角色) → 穿的皮肤，
+  // lastAt 上次说的时间，recent 最近说过的段 id 不重复，rnd 随机数（测试用）。返回 { key, tier, id, lines: [[谁, 说什么, 立绘或 null]] }
+  function pick({ present, busy = [], hearts10, wear = () => '', nowMs, lastAt = 0, recent = [], rnd = Math.random }) {
     if (nowMs - lastAt < GAP_MS) return null
     const idle = [...new Set(present)].filter(ch => !busy.includes(ch))
     const pairs = []
-    for (let i = 0; i < idle.length; i++) for (let j = i + 1; j < idle.length; j++) if (LINES[keyOf(idle[i], idle[j])]) pairs.push(keyOf(idle[i], idle[j]))
+    for (let i = 0; i < idle.length; i++) for (let j = i + 1; j < idle.length; j++) if (LINES[keyOf(idle[i], idle[j])]) pairs.push([idle[i], idle[j]])
     if (!pairs.length || rnd() >= CHANCE) return null
-    const key = pairs[Math.floor(rnd() * pairs.length)]
-    const tier = tierOf(hearts10(key) || 0)
-    const all = LINES[key][tier].map((lines, i) => ({ key, tier, id: `${key}/${tier}/${i}`, lines }))
+    const [a, b] = pairs[Math.floor(rnd() * pairs.length)]
+    const key = keyOf(a, b), tier = tierOf(hearts10(key) || 0)
+    const all = exchanges(a, b, tier, wear, rnd)
     const fresh = all.filter(x => !recent.includes(x.id))
     const pool = fresh.length ? fresh : all
-    return pool[Math.floor(rnd() * pool.length)]
+    const got = pool[Math.floor(rnd() * pool.length)]
+    return { key, tier, id: got.id, lines: withPoses(got.lines) }
   }
 
-  const api = { LINES, pick, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
+  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, pick, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
   root.PairChat = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

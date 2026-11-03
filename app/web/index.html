@@ -1727,26 +1727,34 @@ function tryPairChat() {
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
   const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
-                             hearts10: key => Friendship.hearts(store[key]?.points || 0) })
+                             hearts10: key => Friendship.hearts(store[key]?.points || 0), wear: ch => manifest.characters?.[ch]?.skin || '' })
   if (!got) return
   pairChatAt = nowMs
   pairChatRecent.push(got.id)
   if (pairChatRecent.length > 12) pairChatRecent.shift()
-  got.lines.forEach(([who, line], i) => setTimeout(() => chatAs(who, line), i * PairChat.REPLY_MS))
+  got.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
 }
-function chatAs(character, line) {
+function chatAs(character, line, pose) {
   if (!friendshipOn()) return
-  if (character === mainCharacter()) { chat(line); return }
+  if (character === mainCharacter()) { chat(line, pose); return }
   const p = companionsState?.pets.find(x => x.character === character)
-  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line] } })
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null] } })
 }
-// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）
+// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
+// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换
+const CHAT_MS = 6000
 let chatTimer = null
-function chat(line) {
-  if (egg || farewellLine !== null || aiActivity() || typeof line !== 'string') return
+function chat(line, look) {
+  if (egg || farewellLine !== null || updatingNow || aiActivity() || typeof line !== 'string') return
+  if (typeof look === 'string' && MOTION[look] && !tucked) {
+    clearTimeout(pending); clearTimeout(revertTimer)
+    shownAt = Date.now()
+    setPose(look)
+    revertTimer = characterTimeout(() => { if (pose === look) setPose(restPose()) }, CHAT_MS)
+  }
   say(line)
   clearTimeout(chatTimer)
-  chatTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, 6000)
+  chatTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, CHAT_MS)
 }
 setInterval(tryPairChat, FRIEND_TICK)
 
