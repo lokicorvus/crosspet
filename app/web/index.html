@@ -790,6 +790,7 @@ function init(m) {
     else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
   } else { $('caption').textContent = char().name }
   sendStoredFriendship()
+  restoreGathered()
 }
 // 主桌宠页面第一次 init 完：存着友谊就交一次给外壳（不管开关开没开），重启后开关关着设置页也能显示灰的列表。额外那只不发
 let storedFriendshipSent = false
@@ -1453,7 +1454,13 @@ let foreground = null            // 前台 { kind: 'ai' | 'terminal' | 'ours' | 
 let runningKeys = null           // 有窗口的 AI 程序在跑的「角色@客户端」（Set）；null = 外壳还没交，decide 当作不知道
 let claim = null                 // 主桌宠占着她角色的哪个客户端 { key, since }（Companions.mainClaim）
 let companionsState = null       // decide 上次的 state；pets 里多记一个 id，decide 复制时会带着
-let gathered = [], gatherTimers = []   // 页面重载 / 渲染重启算解散：gathered 丢了，外壳按重载后的完整列表关掉那些窗口
+let gathered = [], gatherTimers = []   // 集合来 / 叫出来的角色；存在 localStorage（crosspet-gathered），重启、页面重载后再叫回来（restoreGathered）
+const GATHERED_KEY = 'crosspet-gathered'
+// 改 gathered 一律走这里：顺手存下来（只有主桌宠页面存）
+function setGathered(list) {
+  gathered = list
+  if (role === 'main') { try { localStorage.setItem(GATHERED_KEY, JSON.stringify(gathered)) } catch {} }
+}
 let sentCompanions = null        // 上次发出去的列表（JSON）；null = 还没发过，所以页面重载后第一次一定发完整列表
 let gatherPending = 0, sentGathering = false   // 集合 / 解散还没轮到的那几步；上次告诉外壳的 gathering
 const gatheringNow = () => gathered.length > 0 || gatherPending > 0
@@ -1524,7 +1531,7 @@ function setMultiPets(o) {
 }
 // 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
 function stopCompanions() {
-  gatherTimers.forEach(clearTimeout); gatherTimers = []; gathered = []; gatherPending = 0
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; setGathered([]); gatherPending = 0
   claim = null; companionsState = null; companionsReadyAt = 0
   for (const k of Object.keys(clientStateSeen)) delete clientStateSeen[k]
   toShell({ companions: [], gathering: false }); sentCompanions = null; sentGathering = false
@@ -1559,10 +1566,27 @@ function gather() {
   todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
     gatherPending = Math.max(0, gatherPending - 1)
     if (gathered.includes(id)) return
-    gathered = [...gathered, id]
+    setGathered([...gathered, id])
     updateCompanions()
   }, i * GATHER_STEP)))
   return todo.length > 0
+}
+// 主桌宠页面第一次 init 完：上次（退出前 / 页面重载前）集合来、叫出来的那几只再一只接一只叫回来。
+// 角色没了、成了彩蛋、叫的时候正是主桌宠的不叫；额外那只不做
+let gatheredRestored = false
+function restoreGathered() {
+  if (role !== 'main' || gatheredRestored) return
+  gatheredRestored = true
+  let saved = []
+  try { saved = JSON.parse(localStorage.getItem(GATHERED_KEY)) || [] } catch {}
+  // 主桌宠是谁到叫的时候再看：外壳 init 完才 setCharacter 换回上次的角色
+  const chars = manifest.characters || {}
+  const todo = (Array.isArray(saved) ? saved : []).filter(id => typeof id === 'string' && chars[id] && !chars[id].egg && !gathered.includes(id))
+  todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+    if (gathered.includes(id) || id === mainCharacter()) return
+    setGathered([...gathered, id])
+    updateCompanions()
+  }, COMPANIONS_WARMUP + i * GATHER_STEP)))
 }
 // 「叫她出来」：只叫一个角色来陪主桌宠（不用两个 AI 同时干活）；和集合来的一样算 gather，一起在场照样攒好感，
 // 「让她先回去」或「解散」送走。主桌宠正演着的、彩蛋角色、已经叫来的不叫
@@ -1570,7 +1594,7 @@ function callCompanion(id) {
   if (role !== 'main') return false
   const c = (manifest.characters || {})[id]
   if (!c || c.egg || id === mainCharacter() || gathered.includes(id)) return false
-  gathered = [...gathered, id]
+  setGathered([...gathered, id])
   updateCompanions()
   return true
 }
@@ -1578,12 +1602,12 @@ function callCompanion(id) {
 function dismiss() {
   gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
   const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
-  gathered = gathered.filter(ch => order.includes(ch))   // 还没登场的不用再叫
+  setGathered(gathered.filter(ch => order.includes(ch)))   // 还没登场的不用再叫
   if (!order.length) { updateCompanions(); return }      // 没有站着的（比如还在热身）：直接收尾
   gatherPending = order.length
   order.forEach((ch, i) => gatherTimers.push(setTimeout(() => {
     gatherPending = Math.max(0, gatherPending - 1)
-    gathered = gathered.filter(x => x !== ch)
+    setGathered(gathered.filter(x => x !== ch))
     updateCompanions()
   }, i * GATHER_STEP)))
 }
@@ -1594,7 +1618,7 @@ function sendHome(k) {
   const p = companionsState.pets.find(x => x.id === k) || companionsState.pets.find(x => x.key === k)
   if (!p) return
   companionsState = Companions.sendHome(companionsState, p.key, Date.now())
-  if (p.via === 'gather') gathered = gathered.filter(ch => ch !== p.character)
+  if (p.via === 'gather') setGathered(gathered.filter(ch => ch !== p.character))
   updateCompanions()
 }
 // 额外那只被摸了头（外壳转来；主桌宠自己被摸也记）：记下时间。5 分钟内摸了两个不同的角色就 +2（记过的那几下清掉，不重复算）

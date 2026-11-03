@@ -831,6 +831,28 @@ const multiCases = [
     await e.advance(2000)
     assert(lastCompanions(e).length === 0 && lastGathering(e) === false, `still here: ${JSON.stringify(multiMsgs(e).slice(-2))}`)
   }],
+  ['called_companions_come_back_after_restart', async e => {
+    // 叫出来 / 集合来的记在 crosspet-gathered：重启（新页面、同一份存储）后一只接一只再叫回来；送走的不回来
+    e.run(`setRole('main')`)
+    e.run(`callCompanion('claude'); callCompanion('grok')`)
+    await e.advance(2000)
+    e.run(`sendHome('grok@gather')`)
+    await e.advance(2000)
+    const saved = e.run(`localStorage.getItem('crosspet-gathered')`)
+    assert(saved === '["claude"]', `saved: ${saved}`)
+    const f = makePage()
+    f.run(`localStorage.setItem('crosspet-gathered', ${JSON.stringify(saved)})`)
+    f.run(`init(${JSON.stringify(manifest())}); setCharacter('gpt', true)`)
+    await f.advance(4000)
+    const list = lastCompanions(f)
+    assert(list && list.length === 1 && list[0].character === 'claude', `after restart: ${JSON.stringify(list)}`)
+    f.run(`init(${JSON.stringify(manifest())})`)   // 换衣服时外壳重新 init：不重复叫
+    await f.advance(4000)
+    assert(lastCompanions(f).length === 1, `re-init called again: ${JSON.stringify(lastCompanions(f))}`)
+    f.run('dismiss()')
+    await f.advance(3000)
+    assert(f.run(`localStorage.getItem('crosspet-gathered')`) === '[]', 'dismiss did not clear the saved list')
+  }],
   ['gather_staggered', async e => {
     await multiOn(e, 'gpt')
     e.run(`gather()`)
