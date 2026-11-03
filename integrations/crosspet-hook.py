@@ -379,12 +379,14 @@ if os.environ.get("GROK_HOOK_EVENT"):
             event[snake] = event[camel]
 
 # Codex 会在对话结束后自己在后台整理记忆（工作目录在 ~/.codex/memories），也会调工具，但不是你让它干的活，
-# 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管
+# 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管。
+# 例外：ChatGPT 桌面版的本地项目也放在这里（~/.codex/.chatgpt-projects/<项目>），那是你让它干的活，照常演（#38）
 if character == "gpt":
     try:
         codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
         cwd = Path(str(event.get("cwd") or "")).resolve() if event.get("cwd") else None
-        if cwd and (cwd == codex_home or codex_home in cwd.parents):
+        projects = codex_home / ".chatgpt-projects"
+        if cwd and (cwd == codex_home or codex_home in cwd.parents) and projects not in cwd.parents:
             ledger("dropped", "codex-memory")
             sys.exit(0)
     except (OSError, ValueError):
