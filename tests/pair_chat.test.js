@@ -138,3 +138,23 @@ test('说话时挑立绘：写了用写的，没写按字面（胖 → 鼓脸，
   const got = P.pick({ present: ['claude', 'gpt'], hearts10: () => 9, wear: ch => ch === 'gpt' ? 'gpt-onesie' : '', nowMs: 1e9, rnd: seq([0, 0, 0.6]) })
   assert.deepEqual(got.lines[1], ['gpt', '嗯……软的哦。', 'pat'])
 })
+
+test('升级台词：每个角色和每套皮肤都有三档，不长', () => {
+  const skins = fs.readdirSync(DIR).filter(id => CHARS.includes(skinOf(id)))
+  for (const w of [...CHARS, ...skins]) {
+    const lines = P.LEVEL_LINES[w]
+    assert.ok(lines && lines.length === 3, `缺 ${w}`)
+    for (const l of lines) assert.ok(l.length > 0 && l.length <= 14, `${w} 这句太长：${l}`)
+  }
+})
+
+test('levelUp：升了级没演过才演；只演最高那档；在忙的不算；按穿的说', () => {
+  const base = { present: ['claude', 'gpt', 'grok'], shownOf: () => 0, rnd: () => 0 }
+  assert.equal(P.levelUp({ ...base, levelOf: () => 0 }), null)
+  const up = P.levelUp({ ...base, levelOf: k => k === 'gpt+grok' ? 2 : 0, wear: ch => ch === 'gpt' ? 'gpt-onesie' : '' })
+  assert.equal(up.key, 'gpt+grok'); assert.equal(up.level, 2)
+  assert.deepEqual(up.lines, [['gpt', P.LEVEL_LINES['gpt-onesie'][1], 'friend_up'], ['grok', P.LEVEL_LINES.grok[1], 'friend_up']])
+  assert.equal(P.levelUp({ ...base, levelOf: () => 2, shownOf: () => 2 }), null)
+  assert.equal(P.levelUp({ ...base, busy: ['grok'], levelOf: k => k === 'gpt+grok' ? 1 : 0 }), null)
+  assert.equal(P.levelUp({ ...base, levelOf: () => 3, shownOf: () => 1 }).level, 3)
+})

@@ -258,6 +258,7 @@ const MOTION = {
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
   roll_call: 'm-hop',   // 集合点名举手答「到！」
+  friend_up: 'm-hop',   // 关系升级（每对台词，pair-chat.js）
   // 甩她 / 红温
   annoyed: 'm-rock', puffed: 'm-jolt', redhot: 'm-angry', sulk: 'm-slow', dizzy: 'm-dizzy', coaxed: 'm-sway', forgiven: 'm-hop',
   // 按时段 / 节日打招呼
@@ -275,7 +276,7 @@ Object.assign(LOCAL_LINES, CodexResets.LINES)   // 重置提醒的默认台词�
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
   reset_check: 'thinking', reset_bell: 'reset', reset_hope: 'happy', reset_maybe: 'hum', reset_nope: 'sulk',   // Codex 重置提醒（见 codex-resets.js）
   busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
-  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy' }
+  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
   annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000, roll_call: 6000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
@@ -1676,6 +1677,9 @@ function pairsOf(list) {
 function friendStoreRead() {
   try { const v = JSON.parse(localStorage.getItem(FRIEND_KEY)); return v && typeof v === 'object' && !Array.isArray(v) ? v : {} } catch { return {} }
 }
+function friendStoreWrite(store) {
+  try { localStorage.setItem(FRIEND_KEY, JSON.stringify(store)) } catch {}
+}
 function friendAward(pairs, kind) {
   const before = friendStoreRead(), nowMs = Date.now()
   let store = before
@@ -1726,14 +1730,26 @@ setInterval(() => {
 // 多桌宠在跑、两只都在场又都闲着时，隔一阵子（至少 12 分钟、每分钟掷一次）挑一对一问一答；按这一对的心数分档说不同的话。
 // 主桌宠自己说走 chat()，额外那只说交给外壳转（companionCall，fn = chat）。只由主桌宠页面挑，额外那只只管说
 let pairChatAt = 0
+const LEVEL_UP_GAP = 30_000
 const pairChatRecent = []
 function tryPairChat() {
   if (role !== 'main' || !friendshipOn() || pageHidden || egg) return
   const store = friendStoreRead(), nowMs = Date.now()
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
+  const wear = ch => manifest.characters?.[ch]?.skin || ''
+  // 先看有没有升了级还没演的（不等 12 分钟、不掷骰子；和上一段至少隔半分钟）。演过的最高关系记在这一对的 shown 里
+  if (nowMs - pairChatAt >= LEVEL_UP_GAP) {
+    const up = PairChat.levelUp({ present: presentCharacters(), busy, wear, levelOf: key => Friendship.level(store[key]?.points || 0), shownOf: key => store[key]?.shown || 0 })
+    if (up) {
+      pairChatAt = nowMs
+      friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
+      up.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
+      return
+    }
+  }
   const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
-                             hearts10: key => Friendship.hearts(store[key]?.points || 0), wear: ch => manifest.characters?.[ch]?.skin || '' })
+                             hearts10: key => Friendship.hearts(store[key]?.points || 0), wear })
   if (!got) return
   pairChatAt = nowMs
   pairChatRecent.push(got.id)

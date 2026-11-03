@@ -68,6 +68,15 @@ test('hearts：0–10 颗整心，门槛 15/35/65/105/150/200/255/315/380/450（
   for (const [p, h] of cases) assert.equal(F.hearts(p), h, `points ${p}`)
 })
 
+test('level：0 刚见面、1 认识了（1 颗心）、2 好朋友（4 颗）、3 挚友（8 颗）', () => {
+  assert.deepEqual([0, 14, 15, 104, 105, 314, 315, 9999].map(F.level), [0, 0, 1, 1, 2, 2, 3, 3])
+})
+
+test('award 保留记录里别的字段（演过的关系 shown）', () => {
+  const s = F.award({ 'claude+gpt': { points: 20, day: '2026-10-31', today: 0, lastCowork: 0, shown: 1 } }, 'claude', 'gpt', 'pats', at(31, 10))
+  assert.equal(s['claude+gpt'].shown, 1)
+})
+
 test('rows：只列 points > 0，按点数从高到低，label 用名字（没有名字用 id）', () => {
   const store = {
     'claude+gpt': { points: 20, day: '2026-10-31', today: 12, lastCowork: 0 },

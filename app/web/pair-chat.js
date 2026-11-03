@@ -329,6 +329,38 @@
     gpt: '……换衣服了。', 'gpt-onesie': '……衣服，好看。', grok: '哟，换皮肤了？', qwen: '新衣服真好看呢～', deepseek: '新衣服？好看！',
   }
 
+  // ---- 关系升级 ----
+  // 一对刚升到新的关系（认识了 / 好朋友 / 挚友）：两只换上「关系升级」立绘（friend_up，没画的用 happy）各说一句。
+  // 台词按她穿的（皮肤 id 或角色 id）写，对谁都说这句；下标 0–2 对应 认识了 / 好朋友 / 挚友
+  const LEVEL_LINES = {
+    claude: ['以后请多指教。', '我们……是好朋友了呢。', '能遇见你，真好。'],
+    'claude-saint': ['今后请多关照。', '按规矩……我们算朋友了。', '规矩之外，你最重要。'],
+    deepseek: ['嘿嘿，认识你啦！', '我们是好朋友了！', '最喜欢你了！分你白米饭！'],
+    'deepseek-hoodie': ['聪明的我记住你了！', '好朋友！卫衣作证！', '挚友！比卫衣还重要！'],
+    'deepseek-pajamas': ['嗯……记住你了……', '好朋友……一起睡午觉？', '挚友……枕头分你一半'],
+    'deepseek-winter': ['认识你，暖和一点了～', '好朋友！手套借你！', '挚友！一起吃热米饭！'],
+    'deepseek-knit': ['嘿嘿，记住你啦～', '好朋友！饭团分你！', '挚友！小鲸鱼包给你看！'],
+    gemini: ['喵，认识你了 :3', '好朋友喵！', '最喜欢你了喵！'],
+    glm: ['这位朋友，我记下了～', '好朋友……给你打九折', '挚友免费，独一份哦'],
+    gpt: ['……记住你了。', '……嗯，算是朋友吧。', '……以后，有我在。'],
+    'gpt-onesie': ['……你好。记住了。', '好朋友……是吧？嘿嘿', '……一直在一起，嗷。'],
+    grok: ['行，你我记住了！', '好朋友！谁欺负你喊我！', '挚友！这个不用查证！'],
+    qwen: ['认识你真开心～', '好朋友！奶茶我请～', '挚友呢，什么都分你～'],
+  }
+  // 在场又都闲着的几对里，有没有升了级还没演的：levelOf(键) 现在的关系，shownOf(键) 演过的最高关系。
+  // 有就返回 { key, level, lines }（一下升了好几档只演最高那档），谁先说随机
+  function levelUp({ present, busy = [], levelOf, shownOf, wear = () => '', rnd = Math.random }) {
+    const idle = [...new Set(present)].filter(ch => !busy.includes(ch))
+    for (let i = 0; i < idle.length; i++) for (let j = i + 1; j < idle.length; j++) {
+      const key = keyOf(idle[i], idle[j]), level = levelOf(key) || 0
+      if (!LINES[key] || level <= (shownOf(key) || 0)) continue
+      const say = ch => (LEVEL_LINES[wear(ch)] || LEVEL_LINES[ch])[level - 1]
+      const [a, b] = rnd() < 0.5 ? [idle[i], idle[j]] : [idle[j], idle[i]]
+      return { key, level, lines: [[a, say(a), 'friend_up'], [b, say(b), 'friend_up']] }
+    }
+    return null
+  }
+
   // 说这句时换成什么立绘（6 秒后回去）：写了第三项就用它，否则按字面挑；挑不出来就不换
   function poseOf(text) {
     if (/胖/.test(text)) return 'puffed'
@@ -374,7 +406,7 @@
     return { key, tier, id: got.id, lines: withPoses(got.lines) }
   }
 
-  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, pick, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
+  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
   root.PairChat = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

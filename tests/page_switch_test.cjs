@@ -472,6 +472,27 @@ const multiCases = [
     assert(e.state().bubble !== '不该说', 'chatted while working')
     assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
   }],
+  ['friend_level_up', async e => {
+    // 已经攒到好朋友（4 颗心 = 105 分）、还没演过：集合后两只都闲着，下一分钟演升级，记下演过；不再重复演
+    e.run(`localStorage.setItem('crosspet-friendship', JSON.stringify({ 'claude+gpt': { points: 105, day: '2026-01-01', today: 0, lastCowork: 0 } }))`)
+    e.run(`pageHidden = false; Math.random = () => 0.9`)
+    e.run(`globalThis.__said = []; { const o = say; say = l => { if (l) __said.push(l); return o(l) } }`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    await e.advance(65000)
+    const ups = e.msgs().filter(m => m.companionCall?.fn === 'chat' && m.companionCall.args[1] === 'friend_up')
+    const main = e.run(`mainCharacter()`), other = main === 'gpt' ? 'claude' : 'gpt'
+    const lines = e.run(`PairChat.LEVEL_LINES`)
+    assert(ups.length === 1 && ups[0].companionCall.args[0] === lines[other][1], `companion level line: ${JSON.stringify(ups)}`)
+    assert(e.run(`__said`).includes(lines[main][1]), `main level line: ${JSON.stringify(e.run(`__said`))}`)
+    assert(friendStore(e)['claude+gpt'].shown === 2, `shown not saved: ${JSON.stringify(friendStore(e))}`)
+    await e.advance(30 * 60000)
+    assert(e.msgs().filter(m => m.companionCall?.args?.[1] === 'friend_up').length === 1, 'level-up played twice')
+    // 主桌宠说的那一刻换上升级的图（没画就是 happy），飘心
+    e.run(`chat('测试', 'friend_up')`)
+    assert(e.state().pose === 'friend_up' && e.run(`framesFor('friend_up')`).length > 0, `friend_up pose: ${e.state().pose}`)
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
   ['companion_chat_line', async e => {
     const c = await rolePage('companion')
     c.run(`setCharacter('gpt', true)`)

@@ -46,6 +46,13 @@
     return THRESHOLDS.filter(t => points >= t).length
   }
 
+  // 关系：0 刚见面、1 认识了（1 颗心）、2 好朋友（4 颗）、3 挚友（8 颗）。升到新的一档时两只演一次「关系升级」（pair-chat.js）
+  const LEVEL_HEARTS = [1, 4, 8]
+  function level(points) {
+    const h = hearts(points)
+    return LEVEL_HEARTS.filter(n => h >= n).length
+  }
+
   function rows(store, names) {
     return Object.keys(store)
       .filter(key => store[key] && store[key].points > 0)
@@ -57,7 +64,7 @@
       })
   }
 
-  const api = { pairKey, award, hearts, rows, TOGETHER_MS, COFINISH_MS, PATS_MS }
+  const api = { pairKey, award, hearts, level, rows, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
   root.Friendship = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
