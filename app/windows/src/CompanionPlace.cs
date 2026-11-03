@@ -9,7 +9,8 @@ namespace CrossPet
     /// 先排主桌宠左边（由近到远），左边放不下放右边，再放不下往上一排（上面的排里主桌宠正上方先放），还不够往下一排；
     /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。
     /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠；
-    /// 主桌宠在屏幕中间、和她对齐排不下第二排时，改从屏幕底边（再不行顶边）开始排，再不够才叠着放。
+    /// 主桌宠在屏幕中间、和她对齐排不下第二排时，改从屏幕底边（再不行顶边）开始排；
+    /// 还不够，左右相邻的再压着两边的透明边排（11-03：笔记本上主桌宠在中间时左边放两列差一点，第 5、6 只叠到了前面那只上），再不够才叠着放。
     /// 格子不够（屏幕太小）时剩下的错开叠在已有的格子上，照样夹在 visible 里。
     /// 自己定义 Rect / Size：LogicTests 跑在 macOS 的 .NET 8 上，没有 WPF 的 System.Windows.Rect</summary>
     static class CompanionPlace
@@ -38,12 +39,21 @@ namespace CrossPet
             var t = tuck ?? r.H * BubbleShare;
             return new Rect(r.X, r.Y + t, r.W, r.H - t);
         }
+        /// <summary>窗口左右两边各有一截透明边（画布比人物、名牌、额度条都宽）：排不下时左右相邻的窗口可以压着这截排。
+        /// 量过（11-03）：人物左右各空 15%–19%，最宽的 Grok（斧头）一边只空 4.5%；两只相对的两边加起来都够 13%</summary>
+        public const double SideShare = 0.065;
+        /// <summary>比重叠用的部分：去掉气泡空白、再去掉左右两截透明边</summary>
+        public static Rect Core(Rect r)
+        {
+            var b = Body(r); var d = r.W * SideShare;
+            return new Rect(b.X + d, b.Y, b.W - 2 * d, b.H);
+        }
 
         /// <summary>还空着的格子（互相之间也不重叠，后面一只一只放进去不会叠）</summary>
         public static List<Rect> FreeSlots(IEnumerable<Rect> slots, IEnumerable<Rect> taken)
         {
             var used = taken.ToList(); var o = new List<Rect>();
-            foreach (var s in slots) if (!used.Any(t => Body(t).Intersects(Body(s), 1))) { o.Add(s); used.Add(s); }
+            foreach (var s in slots) if (!used.Any(t => Core(s).Intersects(Core(t), 1))) { o.Add(s); used.Add(s); }
             return o;
         }
 
@@ -56,18 +66,21 @@ namespace CrossPet
             double top0 = Math.Min(Math.Max(main.Bottom - h, vy), Math.Max(vy, vb - h));
             // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始）；
             // tuck：上下排可以压着的那截（0 = 整窗口不重叠）。往上一排压着第一排和主桌宠的气泡空白，主桌宠正上方那格才不压着她
+            // side：左右相邻压着的那截（0 = 不压）
+            double side = 0;
             List<Rect> Row(double y, bool center)
             {
                 var o = new List<Rect>();
                 if (center) o.Add(new Rect(main.X, y, w, h));
-                for (var x = main.X - w; x >= vx - 0.01; x -= w) o.Add(new Rect(x, y, w, h));
-                for (var x = main.X + Math.Max(w, main.W); x + w <= vr + 0.01; x += w) o.Add(new Rect(x, y, w, h));
+                for (var x = main.X - w + side; x >= vx - 0.01; x -= w - side) o.Add(new Rect(x, y, w, h));
+                for (var x = main.X + Math.Max(w, main.W) - side; x + w <= vr + 0.01; x += w - side) o.Add(new Rect(x, y, w, h));
                 return o;
             }
+            Rect Narrow(Rect r) => new Rect(r.X + side / 2, r.Y, r.W - side, r.H);
             List<Rect> Keep(List<Rect> c, double tuck)
             {
-                var mainBody = Body(main, tuck > 0 ? main.H * BubbleShare : 0);
-                return c.Where(r => Fits(r) && !Body(r, tuck).Intersects(mainBody, 0.5)).ToList();
+                var mainBody = Narrow(Body(main, tuck > 0 ? main.H * BubbleShare : 0));
+                return c.Where(r => Fits(r) && !Narrow(Body(r, tuck)).Intersects(mainBody, 0.5)).ToList();
             }
             // 第一排和主桌宠底边对齐，往上、往下各排几排
             List<Rect> Layout(double tuck)
@@ -89,11 +102,15 @@ namespace CrossPet
             }
             var tight = h * BubbleShare;
             var cands = Layout(0);
-            foreach (var next in new Func<List<Rect>>[] { () => Layout(tight), () => Grid(0, false), () => Grid(tight, false), () => Grid(0, true), () => Grid(tight, true) })
+            foreach (var s in new[] { 0, w * 2 * SideShare })
             {
-                if (cands.Count >= count) break;
-                var more = next();
-                if (more.Count > cands.Count) cands = more;
+                side = s;
+                foreach (var next in new Func<List<Rect>>[] { () => Layout(0), () => Layout(tight), () => Grid(0, false), () => Grid(tight, false), () => Grid(0, true), () => Grid(tight, true) })
+                {
+                    if (cands.Count >= count) break;
+                    var more = next();
+                    if (more.Count > cands.Count) cands = more;
+                }
             }
             var output = cands.Take(count).ToList();
             // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里

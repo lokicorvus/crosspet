@@ -12,21 +12,23 @@ run() {   # 和 window_place_probe.sh 一样 5 秒超时：参数不认识时 Ap
 }
 # 名字 主桌宠(4) 几只 宽 高 可见区(4)：几只都要有、都在可见区里、两两不重叠、不压主桌宠
 # SHARE=59/362：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
+# SIDE=0.065：左右再各去掉这么多（屏幕排不下时左右相邻的压着两边的透明边，见 App.sideShare）
 SHARE=0
+SIDE=0
 check_layout() {
   name=$1; shift
   count=$5; mx=$1; my=$2; mw=$3; mh=$4; vx=$8; vy=$9; vw=${10}; vh=${11}
   out=$(run "$@")
-  verdict=$(printf '%s\n' "$out" | awk -v s="$SHARE" -v n="$count" -v mx="$mx" -v my="$my" -v mw="$mw" -v mh="$mh" \
+  verdict=$(printf '%s\n' "$out" | awk -v s="$SHARE" -v e="$SIDE" -v n="$count" -v mx="$mx" -v my="$my" -v mw="$mw" -v mh="$mh" \
       -v vx="$vx" -v vy="$vy" -v vw="$vw" -v vh="$vh" '
     BEGIN { k = 0 }
-    NF == 4 { x[k] = $1; y[k] = $2; w[k] = $3; H[k] = $4; h[k] = $4 * (1 - s); k++ }
+    NF == 4 { X[k] = $1; x[k] = $1 + $3 * e; y[k] = $2; W[k] = $3; w[k] = $3 * (1 - 2 * e); H[k] = $4; h[k] = $4 * (1 - s); k++ }
     function over(ax, ay, aw, ah, bx, by, bw, bh) { return ax < bx + bw - 0.01 && bx < ax + aw - 0.01 && ay < by + bh - 0.01 && by < ay + ah - 0.01 }
     END {
       if (k != n) { print "只有 " k + 0 " 只（要 " n " 只）"; exit }
       for (i = 0; i < k; i++) {
-        if (x[i] < vx - 0.01 || y[i] < vy - 0.01 || x[i] + w[i] > vx + vw + 0.01 || y[i] + H[i] > vy + vh + 0.01) { print "第 " i + 1 " 只出了可见区：" x[i] " " y[i]; exit }
-        if (over(x[i], y[i], w[i], h[i], mx, my, mw, mh * (1 - s))) { print "第 " i + 1 " 只压着主桌宠：" x[i] " " y[i]; exit }
+        if (X[i] < vx - 0.01 || y[i] < vy - 0.01 || X[i] + W[i] > vx + vw + 0.01 || y[i] + H[i] > vy + vh + 0.01) { print "第 " i + 1 " 只出了可见区：" X[i] " " y[i]; exit }
+        if (over(x[i], y[i], w[i], h[i], mx + mw * e, my, mw * (1 - 2 * e), mh * (1 - s))) { print "第 " i + 1 " 只压着主桌宠：" x[i] " " y[i]; exit }
         for (j = 0; j < i; j++) if (over(x[i], y[i], w[i], h[i], x[j], y[j], w[j], h[j])) { print "第 " j + 1 " 和第 " i + 1 " 只重叠"; exit }
       }
       print "ok"
@@ -69,7 +71,13 @@ MODE=--companion-seq-probe
 check_layout seq-middle 1146 381 310 431 6 310 431 0 83 1512 874
 check_layout seq-saved 1146 381 310 431 6 310 431 0 83 1512 874 60 245 463 198 964 513
 check_layout seq-saved-few 1146 381 310 431 3 310 431 0 83 1512 874 463 198 60 245
+# 主桌宠在屏幕正中间（11-03 截图）：左边 618 点放两列整窗口差 2 点，以前只排得下 4 格，第 5、6 只错开 48 点叠在前面那只上；
+# 现在左右相邻压着两边的透明边排（人物、名牌、额度条不压）
+SIDE=0.065
+check_layout seq-center-6 618 338 310 431 6 310 431 0 86 1512 871
 MODE=--companion-place-probe
+check_layout center-6 618 338 310 431 6 310 431 0 86 1512 871
+SIDE=0
 SHARE=0
 check_layout laptop-three-fit 1164 513 310 431 3 310 431 0 85 1512 859
 # 屏幕太小放不下：只要求都在可见区里（重叠躲不开）

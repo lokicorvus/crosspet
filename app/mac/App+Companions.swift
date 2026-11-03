@@ -32,11 +32,17 @@ extension App {
     static func body(_ r: NSRect, tuck: CGFloat? = nil) -> NSRect {
         NSRect(x: r.minX, y: r.minY, width: r.width, height: r.height - (tuck ?? r.height * bubbleShare))
     }
+    /// 窗口左右两边各有一截透明边（画布比人物、名牌、额度条都宽）：排不下时左右相邻的窗口可以压着这截排。
+    /// 量过（11-03）：人物左右各空 15%–19%，最宽的 Grok（斧头）一边只空 4.5%；两只相对的两边加起来都够 13%
+    static let sideShare: CGFloat = 0.065
+    /// 比重叠用的部分：去掉气泡空白、再去掉左右两截透明边
+    static func core(_ r: NSRect) -> NSRect { body(r).insetBy(dx: r.width * sideShare, dy: 0) }
 
     /// 纯计算（tests/companion_place_probe.sh 测），屏幕点、y 向上：count 只额外桌宠各放哪。
     /// 先排主桌宠左边（由近到远），左边放不下放右边，再放不下往上一排（上面的排里主桌宠正上方先放），还不够往下一排；
     /// 每个格子都整个在 visible 里、两两不重叠、不压着主桌宠。
-    /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠，再不够才叠着放。
+    /// 整窗口排不下（比如笔记本屏幕只放得下一排）：上下两排改成压着下面那排顶上的气泡空白排，人物照样不重叠；
+    /// 还不够，左右相邻的再压着两边的透明边排（11-03：笔记本上主桌宠在中间时左边 618 点放两列差 2 点，第 5、6 只叠到了前面那只上），再不够才叠着放。
     /// 格子不够（屏幕太小）时剩下的叠在已有的格子上，照样夹在 visible 里
     static func companionSlots(main: NSRect, count: Int, size: NSSize, visible vf: NSRect) -> [NSRect] {
         guard count > 0, size.width > 0, size.height > 0 else { return [] }
@@ -45,18 +51,20 @@ extension App {
         let y0 = min(max(main.minY, vf.minY), max(vf.minY, vf.maxY - h))   // 第一排和主桌宠底边对齐（主桌宠藏出屏幕时夹回来）
         // 每排的格子：同一排里左右相邻不重叠（右边从主桌宠和格子里较宽的那个之后开始）；
         // tuck：上下排可以压着的那截（0 = 整窗口不重叠）。往上一排压着第一排和主桌宠的气泡空白，主桌宠正上方那格才不压着她
+        // side：左右相邻压着的那截（0 = 不压）
+        var side: CGFloat = 0
         func row(_ y: CGFloat, center: Bool) -> [NSRect] {
             var out: [NSRect] = []
             if center { out.append(NSRect(x: main.minX, y: y, width: w, height: h)) }
-            var x = main.minX - w
-            while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w }
-            x = main.minX + max(w, main.width)
-            while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w }
+            var x = main.minX - w + side
+            while x >= vf.minX - 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x -= w - side }
+            x = main.minX + max(w, main.width) - side
+            while x + w <= vf.maxX + 0.01 { out.append(NSRect(x: x, y: y, width: w, height: h)); x += w - side }
             return out
         }
         func keep(_ cands: [NSRect], tuck: CGFloat) -> [NSRect] {
-            let mainBody = body(main, tuck: tuck > 0 ? main.height * bubbleShare : 0)
-            return cands.filter { fits($0) && !body($0, tuck: tuck).insetBy(dx: 0.5, dy: 0.5).intersects(mainBody) }
+            let mainBody = body(main, tuck: tuck > 0 ? main.height * bubbleShare : 0).insetBy(dx: side / 2, dy: 0)
+            return cands.filter { fits($0) && !body($0, tuck: tuck).insetBy(dx: 0.5 + side / 2, dy: 0.5).intersects(mainBody) }
         }
         // 第一排和主桌宠底边对齐，往上、往下各排几排
         func layout(tuck: CGFloat) -> [NSRect] {
@@ -81,10 +89,13 @@ extension App {
         }
         let tight = h * bubbleShare
         var cands = layout(tuck: 0)
-        for next in [{ layout(tuck: tight) }, { grid(tuck: 0, fromTop: false) }, { grid(tuck: tight, fromTop: false) },
-                     { grid(tuck: 0, fromTop: true) }, { grid(tuck: tight, fromTop: true) }] where cands.count < count {
-            let more = next()
-            if more.count > cands.count { cands = more }
+        for s in [0, w * 2 * sideShare] {
+            side = s
+            for next in [{ layout(tuck: 0) }, { layout(tuck: tight) }, { grid(tuck: 0, fromTop: false) }, { grid(tuck: tight, fromTop: false) },
+                         { grid(tuck: 0, fromTop: true) }, { grid(tuck: tight, fromTop: true) }] where cands.count < count {
+                let more = next()
+                if more.count > cands.count { cands = more }
+            }
         }
         var out = Array(cands.prefix(count))
         // 放不下了：在已有的格子上错开一点叠着放（躲不开重叠），夹在可见区里
@@ -125,7 +136,8 @@ extension App {
         let planned = companionSlots(main: main, count: total, size: size, visible: vf)
         let slots = planned + companionSlots(main: main, count: 2 * others.count + 1, size: size, visible: vf)
         // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
-        let clear = { (s: NSRect, taken: [NSRect]) in !taken.contains { body($0).intersects(body(s).insetBy(dx: 1, dy: 1)) } }
+        // 左右再去掉两边的透明边：格子排不下时左右也压着这截
+        let clear = { (s: NSRect, taken: [NSRect]) in !taken.contains { core($0).intersects(core(s).insetBy(dx: 1, dy: 1)) } }
         if let r = saved, clear(r, [main] + others), freeSlots(planned, taken: others + [r]).count >= total - others.count - 1 { return r }
         return slots.first { clear($0, others) } ?? slots.last ?? main
     }
@@ -133,7 +145,7 @@ extension App {
     /// 还空着的格子（互相之间也不重叠，后面一只一只放进去不会叠）
     static func freeSlots(_ slots: [NSRect], taken: [NSRect]) -> [NSRect] {
         var used = taken, out: [NSRect] = []
-        for s in slots where !used.contains(where: { body($0).intersects(body(s).insetBy(dx: 1, dy: 1)) }) { out.append(s); used.append(s) }
+        for s in slots where !used.contains(where: { core($0).intersects(core(s).insetBy(dx: 1, dy: 1)) }) { out.append(s); used.append(s) }
         return out
     }
 

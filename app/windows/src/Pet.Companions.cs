@@ -72,7 +72,7 @@ namespace CrossPet
             var planned = CompanionPlace.Slots(main, total, size, wa);
             var slots = planned.Concat(CompanionPlace.Slots(main, 2 * others.Count + 1, size, wa)).ToArray();
             // 比的是去掉气泡空白的那部分：排不下时格子本来就压着上一排的气泡空白
-            bool Clear(CompanionPlace.Rect s, IEnumerable<CompanionPlace.Rect> taken) => !taken.Any(o => CompanionPlace.Body(s).Intersects(CompanionPlace.Body(o), 1));
+            bool Clear(CompanionPlace.Rect s, IEnumerable<CompanionPlace.Rect> taken) => !taken.Any(o => CompanionPlace.Core(s).Intersects(CompanionPlace.Core(o), 1));   // 左右也去掉两边的透明边：格子排不下时左右压着这截
             if (Store.Settings.TryGetValue("origin-" + key, out var pos) && pos is Dictionary<string, object> p && p.ContainsKey("x") && p.ContainsKey("y"))
             {
                 var r = new CompanionPlace.Rect(Convert.ToDouble(p["x"]), Convert.ToDouble(p["y"]), w, h);

@@ -218,10 +218,11 @@ static class Program
         // 多桌宠：额外那几只第一次出现放在哪（CompanionPlace.Slots，物理像素、y 向下；规则同 macOS 的 companionSlots，
         // 那边测试 tests/companion_place_probe.sh）。都要整个在可见区里、两两不重叠、不压着主桌宠
         // bodies：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
-        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis, bool bodies = false)
+        // cores：再去掉左右两边的透明边（排不下时左右相邻压着这截，见 CompanionPlace.SideShare）
+        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis, bool bodies = false, bool cores = false)
         {
             var s = CompanionPlace.Slots(main, n, size, vis);
-            CompanionPlace.Rect B(CompanionPlace.Rect r) => bodies ? CompanionPlace.Body(r) : r;
+            CompanionPlace.Rect B(CompanionPlace.Rect r) => cores ? CompanionPlace.Core(r) : bodies ? CompanionPlace.Body(r) : r;
             if (s.Length != n) return $"只有 {s.Length} 只（要 {n} 只）";
             bool Over(CompanionPlace.Rect a, CompanionPlace.Rect b) => a.X < b.X + b.W - 0.01 && b.X < a.X + a.W - 0.01 && a.Y < b.Y + b.H - 0.01 && b.Y < a.Y + a.H - 0.01;
             for (int i = 0; i < n; i++)
@@ -266,6 +267,10 @@ static class Program
         // 主桌宠在屏幕中间（11-02 截图）：和她底边对齐往上、往下都差一点排不下第二排，以前后 3 只错开叠在前 3 只上
         var lMid = string.Join(" / ", new[] { 151, 251, 351 }.Select(y => Layout(R(1164, y, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true)));
         Check("多桌宠位置：主桌宠在屏幕中间也排得下两排（" + lMid + "）", lMid == "ok / ok / ok");
+        // 主桌宠在屏幕正中间（11-03 截图）：左边放两列整窗口差 2 点，以前只排得下 4 格，第 5、6 只错开叠在前面那只上；
+        // 现在左右相邻压着两边的透明边排（人物、名牌、额度条不压）
+        var lCenter = Layout(R(618, 213, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 25, 1512, 871), cores: true);
+        Check("多桌宠位置：主桌宠在正中间时 6 只左右压着透明边排（" + lCenter + "）", lCenter == "ok");
         // 默认大小在 1280×720 上放不下 12 只：躲不开重叠，但每只都夹在可见区里
         var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
         Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12
