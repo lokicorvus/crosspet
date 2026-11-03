@@ -169,7 +169,7 @@ const cases = [
     assert(label.includes('在干活的 AI 各显示一只'), '开关标题不对：' + label)
     assert(label.includes('同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息'), '开关说明不对：' + label)
     const main = p.$('mainPetRow').textContent, rest = p.$('petsRestRow').textContent
-    for (const t of ['主桌宠', '跟着规则换', '固定为']) assert(main.includes(t), '主桌宠一行缺：' + t)
+    for (const t of ['主桌宠', '先来的当', '固定为']) assert(main.includes(t), '主桌宠一行缺：' + t)
     for (const t of ['她们什么时候去休息', '干完活、你离开 AI 软件一会儿后', '一直留着，直到我让她回去或 AI 程序关掉']) assert(rest.includes(t), '休息一行缺：' + t)
     assert(p.$('friendship').closest('.card').dataset.tab === 'character' && p.$('friendship').textContent.includes('她们的友谊'), '友谊区不在「角色」页')
   }],
@@ -240,14 +240,14 @@ const cases = [
     again.push({ multiPets: false, friendship: ROWS })
     assert(!hidden(again.$('friendship')) && again.$('friendship').classList.contains('dim'), '重开后该记得打开过')
   }],
-  ['主桌宠：下拉列出外壳给的角色；"" = 跟着规则换', p => {
+  ['主桌宠：下拉列出外壳给的角色；"" = 先来的当', p => {
     p.push({ multiPets: true, mainPet: '' })
     const sel = p.$('mainPetSelect')
     assert(sel.options.map(o => o.value).join() === 'claude,gpt,deepseek', '下拉角色不对：' + sel.options.map(o => o.value).join())
     assert(sel.options.map(o => o.textContent).join() === 'Claude,GPT,小鲸', '下拉名字不对')
-    assert(p.q('input[name=mainPet][value=rule]').checked && !p.q('input[name=mainPet][value=fixed]').checked, '"" 该选中跟着规则换')
+    assert(p.q('input[name=mainPet][value=rule]').checked && !p.q('input[name=mainPet][value=fixed]').checked, '"" 该选中先来的当')
     p.push({ multiPets: true })
-    assert(p.q('input[name=mainPet][value=rule]').checked, '没推 mainPet 时按跟着规则换')
+    assert(p.q('input[name=mainPet][value=rule]').checked, '没推 mainPet 时按先来的当')
   }],
   ['两个选项行不带 .sub（页头版本号那一行的灰色小字样式）', p => {
     p.push({ multiPets: true })
@@ -274,7 +274,7 @@ const cases = [
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: 'deepseek' }), '点「固定为」该发下拉里的角色：' + JSON.stringify(p.posted.at(-1)))
     p.push({ multiPets: true, mainPet: 'deepseek' })
     click(p.q('input[name=mainPet][value=rule]'))
-    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: '' }), '点「跟着规则换」该发 ""')
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: '' }), '点「先来的当」该发 ""')
     p.push({ multiPets: true, mainPet: '' })
     p.$('mainPetSelect').value = 'gpt'; p.$('mainPetSelect').onchange()
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: 'gpt' }), '换下拉该直接固定为那个角色')

@@ -413,6 +413,27 @@ const multiCases = [
     assert(c.run(`$('caption').dataset.label`) === '终端', 'client label not shown under the name')
     assert(!c.errors.length, `page errors: ${JSON.stringify(c.errors)}`)
   }],
+  ['main_claimed_keeps_first_comer', async e => {
+    // 谁先来谁当主桌宠：主桌宠的角色有会话时，外壳问「跟随前台」换不换，答案是不换（11-03）
+    await multiOn(e, 'claude')
+    const ask = () => e.run(`FollowPolicy.foregroundTarget(Object.assign({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: [] }, { mainClaimed: mainClaimed() }))`)
+    assert(ask() === 'gpt', `main with no sessions should follow the first comer: ${ask()}`)
+    e.run(`setSessions('claude', csess(['s1','writing','claude-desktop'])); setForeground({ kind: 'ai', character: 'claude', client: 'claude-desktop' })`)
+    await e.advance(3000)
+    assert(e.run('mainClaimed()') === true, 'claude sessions did not claim the main pet')
+    assert(ask() === null, `switched away from the first comer: ${ask()}`)
+  }],
+  ['companion_waves_on_quit', async e => {
+    // 退出时外壳也让额外那只 farewell：她挥手（bye）、说一句道别，之后状态事件不再打断
+    const c = await rolePage('companion')
+    c.run('farewell(null, 2000)')
+    await c.advance(300)
+    const s = c.state()
+    assert(s.pose === 'bye', `companion did not wave: ${JSON.stringify(s)}`)
+    c.run(`hook('gpt','writing','PreToolUse')`)
+    await c.advance(500)
+    assert(c.state().pose === 'bye', `work event interrupted the farewell: ${c.state().pose}`)
+  }],
   ['companion_leave_now', async e => {
     const c = await rolePage('companion')
     c.run(`setCharacter('gpt', true)`)

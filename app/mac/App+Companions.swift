@@ -449,13 +449,13 @@ extension App {
         js("setRunning(\(json))")
     }
 
-    /// 「跟随前台」要换角色：开关开着时先问页面（固定了主桌宠、要换成的已经有一只站着：不换）；still：答复回来时情况还对不对
+    /// 「跟随前台」要换角色：开关开着时先问页面（固定了主桌宠、主桌宠的角色有会话、要换成的已经有一只站着：不换）；still：答复回来时情况还对不对
     func followForeground(_ id: String, why: String, via: String, still: @escaping () -> Bool = { true }) {
         guard multiPetsOn else { switchTo(id, why: why, via: via); return }
         let standing = Array(Set(companions.values.map { $0.character })).sorted()
         let input: [String: Any] = ["foregroundId": id, "current": currentId as Any? ?? NSNull(), "mainPet": mainPet, "standing": standing]
         guard let data = try? JSONSerialization.data(withJSONObject: input), let json = String(data: data, encoding: .utf8) else { return }
-        web.evaluateJavaScript("FollowPolicy.foregroundTarget(\(json))") { [weak self] r, _ in
+        web.evaluateJavaScript("FollowPolicy.foregroundTarget(Object.assign(\(json), { mainClaimed: mainClaimed() }))") { [weak self] r, _ in
             guard let self, r as? String == id, id != self.currentId, self.characterIds.contains(id), still() else { return }
             self.switchTo(id, why: why, via: via)
         }

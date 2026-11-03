@@ -1614,6 +1614,8 @@ function windDownCompanions() {
   companionsState = null; sentCompanions = null; claim = null
   resetFriendship()
 }
+// 主桌宠的角色有没有会话（占着客户端）：外壳问「跟随前台」换不换时一起带上（FollowPolicy.foregroundTarget）
+const mainClaimed = () => !!claim?.key
 function updateCompanions() {
   if (!companionsRunning()) { if (role === 'main' && !multiPets.on && sentCompanions !== null) windDownCompanions(); return }
   const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}

@@ -84,3 +84,10 @@ test('跳过原因分得清：前台 AI 优先 / 当前角色在忙 / 关了跟�
   assert.equal(eventSkip({ ...base, followEvents: false }), 'off')
   assert.equal(eventSkip({ ...base, foregroundId: null }), null)
 })
+
+test('多桌宠：谁先来谁当主桌宠，主桌宠的角色有会话时跟随前台不换（11-03）', () => {
+  // 开着 Claude 干活，切到 Codex：主桌宠还是 Claude，GPT 干活时冒它自己那只
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: [], mainClaimed: true }), null)
+  // 主桌宠的角色一个会话都没有（昨天留下的角色）：第一个来的 AI 当主桌宠
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: [], mainClaimed: false }), 'gpt')
+})

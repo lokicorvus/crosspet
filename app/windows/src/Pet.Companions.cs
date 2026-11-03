@@ -452,7 +452,7 @@ namespace CrossPet
             var generation = followEventGeneration;
             var standing = companions.Values.Select(c => c.Character).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray();
             var input = Store.Json.Serialize(new Dictionary<string, object> { ["foregroundId"] = id, ["current"] = current, ["mainPet"] = MainPet, ["standing"] = standing });
-            var answer = await Eval($"FollowPolicy.foregroundTarget({input})");
+            var answer = await Eval($"FollowPolicy.foregroundTarget(Object.assign({input}, {{ mainClaimed: mainClaimed() }}))");   // 主桌宠的角色有会话就不换（谁先来谁当）
             string target;
             try { target = Store.Json.Deserialize<string>(answer); } catch { target = null; }
             if (target != id || id == current || generation != followEventGeneration || !ready || Paused || Native.ForegroundExe() != exe) return;
