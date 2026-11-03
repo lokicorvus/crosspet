@@ -578,6 +578,30 @@ const multiCases = [
     await c.advance(1000)
     assert(!c.msgs().some(m => 'friendship' in m), `companion sent friendship: ${JSON.stringify(c.msgs())}`)
   }],
+  ['friendship_backup_restore', async e => {
+    // 外壳载入完先交回 friendship.json：网页的存储被清掉了也能找回；init 发的友谊行就是并好的；记账时每次都交一份给外壳存
+    const rec = points => ({ points, day: '2026-01-01', today: 0, lastCowork: 0 })
+    const f = makePage()
+    f.run(`restoreFriendship(${JSON.stringify({ 'claude+gpt': rec(105) })})`)
+    assert(friendStore(f)['claude+gpt'].points === 105, `not restored: ${JSON.stringify(friendStore(f))}`)
+    assert(!f.msgs().some(m => 'friendshipStore' in m), `echoed an unchanged backup: ${JSON.stringify(f.msgs())}`)
+    f.run(`init(${JSON.stringify(manifest())})`)
+    await f.advance(1000)
+    const rows = f.msgs().filter(m => 'friendship' in m)
+    assert(rows.length === 1 && rows[0].friendship[0].hearts === 4, `rows: ${JSON.stringify(rows)}`)
+    f.run(`friendAward([['claude', 'gpt']], 'pats')`)
+    const backups = f.msgs().filter(m => 'friendshipStore' in m)
+    assert(backups.length === 1 && backups[0].friendshipStore['claude+gpt'].points === 107, `backup: ${JSON.stringify(backups)}`)
+    // 网页这边比备份新（或备份没有）：回写一次让备份跟上；没有备份、网页也是空的：不发
+    const g = makePage()
+    g.run(`localStorage.setItem('crosspet-friendship', ${JSON.stringify(JSON.stringify({ 'claude+gpt': rec(50) }))})`)
+    g.run(`restoreFriendship(${JSON.stringify({ 'claude+gpt': rec(20) })})`)
+    const up = g.msgs().filter(m => 'friendshipStore' in m)
+    assert(up.length === 1 && up[0].friendshipStore['claude+gpt'].points === 50 && friendStore(g)['claude+gpt'].points === 50, `stale backup: ${JSON.stringify(up)}`)
+    const h = makePage()
+    h.run('restoreFriendship(null)')
+    assert(!h.msgs().some(m => 'friendshipStore' in m) && !h.run(`localStorage.getItem('crosspet-friendship')`), 'empty restore wrote something')
+  }],
   ['companion_first_character_gets_entrance', async e => {
     // 额外那只的角色正好是清单里排第一的（claude）：init 不能先悄悄换上她，让外壳的 setCharacter 成了空操作、没有噗和招呼
     const c = makePage()

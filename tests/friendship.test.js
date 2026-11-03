@@ -93,6 +93,26 @@ test('rows：只列 points > 0，按点数从高到低，label 用名字（没�
   assert.deepEqual(F.rows({}, names), [])
 })
 
+test('merge：每对取分数高的；同分留网页的；坏记录和坏 key 不要；不是对象就原样返回', () => {
+  const rec = (points, extra = {}) => ({ points, day: '2026-11-01', today: 0, lastCowork: 0, ...extra })
+  const local = { 'claude+gpt': rec(40), 'claude+qwen': rec(10, { shown: 1 }) }
+  const saved = {
+    'claude+gpt': rec(20),                 // 备份旧了：不往回拉
+    'claude+qwen': rec(10),                // 同分：留网页的（带 shown）
+    'deepseek+gpt': rec(70, { shown: 2 }), // 网页这边没有：整条拿回来
+    'gpt+claude': rec(99),                 // key 顺序不对
+    'claude+claude': rec(99),
+    'gemini+grok': { points: 'x' },
+    'glm+grok': { points: -1 },
+  }
+  const out = F.merge(local, saved)
+  assert.deepEqual(out, { ...local, 'deepseek+gpt': rec(70, { shown: 2 }) })
+  assert.equal(F.merge({ 'claude+gpt': rec(5) }, { 'claude+gpt': rec(30) })['claude+gpt'].points, 30)
+  assert.equal(F.merge(local, local), local)
+  assert.equal(F.merge(local, null), local)
+  assert.equal(F.merge(local, [1]), local)
+})
+
 test('间隔常量', () => {
   assert.equal(F.TOGETHER_MS, 600_000)
   assert.equal(F.COFINISH_MS, 300_000)

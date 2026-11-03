@@ -1660,7 +1660,7 @@ setInterval(updateCompanions, 5000)
 //   同时干活：在场的两个角色都在干活 → cowork（同一对 10 分钟一次，friendship.js 管）
 //   前后脚干完：一个角色从干活变成不干活时记下时间，5 分钟内另一个也这样 → cofinish
 //   分别摸头：见 notePat
-// 存 localStorage['crosspet-friendship']（坏了 / 没有就当空的）；设置页从外壳拿：toShell({ friendship: Friendship.rows(...) })，
+// 存 localStorage['crosspet-friendship']（坏了 / 没有就当空的），外壳在数据目录另存一份 friendship.json；设置页从外壳拿：toShell({ friendship: Friendship.rows(...) })，
 // 和 companions 一样只在变化时发，开始记账后第一次一定发
 const FRIEND_KEY = 'crosspet-friendship', FRIEND_TICK = 60_000
 const togetherMs = {}            // 一对（pairKey）→ 攒下的一起在场时间
@@ -1677,14 +1677,24 @@ function pairsOf(list) {
 function friendStoreRead() {
   try { const v = JSON.parse(localStorage.getItem(FRIEND_KEY)); return v && typeof v === 'object' && !Array.isArray(v) ? v : {} } catch { return {} }
 }
+// 每次写都顺手交给外壳存一份 friendship.json（数据目录里，和设置、角色放一起），网页的存储丢了靠它找回（见 restoreFriendship）
 function friendStoreWrite(store) {
   try { localStorage.setItem(FRIEND_KEY, JSON.stringify(store)) } catch {}
+  if (role === 'main') toShell({ friendshipStore: store })
+}
+// 外壳载入完、init 之前调：saved 是 friendship.json 的内容（没有就是 null）。并进网页的存储；
+// 网页这边有备份里没有的（或更高的）也回写一次，备份跟上
+function restoreFriendship(saved) {
+  const local = friendStoreRead(), merged = Friendship.merge(local, saved)
+  if (merged !== local) { try { localStorage.setItem(FRIEND_KEY, JSON.stringify(merged)) } catch {} }
+  if (Object.keys(merged).length && JSON.stringify(Friendship.merge(saved || {}, merged)) !== JSON.stringify(saved || {})) toShell({ friendshipStore: merged })
+  if (storedFriendshipSent) sendFriendship(merged)
 }
 function friendAward(pairs, kind) {
   const before = friendStoreRead(), nowMs = Date.now()
   let store = before
   for (const [a, b] of pairs) store = Friendship.award(store, a, b, kind, nowMs)
-  if (store !== before && JSON.stringify(store) !== JSON.stringify(before)) { try { localStorage.setItem(FRIEND_KEY, JSON.stringify(store)) } catch {} }
+  if (store !== before && JSON.stringify(store) !== JSON.stringify(before)) friendStoreWrite(store)
   sendFriendship(store)
 }
 function sendFriendship(store = friendStoreRead()) {

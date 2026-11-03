@@ -153,6 +153,26 @@ extension App {
         if let call = d["companionCall"] as? [String: Any] { companionCall(call) }
         if let ok = d["eggAllowed"] as? Bool { eggAllowed = ok }
         if let rows = d["friendship"] as? [Any] { friendshipRows = rows; pushSettings() }
+        if let store = d["friendshipStore"] as? [String: Any] { saveFriendshipFile(store) }
+    }
+
+    // MARK: 友谊的备份（数据目录里的 friendship.json）
+    // 网页的存储在 ~/Library/WebKit 下，不在数据目录里：搬数据文件夹带不走、被清理掉就没了。页面每次记账都交一份来，
+    // 载入完（didFinish，init 之前）交回去并进网页的存储（restoreFriendship，合并规则见 friendship.js 的 merge）
+
+    var friendshipFile: URL { root.appendingPathComponent("friendship.json") }
+
+    func saveFriendshipFile(_ store: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: store, options: [.sortedKeys]) else { return }
+        try? data.write(to: friendshipFile, options: .atomic)
+    }
+
+    /// 交给 restoreFriendship 的参数：文件里的 JSON 对象，没有 / 坏了就是 null
+    func savedFriendshipJSON() -> String {
+        guard let data = try? Data(contentsOf: friendshipFile),
+              (try? JSONSerialization.jsonObject(with: data)) is [String: Any],
+              let text = String(data: data, encoding: .utf8) else { return "null" }
+        return text
     }
 
     /// 按完整列表对齐窗口（按 id）：没有窗口的开；已经不在列表里、也没收到过 companionLeave 的（开关关掉时的 []、页面重载后的完整列表）

@@ -64,7 +64,22 @@
       })
   }
 
-  const api = { pairKey, award, hearts, level, rows, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
+  // 外壳在数据目录存的备份（friendship.json）并回网页的存储：每一对取分数高的那份（同分留网页的），坏的记录不要。
+  // 网页的存储被清掉了靠它找回；备份旧了（比如换回了旧的数据文件夹）也不会把分数往回拉
+  const valid = r => r && typeof r === 'object' && Number.isFinite(r.points) && r.points >= 0
+  function merge(local, saved) {
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return local
+    let out = local
+    for (const key of Object.keys(saved)) {
+      const [a, b] = key.split('+')
+      if (pairKey(a, b) !== key || !valid(saved[key])) continue
+      if (valid(local[key]) && local[key].points >= saved[key].points) continue
+      out = { ...out, [key]: saved[key] }
+    }
+    return out
+  }
+
+  const api = { pairKey, award, hearts, level, rows, merge, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
   root.Friendship = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

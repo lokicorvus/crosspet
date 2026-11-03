@@ -224,6 +224,7 @@ extension App {
             return
         }
         ready = true
+        js("restoreFriendship(\(savedFriendshipJSON()))")   // 在 init（loadCharacters 里）之前：init 发给设置页的友谊行就是并好的
         loadCharacters()
         // 恢复上次的角色（和 Windows 一致：先恢复，再让下面的「跟随前台」按前台程序覆盖）。
         // 没存过 / 那个角色已经不在了：保持 init() 里选的第一个。quiet：不演登场招呼

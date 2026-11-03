@@ -110,7 +110,19 @@ namespace CrossPet
             if (m.TryGetValue("companionCall", out var call) && call is Dictionary<string, object> cd) CompanionCall(cd);
             if (m.TryGetValue("eggAllowed", out var ea) && ea is bool ok) eggAllowed = ok;
             if (m.TryGetValue("friendship", out var fr) && fr is object[] rows) { friendshipRows = rows; PushSettings(); }
+            if (m.TryGetValue("friendshipStore", out var fs) && fs is Dictionary<string, object> store) SaveFriendshipFile(store);
         }
+
+        // ---- 友谊的备份（数据目录里的 friendship.json）----
+        // 网页的存储在 webview2 文件夹里：被清掉就没了。页面每次记账都交一份来，载入完（NavigationCompleted，init 之前）
+        // 交回去并进网页的存储（restoreFriendship，合并规则见 friendship.js 的 merge）。和 Mac 一样
+        static string FriendshipFile => Path.Combine(Store.Data, "friendship.json");
+        static void SaveFriendshipFile(Dictionary<string, object> store)
+        {
+            try { Store.WriteJson(FriendshipFile, store); } catch (Exception e) { Store.Log("保存友谊备份失败: " + e.Message); }
+        }
+        /// <summary>交给 restoreFriendship 的参数：文件里的 JSON 对象，没有 / 坏了就是 null</summary>
+        static string SavedFriendshipJson() => Store.ReadJson(FriendshipFile) is Dictionary<string, object> d ? Store.Json.Serialize(d) : "null";
 
         /// <summary>按完整列表对齐窗口（按 id）：没有窗口的开；已经不在列表里、也没收到过 companionLeave 的（开关关掉时的 []、页面重载后的完整列表）
         /// 直接关掉，不留残窗；收到过 companionLeave 的已经挪到 leavingCompanions，在说 bye</summary>
