@@ -734,6 +734,8 @@ const multiCases = [
   ['gather_staggered', async e => {
     await multiOn(e, 'gpt')
     e.run(`gather()`)
+    // 主桌宠自己也答到（举手的图没有就用 proud）
+    assert(e.state().bubble === 'GPT到！' && ['roll_call', 'proud'].includes(e.state().pose), `main roll call: ${e.state().bubble} ${e.state().pose}`)
     await e.advance(10)
     let list = lastCompanions(e)
     assert(list.length === 1, `first one: ${JSON.stringify(list)}`)

@@ -1542,6 +1542,12 @@ function gather() {
   const main = mainCharacter(), chars = manifest.characters || {}
   const todo = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main && !gathered.includes(id))
   gatherPending = todo.length
+  // 主桌宠先答「到！」（她不是新出场的，以前只有出场的那几只答）；别的照常一只接一只来，新窗口加载要一会儿，她的「到！」自然在前面。
+  // 正在干活不换举手的图、只说；演彩蛋、道别、更新时不说
+  if (todo.length && !egg && farewellLine === null && !updatingNow) {
+    if (!aiActivity()) show(hasPose('roll_call') ? 'roll_call' : 'proud', true)
+    say(`${char().name}到！`)
+  }
   todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
     gatherPending = Math.max(0, gatherPending - 1)
     if (gathered.includes(id)) return
