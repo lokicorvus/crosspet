@@ -176,7 +176,8 @@ namespace CrossPet
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"restoreFriendship({SavedFriendshipJson()}); init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)}); setShellPrepares(true)");
+                    // 不再 setShellPrepares(true)：副桌宠换成 DirectHost 后一秒开一只不卡，一起预开好几只反而卡（试验 C：同时开 6 只停 206ms，1.3.9-test.13 集合时主桌宠卡很久）
+                    await core.ExecuteScriptAsync($"restoreFriendship({SavedFriendshipJson()}); init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)})");
                     if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
