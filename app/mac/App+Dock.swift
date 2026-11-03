@@ -34,6 +34,8 @@ extension App {
     var codexResets: Bool { defaults.bool(forKey: "codexResets") }   // Codex 重置提醒（默认关，数据来自 codex-resets.com）
     /// 省电模式（默认关）：特效每秒 15 帧、闲着 10 秒就停（平时 30 帧、30 秒）
     var powerSave: Bool { defaults.bool(forKey: "powerSave") }
+    /// 不睡觉（默认关）：闲太久、AI 会话结束都不睡，判断在网页（setNeverSleep）
+    var noSleep: Bool { defaults.bool(forKey: "noSleep") }
     // 看不见的时候（窗口被完全挡住、锁屏、屏幕休眠）让网页把动画全停了
     func updatePageHidden() {
         guard ready else { return }

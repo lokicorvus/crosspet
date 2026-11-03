@@ -264,6 +264,21 @@ const cases = [
     await e.advance(21000)
     assert(e.state().pose !== 'sleeping', 'Grok fell asleep right after showing up')
   }],
+  ['never_sleep_setting', async e => {
+    // 设置里打开「不睡觉」：正睡着就醒；闲多久、AI 会话结束都不睡；关掉后照旧会睡
+    await e.advance(12 * 60 * 1000)
+    assert(e.state().pose === 'sleeping', `did not fall asleep normally: ${e.state().pose}`)
+    e.run('setNeverSleep(true)')
+    assert(e.state().pose === 'idle', `did not wake up: ${e.state().pose}`)
+    await e.advance(30 * 60 * 1000)
+    assert(e.state().pose !== 'sleeping', 'fell asleep with the setting on')
+    e.run(`hook('gpt','sleeping','SessionEnd')`)
+    await e.advance(2000)
+    assert(e.state().pose !== 'sleeping', 'slept on SessionEnd with the setting on')
+    e.run('setNeverSleep(false)')
+    await e.advance(12 * 60 * 1000)
+    assert(e.state().pose === 'sleeping', `did not sleep after turning it off: ${e.state().pose}`)
+  }],
   ['reset_notice_is_not_used_up_on_the_fading_stage', async e => {
     e.run(`resetsOn = true; resetsData = CodexResets.parse({data:{scheduled_reset:{id:'r1', announced_at:new Date(Date.now()-60000).toISOString(), scheduled_for:new Date(Date.now()+3600000).toISOString()}}}); announceReset()`)
     await e.advance(2800)
