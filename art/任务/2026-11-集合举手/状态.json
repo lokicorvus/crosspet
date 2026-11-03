@@ -4,7 +4,7 @@
   {
    "char": "claude",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -17,7 +17,7 @@
   {
    "char": "deepseek",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -30,7 +30,7 @@
   {
    "char": "deepseek-hoodie",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -43,7 +43,7 @@
   {
    "char": "deepseek-pajamas",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -56,7 +56,7 @@
   {
    "char": "deepseek-winter",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -69,7 +69,7 @@
   {
    "char": "gemini",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -82,7 +82,7 @@
   {
    "char": "glm",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -95,7 +95,7 @@
   {
    "char": "gpt",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -108,7 +108,7 @@
   {
    "char": "gpt-onesie",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -121,7 +121,7 @@
   {
    "char": "grok",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -134,7 +134,7 @@
   {
    "char": "qwen",
    "pose": "roll_call",
-   "state": "待验收",
+   "state": "已导入",
    "notes": [],
    "checks": [
     {
@@ -147,16 +147,28 @@
   {
    "char": "claude-saint",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-knit",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   }
  ]
 }
