@@ -31,6 +31,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #newsCard button.go { color: #c8792f; font-weight: 600; }
 #stage { position: relative; width: 250px; height: 241px; transition: transform .32s ease, opacity .32s ease; }
 #stage.swap { transform: scale(.9) translateY(4%); opacity: 0; }
+/* 额外那只先在屏幕外备着（Windows 预开窗口，见 prepareThen）：整页不显示，登场时 arriveNow() 再噗一下出来 */
+body.parked { visibility: hidden; }
 #aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
   border-radius: 50%; opacity: var(--aura-o);
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
@@ -785,8 +787,10 @@ function init(m) {
   if (!charId || !manifest.characters[charId]) {
     // 额外那只：直接换上外壳要的角色、不 quiet（噗一下、说登场招呼）。不能先悄悄换上排第一的：
     // 她正好是排第一的那个时，外壳接着的 setCharacter(同一个) 就成了空操作，没有噗也没有招呼
+    // 屏幕外备着的（roleInfo.parked）：悄悄换上、整页藏着，登场时外壳调 arriveNow()
     const want = role === 'companion' && roleInfo?.character
-    if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want)
+    if (want && roleInfo?.parked) document.body.classList.add('parked')
+    if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want, !!roleInfo?.parked)
     else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
   } else { $('caption').textContent = char().name }
   sendStoredFriendship()
@@ -810,6 +814,26 @@ function greetDue(id) {
   if (Date.now() - (greetedAt[id] || 0) < GREET_COOLDOWN) return false
   greetedAt[id] = Date.now()
   return true
+}
+
+// 登场招呼。集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
+function arrivalGreeting(id, c, busy) {
+  const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
+  if (roll) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }   // 有举手答到的专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态
+  else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
+}
+// 由外壳调（额外那只，屏幕外备好的窗口挪到位置了）：和换角色一样噗一下出来、说登场招呼
+function arriveNow() {
+  if (!document.body.classList.contains('parked')) return
+  const stage = $('stage')
+  stage.classList.add('swap')
+  document.body.classList.remove('parked')
+  const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
+  setTimeout(() => {
+    stage.classList.remove('swap')
+    const c = char(), s = charState[charId]
+    if (c) arrivalGreeting(charId, c, !!(s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'))
+  }, 330)
 }
 
 function setCharacter(id, quiet) {
@@ -855,10 +879,8 @@ function setCharacter(id, quiet) {
     if (busy && s.pose === 'listening') thinkTimer = characterTimeout(() => show('thinking'), LISTEN_TO_THINKING)
     // 这个时段 / 节日还没打过招呼：演专属的登场动作；打过了就用平常那句（30 分钟冷却）
     // 集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
-    const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
     if (quiet) say('')
-    else if (roll) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }   // 有举手答到的专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态
-    else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
+    else arrivalGreeting(id, c, busy)
     renderQuota()
     if (id === 'gpt') characterTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说
     const pend = pendingCelebration[id]
@@ -1446,6 +1468,8 @@ function playCharState(id, s) {
 //   toShell({ companionLeave: id })                              这只说 bye 走（外壳调她页面的 leaveNow）
 //   toShell({ companionCall: { id, fn: 'celebrate', args } })   让那只演（额度庆祝交给显示这个角色额度的那只）
 //   toShell({ eggAllowed })                                      右键「召唤彩蛋」变灰用：有别的桌宠在场时 false
+//   toShell({ companionsPrepare: { batch, characters } })        要叫来的这几只先在屏幕外开好（只有说过 setShellPrepares(true) 的外壳）；
+//                                                                外壳备好了调 companionsPrepared(batch)，这边才开始一只只登场
 // 开关关着时这些一律不发、applyClientState 不演，行为和以前一样；只有你主动「集合」时例外（只叫集合来的，不冒干活的，
 // 解散完发一次空列表就停）。这一套只在主桌宠页面（role 'main'）做。
 // role / roleInfo 在脚本最前面声明
@@ -1471,6 +1495,23 @@ const patAt = {}                 // 角色 → 最近一次被摸头的时间（
 // 刚打开开关 / 页面刚重载时，外壳要一会儿才把会话、前台交齐；这时就算，会先发出一个空列表，外壳就会把还该站着的窗口关掉再重开
 const COMPANIONS_WARMUP = 1500
 const GATHER_STEP = 1000         // 集合 / 解散时一只接一只的间隔
+// 先备好再登场：Windows 每开一个新窗口，网页控件第一次画画面时要把整个界面卡住 0.3 秒左右（1.3.9-test.11 实测），
+// 一只只登场就成了「卡一下出来一只」。所以外壳说能预开（setShellPrepares）时，先把要来的几只在屏幕外一起开好，
+// 卡顿集中在主桌宠举手答到的那一下；备好了（或等太久）再按原来的节奏一只只挪过来。macOS 的外壳不说，照旧直接登场
+const PREPARE_MAX_MS = 5000
+let shellPrepares = false, prepareBatch = 0
+const prepareWaits = new Map()   // batch → 备好后要做的事
+function setShellPrepares(on) { shellPrepares = !!on }
+function prepareThen(characters, start) {
+  if (!shellPrepares || !characters.length) { start(); return }
+  const batch = ++prepareBatch
+  const go = () => { if (!prepareWaits.has(batch)) return; prepareWaits.delete(batch); start() }
+  prepareWaits.set(batch, go)
+  gatherTimers.push(setTimeout(go, PREPARE_MAX_MS))
+  toShell({ companionsPrepare: { batch, characters } })
+}
+// 由外壳调：那一批备好了
+function companionsPrepared(batch) { prepareWaits.get(batch)?.() }
 
 const mainCharacter = () => egg ? egg.host : (characterTarget || charId)   // 正在换角色时按要换成的算，演彩蛋时按原来的
 const companionsActive = () => role === 'main' && multiPets.on
@@ -1531,7 +1572,7 @@ function setMultiPets(o) {
 }
 // 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
 function stopCompanions() {
-  gatherTimers.forEach(clearTimeout); gatherTimers = []; setGathered([]); gatherPending = 0
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); setGathered([]); gatherPending = 0
   claim = null; companionsState = null; companionsReadyAt = 0
   for (const k of Object.keys(clientStateSeen)) delete clientStateSeen[k]
   toShell({ companions: [], gathering: false }); sentCompanions = null; sentGathering = false
@@ -1553,7 +1594,7 @@ function applyClientState(character, client, s) {
 // 集合！每个角色各叫一只（不含主桌宠正演着的、彩蛋角色），一只接一只登场
 function gather() {
   if (role !== 'main') return false
-  gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); gatherPending = 0
   const main = mainCharacter(), chars = manifest.characters || {}
   const todo = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main && !gathered.includes(id))
   gatherPending = todo.length
@@ -1563,12 +1604,13 @@ function gather() {
     if (!aiActivity()) show(hasPose('roll_call') ? 'roll_call' : 'proud', true)
     say(`${char().name}到！`)
   }
-  todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+  if (todo.length) updateCompanions()   // gatherPending 变了：先让外壳菜单有「解散」
+  prepareThen(todo, () => todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
     gatherPending = Math.max(0, gatherPending - 1)
     if (gathered.includes(id)) return
     setGathered([...gathered, id])
     updateCompanions()
-  }, i * GATHER_STEP)))
+  }, i * GATHER_STEP))))
   return todo.length > 0
 }
 // 主桌宠页面第一次 init 完：上次（退出前 / 页面重载前）集合来、叫出来的那几只再一只接一只叫回来。
@@ -1582,11 +1624,12 @@ function restoreGathered() {
   // 主桌宠是谁到叫的时候再看：外壳 init 完才 setCharacter 换回上次的角色
   const chars = manifest.characters || {}
   const todo = (Array.isArray(saved) ? saved : []).filter(id => typeof id === 'string' && chars[id] && !chars[id].egg && !gathered.includes(id))
-  todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+  if (!todo.length) return
+  gatherTimers.push(setTimeout(() => prepareThen(todo.filter(id => id !== mainCharacter()), () => todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
     if (gathered.includes(id) || id === mainCharacter()) return
     setGathered([...gathered, id])
     updateCompanions()
-  }, COMPANIONS_WARMUP + i * GATHER_STEP)))
+  }, i * GATHER_STEP)))), COMPANIONS_WARMUP))
 }
 // 「叫她出来」：只叫一个角色来陪主桌宠（不用两个 AI 同时干活）；和集合来的一样算 gather，一起在场照样攒好感，
 // 「让她先回去」或「解散」送走。主桌宠正演着的、彩蛋角色、已经叫来的不叫
@@ -1594,13 +1637,19 @@ function callCompanion(id) {
   if (role !== 'main') return false
   const c = (manifest.characters || {})[id]
   if (!c || c.egg || id === mainCharacter() || gathered.includes(id)) return false
-  setGathered([...gathered, id])
+  gatherPending++
   updateCompanions()
+  prepareThen([id], () => {
+    gatherPending = Math.max(0, gatherPending - 1)
+    if (gathered.includes(id) || id === mainCharacter()) { updateCompanions(); return }
+    setGathered([...gathered, id])
+    updateCompanions()
+  })
   return true
 }
 // 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下；收编的客户端还在干活的那只不走，转成干活那只（decide 里）
 function dismiss() {
-  gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); gatherPending = 0
   const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
   setGathered(gathered.filter(ch => order.includes(ch)))   // 还没登场的不用再叫
   if (!order.length) { updateCompanions(); return }      // 没有站着的（比如还在热身）：直接收尾

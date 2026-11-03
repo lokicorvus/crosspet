@@ -853,6 +853,61 @@ const multiCases = [
     await f.advance(3000)
     assert(f.run(`localStorage.getItem('crosspet-gathered')`) === '[]', 'dismiss did not clear the saved list')
   }],
+  ['gather_prepares_before_arriving', async e => {
+    // Windows 外壳说能预开（setShellPrepares）：集合先交要来的角色让外壳在屏幕外开好，备好了才一只只登场；
+    // 外壳一直不回（崩了、老版本）就等 5 秒照常来。macOS 不说：照旧直接来（gather_staggered 测）
+    await multiOn(e, 'gpt')
+    e.run(`setShellPrepares(true); gather()`)
+    const prep = e.msgs().filter(m => 'companionsPrepare' in m)
+    assert(prep.length === 1 && prep[0].companionsPrepare.characters.includes('claude') && !prep[0].companionsPrepare.characters.includes('gpt'), `prepare: ${JSON.stringify(prep)}`)
+    assert(e.state().bubble === 'GPT到！', `main did not answer first: ${e.state().bubble}`)
+    assert(lastGathering(e) === true, 'menu would not show 解散 while preparing')
+    await e.advance(3000)
+    assert(!(lastCompanions(e) || []).length, `arrived before prepared: ${JSON.stringify(lastCompanions(e))}`)
+    e.run(`companionsPrepared(${prep[0].companionsPrepare.batch})`)
+    await e.advance(100)
+    assert(lastCompanions(e).length === 1, `first did not arrive right after prepared: ${JSON.stringify(lastCompanions(e))}`)
+    await e.advance(1000)
+    assert(lastCompanions(e).length === 2, `not one per second: ${JSON.stringify(lastCompanions(e))}`)
+    e.run(`companionsPrepared(${prep[0].companionsPrepare.batch})`)   // 重复回：不重新排一遍
+    await e.advance(10000)
+    const n = prep[0].companionsPrepare.characters.length
+    assert(lastCompanions(e).length === n, `expected ${n}: ${JSON.stringify(lastCompanions(e))}`)
+    // 叫一只：外壳不回也照样来（等满 5 秒）
+    e.run(`dismiss()`)
+    await e.advance(15000)
+    assert(lastCompanions(e).length === 0, 'dismiss')
+    e.run(`callCompanion('claude')`)
+    await e.advance(4000)
+    assert(!lastCompanions(e).length, 'called one arrived before the timeout')
+    await e.advance(1500)
+    assert(lastCompanions(e).length === 1 && lastCompanions(e)[0].character === 'claude', `timeout fallback: ${JSON.stringify(lastCompanions(e))}`)
+    // 备着的时候解散：那批作废，备好了也不来
+    e.run(`dismiss()`)
+    await e.advance(3000)
+    e.run(`gather()`)
+    const b2 = e.msgs().filter(m => 'companionsPrepare' in m).slice(-1)[0].companionsPrepare.batch
+    e.run(`dismiss()`)
+    e.run(`companionsPrepared(${b2})`)
+    await e.advance(8000)
+    assert(!lastCompanions(e).length, `cancelled batch still arrived: ${JSON.stringify(lastCompanions(e))}`)
+  }],
+  ['parked_companion_waits_then_arrives', async e => {
+    // 屏幕外备着的那只：悄悄换上、整页藏着、不说话；arriveNow 才噗一下出来答到
+    const c = makePage()
+    c.run(`setRole('companion', { id: 'claude@gather', key: 'claude@gather', character: 'claude', client: null, label: '', parked: true })`)
+    c.run(`init(${JSON.stringify(manifest())})`)
+    await c.advance(1000)
+    assert(c.run(`document.body.classList.contains('parked')`) === true, 'parked page not hidden')
+    assert(c.state().charId === 'claude' && c.state().bubble === '', `parked spoke: ${JSON.stringify(c.state())}`)
+    c.run(`setRole('companion', { id: 'claude@gather', key: 'claude@gather', character: 'claude', client: null, label: '' }); arriveNow()`)
+    assert(c.run(`document.body.classList.contains('parked')`) === false, 'still hidden after arriveNow')
+    await c.advance(500)
+    assert(c.state().bubble === 'Claude到！' && !c.state().stageHidden, `arrival: ${JSON.stringify(c.state())}`)
+    c.run(`arriveNow()`)   // 已经出来了：不再噗一次
+    await c.advance(500)
+    assert(!c.state().stageHidden, 'second arriveNow hid her')
+  }],
   ['gather_staggered', async e => {
     await multiOn(e, 'gpt')
     e.run(`gather()`)

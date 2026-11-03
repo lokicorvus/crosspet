@@ -24,7 +24,7 @@ namespace CrossPet
     sealed class Companion
     {
         readonly Pet pet;
-        public string Id { get; }              // 窗口身份（页面给的，集合来的收编客户端后 key 变、id 不变）
+        public string Id { get; private set; }  // 窗口身份（页面给的，集合来的收编客户端后 key 变、id 不变）
         public string Character { get; }
         public string Key { get; private set; }
         public string Client { get; private set; }   // 集合来、还没收编客户端时是 null
@@ -35,6 +35,8 @@ namespace CrossPet
         readonly Canvas hit;
         IntPtr hwnd;
         bool ready, leaving, closed;
+        bool parked;     // 屏幕外先备着（Pet.PrepareCompanions）：页面藏着，Adopt 时才挪到位置、噗一下出来
+        public bool Warm { get; private set; }   // 备好了：页面加载完、第一下画面也画过了（那一下会卡住界面）
         int crashes;   // 网页进程崩了几次
         public (string pose, DateTime at)? LastPose;   // 她最近一次状态（贴边时判断跑不跑出来）
         readonly List<DispatcherTimer> timers = new List<DispatcherTimer>();
@@ -54,10 +56,12 @@ namespace CrossPet
         string DockKey => "dock-" + Key;
         public bool IsOpen => !closed && hwnd != IntPtr.Zero;
 
-        /// <summary>info：主桌宠页面 companions 列表里的一项 { id, key, character, client, quota, label }（Pet.SyncCompanions 已检查过 id 和角色）</summary>
-        public Companion(Pet pet, CoreWebView2Environment env, IDictionary<string, object> info)
+        /// <summary>info：主桌宠页面 companions 列表里的一项 { id, key, character, client, quota, label }（Pet.SyncCompanions 已检查过 id 和角色）。
+        /// parked：先在屏幕外开好、页面藏着，等列表里真有她了再 Adopt（见 Pet.PrepareCompanions）</summary>
+        public Companion(Pet pet, CoreWebView2Environment env, IDictionary<string, object> info, bool parked = false)
         {
             this.pet = pet;
+            this.parked = parked;
             Id = Str(info, "id") ?? "";
             Key = Str(info, "key") ?? Id;
             Character = Str(info, "character") ?? "";
@@ -77,6 +81,7 @@ namespace CrossPet
             {
                 hwnd = new WindowInteropHelper(Window).Handle;
                 Native.MakeToolWindow(hwnd);
+                if (this.parked) return;   // 备着的留在屏幕外，Adopt 时再摆
                 Native.GetWindowRect(hwnd, out var r);
                 var (x, y) = pet.CompanionOrigin(Key, r.Right - r.Left, r.Bottom - r.Top);
                 Native.MoveTo(hwnd, x, y);
@@ -132,14 +137,14 @@ namespace CrossPet
                     ready = true;
                     // 一定先 setRole 再 init / setCharacter（同一段脚本里按顺序跑）：不然页面按主桌宠演登场招呼，会写共用的 crosspet-greeted
                     // setCharacter 不 quiet：「噗」一下出现，说一句登场招呼
-                    Js($"setRole('companion', {RoleInfoJson}); init({pet.ManifestJson}); {pet.CompanionLookJs}; setCharacter({Pet.Q(Character)})");
+                    // 备着的：init 按 roleInfo.parked 悄悄换上、整页藏着（不发 setCharacter，不然会噗一下说话）
+                    Js($"setRole('companion', {RoleInfoJson}); init({pet.ManifestJson}); {pet.CompanionLookJs}" + (parked ? "" : $"; setCharacter({Pet.Q(Character)})"));
                     ApplySizes(Pet.Anchor.Corner);
+                    if (parked) { Pet.After(WarmMs, () => Warm = true); return; }
                     UpdatePageHidden();
                     pet.FeedCompanion(this);
                     if (leaving) Js("leaveNow()");
-                    Pet.After(1000, () => pet.PassThroughBrowserWindows(hwnd)); Pet.After(5000, () => pet.PassThroughBrowserWindows(hwnd));
-                    if (Store.Settings.TryGetValue(DockKey, out var dk) && dk is string side && Pet.EdgeDockEnabled)
-                        Pet.After(1500, () => { if (!closed && dock == null) SetDock(side); });
+                    Arrived();
                 };
                 core.WebMessageReceived += (_, a) =>
                 {
@@ -173,7 +178,44 @@ namespace CrossPet
             catch { return "null"; }
         }
 
-        string RoleInfoJson => Store.Json.Serialize(new Dictionary<string, object> { ["id"] = Id, ["key"] = Key, ["character"] = Character, ["client"] = Client, ["label"] = Label });
+        string RoleInfoJson => Store.Json.Serialize(new Dictionary<string, object> { ["id"] = Id, ["key"] = Key, ["character"] = Character, ["client"] = Client, ["label"] = Label, ["parked"] = parked });
+
+        // 页面加载完后网页控件第一次画画面，界面线程要停 0.1–0.35 秒（1.3.9-test.11 实测，停顿在加载完 0.1–0.2 秒后开始）：多等一会儿再算备好
+        const int WarmMs = 600;
+
+        /// <summary>备着的那只轮到登场了（列表里有她）：换上列表给的身份，摆到该在的位置，页面噗一下出来答到。
+        /// 还没加载完的：NavigationCompleted 会按不备着的走法来（parked 已经是 false）</summary>
+        public void Adopt(IDictionary<string, object> info)
+        {
+            if (!parked || closed) return;
+            parked = false;
+            Id = Str(info, "id") ?? Id;
+            Key = Str(info, "key") ?? Key;
+            Client = Str(info, "client");
+            Quota = info.TryGetValue("quota", out var q) && q is bool qb && qb;
+            Label = Str(info, "label") ?? "";
+            if (hwnd != IntPtr.Zero)
+            {
+                Native.GetWindowRect(hwnd, out var r);
+                var (x, y) = pet.CompanionOrigin(Key, r.Right - r.Left, r.Bottom - r.Top);
+                Native.MoveTo(hwnd, x, y);
+                SaveOrigin();
+                SyncWithMain();
+            }
+            if (!ready) return;
+            Js($"setRole('companion', {RoleInfoJson}); arriveNow()");
+            UpdatePageHidden();
+            pet.FeedCompanion(this);
+            Arrived();
+        }
+
+        /// <summary>站到桌面上以后：让浏览器窗口的鼠标穿过她、上次贴着边的接着贴</summary>
+        void Arrived()
+        {
+            Pet.After(1000, () => pet.PassThroughBrowserWindows(hwnd)); Pet.After(5000, () => pet.PassThroughBrowserWindows(hwnd));
+            if (Store.Settings.TryGetValue(DockKey, out var dk) && dk is string side && Pet.EdgeDockEnabled)
+                Pet.After(1500, () => { if (!closed && dock == null) SetDock(side); });
+        }
 
         /// <summary>她的页面发来的消息：摸头记给主桌宠页面（友谊记账只在那里做）；道别演完了关窗口</summary>
         void HandleMessage(Dictionary<string, object> m)

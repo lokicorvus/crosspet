@@ -69,7 +69,7 @@ function makeEnv(html) {
     function hook(id,p,event,extra={}){applyCharState(id,{pose:p,event,ts:Date.now()/1000,...extra})}
     function playsByClient(){return false}function updateCompanions(){}
   `
-  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','setCharacter','watchStuck','applyCharState','playCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
+  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','arrivalGreeting','setCharacter','watchStuck','applyCharState','playCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
   vm.runInContext(setup + '\n' + funcs, context)
   const run = code => vm.runInContext(code, context)
   run(`hook('grok','idle','SessionStart');hook('claude','idle','SessionStart')`)

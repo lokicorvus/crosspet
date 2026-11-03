@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 
 namespace CrossPet
@@ -20,6 +21,7 @@ namespace CrossPet
         /// <summary>站着的额外桌宠，按页面给的 id 管（集合来的收编客户端后 key 变、id 不变）</summary>
         internal readonly Dictionary<string, Companion> companions = new Dictionary<string, Companion>();
         readonly List<Companion> leavingCompanions = new List<Companion>();   // 收到 companionLeave、正在说 bye 的
+        readonly Dictionary<string, Companion> parkedCompanions = new Dictionary<string, Companion>();   // 屏幕外先开好、等着登场的（按角色），见 PrepareCompanions
         int companionExpected;
         int companionTarget;         // 这一轮页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（CompanionOrigin）
         bool pageGathering;          // 页面说正集合着（companions 消息里的 gathering）：菜单显示「解散」，开关关着时也转发
@@ -107,6 +109,7 @@ namespace CrossPet
                 SyncCompanions(list);
                 if (CompanionsForwarding && !was) StartForwarding();
             }
+            if (m.TryGetValue("companionsPrepare", out var prep) && prep is Dictionary<string, object> pd) PrepareCompanions(pd);
             if (m.TryGetValue("companionCall", out var call) && call is Dictionary<string, object> cd) CompanionCall(cd);
             if (m.TryGetValue("eggAllowed", out var ea) && ea is bool ok) eggAllowed = ok;
             if (m.TryGetValue("friendship", out var fr) && fr is object[] rows) { friendshipRows = rows; PushSettings(); }
@@ -140,6 +143,13 @@ namespace CrossPet
                     if (c.Character == ch) { c.Update(info); continue; }
                     c.Close();   // 同一个 id 换了角色（不该发生）：关掉重开
                 }
+                if (parkedCompanions.TryGetValue(ch, out var p))
+                {
+                    parkedCompanions.Remove(ch);
+                    companions[id] = p;
+                    p.Adopt(info);
+                    continue;
+                }
                 try { companions[id] = new Companion(this, env, info); }
                 catch (Exception e) { Store.Log("开额外桌宠窗口失败: " + e.Message); }
             }
@@ -165,10 +175,45 @@ namespace CrossPet
         internal void CompanionClosed(Companion c)
         {
             if (companions.TryGetValue(c.Id, out var cur) && cur == c) companions.Remove(c.Id);
+            if (parkedCompanions.TryGetValue(c.Character, out var pk) && pk == c) parkedCompanions.Remove(c.Character);
             leavingCompanions.Remove(c);
         }
 
-        void CloseAllCompanions() { foreach (var c in AllCompanions) c.Close(); }
+        void CloseAllCompanions() { foreach (var c in AllCompanions.Concat(parkedCompanions.Values.ToList())) c.Close(); }
+
+        /// <summary>页面的 companionsPrepare { batch, characters }：要叫来的这几只先在屏幕外一起开好。每开一个新窗口，网页控件第一次画画面时
+        /// 整个界面要卡 0.3 秒左右（1.3.9-test.11 实测，WebView2CompositionControl 初始化截图通道），一只只现开就成了「卡一下出来一只」。
+        /// 一起开，卡顿就集中在主桌宠举手答到那一下；都备好了（或等了 4 秒）告诉页面 companionsPrepared(batch)，页面再按节奏一只只叫来，
+        /// SyncCompanions 拿备好的直接挪过去（Adopt）。备着 20 秒没被叫来的关掉（中途解散了、她成了主桌宠）</summary>
+        void PrepareCompanions(Dictionary<string, object> req)
+        {
+            var batch = req.TryGetValue("batch", out var bv) ? Convert.ToInt32(bv) : 0;
+            var wanted = (req.TryGetValue("characters", out var cv) && cv is object[] arr ? arr : new object[0]).OfType<string>().Distinct()
+                .Where(ch => Characters().Any(c => c.id == ch) && !companions.Values.Any(c => c.Character == ch)).ToList();
+            var waiting = new List<Companion>();
+            foreach (var ch in wanted)
+            {
+                if (!parkedCompanions.TryGetValue(ch, out var c))
+                {
+                    var info = new Dictionary<string, object> { ["id"] = ch + "@gather", ["key"] = ch + "@gather", ["character"] = ch, ["label"] = "" };
+                    try { c = new Companion(this, env, info, parked: true); }
+                    catch (Exception e) { Store.Log("预开额外桌宠窗口失败: " + e.Message); continue; }
+                    parkedCompanions[ch] = c;
+                    var mine = c;
+                    After(20000, () => { if (parkedCompanions.TryGetValue(ch, out var p) && p == mine) mine.Close(); });
+                }
+                waiting.Add(c);
+            }
+            var start = DateTime.UtcNow;
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            t.Tick += (_, __) =>
+            {
+                if (waiting.Any(c => !c.Warm && c.IsOpen && parkedCompanions.ContainsValue(c)) && (DateTime.UtcNow - start).TotalSeconds < 4) return;
+                t.Stop();
+                Js($"companionsPrepared({batch})");
+            };
+            t.Start();
+        }
 
         /// <summary>主桌宠页面重新载入完了：集合的记录跟着丢了。开关开着时页面热身完会发完整列表，按它对齐；
         /// 开关关着时页面不会再发，这里直接把窗口都关掉（回到单只）</summary>
