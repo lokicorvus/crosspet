@@ -278,7 +278,7 @@ function renderMultiPets(s) {
   for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
   const rest = s.petsRest === 'stay' ? 'stay' : 'auto'
   for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
-  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–5、0.5 一档，这里画成 10 颗整心（半档 = 一颗）
+  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–10 颗整心
   const rows = Array.isArray(s.friendship) ? s.friendship : []
   $('friendship').classList.toggle('hidden', !seen || !rows.length)
   $('friendship').classList.toggle('dim', !on)
@@ -321,7 +321,7 @@ function friendRow(r) {
   const row = document.createElement('div'); row.className = 'item friend'
   const faces = document.createElement('div'); faces.className = 'friend-faces'
   faces.append(friendFace(r.a), friendFace(r.b))
-  const n = Math.round(Math.max(0, Math.min(5, Number(r.hearts) || 0)) * 2)
+  const n = Math.round(Math.max(0, Math.min(10, Number(r.hearts) || 0)))
   const text = document.createElement('div'); text.className = 'friend-text'
   const name = document.createElement('div'); name.className = 'friend-name'
   // 名字用 rows 里的 label（「A ♥ B」，带你改过的名字），拆不开再退到角色名 / id

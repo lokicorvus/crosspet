@@ -154,7 +154,7 @@ const BASE = {
   character: 'claude',
   characters: [{ id: 'claude', name: 'Claude' }, { id: 'gpt', name: 'GPT' }, { id: 'deepseek', name: '小鲸' }],
 }
-const ROWS = [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 2.5 }, { a: 'deepseek', b: 'gpt', label: '小鲸 ♥ GPT', hearts: 1 }]
+const ROWS = [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 5 }, { a: 'deepseek', b: 'gpt', label: '小鲸 ♥ GPT', hearts: 2 }]
 
 function assert(cond, detail) { if (!cond) throw Error(detail) }
 const hidden = el => { for (let e = el; e && e.nodeType === 1; e = e.parentNode) if (e.classList.contains('hidden')) return true; return false }
@@ -195,7 +195,7 @@ const cases = [
     assert(sw(p).checked, '开关该是开的')
     assert(!hidden(p.$('mainPetRow')) && !hidden(p.$('petsRestRow')), '开着时两个选项该显示')
   }],
-  ['友谊两行：两个头像框、名字和关系、10 颗像素心（半档 = 一颗）', p => {
+  ['友谊两行：两个头像框、名字和关系、10 颗像素心', p => {
     p.push({ multiPets: true, friendship: ROWS, characters: [{ id: 'claude', name: 'Claude', images: { avatar: 'file:///c/avatar.webp' } }, { id: 'gpt', name: 'GPT', images: { idle: 'file:///g/idle.webp' } }] })
     assert(!hidden(p.$('friendship')), '开着、有记录时友谊区该显示')
     const rows = p.$('friendRows').querySelectorAll('.friend')
@@ -208,15 +208,15 @@ const cases = [
     assert((faces[1].querySelector('img').src || faces[1].querySelector('img').getAttribute('src')) === 'file:///g/idle.webp', '没有头像退到待机图')
     assert(!rows[1].querySelectorAll('.friend-face')[0].querySelector('img'), '外壳没给图的角色只留空框')
     const on = r => r.querySelectorAll('.pixel-heart.on').length
-    assert(rows[0].querySelectorAll('.pixel-heart').length === 10 && on(rows[0]) === 5, '2.5 该是 10 颗里亮 5 颗')
-    assert(rows[1].querySelectorAll('.pixel-heart').length === 10 && on(rows[1]) === 2, '1 该是亮 2 颗')
+    assert(rows[0].querySelectorAll('.pixel-heart').length === 10 && on(rows[0]) === 5, '5 颗心该是 10 颗里亮 5 颗')
+    assert(rows[1].querySelectorAll('.pixel-heart').length === 10 && on(rows[1]) === 2, '2 颗心该亮 2 颗')
     assert(!/\d/.test(p.$('friendRows').textContent), '不显示数字')
   }],
-  ['满心、半颗都画 10 个位置', p => {
-    p.push({ multiPets: true, friendship: [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 5 }, { a: 'claude', b: 'deepseek', label: 'Claude ♥ 小鲸', hearts: 0.5 }] })
+  ['满心、1 颗都画 10 个位置', p => {
+    p.push({ multiPets: true, friendship: [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 10 }, { a: 'claude', b: 'deepseek', label: 'Claude ♥ 小鲸', hearts: 1 }] })
     const rows = p.$('friendRows').querySelectorAll('.friend')
-    assert(rows[0].querySelectorAll('.pixel-heart.on').length === 10 && rows[0].textContent.includes('挚友'), '5 该是 10 颗全亮、挚友')
-    assert(rows[1].querySelectorAll('.pixel-heart.on').length === 1 && rows[1].querySelectorAll('.pixel-heart').length === 10, '0.5 该是亮 1 颗')
+    assert(rows[0].querySelectorAll('.pixel-heart.on').length === 10 && rows[0].textContent.includes('挚友'), '10 颗心该全亮、挚友')
+    assert(rows[1].querySelectorAll('.pixel-heart.on').length === 1 && rows[1].querySelectorAll('.pixel-heart').length === 10, '1 颗心该亮 1 颗')
   }],
   ['没有记录：整块不显示', p => {
     p.push({ multiPets: true, friendship: [] })

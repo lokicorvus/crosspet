@@ -17,10 +17,10 @@ test('同角色、未知 kind 不加点，store 不变', () => {
   assert.deepEqual(F.award(store, 'gpt', 'claude', 'hug', at(31, 10)), store)
 })
 
-test('四种加点：together +1、cowork +3、cofinish +2、pats +2', () => {
+test('四种加点：together +1、cowork +2、cofinish +2、pats +2', () => {
   const now = at(31, 10)
   assert.equal(F.award({}, 'gpt', 'claude', 'together', now)['claude+gpt'].points, 1)
-  assert.equal(F.award({}, 'gpt', 'claude', 'cowork', now)['claude+gpt'].points, 3)
+  assert.equal(F.award({}, 'gpt', 'claude', 'cowork', now)['claude+gpt'].points, 2)
   assert.equal(F.award({}, 'gpt', 'claude', 'cofinish', now)['claude+gpt'].points, 2)
   assert.equal(F.award({}, 'gpt', 'claude', 'pats', now)['claude+gpt'].points, 2)
   const rec = F.award({}, 'claude', 'gpt', 'together', now)['claude+gpt']
@@ -36,42 +36,42 @@ test('award 返回新对象，不改原对象', () => {
   assert.equal(next['claude+gpt'].points, 7)
 })
 
-test('10 分钟内两次 cowork 只加 3；过了 10 分钟再加', () => {
+test('10 分钟内两次 cowork 只加 2；过了 10 分钟再加', () => {
   let s = F.award({}, 'gpt', 'claude', 'cowork', at(31, 10, 0))
   s = F.award(s, 'claude', 'gpt', 'cowork', at(31, 10, 9))
-  assert.equal(s['claude+gpt'].points, 3)
+  assert.equal(s['claude+gpt'].points, 2)
   s = F.award(s, 'gpt', 'claude', 'cowork', at(31, 10, 10))
-  assert.equal(s['claude+gpt'].points, 6)
+  assert.equal(s['claude+gpt'].points, 4)
 })
 
-test('每对每天最多 +25，部分加点会被截到上限；跨天重新算', () => {
+test('每对每天最多 +15，部分加点会被截到上限；跨天重新算', () => {
   let s = {}
-  for (let i = 0; i < 24; i++) s = F.award(s, 'gpt', 'claude', 'together', at(31, 10))
-  assert.equal(s['claude+gpt'].points, 24)
+  for (let i = 0; i < 14; i++) s = F.award(s, 'gpt', 'claude', 'together', at(31, 10))
+  assert.equal(s['claude+gpt'].points, 14)
   s = F.award(s, 'gpt', 'claude', 'cowork', at(31, 11))
-  assert.equal(s['claude+gpt'].points, 25)
+  assert.equal(s['claude+gpt'].points, 15)
   s = F.award(s, 'gpt', 'claude', 'pats', at(31, 12))
-  assert.equal(s['claude+gpt'].points, 25)
+  assert.equal(s['claude+gpt'].points, 15)
   // 别的对不受影响
   s = F.award(s, 'gpt', 'deepseek', 'pats', at(31, 12))
   assert.equal(s['deepseek+gpt'].points, 2)
   // 第二天（本地日期）重新算
   s = F.award(s, 'gpt', 'claude', 'pats', new Date(2026, 10, 1, 0, 5).getTime())
-  assert.equal(s['claude+gpt'].points, 27)
+  assert.equal(s['claude+gpt'].points, 17)
   assert.equal(s['claude+gpt'].today, 2)
   assert.equal(s['claude+gpt'].day, '2026-11-01')
 })
 
-test('hearts：门槛 10/40/90/160/250，到下一档一半加 0.5', () => {
-  const cases = [[0, 0], [9, 0], [10, 1], [24, 1], [25, 1.5], [39, 1.5], [40, 2], [65, 2.5],
-    [90, 3], [125, 3.5], [160, 4], [205, 4.5], [249, 4.5], [250, 5], [999, 5]]
+test('hearts：0–10 颗整心，门槛 15/35/65/105/150/200/255/315/380/450（前快后慢）', () => {
+  const cases = [[0, 0], [14, 0], [15, 1], [34, 1], [35, 2], [65, 3], [104, 3], [105, 4], [150, 5],
+    [200, 6], [255, 7], [314, 7], [315, 8], [380, 9], [449, 9], [450, 10], [9999, 10]]
   for (const [p, h] of cases) assert.equal(F.hearts(p), h, `points ${p}`)
 })
 
 test('rows：只列 points > 0，按点数从高到低，label 用名字（没有名字用 id）', () => {
   const store = {
-    'claude+gpt': { points: 12, day: '2026-10-31', today: 12, lastCowork: 0 },
-    'deepseek+gpt': { points: 40, day: '2026-10-31', today: 25, lastCowork: 0 },
+    'claude+gpt': { points: 20, day: '2026-10-31', today: 12, lastCowork: 0 },
+    'deepseek+gpt': { points: 40, day: '2026-10-31', today: 15, lastCowork: 0 },
     'claude+deepseek': { points: 0, day: '2026-10-31', today: 0, lastCowork: 0 },
     'claude+qwen': { points: 3, day: '2026-10-31', today: 3, lastCowork: 0 },
   }

@@ -1,4 +1,4 @@
-// 多桌宠的友谊记账：每对角色攒好感点，换算成 0–5 颗心。
+// 多桌宠的友谊记账：每对角色攒好感点，换算成 0–10 颗心。
 // 纯函数；只由主桌宠页面调用 award 并存进 localStorage（crosspet-friendship），设置页只读 rows。
 ;(function (root) {
   // 一起在场每 10 分钟记一次 together
@@ -8,10 +8,11 @@
   const PATS_MS = 300_000
   // 同时干活：同一对 10 分钟内只算一次
   const COWORK_GAP = 600_000
-  // 每对每天（本地日期）最多加这么多，别涨太快
-  const DAILY_CAP = 25
-  const POINTS = { together: 1, cowork: 3, cofinish: 2, pats: 2 }
-  const THRESHOLDS = [10, 40, 90, 160, 250]
+  // 每对每天（本地日期）最多加这么多，别涨太快：天天一起干活，约 1 个月满 10 颗心（11-03 从 25 降下来，以前 10 天就满了）
+  const DAILY_CAP = 15
+  const POINTS = { together: 1, cowork: 2, cofinish: 2, pats: 2 }
+  // 第 1–10 颗心各要累计多少分：前面快、越往后越慢。天天拿满上限时大约第 1、3、5、7、10、14、17、21、26、30 天
+  const THRESHOLDS = [15, 35, 65, 105, 150, 200, 255, 315, 380, 450]
 
   function pairKey(a, b) {
     if (a === b) return null
@@ -42,16 +43,7 @@
   }
 
   function hearts(points) {
-    let lo = 0
-    for (let i = 0; i < THRESHOLDS.length; i++) {
-      const hi = THRESHOLDS[i]
-      if (points < hi) {
-        // 第一档之前没有半颗心
-        return i > 0 && points >= (lo + hi) / 2 ? i + 0.5 : i
-      }
-      lo = hi
-    }
-    return THRESHOLDS.length
+    return THRESHOLDS.filter(t => points >= t).length
   }
 
   function rows(store, names) {

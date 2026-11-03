@@ -1727,7 +1727,7 @@ function tryPairChat() {
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
   const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
-                             hearts10: key => Math.round(Friendship.hearts(store[key]?.points || 0) * 2) })
+                             hearts10: key => Friendship.hearts(store[key]?.points || 0) })
   if (!got) return
   pairChatAt = nowMs
   pairChatRecent.push(got.id)
