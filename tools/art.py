@@ -2,6 +2,7 @@
 """立绘生产线：出题 → Codex 画 → 机器检查 → 看图验收 → 导入。说明见 art/README.md。
 
     python3 tools/art.py new <批次> <姿态...> [--chars a,b]   出题：每个角色 × 姿态一份提示词，生成 任务.md
+    python3 tools/art.py add <批次> [--chars a,b]            补角色：出题后才做好的新角色 / 皮肤补进这批（不写 --chars 补上所有缺这张图的）
     python3 tools/art.py check <批次>                          检查 成品/ 里画好的图，更新状态，生成 对比.html
     python3 tools/art.py pass <批次> <角色:姿态 | all>...      验收通过（all = 所有「待验收」的）
     python3 tools/art.py redo <批次> <角色:姿态> "原因"        退回重画：原因写进那份提示词，下次画存成新的一版
@@ -439,6 +440,34 @@ def cmd_new(args):
     print(f"出好了：{rel(batch_dir(batch) / '任务.md')}（{len(items)} 张）")
 
 
+def cmd_add(args):
+    """往已经出好的批次里补角色（比如出题之后才做好的新皮肤）：已有的条目、画好的图都不动"""
+    if not args:
+        sys.exit("用法：art.py add <批次> [--chars a,b]（不写 --chars 就补上所有还没在这批里的上线角色）")
+    batch = args[0]
+    st = load(batch)
+    picked = "--chars" in args
+    chars = args[args.index("--chars") + 1].split(",") if picked else shipped_characters()
+    poses = list(dict.fromkeys(i["pose"] for i in st["items"]))
+    have = {(i["char"], i["pose"]) for i in st["items"]}
+    added = []
+    for c in chars:
+        read_character(c)
+        for spec in sorted((read_pose(p, c) for p in poses), key=lambda s: 1 if s["base"] in poses else 0):
+            if (c, spec["pose"]) in have:
+                continue
+            # 没点名时，已经有这张图的角色不补（比如整套皮肤那批已经画过）；要重画就用 --chars 点名
+            if not picked and any((ROOT / "characters" / c / f"{spec['pose']}.{x}").exists() for x in ("webp", "png")):
+                continue
+            i = {"char": c, "pose": spec["pose"], "state": "待画", "notes": [], "checks": []}
+            st["items"].append(i)
+            added.append(i)
+    for i in added:
+        write_prompt(batch, st, i)
+    save(batch, st)
+    print(f"补了 {len(added)} 张：" + ("、".join(f"{i['char']}:{i['pose']}" for i in added) or "没有要补的"))
+
+
 def find(st, key):
     cid, _, pose = key.partition(":")
     for i in st["items"]:
@@ -626,7 +655,7 @@ def cmd_review(args):
 
 
 def main():
-    cmds = {"new": cmd_new, "check": cmd_check, "pass": cmd_pass, "redo": cmd_redo, "import": cmd_import, "status": cmd_status, "review": cmd_review}
+    cmds = {"new": cmd_new, "add": cmd_add, "check": cmd_check, "pass": cmd_pass, "redo": cmd_redo, "import": cmd_import, "status": cmd_status, "review": cmd_review}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         sys.exit(__doc__)
     cmds[sys.argv[1]](sys.argv[2:])
