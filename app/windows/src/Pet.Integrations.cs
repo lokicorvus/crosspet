@@ -88,7 +88,7 @@ namespace CrossPet
                 try { healed = (Store.Json.DeserializeObject(output.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
                 if (healed == null || healed.Count == 0) return;
                 Store.Log("接回被冲掉的接入: " + string.Join(", ", healed));
-                Window.Dispatcher.Invoke(() => { healTimes.Add(DateTime.UtcNow); Js("configHealed()"); RefreshIntegrated(); });
+                ui.Invoke(() => { healTimes.Add(DateTime.UtcNow); Js("configHealed()"); RefreshIntegrated(); });
             });
         }
 
@@ -99,7 +99,7 @@ namespace CrossPet
                 var r = RunIntegrate("installed").output;
                 List<string> list = null;
                 try { list = (Store.Json.DeserializeObject(r.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
-                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
+                ui.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
             });
             RefreshPlugins();
         }
@@ -114,7 +114,7 @@ namespace CrossPet
                 var (output, code) = RunIntegrate("plugins");
                 var last = (output ?? "").Trim().Split('\n').Last().Trim();
                 try { if (code != 0 || !(Store.Json.DeserializeObject(last) is object[])) return; } catch { return; }
-                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
+                ui.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
             });
         }
 
@@ -293,7 +293,7 @@ namespace CrossPet
             {
                 var (output, code) = RunIntegrate($"{action} {target}");
                 Store.Log($"接入 {action} {target} → {code}\n{output}");
-                Window.Dispatcher.Invoke(() =>
+                ui.Invoke(() =>
                 {
                     // 没找到 AI 的配置目录时脚本正常退出但什么都没改，不能显示成「已更新」
                     var missing = output.Contains("没找到");

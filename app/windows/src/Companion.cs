@@ -67,7 +67,7 @@ namespace CrossPet
             pageW = pet.PageW; pageH = pet.PageH; pageFoot = pet.PageFoot;
 
             // 备着的整个窗口透明、鼠标穿过（网页刚加载、还没藏起来的那一下会漏出光圈，1.3.9-test.12 看到的）
-            Host = new DirectHost(!parked) { TopMost = pet.Window.Topmost, ForcePassThrough = parked };
+            Host = new DirectHost(!parked) { Topmost = pet.Topmost, ForcePassThrough = parked };
             web = Host.Web;
             Host.HandleCreated += (_, __) =>
             {
@@ -113,7 +113,7 @@ namespace CrossPet
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
                 core.Settings.IsStatusBarEnabled = false;
-                web.ZoomFactor = Pet.Scale;
+                web.ZoomFactor = Pet.Scale * pet.ZoomFix;
                 core.ProcessFailed += (_, a) => ui.BeginInvoke(new Action(() => ProcessFailed(a.ProcessFailedKind)));
                 core.NavigationCompleted += (_, a) =>
                 {
@@ -396,7 +396,7 @@ namespace CrossPet
             Native.GetWindowRect(hwnd, out var old);
             var dpi = Host.DpiScale;
             Host.Size = new System.Drawing.Size((int)Math.Round(pageW * scale * dpi), (int)Math.Round(pageH * scale * dpi));
-            if (web != null) web.ZoomFactor = scale;   // 网页控件自己按系统缩放画：CSS 像素 × 人物大小 × 系统缩放 = 物理像素
+            if (web != null) web.ZoomFactor = scale * pet.ZoomFix;   // 网页控件自己按系统缩放画：CSS 像素 × 人物大小 × 系统缩放 = 物理像素（ZoomFix 见 Pet.CheckZoom）
             Native.GetWindowRect(hwnd, out var now);
             int w = now.Right - now.Left, h = now.Bottom - now.Top;
             double footPx = pageFoot * w / pageW;
@@ -422,7 +422,7 @@ namespace CrossPet
         public void UpdatePageHidden() => Js($"setPageHidden({(pet.Concealed || pet.SessionLocked ? "true" : "false")})");
 
         /// <summary>重新放到最顶层（主桌宠 Raise 时一起）</summary>
-        public void Raise() { if (!closed && !concealedShown && Host.TopMost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd); }
+        public void Raise() { if (!closed && !concealedShown && Host.Topmost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd); }
 
         /// <summary>全屏隐藏、快捷键隐藏、显示层级跟着主桌宠（Pet.SyncCompanionWindows 调）：藏起来用「隐身」（不透明度 0、鼠标穿透、取消置顶），
         /// 和主桌宠的 SetConcealed 一样不 Hide / Show</summary>
@@ -438,10 +438,10 @@ namespace CrossPet
                 else { Host.SetVisible(true); Raise(); }
                 UpdatePageHidden();
             }
-            var top = pet.Window.Topmost;
-            if (Host.TopMost != top)
+            var top = pet.Topmost;
+            if (Host.Topmost != top)
             {
-                Host.TopMost = top;
+                Host.Topmost = top;
                 if (!top) Native.DropFromTop(hwnd); else Raise();
             }
         }

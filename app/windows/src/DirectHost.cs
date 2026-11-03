@@ -20,10 +20,25 @@ namespace CrossPet
     /// </summary>
     sealed class DirectHost : Forms.Form
     {
-        public WebView2 Web { get; } = new WebView2 { DefaultBackgroundColor = Color.Transparent, Dock = Forms.DockStyle.Fill };
+        public WebView2 Web { get; private set; } = NewWeb();
+        static WebView2 NewWeb() => new WebView2 { DefaultBackgroundColor = Color.Transparent, Dock = Forms.DockStyle.Fill };
         readonly DispatcherTimer passTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
         List<Rectangle> hitRects = new List<Rectangle>();   // 能点的那几块，窗口内的物理像素
         byte alpha;
+
+        /// <summary>置顶。不用 Form.TopMost：它调 SetWindowPos 时不带 SWP_NOACTIVATE，会抢焦点</summary>
+        public bool Topmost
+        {
+            get => topmost;
+            set
+            {
+                topmost = value;
+                if (IsHandleCreated) { if (value) Native.BringToTop(Handle); else Native.DropFromTop(Handle); }
+            }
+        }
+        bool topmost;
+        /// <summary>窗口收到的消息先给它看（主桌宠的全局快捷键 WM_HOTKEY）：返回 true = 处理掉了</summary>
+        public Func<int, IntPtr, bool> MessageHook { get; set; }
 
         /// <summary>一直让鼠标穿过（藏着、备着）：不管鼠标在哪都不接</summary>
         public bool ForcePassThrough { get; set; }
@@ -51,6 +66,7 @@ namespace CrossPet
             {
                 var cp = base.CreateParams;
                 cp.ExStyle |= WS_EX_NOREDIRECTIONBITMAP | WS_EX_LAYERED | WS_EX_TRANSPARENT | Native.WS_EX_TOOLWINDOW | Native.WS_EX_NOACTIVATE;
+                if (topmost) cp.ExStyle |= WS_EX_TOPMOST;
                 return cp;
             }
         }
@@ -60,8 +76,24 @@ namespace CrossPet
             SetLayeredWindowAttributes(Handle, 0, alpha, LWA_ALPHA);
         }
         protected override void OnPaintBackground(Forms.PaintEventArgs e) { }   // 没有重定向画布，画了也看不见
+        protected override void WndProc(ref Forms.Message m)
+        {
+            if (MessageHook != null && MessageHook(m.Msg, m.WParam)) { m.Result = IntPtr.Zero; return; }
+            base.WndProc(ref m);
+        }
+
+        /// <summary>浏览器进程挂了（网页控件废了）：换一个新的网页控件，返回旧的（调用方 Dispose）</summary>
+        public WebView2 ReplaceWeb()
+        {
+            var old = Web;
+            Web = NewWeb();
+            Controls.Remove(old);
+            Controls.Add(Web);
+            return old;
+        }
 
         /// <summary>整个窗口的不透明度：藏起来、备着时 0（和以前 WPF 窗口的 Opacity 一样用来「隐身」）</summary>
+        public byte Alpha => alpha;
         public void SetVisible(bool on)
         {
             alpha = on ? (byte)255 : (byte)0;
@@ -110,7 +142,7 @@ namespace CrossPet
             base.Dispose(disposing);
         }
 
-        const int WS_EX_TRANSPARENT = 0x20, WS_EX_LAYERED = 0x80000, WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
+        const int WS_EX_TOPMOST = 0x8, WS_EX_TRANSPARENT = 0x20, WS_EX_LAYERED = 0x80000, WS_EX_NOREDIRECTIONBITMAP = 0x00200000;
         const uint LWA_ALPHA = 2;
         [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
         [DllImport("user32.dll")] static extern bool GetCursorPos(out Point p);
