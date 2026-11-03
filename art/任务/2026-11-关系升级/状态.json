@@ -1,0 +1,96 @@
+{
+ "about": "friend_up：friend_up · 关系升级",
+ "items": [
+  {
+   "char": "claude",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "claude-saint",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-hoodie",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-pajamas",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "deepseek-winter",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gemini",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "glm",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gpt",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "gpt-onesie",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "grok",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  },
+  {
+   "char": "qwen",
+   "pose": "friend_up",
+   "state": "待画",
+   "notes": [],
+   "checks": []
+  }
+ ]
+}
