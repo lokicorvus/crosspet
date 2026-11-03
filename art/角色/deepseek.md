@@ -29,5 +29,6 @@ How she shows emotion: with her whole body. Tail wags, droops or flicks; the aho
 - edge_right: Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression and props.
 - edge_right_peek: Leaning out eagerly, big sparkling eyes, ahoge standing straight up, mouth in a small "ooh!", whale tail wagging behind the border.
 - roll_call: Bouncing on her toes with one hand shot up eagerly, the other fist pumped at her side; big open grin, ahoge standing straight up, whale tail wagging.
+- friend_up: Holding a round white rice ball (onigiri with a small nori strip) out in front of her with both hands at chest height, as if offering to share it; big open grin, eyes sparkling, ahoge up, whale tail flicked up.
 - swamped_left: Total chaos, still cute: papers stacked up to her chin, the top sheets sliding toward the viewer's LEFT (still touching the stack), she hops on one foot leaning that way to balance them, swirly eyes, a small wobbly mouth with a tiny fang, ahoge spinning into a tight spiral, tail flailing, a sweat drop.
 - swamped_right: Same as swamped-left but the papers slide toward the viewer's RIGHT and she hops and leans that way.

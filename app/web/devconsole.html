@@ -318,7 +318,7 @@ const SCENES = [
     run: async (id) => { const s = await petStatus(), saved = s.quota[id] ?? null, now = Date.now() / 1000
       const q = u => ({ text: `测试 本周 剩余 ${100 - u}%`, low: false, windows: [{ label: '本周', used: u, reset: now + 400000 }] })
       pet(`setQuota('gpt', ${J(q(70))})`); await wait(500); pet(`setQuota('gpt', ${J(q(3))})`); await wait(8000); pet(`setQuota('gpt', ${J(saved)})`) } },
-  { id: 'resets', name: 'Codex 重置提醒（7 档）', only: (c, id) => id === 'gpt', exp: '不联网，用假数据依次问她「会重置吗？」：先<b>查手机</b>，再按档回答——<b>官方已宣布</b>（摇铃，额度下方多一行「🔔 官方已宣布重置」）→ <b>刚重置过</b>（庆祝，额度下方「✨ 2 小时前刚重置过」）→ <b>85%</b>（期待）→ <b>50%</b>（半信半疑）→ <b>10%</b>（摇头）→ <b>没风声</b>（摇头，说上次是几天前）→ <b>连不上</b>（摇头）。每档约 10 秒，演完恢复真实设置',
+  { id: 'resets', name: 'Codex 重置提醒（8 档）', only: (c, id) => id === 'gpt', exp: '不联网，用假数据依次问她「会重置吗？」：先<b>查手机</b>，再按档回答——<b>官方已宣布</b>（摇铃，额度下方多一行「🔔 官方已宣布重置」）→ <b>刚重置过</b>（庆祝，额度下方「✨ 2 小时前刚重置过」）→ <b>发重置卡</b>（期待，说发的是卡、要自己去用，额度下方「🎟️ 3 小时前发了重置卡」）→ <b>85%</b>（期待）→ <b>50%</b>（半信半疑）→ <b>10%</b>（摇头）→ <b>没风声</b>（摇头，说上次是几天前）→ <b>连不上</b>（摇头）。每档约 10 秒，演完恢复真实设置',
     run: async (id, prog) => {
       const iso = ms => new Date(Date.now() + ms).toISOString()
       const src = { type: 'x_post', author: 'thsottiaux', url: 'https://x.com' }
@@ -327,6 +327,7 @@ const SCENES = [
       const tiers = [
         ['官方已宣布', data({ scheduled_reset: { id: 'dev', status: 'scheduled', reset_type: 'regular', announced_at: iso(-600e3), scheduled_for: iso(20 * 3600e3), text: '', source: src } })],
         ['刚重置过', data({ latest_reset: { id: 'dev-r', reset_type: 'regular', announced_at: iso(-2 * 3600e3), text: '', source: src } })],
+        ['发重置卡', data({ latest_reset: { id: 'dev-c', reset_type: 'banked', announced_at: iso(-3 * 3600e3), text: '', source: src } })],
         ['85%', data({ active_watch: watch(85) })], ['50%', data({ active_watch: watch(50) })], ['10%', data({ active_watch: watch(10) })],
         ['没风声', data()], ['连不上', null],
       ]

@@ -201,6 +201,9 @@ extension App {
             case "powerSave":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "powerSave"); js("setPowerSave(\(on))")
+            case "noSleep":
+                let on = value as? Bool ?? false
+                defaults.set(on, forKey: "noSleep"); js("setNeverSleep(\(on))")
             case "quotaAggregate":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "quotaAggregate"); js("setQuotaAggregate(\(on))")

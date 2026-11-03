@@ -305,7 +305,7 @@ extension App {
         switch key {
         case "size": companions.values.forEach { $0.applySizes(anchor: .bottom) }
         case "textSize", "textLinked": companions.values.forEach { $0.applySizes(anchor: .feet) }
-        case "showName", "aura", "powerSave", "quotaStyle", "peakStyle": companionsJS(companionLookJS)
+        case "showName", "aura", "powerSave", "noSleep", "quotaStyle", "peakStyle": companionsJS(companionLookJS)
         case "edgeDock": if !edgeDockEnabled { companions.values.forEach { $0.undock() } }
         default: break
         }
@@ -313,7 +313,7 @@ extension App {
 
     /// 额外那只的外观设置（共用的那几项）。合并额度表只在主桌宠身上，所以她的关着
     var companionLookJS: String {
-        "setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setPowerSave(\(powerSave)); setQuotaAggregate(false); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle)))"
+        "setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(false); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle)))"
     }
 
     func companionsJS(_ code: String) { (Array(companions.values) + leavingCompanions).forEach { $0.js(code) } }

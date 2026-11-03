@@ -142,7 +142,7 @@ namespace CrossPet
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
-                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
                 // 多桌宠（设置页「角色」页）：开关、她们什么时候去休息、固定主桌宠、友谊（主桌宠页面最后一次发来的）
                 ["multiPets"] = MultiPetsOn, ["petsRest"] = PetsRest, ["mainPet"] = MainPet, ["friendship"] = friendshipRows ?? new object[0],
@@ -214,6 +214,7 @@ namespace CrossPet
                             if (value is string ps && (ps == "bar" || ps == "text" || ps == "off")) { Store.Settings["peakStyle"] = ps; Store.SaveSettings(); Js($"setPeakStyle({Q(ps)})"); }
                             break;
                         case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Js($"setPowerSave({(on ? "true" : "false")})"); break;
+                        case "noSleep": Store.Settings["noSleep"] = on; Store.SaveSettings(); Js($"setNeverSleep({(on ? "true" : "false")})"); break;
                         case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }

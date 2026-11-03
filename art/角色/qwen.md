@@ -32,5 +32,6 @@ How she shows emotion: gracefully, mostly with the fan. Laughing = fan raised to
 - edge_right: same as edge_left but hiding beyond the RIGHT border and peeking in toward the left.
 - edge_right_peek: Her far hand holds the open fan lowered in front of her chest; a delighted "oh, it's you~" smile.
 - roll_call: The closed fan held in one hand at her chest, the other hand raised gracefully, fingers together; a warm open-mouthed smile, braid and tassels swaying.
+- friend_up: Her fan opened halfway and held in front of the lower half of her face; her eyes above it curved into happy crescents, a light blush, braid and tassels swaying.
 - swamped_left: her composure slipping: leaning toward the viewer's LEFT tapping the tablet, the phone at her ear, and her other hand holding up the open handbag that is stuffed with papers, a forced gentle smile with two sweat drops, slightly wide eyes, hat a little askew.
 - swamped_right: same as swamped_left but leaning toward the viewer's RIGHT, the tablet, phone and handbag swapping sides accordingly.

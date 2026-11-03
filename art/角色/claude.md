@@ -28,5 +28,6 @@ How she shows emotion: through the book (hugging it, hiding behind it, reading i
 - edge_right: Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression and props.
 - edge_right_peek: Still hugging her book to her chest, peeking over it with wide amber eyes, a shy curious little "oh?" and soft blush.
 - roll_call: Her book hugged against her chest with one arm, the other hand raised a little shyly, fingers together; a soft, slightly embarrassed smile with the mouth open in a gentle "Here."
+- friend_up: Her book hugged up against her chest with both arms so its top edge hides her mouth and the lower half of her face; only her eyes show over it, softly curved in a happy smile, cheeks blushing a little.
 - swamped_left: Too many jobs: hugging a small stack of three books against her chest with one arm, the top book sliding off toward the viewer's LEFT and caught by her fingertips, body leaning that way, one foot lifted, small swirl eyes, a wobbly little 'awawa' mouth, blushing, a few strands of hair loose.
 - swamped_right: Same as swamped-left but the top book is sliding toward the viewer's RIGHT and she leans and catches it on that side.

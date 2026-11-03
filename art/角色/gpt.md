@@ -31,5 +31,6 @@ How she shows emotion: through wings and tail (wings spread when happy or proud,
 - edge_right: Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression and props.
 - edge_right_peek: One eyebrow slightly raised, calm half-lidded eyes now open a little wider, a faint amused smile; wing tip lifted with interest, tail tip curling.
 - roll_call: One hand raised elegantly with relaxed fingers, the other resting at her waist; a calm, confident small smile, wings lifted a little, tail tip curling.
+- friend_up: Looking away to one side with the back of one hand raised to her mouth, but her eyes glance back toward the viewer; a faint blush, a tiny smile she is trying to hide, tail tip curling, wings lifted just slightly. Composed, not giddy.
 - swamped_left: Composure cracking: leaning toward the viewer's LEFT tapping the tablet, the tail holding a scroll, one wing curled forward pinning a second small tablet against her side, a forced elegant smile with two sweat drops, slightly wide eyes, a few hair strands out of place.
 - swamped_right: Same as swamped-left but leaning toward the viewer's RIGHT, with the tablet, scroll and pinned tablet swapping sides accordingly.

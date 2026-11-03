@@ -365,6 +365,7 @@ function setFx(p, instant) {
   setTimeout(render, 220)
 }
 function setPose(p, instant) {
+  if (p === 'sleeping' && neverSleep) p = quota[charId]?.low ? 'tired' : 'idle'   // 设置里关了睡觉：AI 会话结束、闲太久都不睡，醒着待机
   if (tucked) p = `edge_${tucked}${tuckedPeek ? '_peek' : ''}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
@@ -1195,6 +1196,12 @@ function noteRest(p) {
   if (RESTING.has(p)) restTimer = setTimeout(() => { if (RESTING.has(pose)) { fxResting = true; applyFxRate() } }, powerSave ? 10000 : 30000)
 }
 function setPowerSave(on) { powerSave = !!on; fxFps = -1; noteRest(pose); applyFxRate() }
+// 不睡觉（设置里，默认关）：闲着太久、AI 会话结束都不睡；正睡着时打开就醒过来
+let neverSleep = false
+function setNeverSleep(on) {
+  neverSleep = !!on
+  if (neverSleep && pose === 'sleeping') setPose('sleeping')
+}
 function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
 applyFxRate()
 
@@ -2054,7 +2061,7 @@ function devStatus() {
 setInterval(() => {
   if (devHeld() || egg || (pose !== 'idle' && pose !== 'tired')) return
   const quiet = Date.now() - lastActive
-  if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
+  if (quiet > SLEEP_AFTER && !neverSleep) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
   if (Math.random() > .42) return
   const builtin = ['hum', 'stretch', ...(quiet > 3 * 60 * 1000 ? ['yawn'] : [])]
   const own = (char()?.idleActions || []).filter(hasPose)

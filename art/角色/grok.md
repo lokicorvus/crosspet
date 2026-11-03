@@ -33,5 +33,6 @@ How she shows emotion: a fang-showing grin or a cheeky wink with her tongue out;
 - edge_right: nothing peeks up from behind her any more; keep the near hand gripping the right border and her face just inside it.
 - edge_right_peek: nothing peeks up from behind her any more; keep her leaning out further and her hand on the border.
 - roll_call: A cocky two-finger salute from the brow, the other hand on her hip; a fang-showing grin and a wink, twin-tails and bat-wing bows perked up.
+- friend_up: One hand on her hip, the other giving a cocky thumbs-up at chest height (no axe, no weapon); a fang-showing grin and a wink, twin-tails and bat-wing bows perked up.
 - swamped_left: keep typing on the phone while leaning to the viewer's LEFT; the other hand pressed to her forehead, keep the askew crown and strained grin.
 - swamped_right: keep typing on the phone while leaning to the viewer's RIGHT; the other hand pressed to her forehead, keep the askew crown and strained grin.

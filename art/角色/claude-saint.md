@@ -29,3 +29,4 @@ How she shows emotion: through the scroll (hugging it, hiding behind it, unrolli
 
 - running: Getting down to work, still proper and standing in place: sleeves pushed back neatly, the scroll tucked under one arm, one small fist raised ("let us begin"), a calm, determined little smile.
 - roll_call: Her scroll hugged against her chest with one arm, the other hand raised politely and a little shyly, fingers together (no higher than the top of her head); a soft, slightly embarrassed smile with the mouth open in a gentle "Here."
+- friend_up: The scroll unrolled a little and held up in both hands in front of her mouth, as if checking whether the rules allow this; her eyes glance shyly to one side over the top of it, cheeks blushing, a tiny hidden smile.
