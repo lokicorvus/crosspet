@@ -2,14 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
+using Microsoft.Web.WebView2.WinForms;
 using Forms = System.Windows.Forms;
 
 namespace CrossPet
@@ -19,7 +14,8 @@ namespace CrossPet
     /// 页面先 setRole('companion') 再 init：只显示，不做只该做一次的事（那些在主桌宠页面里做）。
     /// 状态、会话（按她的客户端过滤）、额度都由 Pet 转发，她自己不读文件（见 Pet.Companions.cs）。
     /// 拖动、贴边、能点到的区域各自管；位置记在 origin-&lt;key&gt;、贴边记在 dock-&lt;key&gt;（key = &lt;角色&gt;@&lt;客户端&gt;），主桌宠原来的键不动。
-    /// 贴边的计算和主桌宠共用 Pet.Dock.cs 里的纯函数；这里只放她自己的状态。和 macOS 的 Companion.swift 一一对应
+    /// 贴边的计算和主桌宠共用 Pet.Dock.cs 里的纯函数；这里只放她自己的状态。和 macOS 的 Companion.swift 一一对应。
+    /// 窗口是 DirectHost（系统直接合成网页，开窗口不卡；见那个文件），鼠标由网页交过来（pointer 消息）
     /// </summary>
     sealed class Companion
     {
@@ -30,9 +26,9 @@ namespace CrossPet
         public string Client { get; private set; }   // 集合来、还没收编客户端时是 null
         public bool Quota { get; private set; }      // 同一个角色只有一只显示额度
         public string Label { get; private set; }    // 「桌面」「终端」小字（同一个角色站了两只时）
-        public Window Window { get; }
-        WebView2CompositionControl web;
-        readonly Canvas hit;
+        public DirectHost Host { get; }
+        WebView2 web;
+        readonly Dispatcher ui = Dispatcher.CurrentDispatcher;
         IntPtr hwnd;
         bool ready, leaving, closed;
         bool parked;     // 屏幕外先备着（Pet.PrepareCompanions）：页面藏着，Adopt 时才挪到位置、噗一下出来
@@ -70,43 +66,26 @@ namespace CrossPet
             Label = Str(info, "label") ?? "";
             pageW = pet.PageW; pageH = pet.PageH; pageFoot = pet.PageFoot;
 
-            Window = new Window
+            // 备着的整个窗口透明、鼠标穿过（网页刚加载、还没藏起来的那一下会漏出光圈，1.3.9-test.12 看到的）
+            Host = new DirectHost(!parked) { TopMost = pet.Window.Topmost, ForcePassThrough = parked };
+            web = Host.Web;
+            Host.HandleCreated += (_, __) =>
             {
-                Title = "CrossPet", WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent,
-                Width = pageW * Pet.Scale, Height = pageH * Pet.Scale,   // 和主桌宠一样大（共用人物大小、文字大小）
-                Topmost = pet.Window.Topmost, ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
-                Left = -10000, Top = -10000,   // 先放屏幕外，拿到窗口句柄后按像素摆到该在的位置
-                // 备着的整个窗口透明：算完画布会被夹进屏幕角上（留着：在屏幕里预热才算数，1.3.9-test.12 就是这样测出登场不卡的），
-                // 网页刚加载、还没藏起来的那一下会漏出光圈（test.12 看到的）
-                Opacity = parked ? 0 : 1,
-            };
-            Window.SourceInitialized += (_, __) =>
-            {
-                hwnd = new WindowInteropHelper(Window).Handle;
-                Native.MakeToolWindow(hwnd);
-                if (this.parked)   // 备着的先不摆、鼠标穿过，Adopt 时再摆
-                {
-                    Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ConcealStyle.ClickThrough(Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE), true));
-                    return;
-                }
+                hwnd = Host.Handle;
+                var dpi = Host.DpiScale;   // 和主桌宠一样大（共用人物大小、文字大小）
+                Host.Size = new System.Drawing.Size((int)Math.Round(pageW * Pet.Scale * dpi), (int)Math.Round(pageH * Pet.Scale * dpi));
+                if (this.parked) return;   // 备着的先不摆，Adopt 时再摆
                 Native.GetWindowRect(hwnd, out var r);
                 var (x, y) = pet.CompanionOrigin(Key, r.Right - r.Left, r.Bottom - r.Top);
                 Native.MoveTo(hwnd, x, y);
                 SaveOrigin();   // 走了以后这个客户端又干活：回到这里出现
                 SyncWithMain();
             };
-            var grid = new Grid();
-            web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
-            grid.Children.Add(web);
-            hit = new Canvas();   // 透明的接鼠标层，和主桌宠一样只在能点的那几块上铺
-            grid.Children.Add(hit);
-            Window.Content = grid;
-            WireMouse();
             Every(250, () => _ = UpdateHitRects());
             Every(80, UpdateDockHover);
-            Window.DpiChanged += (_, __) => Window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(ResyncWebForDpi));
-            Window.Loaded += async (_, __) => await InitWeb(env);
-            Window.Show();
+            Host.DpiChanged += (_, __) => ui.BeginInvoke(DispatcherPriority.Loaded, new Action(() => { lastHitRects = null; dockCut.Clear(); ApplySizes(Pet.Anchor.Feet); }));
+            Host.Load += async (_, __) => await InitWeb(env);
+            Host.Show();
         }
 
         static string Str(IDictionary<string, object> d, string k) => d.TryGetValue(k, out var v) ? v as string : null;
@@ -134,8 +113,8 @@ namespace CrossPet
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
                 core.Settings.IsStatusBarEnabled = false;
-                web.ZoomFactor = Pet.Scale * pet.ZoomFix;
-                core.ProcessFailed += (_, a) => Window.Dispatcher.BeginInvoke(new Action(() => ProcessFailed(a.ProcessFailedKind)));
+                web.ZoomFactor = Pet.Scale;
+                core.ProcessFailed += (_, a) => ui.BeginInvoke(new Action(() => ProcessFailed(a.ProcessFailedKind)));
                 core.NavigationCompleted += (_, a) =>
                 {
                     ready = false;
@@ -145,7 +124,7 @@ namespace CrossPet
                     // 一定先 setRole 再 init / setCharacter（同一段脚本里按顺序跑）：不然页面按主桌宠演登场招呼，会写共用的 crosspet-greeted
                     // setCharacter 不 quiet：「噗」一下出现，说一句登场招呼
                     // 备着的：init 按 roleInfo.parked 悄悄换上、整页藏着（不发 setCharacter，不然会噗一下说话）
-                    Js($"setRole('companion', {RoleInfoJson}); init({pet.ManifestJson}); {pet.CompanionLookJs}" + (parked ? "" : $"; setCharacter({Pet.Q(Character)})"));
+                    Js($"setPointerBridge(true); setRole('companion', {RoleInfoJson}); init({pet.ManifestJson}); {pet.CompanionLookJs}" + (parked ? "" : $"; setCharacter({Pet.Q(Character)})"));
                     ApplySizes(Pet.Anchor.Corner);
                     if (parked) { Pet.After(WarmMs, () => Warm = true); return; }
                     UpdatePageHidden();
@@ -211,7 +190,7 @@ namespace CrossPet
                 concealedShown = true;
                 SyncWithMain();
             }
-            else Window.Opacity = 1;
+            else { Host.SetVisible(true); Host.ForcePassThrough = false; }
             if (!ready) return;
             Js($"setRole('companion', {RoleInfoJson}); arriveNow()");
             UpdatePageHidden();
@@ -219,20 +198,28 @@ namespace CrossPet
             Arrived();
         }
 
-        /// <summary>站到桌面上以后：让浏览器窗口的鼠标穿过她、上次贴着边的接着贴</summary>
+        /// <summary>站到桌面上以后：上次贴着边的接着贴</summary>
         void Arrived()
         {
-            Pet.After(1000, () => pet.PassThroughBrowserWindows(hwnd)); Pet.After(5000, () => pet.PassThroughBrowserWindows(hwnd));
             if (Store.Settings.TryGetValue(DockKey, out var dk) && dk is string side && Pet.EdgeDockEnabled)
                 Pet.After(1500, () => { if (!closed && dock == null) SetDock(side); });
         }
 
-        /// <summary>她的页面发来的消息：摸头记给主桌宠页面（友谊记账只在那里做）；道别演完了关窗口</summary>
+        /// <summary>她的页面发来的消息：鼠标（pointer，见 index.html 的 setPointerBridge）；摸头记给主桌宠页面（友谊记账只在那里做）；道别演完了关窗口</summary>
         void HandleMessage(Dictionary<string, object> m)
         {
+            if (m.TryGetValue("pointer", out var pv) && pv is string pointer)
+            {
+                // 拖窗口要进系统的移动循环（松手才返回）：排到网页控件的回调返回之后
+                if (pointer == "drag") ui.BeginInvoke(new Action(Drag));
+                else if (pointer == "click")
+                    Js($"handleClick('pat', {Pet.Num(Convert.ToDouble(m["x"]))}, {Pet.Num(Convert.ToDouble(m["y"]))})");
+                else if (pointer == "menu") ui.BeginInvoke(new Action(ShowMenu));
+                return;
+            }
             if (m.TryGetValue("patted", out var p) && p is bool pb && pb) pet.Js($"notePat({Pet.Q(Character)})");
             // 不能在这个网页控件自己的消息回调里同步 Dispose 它：排到回调返回之后再关（和 ProcessFailed 一样）
-            if (m.TryGetValue("gone", out var g) && g is bool gb && gb) Window.Dispatcher.BeginInvoke(new Action(Close));
+            if (m.TryGetValue("gone", out var g) && g is bool gb && gb) ui.BeginInvoke(new Action(Close));
         }
 
         /// <summary>列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她</summary>
@@ -284,11 +271,11 @@ namespace CrossPet
             // 关窗口可能是从网页控件的回调里来的（她自己的 gone、主桌宠页面的 companions 消息 / 加载完、初始化失败）：
             // 在回调里同步 Dispose 网页控件不安全，状态先改好（上面），真正的 Dispose 和关窗口排到回调返回之后
             var w = web; web = null;
-            Window.Opacity = 0;   // 先藏起来，排队这一下也不会看见
-            Window.Dispatcher.BeginInvoke(new Action(() =>
+            Host.SetVisible(false); Host.ForcePassThrough = true;   // 先藏起来，排队这一下也不会看见
+            ui.BeginInvoke(new Action(() =>
             {
                 try { w?.Dispose(); } catch { }
-                try { Window.Close(); } catch { }
+                try { Host.Close(); Host.Dispose(); } catch { }
             }));
         }
 
@@ -311,69 +298,47 @@ namespace CrossPet
         }
 
         // ---------------- 能点到的区域（和主桌宠的 UpdateHitRects 一样） ----------------
-        static readonly Brush HitBrush = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
         string lastHitRects;
         async Task UpdateHitRects()
         {
-            if (!ready || closed || Mouse.LeftButton == MouseButtonState.Pressed) return;
+            if (!ready || closed || (Forms.Control.MouseButtons & Forms.MouseButtons.Left) != 0) return;
             var json = await Eval("hitRects()");
             if (closed || json == lastHitRects || json == "null") return;
             lastHitRects = json;
             if (!(Store.Json.DeserializeObject(Store.Json.Deserialize<string>(json)) is object[] list)) return;
-            var zoom = Window.Width / pageW;
-            hit.Children.Clear();
-            foreach (var item in list)
-            {
-                if (!(item is object[] r) || r.Length != 4) continue;
-                var box = new System.Windows.Shapes.Rectangle { Fill = HitBrush, Width = Convert.ToDouble(r[2]) * zoom, Height = Convert.ToDouble(r[3]) * zoom };
-                Canvas.SetLeft(box, Convert.ToDouble(r[0]) * zoom);
-                Canvas.SetTop(box, Convert.ToDouble(r[1]) * zoom);
-                hit.Children.Add(box);
-            }
+            var zoom = (double)Host.Width / pageW;   // 画布坐标 → 窗口里的物理像素
+            Host.SetHitRects(list.OfType<object[]>().Where(r => r.Length == 4).Select(r => new System.Drawing.Rectangle(
+                (int)Math.Floor(Convert.ToDouble(r[0]) * zoom), (int)Math.Floor(Convert.ToDouble(r[1]) * zoom),
+                (int)Math.Ceiling(Convert.ToDouble(r[2]) * zoom), (int)Math.Ceiling(Convert.ToDouble(r[3]) * zoom))));
         }
 
-        // ---------------- 鼠标：单击摸头、拖动换位置（甩她会生气）、右键精简菜单 ----------------
-        void WireMouse()
+        // ---------------- 鼠标：单击摸头、拖动换位置（甩她会生气）、右键精简菜单（网页交来，见 HandleMessage） ----------------
+        void Drag()
         {
-            Point down = default; bool pressed = false;
-            hit.MouseLeftButtonDown += (_, e) => { down = e.GetPosition(Window); pressed = true; hit.CaptureMouse(); };
-            hit.MouseMove += (_, e) =>
+            if (closed) return;
+            Undock();
+            // 甩：拖动时横向来回反转方向（往回超过 18（按 100% 缩放算）算一次反转），0.9 秒内两次以上就算在甩
+            var turn = 18 * Host.DpiScale;
+            bool shook = false; double swingX = Host.Left, swingDir = 0; var swings = new List<DateTime>(); var lastShake = DateTime.MinValue;
+            EventHandler onMove = (_, __) =>
             {
-                if (!pressed || e.LeftButton != MouseButtonState.Pressed) return;
-                var p = e.GetPosition(Window);
-                if (Math.Abs(p.X - down.X) + Math.Abs(p.Y - down.Y) <= 4) return;
-                pressed = false;
-                hit.ReleaseMouseCapture();
-                Undock();
-                bool shook = false; double swingX = Window.Left, swingDir = 0; var swings = new List<DateTime>(); var lastShake = DateTime.MinValue;
-                EventHandler onMove = (_, __) =>
+                double x = Host.Left;
+                if (swingDir == 0) { if (Math.Abs(x - swingX) > turn) { swingDir = x > swingX ? 1 : -1; swingX = x; } }
+                else if ((x - swingX) * swingDir > 0) swingX = x;
+                else if ((swingX - x) * swingDir > turn)
                 {
-                    double x = Window.Left;
-                    if (swingDir == 0) { if (Math.Abs(x - swingX) > 18) { swingDir = x > swingX ? 1 : -1; swingX = x; } }
-                    else if ((x - swingX) * swingDir > 0) swingX = x;
-                    else if ((swingX - x) * swingDir > 18)
-                    {
-                        swingDir = -swingDir; swingX = x;
-                        swings.Add(DateTime.UtcNow);
-                        swings.RemoveAll(t => (DateTime.UtcNow - t).TotalSeconds > 0.9);
-                        if (swings.Count >= 2 && (DateTime.UtcNow - lastShake).TotalSeconds > 0.3) { shook = true; lastShake = DateTime.UtcNow; Js("shaken()"); }
-                    }
-                };
-                Window.LocationChanged += onMove;
-                try { Window.DragMove(); } catch { }
-                Window.LocationChanged -= onMove;
-                SaveOrigin(force: true);
-                if (!shook) CheckDock();
+                    swingDir = -swingDir; swingX = x;
+                    swings.Add(DateTime.UtcNow);
+                    swings.RemoveAll(t => (DateTime.UtcNow - t).TotalSeconds > 0.9);
+                    if (swings.Count >= 2 && (DateTime.UtcNow - lastShake).TotalSeconds > 0.3) { shook = true; lastShake = DateTime.UtcNow; Js("shaken()"); }
+                }
             };
-            hit.MouseLeftButtonUp += (_, e) =>
-            {
-                hit.ReleaseMouseCapture();
-                if (!pressed) return;
-                pressed = false;
-                var p = e.GetPosition(hit); var z = Math.Max(Window.Width / pageW, 0.01);
-                Js($"handleClick('pat', {Pet.Num(Math.Round(p.X / z, 1))}, {Pet.Num(Math.Round(p.Y / z, 1))})");
-            };
-            hit.MouseRightButtonUp += (_, __) => ShowMenu();
+            Host.LocationChanged += onMove;
+            try { Host.DragMove(); } catch { }
+            Host.LocationChanged -= onMove;
+            if (closed) return;
+            SaveOrigin(force: true);
+            if (!shook) CheckDock();
         }
 
         /// <summary>精简菜单：换角色、彩蛋、集合、更新、退出只在主桌宠菜单里</summary>
@@ -401,7 +366,7 @@ namespace CrossPet
             {
                 watch.Stop();
                 if (openMenu == menu) openMenu = null;
-                Window.Dispatcher.BeginInvoke(new Action(menu.Dispose));
+                ui.BeginInvoke(new Action(menu.Dispose));
             };
             openMenu = menu;
             menu.Show(Forms.Cursor.Position);
@@ -427,10 +392,11 @@ namespace CrossPet
                 }
             }
             catch (Exception e) { Store.Log("额外桌宠：算画布失败 " + e.Message); }
+            if (closed) return;
             Native.GetWindowRect(hwnd, out var old);
-            Window.Width = pageW * scale; Window.Height = pageH * scale;
-            Window.UpdateLayout();
-            if (web != null) web.ZoomFactor = scale * pet.ZoomFix;
+            var dpi = Host.DpiScale;
+            Host.Size = new System.Drawing.Size((int)Math.Round(pageW * scale * dpi), (int)Math.Round(pageH * scale * dpi));
+            if (web != null) web.ZoomFactor = scale;   // 网页控件自己按系统缩放画：CSS 像素 × 人物大小 × 系统缩放 = 物理像素
             Native.GetWindowRect(hwnd, out var now);
             int w = now.Right - now.Left, h = now.Bottom - now.Top;
             double footPx = pageFoot * w / pageW;
@@ -453,22 +419,13 @@ namespace CrossPet
         static bool MenuCovers(Forms.ToolStripDropDown d, System.Drawing.Point p) =>
             d.Visible && (d.Bounds.Contains(p) || d.Items.OfType<Forms.ToolStripDropDownItem>().Any(i => i.HasDropDownItems && MenuCovers(i.DropDown, p)));
 
-        /// <summary>换了系统缩放：和主桌宠的 ResyncWebForDpi 一样，把网页控件宽度缩 1 再放回，逼它按新 DPI 重算网页区域</summary>
-        void ResyncWebForDpi()
-        {
-            if (web == null || closed) return;
-            web.Width = Math.Max(1, web.ActualWidth - 1); web.UpdateLayout();
-            web.Width = double.NaN; web.UpdateLayout();
-            lastHitRects = null; dockCut.Clear();
-        }
-
         public void UpdatePageHidden() => Js($"setPageHidden({(pet.Concealed || pet.SessionLocked ? "true" : "false")})");
 
         /// <summary>重新放到最顶层（主桌宠 Raise 时一起）</summary>
-        public void Raise() { if (!closed && !concealedShown && Window.Topmost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd); }
+        public void Raise() { if (!closed && !concealedShown && Host.TopMost && hwnd != IntPtr.Zero) Native.BringToTop(hwnd); }
 
         /// <summary>全屏隐藏、快捷键隐藏、显示层级跟着主桌宠（Pet.SyncCompanionWindows 调）：藏起来用「隐身」（不透明度 0、鼠标穿透、取消置顶），
-        /// 原因同主桌宠的 SetConcealed（反复 Hide / Show 有概率让 WPF 渲染线程挂掉）</summary>
+        /// 和主桌宠的 SetConcealed 一样不 Hide / Show</summary>
         public void SyncWithMain()
         {
             if (closed || hwnd == IntPtr.Zero) return;
@@ -476,16 +433,15 @@ namespace CrossPet
             if (hidden != concealedShown)
             {
                 concealedShown = hidden;
-                if (hidden) { openMenu?.Close(); Window.Opacity = 0; Native.DropFromTop(hwnd); }
-                else { Window.Opacity = 1; Raise(); }
-                Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ConcealStyle.ClickThrough(Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE), hidden));
-                pet.PassThroughBrowserWindows(hwnd);
+                Host.ForcePassThrough = hidden;
+                if (hidden) { openMenu?.Close(); Host.SetVisible(false); Native.DropFromTop(hwnd); }
+                else { Host.SetVisible(true); Raise(); }
                 UpdatePageHidden();
             }
             var top = pet.Window.Topmost;
-            if (Window.Topmost != top)
+            if (Host.TopMost != top)
             {
-                Window.Topmost = top;
+                Host.TopMost = top;
                 if (!top) Native.DropFromTop(hwnd); else Raise();
             }
         }
@@ -526,7 +482,7 @@ namespace CrossPet
         {
             var side = dock;
             if (side == null || hwnd == IntPtr.Zero || closed) return;
-            hit.Children.Clear(); lastHitRects = null;
+            Host.ClearHitRects(); lastHitRects = null;
             Pet.After(500, () => { lastHitRects = null; _ = UpdateHitRects(); });
             Native.GetWindowRect(hwnd, out var r);
             int w = r.Right - r.Left, h = r.Bottom - r.Top;
@@ -579,8 +535,8 @@ namespace CrossPet
         void UpdateDockHover()
         {
             if (dock == null || dockOut || hwnd == IntPtr.Zero || closed) return;
-            if (hit.Children.Count == 0) _ = UpdateHitRects();
-            bool inside = hit.IsMouseOver;
+            if (Host.HitRectCount == 0) _ = UpdateHitRects();
+            bool inside = Host.MouseOverHit;
             if (inside)
             {
                 dockLeaveAt = null;

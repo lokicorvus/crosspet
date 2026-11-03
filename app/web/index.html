@@ -416,6 +416,33 @@ function refit() {
 addEventListener('resize', refit)
 // 网页坐标（getBoundingClientRect 量的）→ 画布坐标
 function toCanvas(r) { return { left: (r.left - fitX) / fit, top: (r.top - fitY) / fit, width: r.width / fit, height: r.height / fit } }
+// Windows 系统直接合成的窗口（DirectHost.cs）：网页不再隔着一层接鼠标的透明层，鼠标直接落到网页上。
+// 外壳调 setPointerBridge(true) 后，按下拖动、单击、右键都交给外壳照旧处理（摸头 / 拖窗口 / 甩 / 菜单）：
+//   toShell({ pointer: 'drag' })                 按住移动超过 4 像素：外壳接手拖窗口
+//   toShell({ pointer: 'click', x, y })          单击，x、y 是画布坐标（和以前外壳算好交给 handleClick 的一样）
+//   toShell({ pointer: 'menu', shift })          右键
+// 网页自己不响应这些点击（卡片按钮也照旧由 handleClick 按坐标判断），和以前收不到鼠标时一样
+let pointerBridge = false
+function setPointerBridge(on) { pointerBridge = !!on }
+{
+  let down = null
+  const swallow = e => { if (pointerBridge) { e.preventDefault(); e.stopPropagation() } }
+  addEventListener('mousedown', e => { if (!pointerBridge) return; swallow(e); if (e.button === 0) down = { x: e.screenX, y: e.screenY } }, true)
+  addEventListener('mousemove', e => {
+    if (!pointerBridge || !down) return
+    if (!(e.buttons & 1)) { down = null; return }
+    if (Math.abs(e.screenX - down.x) + Math.abs(e.screenY - down.y) > 4) { down = null; toShell({ pointer: 'drag' }) }
+  }, true)
+  addEventListener('mouseup', e => {
+    if (!pointerBridge) return
+    swallow(e)
+    if (e.button !== 0 || !down) return
+    down = null
+    toShell({ pointer: 'click', x: Math.round((e.clientX - fitX) / fit * 10) / 10, y: Math.round((e.clientY - fitY) / fit * 10) / 10 })
+  }, true)
+  for (const t of ['click', 'dblclick', 'auxclick']) addEventListener(t, swallow, true)
+  addEventListener('contextmenu', e => { if (!pointerBridge) return; swallow(e); toShell({ pointer: 'menu', shift: e.shiftKey }) }, true)
+}
 // 背景光晕：'auto'（跟着系统深浅色）/ 'on' / 'off'，由宿主调用
 function setAuraMode(mode) {
   const c = document.documentElement.classList
