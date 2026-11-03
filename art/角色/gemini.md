@@ -30,5 +30,6 @@ How she shows emotion: cat body language. Ears perk up or flatten, tail puffs, c
 - edge_right: Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression and props.
 - edge_right_peek: Leaning out like a curious cat, ears perked straight forward, head tilted, a paw-hand raised as if about to bat at the cursor, ":3" mouth, tail curled up.
 - roll_call: A paw-hand raised beside her head like a beckoning cat, the other paw at her chest; ":3" mouth open in a cheerful call, ears perked straight up, tail curled.
+- friend_up: One paw-hand raised beside her cheek in a beckoning-cat wave, the other paw at her chest; ears tilted forward, a delighted ":3" smile with a light blush, fluffy tail curled into a hook.
 - swamped_left: Overwhelmed cat: laptop tucked under one arm, tapping it with the paw-hand, the tail curled up holding a small pencil as a third hand, leaning toward the viewer's LEFT on one foot, fur and tail puffed up, ears flattened back, round surprised eyes, a small wobbly ':3', one sweat drop.
 - swamped_right: Same as swamped-left but leaning toward the viewer's RIGHT with the tasks swapping sides.

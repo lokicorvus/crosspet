@@ -31,5 +31,6 @@ How she shows emotion: fox body language (ears perk up or flatten, the big tail 
 - edge_right: Same as edge_left but she is hiding beyond the RIGHT border and peeking in toward the left: the right border cuts through her body, the near hand gripping the right border. Same expression and props.
 - edge_right_peek: Leaning out with a sly interested smile, both eyes open now, ears perked, one finger raised to her lips as if she just found something worth charging for, tail swishing.
 - roll_call: Her book held against her side with one arm, the other hand raised with one finger up as if bidding at an auction; a sly closed-eye fox smile, ears perked, bells jingling.
+- friend_up: Her Z book tucked under one arm, the other hand holding one finger up in front of her lips as if to say "just for you"; a sly, pleased closed-eye fox smile, ears perked up, big tail swishing to one side.
 - swamped_left: The calm mask slips: leaning toward the viewer's LEFT writing in her Z book, the tail wrapped around a second book, one ear pinned back, the sleep mask slipping down over one eye, a strained but still cute 'ahaha…' smile, sweat drops, bells swinging hard.
 - swamped_right: Same as swamped-left but leaning toward the viewer's RIGHT with the tasks swapping sides.
