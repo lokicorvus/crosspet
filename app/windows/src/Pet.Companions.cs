@@ -202,6 +202,15 @@ namespace CrossPet
             pageGathering = true;
             if (!was) StartForwarding();
         }
+        /// <summary>右键「叫她出来 ▸ 某个角色」：只叫她一个来陪着（页面 callCompanion），和集合一样开始转发</summary>
+        async void CallCompanion(string id)
+        {
+            if (!ready) return;
+            if (await Eval($"callCompanion({Q(id)})") != "true") return;
+            var was = CompanionsForwarding;
+            pageGathering = true;
+            if (!was) StartForwarding();
+        }
         void DismissCompanions() { if (ready) Js("dismiss()"); }   // 解散完页面发 gathering: false
 
         // ---------------- 设置 ----------------

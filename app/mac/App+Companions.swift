@@ -255,6 +255,16 @@ extension App {
             if !was { self.startForwarding() }
         }
     }
+    /// 右键「叫她出来 ▸ 某个角色」：只叫她一个来陪着（页面 callCompanion），和集合一样开始转发
+    @objc func callCompanion(_ sender: NSMenuItem) {
+        guard ready, let id = sender.representedObject as? String else { return }
+        web.evaluateJavaScript("callCompanion(\(quote(id)))") { [weak self] r, _ in
+            guard let self, r as? Bool == true else { return }
+            let was = self.companionsForwarding
+            self.pageGathering = true
+            if !was { self.startForwarding() }
+        }
+    }
     @objc func dismissCompanions() {
         guard ready else { return }
         js("dismiss()")   // 解散完页面发 gathering: false

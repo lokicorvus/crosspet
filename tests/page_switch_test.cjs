@@ -812,6 +812,25 @@ const multiCases = [
     await f.advance(20000)
     assert(companionLists(f).length === 1, `re-sent: ${JSON.stringify(companionLists(f))}`)
   }],
+  ['call_one_companion', async e => {
+    // 「叫她出来」：多桌宠开关关着也能叫；只叫来这一个，算集合（菜单显示「解散」），一起在场攒好感
+    e.run(`setRole('main'); pageHidden = false`)   // 在场要看得见（测试页默认按看不见跑，见 friendship_together_ten_minutes）
+    assert(e.run(`callCompanion('claude')`) === true, 'call refused')
+    await e.advance(2000)
+    let list = lastCompanions(e)
+    assert(list && list.length === 1 && list[0].character === 'claude' && list[0].id === 'claude@gather', `called: ${JSON.stringify(list)}`)
+    assert(lastGathering(e) === true, 'not marked as gathering')
+    assert(e.run(`callCompanion('claude')`) === false, 'called the same one twice')
+    assert(e.run(`callCompanion('gpt')`) === false, 'called the main pet')
+    assert(e.run(`callCompanion('egg-gpt')`) === false, 'called an egg')
+    await e.advance(11 * 60 * 1000)
+    const store = JSON.parse(e.run(`localStorage.getItem('crosspet-friendship')`) || '{}')
+    assert(store['claude+gpt']?.points > 0, `no friendship while called out: ${JSON.stringify(store)}`)
+    // 让她先回去：走掉、不再算集合
+    e.run(`sendHome('claude@gather')`)
+    await e.advance(2000)
+    assert(lastCompanions(e).length === 0 && lastGathering(e) === false, `still here: ${JSON.stringify(multiMsgs(e).slice(-2))}`)
+  }],
   ['gather_staggered', async e => {
     await multiOn(e, 'gpt')
     e.run(`gather()`)

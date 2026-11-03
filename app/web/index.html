@@ -1564,6 +1564,16 @@ function gather() {
   }, i * GATHER_STEP)))
   return todo.length > 0
 }
+// 「叫她出来」：只叫一个角色来陪主桌宠（不用两个 AI 同时干活）；和集合来的一样算 gather，一起在场照样攒好感，
+// 「让她先回去」或「解散」送走。主桌宠正演着的、彩蛋角色、已经叫来的不叫
+function callCompanion(id) {
+  if (role !== 'main') return false
+  const c = (manifest.characters || {})[id]
+  if (!c || c.egg || id === mainCharacter() || gathered.includes(id)) return false
+  gathered = [...gathered, id]
+  updateCompanions()
+  return true
+}
 // 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下；收编的客户端还在干活的那只不走，转成干活那只（decide 里）
 function dismiss() {
   gatherTimers.forEach(clearTimeout); gatherTimers = []; gatherPending = 0
