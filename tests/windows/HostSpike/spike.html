@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font: 14px "Microsoft YaHei", sans-serif; user-select: none; }
+  #wrap { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); text-align: center; }
+  /* 一直在动：卡住时肉眼能看出来 */
+  #pet { height: 240px; display: block; margin: 0 auto; animation: bob 1.2s ease-in-out infinite; cursor: pointer; }
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-10px) } }
+  #bubble { display: inline-block; background: #fff; border: 2px solid #333; border-radius: 10px; padding: 4px 10px; margin-bottom: 6px; }
+  #glow { position: absolute; left: 50%; bottom: 20px; width: 200px; height: 60px; margin-left: -100px; border-radius: 50%;
+          background: radial-gradient(rgba(255, 170, 60, .55), rgba(255, 170, 60, 0) 70%); z-index: -1; }
+</style></head>
+<body>
+<div id="wrap">
+  <div id="bubble">点我：<b id="n">0</b> 次 · 拖我</div>
+  <img id="pet" src="pet.webp" draggable="false">
+</div>
+<div id="glow"></div>
+<script>
+const post = m => window.chrome?.webview?.postMessage(m)
+let down = null, moved = false
+const pet = document.getElementById('pet')
+pet.addEventListener('mousedown', e => { down = [e.screenX, e.screenY]; moved = false })
+window.addEventListener('mousemove', e => {
+  if (!down || moved) return
+  if (Math.abs(e.screenX - down[0]) + Math.abs(e.screenY - down[1]) > 4) { moved = true; down = null; post({ drag: true }) }
+})
+window.addEventListener('mouseup', () => { if (down && !moved) clicked(); down = null })
+function clicked() { const n = document.getElementById('n'); n.textContent = +n.textContent + 1 }
+// 能点的那块（气泡 + 立绘），按 CSS 像素报给外壳：外壳按它切鼠标穿透
+function report() {
+  const a = document.getElementById('bubble').getBoundingClientRect(), b = pet.getBoundingClientRect()
+  const x = Math.min(a.left, b.left), y = Math.min(a.top, b.top)
+  post({ hit: [x, y, Math.max(a.right, b.right) - x, Math.max(a.bottom, b.bottom) - y], dpr: devicePixelRatio })
+}
+pet.addEventListener('load', report); addEventListener('resize', report); setInterval(report, 1000)
+</script>
+</body></html>
