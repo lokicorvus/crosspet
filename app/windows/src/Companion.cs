@@ -76,12 +76,19 @@ namespace CrossPet
                 Width = pageW * Pet.Scale, Height = pageH * Pet.Scale,   // 和主桌宠一样大（共用人物大小、文字大小）
                 Topmost = pet.Window.Topmost, ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
                 Left = -10000, Top = -10000,   // 先放屏幕外，拿到窗口句柄后按像素摆到该在的位置
+                // 备着的整个窗口透明：算完画布会被夹进屏幕角上（留着：在屏幕里预热才算数，1.3.9-test.12 就是这样测出登场不卡的），
+                // 网页刚加载、还没藏起来的那一下会漏出光圈（test.12 看到的）
+                Opacity = parked ? 0 : 1,
             };
             Window.SourceInitialized += (_, __) =>
             {
                 hwnd = new WindowInteropHelper(Window).Handle;
                 Native.MakeToolWindow(hwnd);
-                if (this.parked) return;   // 备着的留在屏幕外，Adopt 时再摆
+                if (this.parked)   // 备着的先不摆、鼠标穿过，Adopt 时再摆
+                {
+                    Native.SetWindowLong(hwnd, Native.GWL_EXSTYLE, ConcealStyle.ClickThrough(Native.GetWindowLong(hwnd, Native.GWL_EXSTYLE), true));
+                    return;
+                }
                 Native.GetWindowRect(hwnd, out var r);
                 var (x, y) = pet.CompanionOrigin(Key, r.Right - r.Left, r.Bottom - r.Top);
                 Native.MoveTo(hwnd, x, y);
@@ -200,8 +207,11 @@ namespace CrossPet
                 var (x, y) = pet.CompanionOrigin(Key, r.Right - r.Left, r.Bottom - r.Top);
                 Native.MoveTo(hwnd, x, y);
                 SaveOrigin();
+                // 备着时是「藏着」的样子（透明、鼠标穿过）：按主桌宠现在藏没藏重新对一遍
+                concealedShown = true;
                 SyncWithMain();
             }
+            else Window.Opacity = 1;
             if (!ready) return;
             Js($"setRole('companion', {RoleInfoJson}); arriveNow()");
             UpdatePageHidden();
