@@ -4,30 +4,54 @@
   {
    "char": "claude-saint",
    "pose": "running",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-knit",
    "pose": "running",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "grok",
    "pose": "running",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-winter",
    "pose": "running",
-   "state": "待画",
+   "state": "已导入",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   }
  ]
 }
