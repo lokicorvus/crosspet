@@ -4,75 +4,155 @@
   {
    "char": "claude",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "deepseek-hoodie",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-pajamas",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "deepseek-winter",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "gemini",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "glm",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "warn",
+     "msg": "人物比待机图小 11%（桌面上会忽大忽小）"
+    }
+   ],
+   "version": 3
   },
   {
    "char": "gpt",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
   },
   {
    "char": "gpt-onesie",
    "pose": "roll_call",
-   "state": "待画",
+   "state": "待验收",
    "notes": [],
-   "checks": []
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
   },
   {
    "char": "grok",
+   "pose": "roll_call",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "qwen",
+   "pose": "roll_call",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "claude-saint",
    "pose": "roll_call",
    "state": "待画",
    "notes": [],
    "checks": []
   },
   {
-   "char": "qwen",
+   "char": "deepseek-knit",
    "pose": "roll_call",
    "state": "待画",
    "notes": [],

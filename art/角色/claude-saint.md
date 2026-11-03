@@ -28,3 +28,4 @@ How she shows emotion: through the scroll (hugging it, hiding behind it, unrolli
 （这一份是 11-02 重画 running 时从 docs/prompts/皮肤-圣女Claude/ 搬过来的，以前的立绘按那边的提示词画）
 
 - running: Getting down to work, still proper and standing in place: sleeves pushed back neatly, the scroll tucked under one arm, one small fist raised ("let us begin"), a calm, determined little smile.
+- roll_call: Her scroll hugged against her chest with one arm, the other hand raised politely and a little shyly, fingers together (no higher than the top of her head); a soft, slightly embarrassed smile with the mouth open in a gentle "Here."

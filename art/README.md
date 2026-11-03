@@ -32,6 +32,8 @@ art/
    - 命令行也行：`pass <批次> 角色:姿态 | all`、`redo <批次> 角色:姿态 "原因"`；直接双击打开 对比.html 只能看，按钮不能点
 4. **导入**：`python3 tools/art.py import <批次>`：通过的原图存进 `art/原图/`，处理成 `characters/<角色>/<姿态>.webp`。
 
+出题之后又做了新角色 / 新皮肤：`python3 tools/art.py add <批次>` 把缺的补进这批（已有的、画好的都不动），再让 Codex 接着画。
+
 随时看进度：`python3 tools/art.py status`。
 
 ## 机器检查查什么
