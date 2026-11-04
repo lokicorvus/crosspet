@@ -516,17 +516,20 @@ const multiCases = [
     e.run(`gather()`)
     await e.advance(1500)
     await e.advance(65000)
-    const ups = e.msgs().filter(m => m.companionCall?.fn === 'chat' && m.companionCall.args[1] === 'friend_up')
+    const ups = e.msgs().filter(m => m.companionCall?.fn === 'chat' && m.companionCall.args[2] === 'friend_up')
     const main = e.run(`mainCharacter()`), other = main === 'gpt' ? 'claude' : 'gpt'
     const lines = e.run(`PairChat.LEVEL_LINES`)
     assert(ups.length === 1 && ups[0].companionCall.args[0] === lines[other][1], `companion level line: ${JSON.stringify(ups)}`)
+    assert(ups[0].companionCall.args[1] === e.run(`PairChat.LEVEL_POSES`)[other][1], `companion level pose: ${JSON.stringify(ups)}`)
     assert(e.run(`__said`).includes(lines[main][1]), `main level line: ${JSON.stringify(e.run(`__said`))}`)
     assert(friendStore(e)['claude+gpt'].shown === 2, `shown not saved: ${JSON.stringify(friendStore(e))}`)
     await e.advance(30 * 60000)
-    assert(e.msgs().filter(m => m.companionCall?.args?.[1] === 'friend_up').length === 1, 'level-up played twice')
-    // 主桌宠说的那一刻换上升级的图（没画就是 happy），飘心
-    e.run(`chat('测试', 'friend_up')`)
-    assert(e.state().pose === 'friend_up' && e.run(`framesFor('friend_up')`).length > 0, `friend_up pose: ${e.state().pose}`)
+    assert(e.msgs().filter(m => m.companionCall?.args?.[2] === 'friend_up').length === 1, 'level-up played twice')
+    // 主桌宠说的那一刻换上配这句的图，特效是升级的飘心
+    e.run(`chat('测试', 'pat', 'friend_up')`)
+    await e.advance(300)
+    assert(e.state().pose === 'pat', `level-up pose: ${e.state().pose}`)
+    assert(e.run(`$('fx').innerHTML`) === e.run(`'<svg viewBox="0 0 ' + CrossFx.CW + ' ' + CrossFx.CH + '" xmlns="http://www.w3.org/2000/svg">' + CrossFx.surroundings('friend_up') + '</svg>'`), 'level-up fx not hearts')
     assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
   }],
   ['companion_chat_line', async e => {
@@ -700,6 +703,31 @@ const multiCases = [
     e.run(`setRunning([])`)
     await e.advance(6000)
     assert(!(lastCompanions(e) || []).some(p => p.key === 'claude@claude-desktop'), `still there after close: ${JSON.stringify(companionLists(e))}`)
+  }],
+  ['gather_answers_present_pet', async e => {
+    // 已经站着的那只（程序开着就在）：集合时不另开，叫她就地答到；解散时她不走
+    await multiOn(e, 'gpt')
+    e.run(`setMultiPets({ on: true, rest: 'open', mainPet: '' }); setRunning(['claude@claude-desktop', 'gpt@claude-desktop'])`)
+    await e.advance(100)
+    const id = lastCompanions(e)[0].id
+    e.run(`gather()`)
+    await e.advance(20000)
+    const calls = e.msgs().filter(m => m.companionCall?.fn === 'answerRoll')
+    assert(calls.length === 1 && calls[0].companionCall.id === id, `answerRoll: ${JSON.stringify(calls)}`)
+    assert(lastCompanions(e).filter(p => p.character === 'claude').length === 1, `claude twice: ${JSON.stringify(lastCompanions(e))}`)
+    const leaves = () => e.msgs().filter(m => m.companionLeave === id).length
+    e.run(`dismiss()`)
+    await e.advance(20000)
+    assert(leaves() === 0, 'open-program pet left on dismiss')
+    assert(lastCompanions(e).length === 1 && lastCompanions(e)[0].id === id, `after dismiss: ${JSON.stringify(lastCompanions(e))}`)
+  }],
+  ['companion_answer_roll', async e => {
+    const c = await rolePage('companion')
+    c.run(`setCharacter('gpt', true)`)
+    await c.advance(1000)
+    c.run(`answerRoll()`)
+    assert(c.state().bubble === c.run(`char().name`) + '到！', `bubble: ${c.state().bubble}`)
+    assert(['roll_call', 'proud'].includes(c.state().pose), `pose: ${c.state().pose}`)
   }],
   ['open_mode_remembers_host_character', async e => {
     // Cursor 里上次用的是 GPT：会话没了、Cursor 还开着 → 出 GPT；记在 localStorage 里

@@ -330,7 +330,7 @@
   }
 
   // ---- 关系升级 ----
-  // 一对刚升到新的关系（认识了 / 好朋友 / 挚友）：两只换上「关系升级」立绘（friend_up，没画的用 happy）各说一句。
+  // 一对刚升到新的关系（认识了 / 好朋友 / 挚友）：两只各说一句，换上 LEVEL_POSES 里配这句的立绘，程序在她身边飘一圈心（friend_up 特效）。
   // 台词按她穿的（皮肤 id 或角色 id）写，对谁都说这句；下标 0–2 对应 认识了 / 好朋友 / 挚友
   const LEVEL_LINES = {
     claude: ['以后请多指教。', '我们……是好朋友了呢。', '能遇见你，真好。'],
@@ -347,16 +347,34 @@
     grok: ['行，你我记住了！', '好朋友！谁欺负你喊我！', '挚友！这个不用查证！'],
     qwen: ['认识你真开心～', '好朋友！奶茶我请～', '挚友呢，什么都分你～'],
   }
+  // 每句升级台词配的立绘（和 LEVEL_LINES 一一对应）：害羞、温柔的用 pat / forgiven，得意的用 proud，欢呼的用 happy，
+  // 说到吃的用 eat，轻松随口的用 hum。都是每个角色都画了的；1.3.9-beta.1 一律用 friend_up（没画，退成 happy 那张庆祝图）
+  const LEVEL_POSES = {
+    claude: ['forgiven', 'pat', 'forgiven'],
+    'claude-saint': ['forgiven', 'proud', 'pat'],
+    deepseek: ['happy', 'happy', 'eat'],
+    'deepseek-hoodie': ['proud', 'proud', 'pat'],
+    'deepseek-pajamas': ['hum', 'pat', 'pat'],
+    'deepseek-winter': ['forgiven', 'happy', 'eat'],
+    'deepseek-knit': ['happy', 'eat', 'proud'],
+    gemini: ['hum', 'happy', 'pat'],
+    glm: ['proud', 'hum', 'forgiven'],
+    gpt: ['forgiven', 'pat', 'proud'],
+    'gpt-onesie': ['hum', 'pat', 'happy'],
+    grok: ['proud', 'proud', 'happy'],
+    qwen: ['happy', 'hum', 'pat'],
+  }
   // 在场又都闲着的几对里，有没有升了级还没演的：levelOf(键) 现在的关系，shownOf(键) 演过的最高关系。
-  // 有就返回 { key, level, lines }（一下升了好几档只演最高那档），谁先说随机
+  // 有就返回 { key, level, lines }（一下升了好几档只演最高那档），谁先说随机。lines 每项是 [谁, 台词, 立绘, 特效]
   function levelUp({ present, busy = [], levelOf, shownOf, wear = () => '', rnd = Math.random }) {
     const idle = [...new Set(present)].filter(ch => !busy.includes(ch))
     for (let i = 0; i < idle.length; i++) for (let j = i + 1; j < idle.length; j++) {
       const key = keyOf(idle[i], idle[j]), level = levelOf(key) || 0
       if (!LINES[key] || level <= (shownOf(key) || 0)) continue
-      const say = ch => (LEVEL_LINES[wear(ch)] || LEVEL_LINES[ch])[level - 1]
+      const as = ch => LEVEL_LINES[wear(ch)] ? wear(ch) : ch
+      const line = ch => [ch, LEVEL_LINES[as(ch)][level - 1], LEVEL_POSES[as(ch)][level - 1], 'friend_up']
       const [a, b] = rnd() < 0.5 ? [idle[i], idle[j]] : [idle[j], idle[i]]
-      return { key, level, lines: [[a, say(a), 'friend_up'], [b, say(b), 'friend_up']] }
+      return { key, level, lines: [line(a), line(b)] }
     }
     return null
   }
@@ -406,7 +424,7 @@
     return { key, tier, id: got.id, lines: withPoses(got.lines) }
   }
 
-  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
+  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, LEVEL_POSES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
   root.PairChat = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

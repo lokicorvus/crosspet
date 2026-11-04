@@ -148,12 +148,23 @@ test('升级台词：每个角色和每套皮肤都有三档，不长', () => {
   }
 })
 
+test('升级台词的立绘：每句一张、各角色都画了，不是一律同一张', () => {
+  const skins = fs.readdirSync(DIR).filter(id => CHARS.includes(skinOf(id)))
+  for (const w of [...CHARS, ...skins]) {
+    const poses = P.LEVEL_POSES[w]
+    assert.ok(poses && poses.length === 3, `缺 ${w}`)
+    const files = fs.readdirSync(path.join(DIR, w))
+    for (const p of poses) assert.ok(files.some(f => f === p + '.webp' || f.startsWith(p + '-')), `${w} 没画 ${p}`)
+  }
+  assert.ok(new Set(Object.values(P.LEVEL_POSES).flat()).size >= 4)
+})
+
 test('levelUp：升了级没演过才演；只演最高那档；在忙的不算；按穿的说', () => {
   const base = { present: ['claude', 'gpt', 'grok'], shownOf: () => 0, rnd: () => 0 }
   assert.equal(P.levelUp({ ...base, levelOf: () => 0 }), null)
   const up = P.levelUp({ ...base, levelOf: k => k === 'gpt+grok' ? 2 : 0, wear: ch => ch === 'gpt' ? 'gpt-onesie' : '' })
   assert.equal(up.key, 'gpt+grok'); assert.equal(up.level, 2)
-  assert.deepEqual(up.lines, [['gpt', P.LEVEL_LINES['gpt-onesie'][1], 'friend_up'], ['grok', P.LEVEL_LINES.grok[1], 'friend_up']])
+  assert.deepEqual(up.lines, [['gpt', P.LEVEL_LINES['gpt-onesie'][1], P.LEVEL_POSES['gpt-onesie'][1], 'friend_up'], ['grok', P.LEVEL_LINES.grok[1], P.LEVEL_POSES.grok[1], 'friend_up']])
   assert.equal(P.levelUp({ ...base, levelOf: () => 2, shownOf: () => 2 }), null)
   assert.equal(P.levelUp({ ...base, busy: ['grok'], levelOf: k => k === 'gpt+grok' ? 1 : 0 }), null)
   assert.equal(P.levelUp({ ...base, levelOf: () => 3, shownOf: () => 1 }).level, 3)

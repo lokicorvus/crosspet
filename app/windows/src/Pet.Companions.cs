@@ -167,7 +167,7 @@ namespace CrossPet
         /// <summary>主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）；别的不认</summary>
         void CompanionCall(Dictionary<string, object> call)
         {
-            if (!(call.TryGetValue("id", out var iv) && iv is string id) || !(call.TryGetValue("fn", out var fv) && fv is string fn && (fn == "celebrate" || fn == "chat"))
+            if (!(call.TryGetValue("id", out var iv) && iv is string id) || !(call.TryGetValue("fn", out var fv) && fv is string fn && (fn == "celebrate" || fn == "chat" || fn == "answerRoll"))
                 || !(call.TryGetValue("args", out var av) && av is object[] args) || !companions.TryGetValue(id, out var c)) return;
             c.Js($"{fn}.apply(null, {Store.Json.Serialize(args)})");
         }

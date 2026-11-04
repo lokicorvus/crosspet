@@ -351,14 +351,14 @@ setInterval(() => {
   }
 }, 2000)
 
-// instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入
-function setFx(p, instant) {
+// instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入；as：这个姿态改用别的特效（见 chat）
+function setFx(p, instant, as) {
   const fx = $('fx'), owner = charId, poseAt = p, generation = characterGeneration
   const render = () => {
     if (owner !== charId || generation !== characterGeneration || pose !== poseAt || multi) return
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
-    const named = char()?.fx?.[p]
-    const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
+    const named = char()?.fx?.[as || p]
+    const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(as || p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
   }
@@ -846,8 +846,17 @@ function greetDue(id) {
 // 登场招呼。集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
 function arrivalGreeting(id, c, busy) {
   const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
-  if (roll) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }   // 有举手答到的专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态
+  if (roll) rollCall(c, busy)
   else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
+}
+// 举手答到：有专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态。正在干活不换图、只说
+function rollCall(c, busy) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }
+const busyNow = () => { const s = charState[charId]; return !!(s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle') }
+// 由主桌宠调（companionCall）：集合时她已经站着（干活冒出来的、程序开着就在的），不另开窗口，就地答到。演彩蛋、道别、更新时不答
+function answerRoll() {
+  const c = char()
+  if (!c || egg || farewellLine !== null || updatingNow || leavingNow) return
+  rollCall(c, busyNow() || aiActivity())
 }
 // 由外壳调（额外那只，屏幕外备好的窗口挪到位置了）：和换角色一样噗一下出来、说登场招呼
 function arriveNow() {
@@ -862,8 +871,8 @@ function arriveNow() {
   const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
   setTimeout(() => {
     stage.classList.remove('swap')
-    const c = char(), s = charState[charId]
-    if (c) arrivalGreeting(charId, c, !!(s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle'))
+    const c = char()
+    if (c) arrivalGreeting(charId, c, busyNow())
   }, 330)
 }
 
@@ -1775,6 +1784,8 @@ function updateCompanions() {
   })
   companionsState = r.state
   for (const key of r.leaving) toShell({ companionLeave: prevPets.find(x => x.key === key)?.id || key })
+  // 集合点到已经站着的那只：她不是新开的窗口，没有登场招呼，叫她就地答到
+  for (const key of r.answered || []) { const p = r.pets.find(x => x.key === key); if (p) toShell({ companionCall: { id: p.id, fn: 'answerRoll', args: [] } }) }
   const list = r.pets.map(p => ({ id: p.id, key: p.key, character: p.character, client: p.client, quota: !!p.quota, label: companionLabel(p, r.pets, main) }))
   const json = JSON.stringify(list), first = sentCompanions === null
   const gathering = gatheringNow()
@@ -1892,7 +1903,7 @@ function tryPairChat() {
     if (up) {
       pairChatAt = nowMs
       friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
-      up.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
+      up.lines.forEach(([who, line, pose, fx], i) => setTimeout(() => chatAs(who, line, pose, fx), i * PairChat.REPLY_MS))
       return
     }
   }
@@ -1904,22 +1915,24 @@ function tryPairChat() {
   if (pairChatRecent.length > 12) pairChatRecent.shift()
   got.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
 }
-function chatAs(character, line, pose) {
+function chatAs(character, line, pose, fx) {
   if (!friendshipOn()) return
-  if (character === mainCharacter()) { chat(line, pose); return }
+  if (character === mainCharacter()) { chat(line, pose, fx); return }
   const p = companionsState?.pets.find(x => x.character === character)
-  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null] } })
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: fx ? [line, pose || null, fx] : [line, pose || null] } })
 }
 // 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
-// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换
+// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换。
+// fx：换上 look 时改用这个特效（关系升级：图按台词挑，特效统一飘心）
 const CHAT_MS = 6000
 let chatTimer = null
-function chat(line, look) {
+function chat(line, look, fx) {
   if (egg || farewellLine !== null || updatingNow || aiActivity() || typeof line !== 'string') return
   if (typeof look === 'string' && MOTION[look] && !tucked) {
     clearTimeout(pending); clearTimeout(revertTimer)
     shownAt = Date.now()
     setPose(look)
+    if (typeof fx === 'string') setFx(look, false, fx)
     revertTimer = characterTimeout(() => { if (pose === look) setPose(restPose()) }, CHAT_MS)
   }
   say(line)

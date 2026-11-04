@@ -569,3 +569,42 @@ test('rememberClients：每个客户端记最近有动静的那个角色；没�
   const same = { cursor: 'gpt', gemini: 'gemini' }
   assert.equal(C.rememberClients(same, clients), same)
 })
+
+// ---- 集合 / 解散碰上已经在场的 ----
+
+test("集合：这个角色已经有一只干活的站着 → 不另叫，归她，并在 answered 里（页面让她答到）", () => {
+  const running = new Set(['claude@claude-desktop'])
+  const a = run({ ...openBase, running, clients: [] })
+  assert.deepEqual(keys(a), ['claude@claude-desktop'])
+  assert.deepEqual(a.answered, [])
+  const b = run({ ...openBase, t: 1000, running, clients: [], gathered: ['claude'], prev: a.state })
+  assert.deepEqual(keys(b), ['claude@claude-desktop'])
+  assert.equal(b.pets[0].via, 'gather')
+  assert.deepEqual(b.answered, ['claude@claude-desktop'])
+  const c = run({ ...openBase, t: 2000, running, clients: [], gathered: ['claude'], prev: b.state })
+  assert.deepEqual(c.answered, [])
+})
+
+test("rest:'open'：解散时程序还开着的那只不走（转回干活那只），别的照常走", () => {
+  const running = new Set(['claude@claude-desktop'])
+  const a = run({ ...openBase, running, clients: [] })
+  const b = run({ ...openBase, t: 1000, running, clients: [], gathered: ['claude', 'gemini'], prev: a.state })
+  assert.deepEqual(keys(b).sort(), ['claude@claude-desktop', 'gemini@gather'])
+  const c = run({ ...openBase, t: 2000, running, clients: [], gathered: [], prev: b.state })
+  assert.deepEqual(keys(c), ['claude@claude-desktop'])
+  assert.equal(c.pets[0].via, 'work')
+  assert.deepEqual(c.leaving, ['gemini@gather'])
+  const d = run({ ...openBase, t: 3000, running, clients: [], gathered: [], prev: c.state })
+  assert.deepEqual(d.leaving, [])
+})
+
+test("rest:'open'：集合来的那只，她的程序后来开了（没干活）→ 收编，不另冒一只；解散也不走", () => {
+  const a = run({ ...openBase, running: new Set(), clients: [], gathered: ['claude'] })
+  assert.deepEqual(keys(a), ['claude@gather'])
+  const running = new Set(['claude@claude-desktop'])
+  const b = run({ ...openBase, t: 1000, running, clients: [], gathered: ['claude'], prev: a.state })
+  assert.deepEqual(keys(b), ['claude@claude-desktop'])
+  const c = run({ ...openBase, t: 2000, running, clients: [], gathered: [], prev: b.state })
+  assert.deepEqual(keys(c), ['claude@claude-desktop'])
+  assert.deepEqual(c.leaving, [])
+})

@@ -193,8 +193,9 @@
     for (const pet of p.pets || []) {
       if (pet.via === 'gather') {
         if (!gatherSet.has(pet.character) || covered.has(pet.character)) {
+          // 解散时她收编的客户端还在干活（open 下：程序还开着）就不走，转成干活那只；不然走了第 4 步又冒出来
           const c = pet.client && byKey.get(pet.key)
-          if (workPets && c && c.working && !blocked(c)) kept.push({ ...pet, via: 'work' })
+          if (workPets && c && (c.working || open) && !blocked(c)) kept.push({ ...pet, via: 'work' })
           else leaving.push(pet.key)
           continue
         }
@@ -218,8 +219,9 @@
     }
 
     const taken = new Set(kept.filter(x => x.client).map(x => x.key))
+    // open 下开着没干活的也收编：她的程序开着本来就该在，不收编的话第 4 步会再冒一只同角色的
     const adoptable = character => latest(list.filter(c =>
-      c.character === character && c.working && !blocked(c) && !taken.has(c.key)))
+      c.character === character && (c.working || open) && !blocked(c) && !taken.has(c.key)))
 
     // 2. 集合来、还没收编的：她的角色有客户端开始干活就收编
     for (const pet of kept) {
@@ -228,11 +230,13 @@
       if (c) { pet.key = c.key; pet.client = c.client; taken.add(c.key) }
     }
 
-    // 3. 新集合来的：这个角色已经有一只额外的站着就直接归她（不重复叫），不然收编在干活的客户端，都没有就空着来
+    // 3. 新集合来的：这个角色已经有一只额外的站着就直接归她（不重复叫），记进 answered 让页面叫她答到；
+    //    不然收编在干活的客户端，都没有就空着来
+    const answered = []
     for (const character of gatherSet) {
       if (covered.has(character) || kept.some(x => x.via === 'gather' && x.character === character)) continue
       const own = kept.find(x => x.via === 'work' && x.character === character)
-      if (own) { own.via = 'gather'; continue }
+      if (own) { own.via = 'gather'; answered.push(own.key); continue }
       const c = adoptable(character)
       if (c) taken.add(c.key)
       kept.push({ key: c ? c.key : gatherKey(character), character, client: c ? c.client : null, via: 'gather', quota: false })
@@ -255,7 +259,7 @@
     const gatherKeys = {}
     for (const pet of kept) if (pet.via === 'gather') gatherKeys[pet.character] = pet.client ? pet.key : null
 
-    return { pets: kept, leaving, state: { pets: kept.map(x => ({ ...x })), awaySince, idleSince, sentHome, gatherKeys, runningSeen: [...runningSeen] } }
+    return { pets: kept, leaving, answered, state: { pets: kept.map(x => ({ ...x })), awaySince, idleSince, sentHome, gatherKeys, runningSeen: [...runningSeen] } }
   }
 
   const api = {
