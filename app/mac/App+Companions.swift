@@ -10,7 +10,7 @@ extension App {
     // 页面 ↔ 外壳的接口见 .superpowers/sdd/2026-10-31-multi-pets/shell-contract.md；Windows 版（Pet.Companions.cs）照同一份做
 
     var multiPetsOn: Bool { defaults.bool(forKey: "multiPets") }
-    var petsRest: String { defaults.string(forKey: "petsRest") == "stay" ? "stay" : "auto" }
+    var petsRest: String { let r = defaults.string(forKey: "petsRest"); return r == "stay" || r == "open" ? r! : "auto" }
     /// 固定主桌宠：""= 跟着规则换；存的角色已经不在了也当没固定
     var mainPet: String {
         let v = defaults.string(forKey: "mainPet") ?? ""
@@ -289,7 +289,7 @@ extension App {
             applyMainPet()
             if companionsForwarding && !was { startForwarding() }
         case "petsRest":
-            guard let s = value as? String, ["auto", "stay"].contains(s) else { return true }
+            guard let s = value as? String, ["auto", "stay", "open"].contains(s) else { return true }
             defaults.set(s, forKey: "petsRest")
             pushMultiPets()
         case "mainPet":

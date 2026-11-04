@@ -37,7 +37,7 @@ namespace CrossPet
         bool runningInFlight;
 
         static bool MultiPetsOn => Store.Flag("multiPets");
-        static string PetsRest => Store.Settings.TryGetValue("petsRest", out var v) && v as string == "stay" ? "stay" : "auto";
+        static string PetsRest => Store.Settings.TryGetValue("petsRest", out var v) && (v as string == "stay" || v as string == "open") ? (string)v : "auto";
         /// <summary>固定主桌宠：""= 跟着规则换；存的角色已经不在了也当没固定</summary>
         string MainPet => Store.Settings.TryGetValue("mainPet", out var v) && v is string s && Characters().Any(c => c.id == s) ? s : "";
         /// <summary>要不要转发：开关开着，或者正集合着（集合不受开关限制）</summary>
@@ -277,7 +277,7 @@ namespace CrossPet
                     if (CompanionsForwarding && !was) StartForwarding();
                     return true;
                 case "petsRest":
-                    if (value is string r && (r == "auto" || r == "stay")) { Store.Settings["petsRest"] = r; Store.SaveSettings(); PushMultiPets(); }
+                    if (value is string r && (r == "auto" || r == "stay" || r == "open")) { Store.Settings["petsRest"] = r; Store.SaveSettings(); PushMultiPets(); }
                     return true;
                 case "mainPet":
                     if (value is string s && (s == "" || Characters().Any(c => c.id == s))) { Store.Settings["mainPet"] = s; Store.SaveSettings(); PushMultiPets(); ApplyMainPet(); }

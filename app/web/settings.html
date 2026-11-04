@@ -147,9 +147,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
   <div class="item indent" id="mainPetRow"><div class="label">主桌宠</div>
     <div class="ctl choices"><label><input type="radio" name="mainPet" value="rule">先来的当</label>
       <label><input type="radio" name="mainPet" value="fixed">固定为</label><select id="mainPetSelect" aria-label="固定的主桌宠"></select></div></div>
-  <div class="item indent" id="petsRestRow"><div class="label">她们什么时候去休息
-      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干完活、你离开 AI 软件一会儿后</label>
-        <label><input type="radio" name="petsRest" value="stay">一直留着，直到我让她回去或 AI 程序关掉</label></div></div></div>
+  <div class="item indent" id="petsRestRow"><div class="label">她们什么时候在
+      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干活时出来，干完活、你离开 AI 软件一会儿后去休息</label>
+        <label><input type="radio" name="petsRest" value="stay">干活时出来，一直留着，直到我让她回去或 AI 程序关掉</label>
+        <label><input type="radio" name="petsRest" value="open">AI 程序开着就在，关掉才走（终端里的命令行 AI 10 分钟没动静先去休息）</label></div></div></div>
 </div>
 
 <div class="card hidden" data-tab="character" id="friendship">
@@ -278,7 +279,7 @@ function renderMultiPets(s) {
   // 下拉是空的（外壳没给角色）：「固定为」点了也只能发 ""，干脆灰掉
   document.querySelector('input[name=mainPet][value=fixed]').disabled = sel.disabled = !sel.options.length
   for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
-  const rest = s.petsRest === 'stay' ? 'stay' : 'auto'
+  const rest = s.petsRest === 'stay' || s.petsRest === 'open' ? s.petsRest : 'auto'
   for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
   // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–10 颗整心
   const rows = Array.isArray(s.friendship) ? s.friendship : []

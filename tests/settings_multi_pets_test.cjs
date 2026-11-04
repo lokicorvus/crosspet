@@ -170,7 +170,7 @@ const cases = [
     assert(label.includes('同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息'), '开关说明不对：' + label)
     const main = p.$('mainPetRow').textContent, rest = p.$('petsRestRow').textContent
     for (const t of ['主桌宠', '先来的当', '固定为']) assert(main.includes(t), '主桌宠一行缺：' + t)
-    for (const t of ['她们什么时候去休息', '干完活、你离开 AI 软件一会儿后', '一直留着，直到我让她回去或 AI 程序关掉']) assert(rest.includes(t), '休息一行缺：' + t)
+    for (const t of ['她们什么时候在', '干完活、你离开 AI 软件一会儿后去休息', '一直留着，直到我让她回去或 AI 程序关掉', 'AI 程序开着就在，关掉才走']) assert(rest.includes(t), '休息一行缺：' + t)
     assert(p.$('friendship').closest('.card').dataset.tab === 'character' && p.$('friendship').textContent.includes('她们的友谊'), '友谊区不在「角色」页')
   }],
   ['开关关着：两个选项收起，友谊区不显示', p => {
@@ -292,6 +292,15 @@ const cases = [
     assert(p.q('input[name=petsRest][value=stay]').checked, '推回 stay 该选中')
     click(p.q('input[name=petsRest][value=auto]'))
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'petsRest', value: 'auto' }), '该发 auto')
+  }],
+  ['什么时候在：「AI 程序开着就在」发 open，推回 open 选中；不认得的值当 auto', p => {
+    p.push({ multiPets: true })
+    click(p.q('input[name=petsRest][value=open]'))
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'petsRest', value: 'open' }), '该发 open')
+    p.push({ multiPets: true, petsRest: 'open' })
+    assert(p.q('input[name=petsRest][value=open]').checked && !p.q('input[name=petsRest][value=auto]').checked, '推回 open 该选中')
+    p.push({ multiPets: true, petsRest: 'whatever' })
+    assert(p.q('input[name=petsRest][value=auto]').checked, '不认得的值该当 auto')
   }],
   ['现有开关照旧', p => {
     p.push({ followApps: true })

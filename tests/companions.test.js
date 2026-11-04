@@ -466,3 +466,106 @@ test('isCli：hermes 和各角色没有 client 的旧条目按默认接入算；
   assert.equal(C.isCli({ character: 'claude', client: 'cursor' }), false)
   assert.equal(C.isCli({ character: 'glm', client: 'glm' }), false)
 })
+
+// ---- rest:'open'：AI 程序开着就在 ----
+// characterOf：在跑的程序（running 里的客户端）还没有会话时出哪个角色（页面按 clientCharacter 算好交进来）
+
+const openBase = { rest: 'open', mainCharacter: 'gpt', claimKey: 'gpt@codex', characterOf: { 'claude-desktop': 'claude' } }
+
+test("rest:'open'：Claude 桌面开着、还没会话 → 出一只 claude@claude-desktop；程序关掉 → 走", () => {
+  const a = run({ ...openBase, running: new Set(['claude@claude-desktop', 'gpt@claude-desktop']), clients: [] })
+  assert.deepEqual(keys(a), ['claude@claude-desktop'])
+  const b = run({ ...openBase, t: 1000, running: new Set(), clients: [], prev: a.state })
+  assert.deepEqual(keys(b), [])
+  assert.deepEqual(b.leaving, ['claude@claude-desktop'])
+})
+
+test("rest:'open'：程序开着、会话闲着、你也离开 AI 软件很久 → 一直在", () => {
+  const running = new Set(['claude@claude-desktop'])
+  const idle = t => cl(t, sess('claude', 'claude-desktop', 'proud', 1, 0, 'Stop'))
+  const a = run({ ...openBase, running, clients: idle(0) })
+  const b = run({ ...openBase, t: 1000, running, inAI: false, clients: idle(1000), prev: a.state })
+  const c = run({ ...openBase, t: 3_600_000, running, inAI: false, clients: idle(3_600_000), prev: b.state })
+  assert.deepEqual(keys(c), ['claude@claude-desktop'])
+  assert.deepEqual(c.leaving, [])
+})
+
+test("rest:'open'：命令行 AI 有会话就在（10 分钟内有动静），10 分钟没动静先走，又干活再来", () => {
+  const base = { ...openBase, mainCharacter: 'gpt', claimKey: 'gpt@codex', running: new Set() }
+  const a = run({ ...base, clients: cl(0, sess('gemini', 'gemini', 'idle', 1, 0, 'SessionStart')) })
+  assert.deepEqual(keys(a), ['gemini@gemini'])
+  // 之后一直没新事件：会话停在时刻 0 前 1 秒那次
+  const b = run({ ...base, t: 590_000, inAI: false, clients: cl(590_000, sess('gemini', 'gemini', 'idle', 1)), prev: a.state })
+  assert.deepEqual(keys(b), ['gemini@gemini'])
+  const c = run({ ...base, t: 601_000, inAI: false, clients: cl(601_000, sess('gemini', 'gemini', 'idle', 1)), prev: b.state })
+  assert.deepEqual(keys(c), [])
+  assert.deepEqual(c.leaving, ['gemini@gemini'])
+  const d = run({ ...base, t: 700_000, clients: cl(700_000, sess('gemini', 'gemini', 'running', 1, 700_000)), prev: c.state })
+  assert.deepEqual(keys(d), ['gemini@gemini'])
+})
+
+test("rest:'open'：codex 是命令行客户端，但程序（Codex 桌面 / codex 进程）在跑就算开着", () => {
+  const base = { ...openBase, mainCharacter: 'claude', claimKey: 'claude@claude-desktop', characterOf: { codex: 'gpt' } }
+  const a = run({ ...base, running: new Set(['gpt@codex', 'claude@codex']), clients: cl(0, desktopBusy(0)) })
+  assert.deepEqual(keys(a), ['gpt@codex'])
+  const old = t => cl(t, desktopBusy(t), sess('gpt', 'codex', 'proud', 1200, 0, 'Stop'))   // 会话 20 分钟没动静了
+  const b = run({ ...base, t: 1000, running: new Set(['gpt@codex']), clients: old(1000), prev: a.state })
+  assert.deepEqual(keys(b), ['gpt@codex'])
+})
+
+test("rest:'open'：Cursor 开着，上次在里面的是 Claude → 先出 claude@cursor；开始用 GPT → 换成 gpt@cursor", () => {
+  const base = { ...openBase, characterOf: { cursor: 'claude' } }
+  const running = new Set(['claude@cursor', 'gpt@cursor'])
+  const a = run({ ...base, running, clients: [] })
+  assert.deepEqual(keys(a), ['claude@cursor'])
+  const b = run({ ...base, t: 1000, running, clients: cl(1000, sess('gpt', 'cursor', 'thinking', 1)), prev: a.state })
+  assert.deepEqual(keys(b), ['gpt@cursor'])
+  assert.deepEqual(b.leaving, ['claude@cursor'])
+})
+
+test("rest:'open'：程序开着但不知道是谁（characterOf 里没有）→ 不出", () => {
+  const a = run({ ...openBase, characterOf: {}, running: new Set(['claude@cursor', 'gpt@cursor']), clients: [] })
+  assert.deepEqual(keys(a), [])
+})
+
+test("rest:'open'：主桌宠还没占着客户端、程序是她自己的角色 → 不另出一只（她就是那只）", () => {
+  const a = run({ ...openBase, mainCharacter: 'claude', claimKey: null, running: new Set(['claude@claude-desktop']), clients: [] })
+  assert.deepEqual(keys(a), [])
+})
+
+test("rest:'open'：workPets:false（开关关着）→ 程序开着也不出", () => {
+  const a = run({ ...openBase, workPets: false, running: new Set(['claude@claude-desktop']), clients: [] })
+  assert.deepEqual(keys(a), [])
+})
+
+test("rest:'open'：让她先回去 → 程序还开着也不回来；干活了再来", () => {
+  const running = new Set(['claude@claude-desktop'])
+  const a = run({ ...openBase, running, clients: [] })
+  const sent = C.sendHome(a.state, 'claude@claude-desktop', NOW + 1000)
+  const b = run({ ...openBase, t: 2000, running, clients: [], prev: sent })
+  assert.deepEqual(keys(b), [])
+  const c = run({ ...openBase, t: 60_000, running, clients: [], prev: b.state })
+  assert.deepEqual(keys(c), [])
+  const d = run({ ...openBase, t: 70_000, running, clients: cl(70_000, desktopBusy(70_000)), prev: c.state })
+  assert.deepEqual(keys(d), ['claude@claude-desktop'])
+})
+
+test('clientCharacter：上次在里面的角色 > 程序默认的角色 > 客户端名就是角色；没装的角色不算', () => {
+  const valid = new Set(['claude', 'gpt', 'gemini', 'deepseek'])
+  assert.equal(C.clientCharacter('cursor', { cursor: 'gpt' }, valid), 'gpt')
+  assert.equal(C.clientCharacter('cursor', {}, valid), null)
+  assert.equal(C.clientCharacter('codex', {}, valid), 'gpt')
+  assert.equal(C.clientCharacter('codex', { codex: 'deepseek' }, valid), 'deepseek')
+  assert.equal(C.clientCharacter('claude-desktop', {}, valid), 'claude')
+  assert.equal(C.clientCharacter('antigravity', {}, valid), 'gemini')
+  assert.equal(C.clientCharacter('deepseek', {}, valid), 'deepseek')
+  assert.equal(C.clientCharacter('cursor', { cursor: 'grok' }, valid), null)   // 记着的角色没装
+})
+
+test('rememberClients：每个客户端记最近有动静的那个角色；没变就返回原来那份', () => {
+  const was = { cursor: 'claude' }
+  const clients = C.clientsOf(merge(sess('gpt', 'cursor', 'idle', 5), sess('claude', 'cursor', 'idle', 50), sess('gemini', 'gemini', 'idle', 1)), NOW)
+  assert.deepEqual(C.rememberClients(was, clients), { cursor: 'gpt', gemini: 'gemini' })
+  const same = { cursor: 'gpt', gemini: 'gemini' }
+  assert.equal(C.rememberClients(same, clients), same)
+})

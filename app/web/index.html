@@ -1508,6 +1508,13 @@ let multiPets = { on: false, rest: 'auto', mainPet: '' }
 let foreground = null            // 前台 { kind: 'ai' | 'terminal' | 'ours' | 'other', character?, client? }
 let runningKeys = null           // 有窗口的 AI 程序在跑的「角色@客户端」（Set）；null = 外壳还没交，decide 当作不知道
 let claim = null                 // 主桌宠占着她角色的哪个客户端 { key, since }（Companions.mainClaim）
+// 每个程序（客户端）上次在里面的角色：「AI 程序开着就在」时，程序刚打开、还没会话就按它出（Companions.clientCharacter）
+const CLIENT_CHARS_KEY = 'crosspet-client-characters'
+let clientChars = null
+function rememberedClientChars() {
+  if (clientChars == null) { try { clientChars = JSON.parse(localStorage.getItem(CLIENT_CHARS_KEY)) || {} } catch { clientChars = {} } }
+  return clientChars
+}
 let companionsState = null       // decide 上次的 state；pets 里多记一个 id，decide 复制时会带着
 let gathered = [], gatherTimers = []   // 集合来 / 叫出来的角色；存在 localStorage（crosspet-gathered），重启、页面重载后再叫回来（restoreGathered）
 const GATHERED_KEY = 'crosspet-gathered'
@@ -1592,7 +1599,8 @@ function leaveNow() {
 // 由外壳调：设置里的开关和两个选项。mainPet（固定主桌宠）由外壳自己换角色、换前台时问 FollowPolicy.foregroundTarget，这里只记着
 function setMultiPets(o) {
   const was = multiPets.on
-  multiPets = { on: !!o?.on, rest: o?.rest === 'stay' ? 'stay' : 'auto', mainPet: typeof o?.mainPet === 'string' ? o.mainPet : '' }
+  const rest = o?.rest === 'stay' || o?.rest === 'open' ? o.rest : 'auto'
+  multiPets = { on: !!o?.on, rest, mainPet: typeof o?.mainPet === 'string' ? o.mainPet : '' }
   if (role !== 'main') return
   if (multiPets.on && !was && gathered.length) updateCompanions()   // 正集合着：页面没重载、状态都在，不用等
   else if (multiPets.on && !was) {
@@ -1737,14 +1745,21 @@ function updateCompanions() {
   // current 的会话不按角色分，归主桌宠演，不进判断（不会冒出一只主桌宠角色、永远没有状态的）
   const { current: _current, ...byChar } = sessions
   const clients = Companions.clientsOf(byChar, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
+  const remembered = Companions.rememberClients(rememberedClientChars(), clients)
+  if (remembered !== clientChars) { clientChars = remembered; try { localStorage.setItem(CLIENT_CHARS_KEY, JSON.stringify(remembered)) } catch {} }
   claim = Companions.mainClaim({ mainCharacter: main, foreground, clients, last: claim, nowMs })
   if (nowMs < companionsReadyAt) return
   const reactTo = chars[main]?.reactTo
   const covered = new Set(Object.keys(chars).filter(id => StandIn.covers(reactTo, main, id)))
   const prevPets = companionsState?.pets || []
+  const characterOf = {}
+  if (multiPets.rest === 'open' && runningKeys) {
+    const valid = new Set(Object.keys(chars).filter(id => !chars[id].egg))
+    for (const k of runningKeys) { const client = k.slice(k.indexOf('@') + 1); characterOf[client] = Companions.clientCharacter(client, clientChars, valid) }
+  }
   const r = Companions.decide({
     nowMs, clients, claimKey: claim.key, mainCharacter: main, inAI: Companions.inAISoftware({ foreground, clients, nowMs }),
-    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState, workPets: multiPets.on,
+    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState, workPets: multiPets.on, characterOf,
   })
   // 新来的那只的 id 不能和别的撞：集合接管了干活那只后 id 留着旧 key，那个客户端之后可能又冒一只同 key 的。
   // 这一轮刚走的那几只的 id 也不复用（外壳正让她说 bye）

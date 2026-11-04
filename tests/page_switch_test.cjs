@@ -690,6 +690,28 @@ const multiCases = [
     e.run(`sendHome('claude@claude-cli')`)
     assert(JSON.stringify(e.run('__sent')) === '["claude@claude-desktop"]', `sent home: ${JSON.stringify(e.run('__sent'))}`)
   }],
+  ['open_mode_program_open_shows_pet', async e => {
+    // 「AI 程序开着就在」：Claude 桌面开着、还没会话 → 冒一只 Claude；关掉 → 她走
+    await multiOn(e, 'gpt')
+    e.run(`setMultiPets({ on: true, rest: 'open', mainPet: '' }); setRunning(['claude@claude-desktop', 'gpt@claude-desktop'])`)
+    await e.advance(100)
+    const list = lastCompanions(e)
+    assert(list && list.length === 1 && list[0].key === 'claude@claude-desktop' && list[0].character === 'claude', `companions: ${JSON.stringify(companionLists(e))}`)
+    e.run(`setRunning([])`)
+    await e.advance(6000)
+    assert(!(lastCompanions(e) || []).some(p => p.key === 'claude@claude-desktop'), `still there after close: ${JSON.stringify(companionLists(e))}`)
+  }],
+  ['open_mode_remembers_host_character', async e => {
+    // Cursor 里上次用的是 GPT：会话没了、Cursor 还开着 → 出 GPT；记在 localStorage 里
+    await multiOn(e, 'claude')
+    e.run(`setMultiPets({ on: true, rest: 'open', mainPet: '' }); setSessions('gpt', csess(['s1','writing','cursor']))`)
+    await e.advance(100)
+    assert(JSON.parse(e.run(`localStorage.getItem('crosspet-client-characters')`)).cursor === 'gpt', 'cursor → gpt not remembered')
+    e.run(`setSessions('gpt', '{}'); setRunning(['claude@cursor', 'gpt@cursor'])`)
+    await e.advance(100)
+    const list = lastCompanions(e)
+    assert(list && list.length === 1 && list[0].key === 'gpt@cursor', `companions: ${JSON.stringify(companionLists(e))}`)
+  }],
   ['multi_off_untouched', async e => {
     // 开关关着：会话、按客户端的状态、前台、集合都来了，也不发任何多桌宠消息，主桌宠照旧演
     e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setSessions('claude', csess(['c1','reading','claude-cli']))`)

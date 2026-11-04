@@ -92,6 +92,24 @@
     return (clients || []).some(c => isCli(c) && nowMs - c.lastTs * 1000 < CLI_RECENT)
   }
 
+  // 「AI 程序开着就在」（rest:'open'）：程序开着、还没会话时出哪个角色。
+  // 上次在这个程序里的角色（rememberClients 记的）优先，没记过用程序默认的角色，客户端名本身是角色名（deepseek、gemini……）也算；
+  // Cursor、WorkBuddy、ZCode 这类多模型的程序没记过就不知道是谁，返回 null（开始对话后再出）。没装的角色不算
+  const CLIENT_DEFAULT_CHARACTER = { 'claude-desktop': 'claude', 'claude-cli': 'claude', codex: 'gpt', antigravity: 'gemini' }
+  function clientCharacter(client, remembered, validCharacters) {
+    for (const ch of [(remembered || {})[client], CLIENT_DEFAULT_CHARACTER[client], client]) if (ch && validCharacters.has(ch)) return ch
+    return null
+  }
+  // 每个客户端最近有动静的那个角色（clientCharacter 用）；没变就返回原来那份（调用方按 === 判断要不要存）
+  function rememberClients(remembered, clients) {
+    const out = { ...(remembered || {}) }
+    const best = {}
+    for (const c of clients || []) if (!best[c.client] || c.lastTs > best[c.client].lastTs) best[c.client] = c
+    let changed = false
+    for (const [client, c] of Object.entries(best)) if (out[client] !== c.character) { out[client] = c.character; changed = true }
+    return changed ? out : remembered
+  }
+
   // 集合来、还没收编客户端的那只用的 key
   const gatherKey = character => character + '@gather'
 
@@ -111,6 +129,11 @@
   // - 额外那只：没占着的客户端干活就出现；auto 下「不干活」和「不在 AI 软件里」同时成立满 LEAVE_AFTER 才走
   //   （从两者中较晚开始的那一刻起算；停下的时刻按 decide 第一次看到她不干活记，存在 state.idleSince）；
   //   stay 下只在会话全部消失、或有窗口的程序关掉（在 running 里见过、现在不含她；记在 state.runningSeen）时走
+  // - open（AI 程序开着就在）：客户端「开着」就出现、不开着就走，不看干不干活、你在不在 AI 软件里。
+  //   开着 = 程序在跑（running 里有她）；不然有窗口的程序在 running 里见过就算关了；其余（命令行、外壳认不出的程序）
+  //   看会话：在干活或 CLI_RECENT 内有过动静（和钩子的 SESSION_KEEP 一样 10 分钟）。
+  //   在跑、还没会话的客户端按 characterOf（客户端 → 角色，页面按 clientCharacter 算好）补一条；主桌宠还没占着客户端时，
+  //   她自己角色的那条归她，不另出一只
   // - 会话全部消失（上次站着、这次 clients 里没有她的 key；SessionEnd 会从会话表里删掉会话）立刻走
   // - 集合来的每个角色一只，不按上面的规则走，解散（不在 gathered 里）才走；
   //   她的角色有客户端开始干活、而且那个客户端没有自己的那只时，收编它（key / client 换成那个客户端）。
@@ -118,10 +141,19 @@
   // - 解散时收编着的客户端还在干活：她不走，转成干活冒出来的那只（via 'work'）留着，不说 bye 再冒一次
   // - workPets 为 false（开关关着、只是集合）：不冒干活的那几只，已站着的干活那只走；集合来的照样收编、解散就走
   // - quota：同一角色只有一只为 true；主桌宠是这个角色时都为 false
-  function decide({ nowMs, clients, claimKey, mainCharacter, inAI, rest, gathered, running, coveredByStandIn, prev, workPets = true }) {
+  function decide({ nowMs, clients, claimKey, mainCharacter, inAI, rest, gathered, running, coveredByStandIn, prev, workPets = true, characterOf }) {
     const p = prev || {}
     const covered = coveredByStandIn || new Set()
-    const list = clients || []
+    const open = rest === 'open'
+    const list = [...(clients || [])]
+    if (open && running != null) {
+      const has = new Set(list.map(c => c.client))
+      const runningClients = new Set([...running].map(k => k.slice(k.indexOf('@') + 1)))
+      for (const client of runningClients) {
+        const character = !has.has(client) && (characterOf || {})[client]
+        if (character) list.push({ key: character + '@' + client, character, client, working: false, lastTs: 0 })
+      }
+    }
     const byKey = new Map(list.map(c => [c.key, c]))
     // 主桌宠正演着的角色不重复叫
     const gatherSet = new Set((gathered || []).filter(ch => ch !== mainCharacter))
@@ -146,7 +178,13 @@
     // stay 下有窗口的程序关掉了（见过、现在 running 里没有）：也算挡住，不然第 1 步刚让她走、第 4 步看她还在干活又冒出来。
     // 从没见过的（外壳认不出的程序）和命令行一样只看 SessionEnd
     const programClosed = c => rest === 'stay' && running != null && !isCli(c) && runningSeen.has(c.key) && !running.has(c.key)
+    const isOpen = c => {
+      if (running != null && running.has(c.key)) return true
+      if (running != null && !isCli(c) && runningSeen.has(c.key)) return false
+      return c.working || nowMs - c.lastTs * 1000 < CLI_RECENT
+    }
     const blocked = c => c.key === claimKey || covered.has(c.character) || sentHome[c.key] != null || programClosed(c)
+      || (open && (!isOpen(c) || (!claimKey && c.character === mainCharacter)))
 
     // 1. 上次站着的：先定谁留谁走
     // 额外那只停下的时刻：这一次调用才发现她不干活就记成 nowMs（3 分钟兜底判停也一样，不按旧的 lastTs 倒推）
@@ -167,8 +205,8 @@
       }
       const c = byKey.get(pet.key)
       let go = !workPets || !c || blocked(c)
-      // stay 下不按「不干活、不在 AI 软件里」走（程序关掉已经算进 blocked）
-      if (!go && rest !== 'stay' && !c.working) {
+      // stay、open 下不按「不干活、不在 AI 软件里」走（程序关掉、不开着已经算进 blocked）
+      if (!go && rest !== 'stay' && !open && !c.working) {
         const prevIdle = p.idleSince && p.idleSince[pet.key]
         idleSince[pet.key] = prevIdle != null ? prevIdle : nowMs
         // 两条都不满足（不干活、不在 AI 软件里）持续 LEAVE_AFTER：从较晚的那个时刻起算
@@ -200,9 +238,9 @@
       kept.push({ key: c ? c.key : gatherKey(character), character, client: c ? c.client : null, via: 'gather', quota: false })
     }
 
-    // 4. 新干活的客户端各冒一只
+    // 4. 新干活的客户端各冒一只（open 下开着的都冒，blocked 里已经去掉不开着的）
     for (const c of workPets ? list : []) {
-      if (!c.working || blocked(c) || taken.has(c.key)) continue
+      if ((!open && !c.working) || blocked(c) || taken.has(c.key)) continue
       taken.add(c.key)
       kept.push({ key: c.key, character: c.character, client: c.client, via: 'work', quota: false })
     }
@@ -223,7 +261,7 @@
   const api = {
     STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome,
+    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome, clientCharacter, rememberClients,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api
