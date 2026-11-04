@@ -55,7 +55,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         label = pet["label"] as? String ?? ""
         pageSize = app.pageSize; pageFoot = app.pageFoot; shownFootPt = app.shownFootPt
         let size = app.panel.frame.size   // 和主桌宠一样大（共用人物大小、文字大小）
-        panel = NSPanel(contentRect: NSRect(origin: app.companionOrigin(key: key, size: size), size: size),
+        panel = PetPanel(contentRect: NSRect(origin: app.companionOrigin(key: key, size: size), size: size),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         let config = WKWebViewConfiguration()
         let bridge = DevBridge(app: app, kind: .companion)
@@ -91,6 +91,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         drag.onDragStart = { [weak self] in self?.undock() }
         drag.onDragEnd = { [weak self] in self?.checkDock() }
         drag.onShake = { [weak self] in self?.js("shaken()") }
+        drag.topRoom = { [weak self] in self.map { s in (s.hitRects.map(\.minY).min() ?? 0) * s.web.pageZoom } ?? 0 }   // 可点区域是画布坐标（左上角起），× 人物大小 = 窗口里的点
         container.addSubview(drag)
         panel.contentView = container
 

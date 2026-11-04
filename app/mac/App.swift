@@ -162,7 +162,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         } else if let screen = NSScreen.main?.visibleFrame {
             origin = NSPoint(x: screen.maxX - size.width - 40, y: screen.minY + 100)
         }
-        panel = NSPanel(contentRect: NSRect(origin: origin, size: size),
+        panel = PetPanel(contentRect: NSRect(origin: origin, size: size),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -194,6 +194,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         drag.onDragStart = { [weak self] in self?.undock() }
         drag.onDragEnd = { [weak self] in self?.checkDock() }
         drag.onShake = { [weak self] in self?.js("shaken()") }
+        drag.topRoom = { [weak self] in self.map { s in (s.hitRects.map(\.minY).min() ?? 0) * s.web.pageZoom } ?? 0 }   // 可点区域是画布坐标（左上角起），× 人物大小 = 窗口里的点
         container.addSubview(drag)
 
         panel.contentView = container
