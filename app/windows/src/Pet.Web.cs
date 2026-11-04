@@ -35,7 +35,7 @@ namespace CrossPet
         public static string Q(string s) => Store.Json.Serialize(s);
 
         /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
-        void Wear(string id, string skin)
+        internal void Wear(string id, string skin)
         {
             if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
             if ((sd.TryGetValue(id, out var cur) ? cur as string ?? "" : "") == skin) return;

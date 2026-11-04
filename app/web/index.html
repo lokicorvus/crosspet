@@ -893,6 +893,7 @@ function setCharacter(id, quiet) {
   }
   dropTimers()
   characterTarget = id
+  if (role === 'main' && companionsRunning()) updateCompanions()   // 换成了站着的那只的角色：马上对调，和她同时噗
   endMulti()
   characterTimeout(refreshMulti, 700, id, generation)   // 换过去的角色如果也有好几个对话在干活，接着演
   characterTimeout(preloadEdges, 900, id, generation)
@@ -1747,6 +1748,7 @@ function windDownCompanions() {
 }
 // 主桌宠的角色有没有会话（占着客户端）：外壳问「跟随前台」换不换时一起带上（FollowPolicy.foregroundTarget）
 const mainClaimed = () => !!claim?.key
+let lastMain = null   // 上次算的时候主桌宠是谁（看出换角色，见 swapMain）
 function updateCompanions() {
   if (!companionsRunning()) { if (role === 'main' && !multiPets.on && sentCompanions !== null) windDownCompanions(); return }
   const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}
@@ -1756,6 +1758,12 @@ function updateCompanions() {
   const clients = Companions.clientsOf(byChar, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
   const remembered = Companions.rememberClients(rememberedClientChars(), clients)
   if (remembered !== clientChars) { clientChars = remembered; try { localStorage.setItem(CLIENT_CHARS_KEY, JSON.stringify(remembered)) } catch {} }
+  // 主桌宠换成了站着的那只的角色：两个对调（swapMain），那只就地换成主桌宠原来的角色，不是两只一样的并排、再走一只
+  const from = lastMain; lastMain = main
+  if (from && from !== main && companionsState && chars[from] && !chars[from].egg) {
+    const sw = Companions.swapMain(companionsState, { from, to: main, fromClaim: claim?.key, gathered })
+    if (sw.state !== companionsState) { companionsState = sw.state; if (sw.gathered !== gathered) setGathered(sw.gathered) }
+  }
   claim = Companions.mainClaim({ mainCharacter: main, foreground, clients, last: claim, nowMs })
   if (nowMs < companionsReadyAt) return
   const reactTo = chars[main]?.reactTo

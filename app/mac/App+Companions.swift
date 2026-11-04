@@ -196,10 +196,7 @@ extension App {
             guard let id = pet["id"] as? String, !id.isEmpty, !seen.contains(id),
                   let ch = pet["character"] as? String, characterIds.contains(ch) else { continue }
             seen.insert(id)
-            if let c = companions[id] {
-                if c.character == ch { c.update(pet); continue }
-                c.close()   // 同一个 id 换了角色（不该发生）：关掉重开
-            }
+            if let c = companions[id] { c.update(pet); continue }   // 同一个 id 换了角色（主桌宠换成她的角色，对调）：就地换
             companions[id] = Companion(app: self, pet: pet)
         }
         for (id, c) in companions where !seen.contains(id) { c.close() }

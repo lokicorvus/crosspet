@@ -138,11 +138,7 @@ namespace CrossPet
                 if (!(item is Dictionary<string, object> info) || !(info.TryGetValue("id", out var iv) && iv is string id) || id == "" || seen.Contains(id)
                     || !(info.TryGetValue("character", out var chv) && chv is string ch) || !Characters().Any(c => c.id == ch)) continue;
                 seen.Add(id);
-                if (companions.TryGetValue(id, out var c))
-                {
-                    if (c.Character == ch) { c.Update(info); continue; }
-                    c.Close();   // 同一个 id 换了角色（不该发生）：关掉重开
-                }
+                if (companions.TryGetValue(id, out var c)) { c.Update(info); continue; }   // 同一个 id 换了角色（主桌宠换成她的角色，对调）：就地换
                 if (parkedCompanions.TryGetValue(ch, out var p))
                 {
                     parkedCompanions.Remove(ch);

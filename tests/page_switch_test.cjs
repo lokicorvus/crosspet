@@ -721,6 +721,27 @@ const multiCases = [
     assert(leaves() === 0, 'open-program pet left on dismiss')
     assert(lastCompanions(e).length === 1 && lastCompanions(e)[0].id === id, `after dismiss: ${JSON.stringify(lastCompanions(e))}`)
   }],
+  ['switch_main_swaps_with_companion', async e => {
+    // 主桌宠 Claude、叫出来的 GPT 在场；主桌宠换成 GPT → 那只同一个窗口就地换成 Claude，不说 bye、不并排两只 GPT，之后也不另冒 Claude
+    await multiOn(e, 'claude')
+    e.run(`callCompanion('gpt')`)
+    await e.advance(3000)
+    assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/gpt"]', `before: ${JSON.stringify(lastCompanions(e))}`)
+    const n = companionLists(e).length
+    e.run(`setCharacter('gpt')`)
+    await e.advance(50)
+    const first = companionLists(e)[n]
+    assert(first && first.length === 1 && first[0].id === 'gpt@gather' && first[0].character === 'claude', `first list after switch: ${JSON.stringify(companionLists(e).slice(n))}`)
+    await e.advance(20000)
+    assert(!e.msgs().some(m => m.companionLeave), `left: ${JSON.stringify(e.msgs().filter(m => m.companionLeave))}`)
+    assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/claude"]', `after: ${JSON.stringify(lastCompanions(e))}`)
+    assert(e.run(`JSON.stringify(gathered)`) === '["claude"]', `gathered: ${e.run(`JSON.stringify(gathered)`)}`)
+    // 换回 Claude：再对调回来
+    e.run(`setCharacter('claude')`)
+    await e.advance(2000)
+    assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/gpt"]', `back: ${JSON.stringify(lastCompanions(e))}`)
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
   ['companion_answer_roll', async e => {
     const c = await rolePage('companion')
     c.run(`setCharacter('gpt', true)`)

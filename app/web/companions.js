@@ -121,6 +121,25 @@
     return { ...s, sentHome: { ...(s.sentHome || {}), [key]: { t: nowMs, sawIdle: false } } }
   }
 
+  // 主桌宠从 from 换成 to，而 to 已经有一只额外的站着：两个对调——那只就地换成 from（窗口、位置、id 不变，外壳就地换角色），
+  // 不然会两只 to 同时在、那只再说 bye 走，from 也凭空没了。
+  // 集合来的那只换成集合来的 from；干活那只换成主桌宠原来占着的客户端（fromClaim，<from>@<客户端>），没占着就当集合来的。
+  // 返回 { state, gathered }：gathered 是新的集合名单（集合来的才变：去掉 to、加上 from）；不用对调时原样返回
+  function swapMain(state, { from, to, fromClaim, gathered }) {
+    const g = gathered || []
+    if (!state || !from || !to || from === to) return { state, gathered: g }
+    const pets = state.pets || []
+    const i = pets.findIndex(x => x.character === to)
+    if (i < 0 || pets.some(x => x.character === from)) return { state, gathered: g }
+    const pet = pets[i]
+    const work = pet.via !== 'gather' && typeof fromClaim === 'string' && fromClaim.startsWith(from + '@')
+    const swapped = work
+      ? { ...pet, character: from, key: fromClaim, client: fromClaim.slice(from.length + 1), via: 'work', quota: false }
+      : { ...pet, character: from, key: gatherKey(from), client: null, via: 'gather', quota: false }
+    const next = { ...state, pets: pets.map((x, j) => j === i ? swapped : x) }
+    return { state: next, gathered: work ? g : [...g.filter(ch => ch !== to && ch !== from), from] }
+  }
+
   // 谁站着、谁走。每次状态变化调一次，返回该站着的 pets（按出现先后）和这次要说 bye 走的 leaving。
   // 「离开满 LEAVE_AFTER 才走」只在调用时判断：调用方除了状态变化时调，还要定时调（比如每几秒一次），
   // 不然没有新事件时她会一直不走。
@@ -265,7 +284,7 @@
   const api = {
     STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome, clientCharacter, rememberClients,
+    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome, swapMain, clientCharacter, rememberClients,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api

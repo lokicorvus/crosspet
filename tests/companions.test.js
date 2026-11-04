@@ -608,3 +608,35 @@ test("rest:'open'：集合来的那只，她的程序后来开了（没干活）
   assert.deepEqual(keys(c), ['claude@claude-desktop'])
   assert.deepEqual(c.leaving, [])
 })
+
+// ---- swapMain：主桌宠换成在场那只的角色 → 对调 ----
+
+test("swapMain：集合来的 GPT 在场，主桌宠 Claude 换成 GPT → 那只就地换成集合来的 Claude（id 不变），名单 gpt 换成 claude", () => {
+  const state = { pets: [{ id: 'gpt@gather', key: 'gpt@codex', character: 'gpt', client: 'codex', via: 'gather', quota: true }] }
+  const r = C.swapMain(state, { from: 'claude', to: 'gpt', fromClaim: 'claude@claude-desktop', gathered: ['gpt', 'gemini'] })
+  assert.deepEqual(r.state.pets, [{ id: 'gpt@gather', key: 'claude@gather', character: 'claude', client: null, via: 'gather', quota: false }])
+  assert.deepEqual(r.gathered, ['gemini', 'claude'])
+  // 接着 decide：主桌宠是 GPT，Claude 桌面开着 → 收编，不另冒一只、也不走
+  const d = run({ ...openBase, mainCharacter: 'gpt', claimKey: 'gpt@codex', running: new Set(['claude@claude-desktop', 'gpt@codex']), clients: [], gathered: r.gathered, prev: r.state })
+  assert.deepEqual(keys(d).filter(k => k.startsWith('claude')), ['claude@claude-desktop'])
+  assert.equal(d.pets.find(p => p.character === 'claude').id, 'gpt@gather')
+  assert.deepEqual(d.leaving, [])
+})
+
+test("swapMain：干活冒出来的 GPT，主桌宠原来占着 claude@claude-desktop → 换成干活的 Claude 那只，名单不变", () => {
+  const state = { pets: [{ id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', client: 'codex', via: 'work', quota: true }] }
+  const r = C.swapMain(state, { from: 'claude', to: 'gpt', fromClaim: 'claude@claude-desktop', gathered: [] })
+  assert.deepEqual(r.state.pets[0], { id: 'gpt@codex', key: 'claude@claude-desktop', character: 'claude', client: 'claude-desktop', via: 'work', quota: false })
+  assert.deepEqual(r.gathered, [])
+  // 主桌宠没占着客户端：当集合来的
+  const r2 = C.swapMain(state, { from: 'claude', to: 'gpt', fromClaim: null, gathered: [] })
+  assert.equal(r2.state.pets[0].via, 'gather')
+  assert.deepEqual(r2.gathered, ['claude'])
+})
+
+test("swapMain：没有 to 的那只、或者 from 已经站着 → 不对调", () => {
+  const state = { pets: [{ id: 'g', key: 'gemini@gather', character: 'gemini', client: null, via: 'gather' }] }
+  assert.equal(C.swapMain(state, { from: 'claude', to: 'gpt', gathered: ['gemini'] }).state, state)
+  const both = { pets: [{ id: 'a', key: 'gpt@gather', character: 'gpt', via: 'gather' }, { id: 'b', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', via: 'work' }] }
+  assert.equal(C.swapMain(both, { from: 'claude', to: 'gpt', gathered: ['gpt'] }).state, both)
+})

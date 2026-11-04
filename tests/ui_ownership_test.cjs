@@ -58,7 +58,7 @@ function makeEnv(html) {
     const standsIn=id=>id!==charId && (char()?.reactTo||[]).includes(id)
     function setPose(p){if(p===pose)return;pose=p;poseSince=Date.now();history.push({at:Date.now(),charId,pose});setFx(p)}
     function say(line){$('bubble').textContent=line||'';if(line)$('bubble').classList.remove('hide');else $('bubble').classList.add('hide')}
-    function applyLook(){} function renderQuota(){} function preloadEdges(){} function clearEggTimers(){}
+    function applyLook(){} function renderQuota(){} function preloadEdges(){} function clearEggTimers(){} function companionsRunning(){return false} function updateCompanions(){}
     function timeGreet(){return false}function greetDue(){return true}function announceReset(){}
     const role='main',roleInfo=null
     function angerLevel(){return null}function angerNow(){return 0}function react(){}

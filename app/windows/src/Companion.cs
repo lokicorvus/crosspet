@@ -21,7 +21,7 @@ namespace CrossPet
     {
         readonly Pet pet;
         public string Id { get; private set; }  // 窗口身份（页面给的，集合来的收编客户端后 key 变、id 不变）
-        public string Character { get; }
+        public string Character { get; private set; }   // 主桌宠换成她的角色时就地对调成主桌宠原来的角色（窗口、位置不变）
         public string Key { get; private set; }
         public string Client { get; private set; }   // 集合来、还没收编客户端时是 null
         public bool Quota { get; private set; }      // 同一个角色只有一只显示额度
@@ -222,15 +222,18 @@ namespace CrossPet
             if (m.TryGetValue("gone", out var g) && g is bool gb && gb) ui.BeginInvoke(new Action(Close));
         }
 
-        /// <summary>列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她</summary>
+        /// <summary>列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她、对调成了别的角色</summary>
         public void Update(IDictionary<string, object> info)
         {
             var newKey = Str(info, "key") ?? Key;
             var newClient = Str(info, "client");
             var newQuota = info.TryGetValue("quota", out var q) && q is bool qb && qb;
             var newLabel = Str(info, "label") ?? "";
-            var roleChanged = newKey != Key || newClient != Client || newLabel != Label;
-            var clientChanged = newClient != Client;
+            var newCharacter = Str(info, "character") ?? Character;
+            var characterChanged = newCharacter != Character;
+            var roleChanged = newKey != Key || newClient != Client || newLabel != Label || characterChanged;
+            var clientChanged = newClient != Client || characterChanged;
+            Character = newCharacter;
             var quotaChanged = newQuota != Quota;
             if (newKey != Key)
             {
@@ -241,6 +244,7 @@ namespace CrossPet
             Client = newClient; Quota = newQuota; Label = newLabel;
             if (!ready) return;
             if (roleChanged) Js($"setRole('companion', {RoleInfoJson})");   // 页面按新的 label 改小字
+            if (characterChanged) Js($"setCharacter({Pet.Q(Character)})");   // 噗一下换成她、说登场招呼
             if (clientChanged) pet.FeedCompanion(this);
             else if (quotaChanged)
             {
@@ -356,6 +360,22 @@ namespace CrossPet
             Add("戳一下", () => Js("handleClick('poke')"));
             // 让她先回去：交给主桌宠页面判（她这个客户端开始新的一轮活之前不再出现），页面再发 companionLeave 让她走
             Add("让她先回去", () => pet.Js($"sendHome({Pet.Q(Id)})"));
+            // 换衣服：这个角色有别的衣服（皮肤）时列出来，原版排第一。衣服按角色记，同一个角色的几只一起换（Pet.Wear）
+            if (Store.SkinChoices.TryGetValue(Character, out var skins) && skins.Count > 0)
+            {
+                var ch = Character;
+                var worn = Store.Skins != null && Store.Skins.TryGetValue(ch, out var w) ? w as string ?? "" : "";
+                var outfit = new Forms.ToolStripMenuItem("换衣服");
+                var baseName = Store.BaseOutfit.TryGetValue(ch, out var bo) && bo != null ? bo : "原版";
+                foreach (var (sid, sname) in new[] { ("", baseName) }.Concat(skins))
+                {
+                    var k = sid;
+                    var i = new Forms.ToolStripMenuItem(sname) { Checked = worn == k };
+                    i.Click += (_, __) => { try { pet.Wear(ch, k); } catch (Exception e) { Store.Log("菜单出错: " + e); } };
+                    outfit.DropDownItems.Add(i);
+                }
+                menu.Items.Add(outfit);
+            }
             menu.Items.Add(new Forms.ToolStripSeparator());
             Add("设置…", () => pet.OpenSettingsFromCompanion());
             // 和主桌宠一样：窗口从不拿焦点，菜单收不到「失去焦点」，鼠标在菜单外面按下就自己关

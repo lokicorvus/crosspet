@@ -9,7 +9,7 @@ import WebKit
 final class Companion: NSObject, WKNavigationDelegate {
     unowned let app: App
     let id: String              // 窗口身份（页面给的，集合来的收编客户端后 key 变、id 不变）
-    let character: String
+    private(set) var character: String   // 主桌宠换成她的角色时就地对调成主桌宠原来的角色（窗口、位置不变）
     private(set) var key: String
     private(set) var client: String?   // 集合来、还没收编客户端时是 nil
     private(set) var quota: Bool       // 同一个角色只有一只显示额度
@@ -152,12 +152,15 @@ final class Companion: NSObject, WKNavigationDelegate {
         if d["gone"] as? Bool == true { close() }
     }
 
-    /// 列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她
+    /// 列表里同一个 id 的新内容：收编了客户端（key / client 变了）、小字变了、额度归不归她、对调成了别的角色
     func update(_ pet: [String: Any]) {
         let newKey = pet["key"] as? String ?? key, newClient = pet["client"] as? String
         let newQuota = pet["quota"] as? Bool ?? false, newLabel = pet["label"] as? String ?? ""
-        let roleChanged = newKey != key || newClient != client || newLabel != label
-        let clientChanged = newClient != client
+        let newCharacter = pet["character"] as? String ?? character
+        let characterChanged = newCharacter != character
+        let roleChanged = newKey != key || newClient != client || newLabel != label || characterChanged
+        let clientChanged = newClient != client || characterChanged
+        character = newCharacter
         let quotaChanged = newQuota != quota
         if newKey != key {
             key = newKey
@@ -168,6 +171,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         client = newClient; quota = newQuota; label = newLabel
         guard ready else { return }
         if roleChanged { js("setRole('companion', \(roleInfoJSON))") }   // 页面按新的 label 改小字
+        if characterChanged { js("setCharacter(\(app.quote(character)))") }   // 噗一下换成她、说登场招呼
         if clientChanged { app.feedCompanion(self) }
         else if quotaChanged {
             if quota { app.quotaCodes(character).forEach { js($0) } } else { js("setQuota(\(app.quote(character)), null)") }
@@ -213,6 +217,21 @@ final class Companion: NSObject, WKNavigationDelegate {
             item.target = self
             menu.addItem(item)
         }
+        // 换衣服：这个角色有别的衣服（皮肤）时列出来，原版排第一。衣服按角色记，同一个角色的几只一起换（App.wear）
+        if let skins = app.skinChoices[character], !skins.isEmpty {
+            let worn = (defaults.dictionary(forKey: "skins") as? [String: String] ?? [:])[character] ?? ""
+            let outfitItem = NSMenuItem(title: "换衣服", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            for o in [("", app.baseOutfit[character] ?? "原版")] + skins.map({ ($0.id, $0.name) }) {
+                let item = NSMenuItem(title: o.1, action: #selector(wearOutfit(_:)), keyEquivalent: "")
+                item.representedObject = o.0
+                item.target = self
+                item.state = worn == o.0 ? .on : .off
+                sub.addItem(item)
+            }
+            outfitItem.submenu = sub
+            menu.addItem(outfitItem)
+        }
         menu.addItem(.separator())
         let settings = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: "")
         settings.target = self
@@ -224,6 +243,7 @@ final class Companion: NSObject, WKNavigationDelegate {
     /// 让她先回去：交给主桌宠页面判（她这个客户端开始新的一轮活之前不再出现），页面再发 companionLeave 让她走
     @objc func sendHome() { app.js("sendHome(\(app.quote(id)))") }
     @objc func openSettings() { app.openSettings() }
+    @objc func wearOutfit(_ sender: NSMenuItem) { if let skin = sender.representedObject as? String { app.wear(character, skin) } }
 
     // MARK: 大小、藏起来、层级（跟着主桌宠）
 
