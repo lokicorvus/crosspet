@@ -166,11 +166,11 @@ const cases = [
     const s = sw(p); assert(s, '没有 data-key=multiPets 的开关')
     const card = s.closest('.card'); assert(card && card.dataset.tab === 'character', '开关不在「角色」页')
     const label = s.closest('.item').querySelector('.label').textContent
-    assert(label.includes('在干活的 AI 各显示一只'), '开关标题不对：' + label)
-    assert(label.includes('同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息'), '开关说明不对：' + label)
+    assert(label.includes('几个 AI 各显示一只'), '开关标题不对：' + label)
+    assert(label.includes('同时开着几个 AI 时，每个各来一只'), '开关说明不对：' + label)
     const main = p.$('mainPetRow').textContent, rest = p.$('petsRestRow').textContent
     for (const t of ['主桌宠', '先来的当', '固定为']) assert(main.includes(t), '主桌宠一行缺：' + t)
-    for (const t of ['她们什么时候在', '干完活、你离开 AI 软件一会儿后去休息', '一直留着，直到我让她回去或 AI 程序关掉', 'AI 程序开着就在，关掉才走']) assert(rest.includes(t), '休息一行缺：' + t)
+    for (const t of ['她们什么时候在', '干活时出来，闲下来就走', '干活时出来，程序关了才走', '程序开着就在，关了才走']) assert(rest.includes(t), '休息一行缺：' + t)
     assert(p.$('friendship').closest('.card').dataset.tab === 'character' && p.$('friendship').textContent.includes('她们的友谊'), '友谊区不在「角色」页')
   }],
   ['开关关着：两个选项收起，友谊区不显示', p => {

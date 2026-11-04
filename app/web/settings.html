@@ -142,15 +142,15 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="followEvents"><span></span></label></div></div>
   <div class="item"><div class="label">随机彩蛋<small>偶尔有别的角色冒出来捣乱；关掉后右键「召唤彩蛋」还能手动看</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="eggs"><span></span></label></div></div>
-  <div class="item"><div class="label">在干活的 AI 各显示一只<small>同时开着几个 AI（比如 Claude 和 Codex）时，干活的那几个各出来一只；你离开 AI 软件一会儿，干完活的就先去休息</small></div>
+  <div class="item"><div class="label">几个 AI 各显示一只<small>同时开着几个 AI 时，每个各来一只</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="multiPets"><span></span></label></div></div>
   <div class="item indent" id="mainPetRow"><div class="label">主桌宠</div>
     <div class="ctl choices"><label><input type="radio" name="mainPet" value="rule">先来的当</label>
       <label><input type="radio" name="mainPet" value="fixed">固定为</label><select id="mainPetSelect" aria-label="固定的主桌宠"></select></div></div>
   <div class="item indent" id="petsRestRow"><div class="label">她们什么时候在
-      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干活时出来，干完活、你离开 AI 软件一会儿后去休息</label>
-        <label><input type="radio" name="petsRest" value="stay">干活时出来，一直留着，直到我让她回去或 AI 程序关掉</label>
-        <label><input type="radio" name="petsRest" value="open">AI 程序开着就在，关掉才走（终端里的命令行 AI 10 分钟没动静先去休息）</label></div></div></div>
+      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干活时出来，闲下来就走</label>
+        <label><input type="radio" name="petsRest" value="stay">干活时出来，程序关了才走</label>
+        <label><input type="radio" name="petsRest" value="open">程序开着就在，关了才走</label></div></div></div>
 </div>
 
 <div class="card hidden" data-tab="character" id="friendship">

@@ -2,7 +2,7 @@ import Cocoa
 import WebKit
 
 extension App {
-    // MARK: 多桌宠（设置「在干活的 AI 各显示一只」，默认关）
+    // MARK: 多桌宠（设置「几个 AI 各显示一只」，默认关）
     // 谁站着、谁走全在主桌宠页面判（app/web/companions.js）；外壳只做系统那一块：
     //   - 按页面交来的 companions 列表开 / 关额外桌宠的窗口（Companion.swift，同一个进程、同一套网页）
     //   - 把 <角色>@<客户端>-state.json、按客户端过滤的会话、额度转给对应的那只，前台程序、在跑的 AI 程序告诉主桌宠页面

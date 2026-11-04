@@ -247,7 +247,7 @@ addEventListener('error', e => {
 //   setPeakSkins(map)       按时段换衣服的设置 { 角色: { peak: 皮肤, valley: 皮肤 } }（'' = 原版，没写 = 不换）
 //   handleClick(kind)       单击 = pat（摸摸头），右键菜单「戳一下」= poke
 //   playEgg(force)          彩蛋
-//   多桌宠（设置「在干活的 AI 各显示一只」，默认关）：setRole、setMultiPets、setForeground、setRunning、applyClientState、
+//   多桌宠（设置「几个 AI 各显示一只」，默认关）：setRole、setMultiPets、setForeground、setRunning、applyClientState、
 //   gather、dismiss、sendHome、notePat，见下面「多桌宠」一节；额外那只的页面还有 leaveNow
 
 const MOTION = {
@@ -1486,7 +1486,7 @@ function playCharState(id, s) {
   }
 }
 
-// ---- 多桌宠：在干活的 AI 各显示一只（设置里的开关，默认关）----
+// ---- 多桌宠：几个 AI 各显示一只（设置里的开关，默认关）----
 // 谁站着、谁走都在 companions.js 判断；这里只收外壳交来的东西、按时调 decide、把结果告诉外壳：
 //   toShell({ companions: [{ id, key, character, client, quota, label }], gathering })   该站着的额外桌宠。总是完整列表，变了才发
 //     gathering  正集合着（还有集合来的，或集合 / 解散正一只只错开）：外壳菜单显示「解散」、开关关着时也转发。
