@@ -747,6 +747,19 @@ const multiCases = [
     assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/gpt"]', `back: ${JSON.stringify(lastCompanions(e))}`)
     assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
   }],
+  ['gather_answers_called_pet', async e => {
+    // 先「叫她出来」一只，再集合：她不另开，轮到她时就地答到，别的照常一只只来
+    await multiOn(e, 'claude')
+    e.run(`callCompanion('gpt')`)
+    await e.advance(3000)
+    const id = lastCompanions(e)[0].id
+    e.run(`gather()`)
+    await e.advance(20000)
+    const calls = e.msgs().filter(m => m.companionCall?.fn === 'answerRoll')
+    assert(calls.length === 1 && calls[0].companionCall.id === id, `answerRoll: ${JSON.stringify(calls)}`)
+    const list = lastCompanions(e)
+    assert(list.filter(p => p.character === 'gpt').length === 1 && list.length > 1, `list: ${JSON.stringify(list)}`)
+  }],
   ['companion_answer_roll', async e => {
     const c = await rolePage('companion')
     c.run(`setCharacter('gpt', true)`)
