@@ -43,6 +43,7 @@ namespace CrossPet
             var hint = AIAutostart && !Store.Flag("quitHinted");
             if (hint) { Store.Settings["quitHinted"] = true; Store.SaveSettings(); }
             Js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来', 5000)" : "farewell(null, 2000)");
+            CompanionsJs($"farewell(null, {(hint ? 5000 : 2000)})");   // 多桌宠：额外那几只也一起挥手、同一时刻走开
             var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(hint ? 5 : 2) };
             t.Tick += (_, __) => { t.Stop(); Quit(); };
             t.Start();

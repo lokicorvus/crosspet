@@ -224,6 +224,7 @@ extension App {
             return
         }
         ready = true
+        js("restoreFriendship(\(savedFriendshipJSON()))")   // 在 init（loadCharacters 里）之前：init 发给设置页的友谊行就是并好的
         loadCharacters()
         // 恢复上次的角色（和 Windows 一致：先恢复，再让下面的「跟随前台」按前台程序覆盖）。
         // 没存过 / 那个角色已经不在了：保持 init() 里选的第一个。quiet：不演登场招呼
@@ -231,10 +232,13 @@ extension App {
             currentId = saved
             js("setCharacter(\(quote(saved)), true)")
         }
+        companionsMainReloaded()   // 开关关着时页面不会再发列表：额外的窗口直接关掉；开着时等页面发完整列表
+        pushMultiPets()
+        applyMainPet()   // 固定了主桌宠：换成她（页面不换，外壳自己换）
         if let side = defaults.string(forKey: "dock"), edgeDockEnabled {   // 上次是贴着边的
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.setDock(side) }
         }
-        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave)); setQuotaAggregate(\(quotaAggregate)); setCodexResets(\(codexResets)); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle))); setPeakSkins(\(peakSkinsJSON))")
+        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(\(quotaAggregate)); setCodexResets(\(codexResets)); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle))); setPeakSkins(\(peakSkinsJSON))")
         applySizes(anchor: .corner)   // 解锁过文字大小的：按画布重设窗口，左下角不动（锁着的尺寸不变）
         updatePageHidden()
         stamps = [:]
@@ -242,9 +246,10 @@ extension App {
         refreshCodexQuota(.now)
         refreshAntigravityQuota()
         refreshPlugins(tellPet: true)   // 插件旧了：等她闲下来提醒一句
+        if companionsForwarding { startForwarding() }
         if followApps, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
            let id = appToCharacter[front] ?? hostApp(front), characterIds.contains(hostCharacter(id)) {
-            switchTo(hostCharacter(id), why: "startup", via: front)
+            followForeground(hostCharacter(id), why: "startup", via: front)
         }
     }
 

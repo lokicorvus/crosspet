@@ -1,0 +1,1 @@
+TWO-FRAME PAIR: this image is the first of a left/right pair ("{PARTNER}" will be drawn later as an edit of this one). Make the pose clearly directional toward the viewer's {SIDE}, so the partner can turn the other way. "left" and "right" mean the viewer's left and right.

@@ -8,6 +8,8 @@ using System.Windows.Threading;
 namespace CrossPet
 {
     // WPF 合成线程已损坏后，只做文件/进程交接，不能 Close/Dispose WebView2。
+    // 多桌宠：额外那几只和主桌宠同一个进程，随旧进程一起结束，不交接（也不记她们）；新进程里主桌宠页面加载完、
+    // 按设置和重新算出的完整列表再开（开关关着时集合的记录随旧页面丢了，回到单只），见 Pet.Companions.cs 的 CompanionsMainReloaded。
     // net48 的 Environment.Exit 也会运行终结器（#28：HwndHost.Finalize 内的 COM 强转崩溃）。
     static class RenderRecovery
     {

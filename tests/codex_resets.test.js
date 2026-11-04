@@ -12,7 +12,7 @@ test('parse：全空（真实接口 10-14 的样子）', () => {
   const d = R.parse(base({ latest_reset: { id: '210', reset_type: 'regular', announced_at: '2026-10-13T05:06:06.000Z', text: 't', source: { type: 'x_post', author: 'thsottiaux', url: 'u' } } }))
   assert.strictEqual(d.announced, null)
   assert.strictEqual(d.watch, null)
-  assert.deepStrictEqual(d.latest, { id: '210', at: Date.parse('2026-10-13T05:06:06Z') / 1000 })
+  assert.deepStrictEqual(d.latest, { id: '210', at: Date.parse('2026-10-13T05:06:06Z') / 1000, card: false })
   assert.deepStrictEqual(d.stats, { since: 1.4, avg: 6.5 })
 })
 
@@ -93,7 +93,7 @@ test('windowText / fill', () => {
 })
 
 test('LINES：每个台词键都有默认句', () => {
-  for (const k of ['resetAnnounced', 'resetDone', 'resetHigh', 'resetMid', 'resetLow', 'resetNone', 'resetQuiet', 'resetOffline'])
+  for (const k of ['resetAnnounced', 'resetDone', 'resetCard', 'resetHigh', 'resetMid', 'resetLow', 'resetNone', 'resetNoneCard', 'resetQuiet', 'resetOffline'])
     assert.ok(Array.isArray(R.LINES[k]) && R.LINES[k].length, k)
 })
 
@@ -145,4 +145,26 @@ test('刚重置过：主动说一次；说过或我们自己已经看到重置�
 })
 test('LINES：resetRecent 有默认句', () => {
   assert.ok(R.LINES.resetRecent.length && R.LINES.resetRecent.every(l => l.includes('{ago}') || !l.includes('{')))
+})
+
+// 11-01 官方两次都是发重置卡（reset_type: banked，「Banked 1/2」「Banked 2/2」）：额度不会自己满，不能说「刚重置过、额度满满」
+const cardAt = (sec, id = 'c1') => ({ ...latestAt(sec), id, reset_type: 'banked' })
+test('发重置卡：一天内问她答 card，不算刚重置过；过了一天答 none 但说上次是卡', () => {
+  const a = R.answer(R.parse(base({ latest_reset: cardAt(NOW - 3 * 3600) })), NOW, 0)
+  assert.deepStrictEqual(a, { tier: 'card', pose: 'reset_hope', key: 'resetCard', vars: { ago: '3 小时前' } })
+  const b = R.answer(R.parse(base({ latest_reset: cardAt(NOW - 30 * 3600) })), NOW, 0)
+  assert.strictEqual(b.tier, 'none')
+  assert.strictEqual(b.key, 'resetNoneCard')
+  assert.strictEqual(R.answer(R.parse(base({ latest_reset: latestAt(NOW - 30 * 3600) })), NOW, 0).key, 'resetNone')
+})
+test('发重置卡：额度下方写「发了重置卡」，主动说一次（c: 开头），说过不再说', () => {
+  const d = R.parse(base({ latest_reset: cardAt(NOW - 3 * 3600) }))
+  assert.strictEqual(R.notice(d, 0, NOW), '🎟️ 3 小时前发了重置卡，要自己去用')
+  assert.deepStrictEqual(R.toAnnounce(d, NOW, 0, []), { id: 'c:c1' })
+  assert.strictEqual(R.toAnnounce(d, NOW, 0, ['c:c1']), null)
+  assert.strictEqual(R.notice(R.parse(base({ latest_reset: cardAt(NOW - 30 * 3600) })), 0, NOW), '')
+})
+test('没有 reset_type 的旧数据照旧当直接重置', () => {
+  const l = latestAt(NOW - 2 * 3600); delete l.reset_type
+  assert.strictEqual(R.answer(R.parse(base({ latest_reset: l })), NOW, 0).tier, 'recent')
 })

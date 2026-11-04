@@ -13,7 +13,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.Wpf;
+using Microsoft.Web.WebView2.WinForms;
 using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
@@ -22,16 +22,18 @@ namespace CrossPet
     /// <summary>
     /// 桌宠本体。和 macOS 版（app/mac/）做的事一样：一个透明、置顶、不抢焦点的小窗口里放桌宠网页（app/web/index.html），
     /// 读 AI 写来的状态文件交给网页演，跟着前台程序换角色，右键菜单 / 托盘 / 接入 AI / 额度 / 检查更新。
-    /// 网页用 WebView2CompositionControl：它把网页画面当图片放进 WPF 透明窗口，才能做到逐像素半透明（柔和边缘、光晕）。
+    /// 窗口是 DirectHost：网页由系统直接合成，逐像素半透明（柔和边缘、光晕），界面线程停一下她也照样动（见那个文件）。
     /// </summary>
     sealed partial class Pet
     {
         const string Repo = "lokicorvus/crosspet";
         CoreWebView2Environment env;   // 浏览器进程崩溃后要换一个新的（见 RecoverWeb）
-        Grid grid;
-        public Window Window { get; private set; }
-        WebView2CompositionControl web;
+        public DirectHost Host { get; private set; }
+        WebView2 web;
+        readonly Dispatcher ui = Dispatcher.CurrentDispatcher;
         IntPtr hwnd;
+        /// <summary>主桌宠现在置不置顶（额外那几只跟着）</summary>
+        public bool Topmost => Host?.Topmost ?? false;
         bool ready;
         string current;
         bool paused;
@@ -65,39 +67,30 @@ namespace CrossPet
             Store.SyncResources();
             current = Store.Settings.TryGetValue("character", out var c) && c is string s ? s : "claude";
 
-            Window = new Window
+            Host = new DirectHost(true) { Topmost = LayerMode != "normal" };
+            web = Host.Web;
+            Host.MessageHook = HotKeyHook;
+            Host.HandleCreated += (_, __) =>
             {
-                Title = "CrossPet", WindowStyle = WindowStyle.None, AllowsTransparency = true, Background = Brushes.Transparent,
-                Width = BaseWidth * Scale, Height = BaseHeight * Scale, Topmost = LayerMode != "normal", ShowInTaskbar = false, ShowActivated = false, ResizeMode = ResizeMode.NoResize,
-                Left = -10000, Top = -10000,   // 先放屏幕外，拿到窗口句柄后按像素摆到保存的位置
-            };
-            Window.SourceInitialized += (_, __) =>
-            {
-                hwnd = new WindowInteropHelper(Window).Handle;
-                Native.MakeToolWindow(hwnd);
+                hwnd = Host.Handle;
+                ResizeHost(Scale);
                 RestorePosition();
-                HwndSource.FromHwnd(hwnd)?.AddHook(HotKeyHook);
                 RegisterHideHotKey();
             };
-
-            grid = new Grid();
-            web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
-            grid.Children.Add(web);
-            // 透明的接鼠标层：拖动 / 单击 / 右键由窗口自己处理（和 macOS 版的 DragView 一样），网页只负责画
-            // 只在桌宠本体、气泡、名牌、额度上铺：窗口其余地方完全透明，点击直接落到后面的窗口
-            // （窗口比桌宠大，是给动作、气泡留的空间；透明窗口里全透明的像素本来就不接鼠标）
-            hit = new Canvas();
-            grid.Children.Add(hit);
-            Window.Content = grid;
-            WireMouse(hit);
+            // 拖动 / 单击 / 右键：网页收到鼠标后交给外壳（pointer 消息，见 HandlePointer），外壳照旧处理（和 macOS 版的 DragView 一样）
+            // 鼠标只在桌宠本体、气泡、名牌、额度上才接（hitRects），窗口其余地方穿过去，点击直接落到后面的窗口
             Every(TimeSpan.FromMilliseconds(250), () => { _ = UpdateHitRects(); });
             Every(TimeSpan.FromMilliseconds(80), UpdateDockHover);
-
-            // 换 DPI 时 WPF 先按新缩放排好窗口再发这个事件；等这一轮排版走完再让网页控件对齐（原因见 ResyncWebForDpi）
-            Window.DpiChanged += (_, e) => Window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
-                new Action(() => ResyncWebForDpi(e.OldDpi.DpiScaleX, e.NewDpi.DpiScaleX)));
-            Window.Loaded += async (_, __) => await InitWeb();
-            Window.Show();
+            // 换了系统缩放（改了缩放、拖到缩放不同的另一块屏幕）：窗口按新缩放重设物理像素大小，脚底不动
+            Host.DpiChanged += (_, __) => ui.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                Store.Log($"系统缩放变了：现在 {Math.Round(Host.DpiScale * 100)}%");
+                lastHitRects = null; dockCut.Clear();
+                ApplyScale(shownScale > 0 ? shownScale : Scale, Anchor.Feet);
+                if (dock != null) ApplyDock();
+            }));
+            Host.Load += async (_, __) => await InitWeb();
+            Host.Show();
 
             tray = new Forms.NotifyIcon { Text = "CrossPet", Visible = true };
             try { tray.Icon = new System.Drawing.Icon(Path.Combine(Store.Install, "AppIcon.ico")); } catch { tray.Icon = System.Drawing.SystemIcons.Application; }
@@ -120,11 +113,12 @@ namespace CrossPet
             Every(TimeSpan.FromMilliseconds(300), Poll);
             Every(TimeSpan.FromSeconds(60), () => { RefreshQuota(); RefreshCodexQuota(CodexWhy.Tick); });
             Every(TimeSpan.FromSeconds(3), WatchClaudeConfig);
+            Every(TimeSpan.FromSeconds(5), () => PushRunning());   // 多桌宠：在跑的 AI 程序（开关关着、没在集合时直接返回）
             // 锁屏时动画全停（看不见还在画，白白耗电）
             SystemEvents.SessionSwitch += (_, e) =>
             {
                 if (e.Reason == SessionSwitchReason.SessionLock || e.Reason == SessionSwitchReason.SessionUnlock)
-                    Window.Dispatcher.BeginInvoke(new Action(() =>
+                    ui.BeginInvoke(new Action(() =>
                     {
                         var locked = e.Reason == SessionSwitchReason.SessionLock;
                         var wasLocked = sessionLocked; sessionLocked = locked;
@@ -161,7 +155,7 @@ namespace CrossPet
                 await web.EnsureCoreWebView2Async(env);
                 var core = web.CoreWebView2;
                 Map(core);
-                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; } };
+                core.NavigationStarting += (_, a) => { if (!a.Cancel) { ++followEventGeneration; ready = false; pageGathering = false; } };   // 页面重载：集合的记录跟着丢了
                 core.Settings.AreDefaultContextMenusEnabled = false;
                 core.Settings.AreDevToolsEnabled = false;
                 core.Settings.IsZoomControlEnabled = false;
@@ -169,13 +163,14 @@ namespace CrossPet
                 web.ZoomFactor = Scale * zoomFix;
                 // 网页进程 / 浏览器进程崩溃（显卡驱动、系统睡眠醒来、内存不够时偶尔会）：不处理的话她就一直停住，
                 // 之后每次调网页都报「控件已失效」
-                core.ProcessFailed += (_, a) => Window.Dispatcher.BeginInvoke(new Action(() => _ = RecoverWeb(a.ProcessFailedKind)));
+                core.ProcessFailed += (_, a) => ui.BeginInvoke(new Action(() => _ = RecoverWeb(a.ProcessFailedKind)));
                 core.NavigationCompleted += async (_, a) =>
                 {
                     ready = false;
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
-                    await core.ExecuteScriptAsync($"init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)})");
+                    // 不再 setShellPrepares(true)：副桌宠换成 DirectHost 后一秒开一只不卡，一起预开好几只反而卡（试验 C：同时开 6 只停 206ms，1.3.9-test.13 集合时主桌宠卡很久）
+                    await core.ExecuteScriptAsync($"restoreFriendship({SavedFriendshipJson()}); init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)}); setPointerBridge(true)");
                     if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
@@ -188,14 +183,18 @@ namespace CrossPet
                         if (last != null && Newer(Store.Version, last)) Js($"justUpdated({Q("v" + Store.Version)}, {Q(last)})");
                     }
                     ready = true;
-                    if (RenderRecovery.Ready()) tray?.ShowBalloonTip(6000, "CrossPet", "上次画面出了问题，现已重新打开。若再次消失，请提交反馈。", Forms.ToolTipIcon.Info);
+                    // 多桌宠：开关关着时页面不会再发列表，额外的窗口直接关掉；开着时等页面热身完发完整列表再对齐（崩溃恢复、渲染出错重启后也一样）
+                    CompanionsMainReloaded();
+                    PushMultiPets();
+                    ApplyMainPet();   // 固定了主桌宠：换成她（页面不换，外壳自己换）
+                    if (RenderRecovery.Ready()) Js("justRecovered()");   // 渲染出错重启回来：她自己说一声（托盘通知在 Windows 11 上常被收进通知中心）
                     ApplySizes(anchor: Anchor.Corner);   // 解锁过文字大小的：按画布重设窗口，左上角不动（锁着的尺寸不变）
-                    After(1000, PassThroughBrowserWindows); After(5000, PassThroughBrowserWindows);   // 背后的浏览器窗口不接鼠标（见 PassThroughBrowserWindows）
                     stamps.Clear();
                     Poll();
                     RefreshQuota();
                     RefreshCodexQuota(CodexWhy.Now);
                     RefreshPlugins(tellPet: true);   // 插件旧了：等她闲下来提醒一句
+                    if (CompanionsForwarding) StartForwarding();
                     FollowForeground("startup");
                 };
                 // 立绘加载失败时网页发消息过来：记进日志（每次启动最多 5 条），反馈里能看出是哪张图、为什么
@@ -204,6 +203,8 @@ namespace CrossPet
                     try
                     {
                         if (!(Store.Json.DeserializeObject(a.WebMessageAsJson) is Dictionary<string, object> m)) return;
+                        if (HandlePointer(m)) return;
+                        HandleCompanionMessage(m);   // 多桌宠：companions / companionLeave / companionCall / eggAllowed / friendship
                         // 「新功能」卡片点了「去看看」：打开设置停在「新功能」页
                         if (m.TryGetValue("openSettings", out var tab) && tab is string t) { if (t == "character") OpenCharacterWindow(); else OpenSettings(t); return; }
                         // 按时段换衣服（网页层判断好了时段）：只换这个角色已有的衣服，不切换当前角色（和 macOS 的 handlePet 一致）
@@ -233,6 +234,7 @@ namespace CrossPet
         {
             Store.Log("WebView2 进程崩溃: " + kind);
             if (kind == CoreWebView2ProcessFailedKind.GpuProcessExited) return;
+            CompanionsMainCrashed();   // 多桌宠：额外那几只全部关掉，页面重新载入完按重新算的完整列表再开，不留残窗
             crashes.RemoveAll(t => (DateTime.UtcNow - t).TotalMinutes > 10);
             if (crashes.Count >= 3) { Store.Log("10 分钟内崩溃太多次，不再自动恢复"); return; }
             crashes.Add(DateTime.UtcNow);
@@ -245,10 +247,8 @@ namespace CrossPet
                     web.CoreWebView2.Reload();
                     return;
                 }
-                var old = web;
-                web = new WebView2CompositionControl { DefaultBackgroundColor = System.Drawing.Color.Transparent, IsHitTestVisible = false };
-                grid.Children.Remove(old);
-                grid.Children.Insert(0, web);
+                var old = Host.ReplaceWeb();
+                web = Host.Web;
                 try { old.Dispose(); } catch { }
                 env = await CoreWebView2Environment.CreateAsync(null, Path.Combine(Store.Data, "webview2"));
                 await InitWeb();
@@ -277,6 +277,7 @@ namespace CrossPet
             characters = chars.Where(kv => !IsEgg(kv.Value))
                               .Select(kv => (kv.Key, (kv.Value as Dictionary<string, object>)?["name"] as string ?? kv.Key)).ToList();
             if (!characters.Any(c => c.id == current)) current = characters.FirstOrDefault().id ?? "claude";
+            CompanionsJs($"init({ManifestJson})");   // 多桌宠：额外那几只也换上新的清单（换衣服、改名后）
         }
         static bool IsEgg(object info) => info is Dictionary<string, object> d && d.TryGetValue("egg", out var e) && e is bool b && b;
         List<(string id, string name)> Characters() => characters;

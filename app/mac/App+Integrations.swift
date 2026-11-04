@@ -167,6 +167,8 @@ extension App {
         case "set":
             guard let key = msg["key"] as? String else { return }
             let value = msg["value"]
+            if setCompanionSetting(key, value) { pushSettings(); return }   // 多桌宠的三个键（App+Companions.swift）
+            defer { companionsSettingChanged(key) }   // 共用的设置额外那几只跟着
             switch key {
             case "size":
                 if let n = value as? Double { let v = min(1.6, max(0.6, (n * 100).rounded() / 100)); defaults.set(v, forKey: "size"); applySizes(animateTo: CGFloat(v)) }
@@ -199,6 +201,9 @@ extension App {
             case "powerSave":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "powerSave"); js("setPowerSave(\(on))")
+            case "noSleep":
+                let on = value as? Bool ?? false
+                defaults.set(on, forKey: "noSleep"); js("setNeverSleep(\(on))")
             case "quotaAggregate":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "quotaAggregate"); js("setQuotaAggregate(\(on))")
@@ -217,7 +222,7 @@ extension App {
                 let on = value as? Bool ?? true
                 defaults.set(on, forKey: "dsQuota")
                 stamps["deepseek-quota"] = nil   // 重新打开时马上读一次
-                if !on { js("setQuota('deepseek', null)") }
+                if !on { quotaJS("deepseek", "setQuota('deepseek', null)") }
             case "edgeDock":
                 let on = value as? Bool ?? true
                 defaults.set(on, forKey: "edgeDock")
@@ -246,6 +251,7 @@ extension App {
             defaults.set(names, forKey: "names")
             loadCharacters()
             js("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
+            companionsJS("setName(\(quote(id)), \(quote(displayNames[id] ?? id)))")
             pushSettings()
         case "action":
             switch msg["name"] as? String {

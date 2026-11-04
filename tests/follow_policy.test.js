@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { eventTarget } = require('../app/web/follow-policy.js')
+const { eventTarget, eventSkip, foregroundTarget } = require('../app/web/follow-policy.js')
 const characters = ['gpt', 'deepseek', 'claude']
 const decide = args => eventTarget({ eventId: 'deepseek', foregroundId: 'gpt', followApps: true, followEvents: true, characters, ...args })
 
@@ -33,4 +33,61 @@ test('关闭跟随前台后，已识别的 AI 在前台也允许跟随事件', (
 test('关闭跟随事件、current 通道及未知角色不会自动切换', () => {
   assert.equal(decide({ followEvents: false }), null)
   for (const eventId of [null, '', 'current', 'unknown']) assert.equal(decide({ eventId }), null)
+})
+
+test('多桌宠打开时，跟随事件不再给主桌宠换角色', () => {
+  assert.equal(decide({ multiPets: true, foregroundId: null }), null)
+  assert.equal(decide({ multiPets: false, foregroundId: null }), 'deepseek')
+})
+
+test('固定主桌宠：前台是别的 AI 也不换', () => {
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: 'claude', standing: [] }), null)
+})
+
+test('要换成的角色已经有一只额外的站着：不换（不然两只对调）', () => {
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: ['gpt'] }), null)
+})
+
+test('不固定、没有站着的：照常换成前台的角色；已经是她就不换', () => {
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: ['deepseek'] }), 'gpt')
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'gpt', mainPet: '', standing: [] }), null)
+})
+
+test('浏览器在前台、Claude 和 GPT 同时干活：当前角色还在忙就不来回切', () => {
+  let current = 'claude'
+  const last = { claude: { pose: 'running', t: 0 }, gpt: { pose: 'running', t: 0 } }
+  const switches = []
+  // 两边交替来事件，每 0.3～6 秒一条（loki 11-02 日志里的节奏）
+  for (const [t, id, pose] of [[0.3, 'gpt', 'drawing'], [0.6, 'claude', 'running'], [6, 'gpt', 'running'], [6.5, 'claude', 'thinking'], [12, 'gpt', 'thinking']]) {
+    last[id] = { pose, t }
+    const target = eventTarget({ eventId: id, foregroundId: null, followApps: true, followEvents: true, characters,
+      currentPose: last[current].pose, currentAge: t - last[current].t })
+    if (target && target !== current) { current = target; switches.push(target) }
+  }
+  assert.deepEqual(switches, [])
+})
+
+test('当前角色做完了（happy）或 20 秒没动静，别的 AI 的事件可以接手', () => {
+  const base = { eventId: 'gpt', foregroundId: null, followApps: true, followEvents: true, characters }
+  for (const pose of ['idle', 'sleeping', 'happy', 'proud', 'bye']) {
+    assert.equal(eventTarget({ ...base, currentPose: pose, currentAge: 1 }), 'gpt', pose)
+  }
+  assert.equal(eventTarget({ ...base, currentPose: 'running', currentAge: 20 }), 'gpt')
+  assert.equal(eventTarget({ ...base, currentPose: 'running', currentAge: 19.9 }), null)
+  assert.equal(eventTarget({ ...base, currentPose: null, currentAge: null }), 'gpt')   // 还没收到过她的状态
+})
+
+test('跳过原因分得清：前台 AI 优先 / 当前角色在忙 / 关了跟随', () => {
+  const base = { eventId: 'gpt', followApps: true, followEvents: true, characters }
+  assert.equal(eventSkip({ ...base, foregroundId: 'claude' }), 'front-ai')
+  assert.equal(eventSkip({ ...base, foregroundId: null, currentPose: 'running', currentAge: 3 }), 'current-busy')
+  assert.equal(eventSkip({ ...base, followEvents: false }), 'off')
+  assert.equal(eventSkip({ ...base, foregroundId: null }), null)
+})
+
+test('多桌宠：谁先来谁当主桌宠，主桌宠的角色有会话时跟随前台不换（11-03）', () => {
+  // 开着 Claude 干活，切到 Codex：主桌宠还是 Claude，GPT 干活时冒它自己那只
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: [], mainClaimed: true }), null)
+  // 主桌宠的角色一个会话都没有（昨天留下的角色）：第一个来的 AI 当主桌宠
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: [], mainClaimed: false }), 'gpt')
 })

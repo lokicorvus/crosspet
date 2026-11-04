@@ -35,7 +35,7 @@ namespace CrossPet
         public static string Q(string s) => Store.Json.Serialize(s);
 
         /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
-        void Wear(string id, string skin)
+        internal void Wear(string id, string skin)
         {
             if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
             if ((sd.TryGetValue(id, out var cur) ? cur as string ?? "" : "") == skin) return;
@@ -43,6 +43,7 @@ namespace CrossPet
             Store.SaveSettings();
             LoadCharacters();
             Js($"init({ManifestJson}); refreshLook({Q(id)})");
+            CompanionsJs($"refreshLook({Q(id)})");   // 多桌宠：额外那只是这个角色也换上（清单在 LoadCharacters 里给过了）
             PushSettings();   // 设置页开着（角色页的衣服卡）时高亮跟着变：按时段自动换衣服也走这里
         }
 
@@ -89,7 +90,12 @@ namespace CrossPet
                     if (value == null) continue;   // 可能正被另一边写一半，下次再读
                     stamps[key] = stamp;
                     var json = Store.Json.Serialize(value);
-                    if (kind == "sessions") { if (!Paused) Js($"setSessions({Q(id)}, {json})"); continue; }
+                    if (kind == "sessions")
+                    {
+                        if (!Paused) Js($"setSessions({Q(id)}, {json})");
+                        NoteSessions(id, json);   // 多桌宠：额外那只拿她客户端的那份
+                        continue;
+                    }
                     dev?.Js($"logEvent({Q(id)}, {Q(kind)}, {json}, {(Paused ? "true" : "false")})");
                     if (Paused) { if (kind == "state") NotePet(id, value, "skipped", "paused"); continue; }
                     if (kind == "state")
@@ -101,6 +107,7 @@ namespace CrossPet
                         lastPose[id] = (pose ?? "", DateTime.UtcNow);
                         if (id != "current" && pose != "idle" && pose != "sleeping" && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - ts < 30 && ts > latestActive.ts) latestActive = (id, ts);
                         Js($"applyCharState({Q(id)}, {json})");
+                        if (id != "current") NoteCharState(id, json, pose, fi.LastWriteTimeUtc);   // 多桌宠：旧钩子没有按客户端的状态时给额外那只
                         // Codex 回完一轮：额度记录刚写进会话，马上读一次（不然要等每分钟一次的定时刷新）
                         if (id == "gpt")
                         {
@@ -108,11 +115,13 @@ namespace CrossPet
                             else codexBusyAt = DateTime.UtcNow;   // 在干活：定时查额度改成 1 分钟一次（CodexTickDue）
                         }
                     }
-                    else Js($"setQuota({Q(id)}, {json})");
+                    else QuotaJS(id, $"setQuota({Q(id)}, {json})");   // 额外那只是这个角色、显示额度：也拿一份
                 }
             if (latestActive.id != null) _ = FollowEvent(latestActive.id);
+            PollClientStates();   // 多桌宠：按客户端的状态（开关关着、没在集合时直接返回，不读 @ 文件）
             ApplyLayer();
             UpdateDock();
+            foreach (var c in companions.Values) c.UpdateDock();
         }
     }
 }

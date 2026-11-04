@@ -65,7 +65,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     // 快捷键隐藏 用的
     var userHidden = false {
-        didSet { if userHidden != oldValue { applyHiddenState() } }   // 快捷键藏起来：和全屏时收着一样，只是透明
+        didSet { if userHidden != oldValue { applyHiddenState(); syncCompanionWindows() } }   // 快捷键藏起来：和全屏时收着一样，只是透明；额外那几只一起藏
     }
     var hotKeyRef: EventHotKeyRef?
     var hotKeyHandlerInstalled = false
@@ -97,6 +97,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             guard hiddenForFullscreen != oldValue else { return }
             appLog(hiddenForFullscreen ? "全屏中，先藏起来（前台 \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "-")）" : "退出全屏，出来了")
             applyHiddenState()
+            syncCompanionWindows()   // 额外那几只跟着一起收 / 放
         }
     }
     var fullscreenCheckedAt = Date.distantPast
@@ -125,6 +126,22 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
         do { try p.run(); p.waitUntilExit(); return p.terminationStatus == 0 } catch { return false }
     }()
+
+    // 多桌宠 用的（App+Companions.swift）：窗口按页面交来的 id 管
+    var companions: [String: Companion] = [:]
+    var leavingCompanions: [Companion] = []   // 收到 companionLeave、正在说 bye 的（等 gone 或 3 秒后关）
+    var pageGathering = false                 // 主桌宠页面里正集合着（菜单显示「解散」；开关关着时也转发前台 / 在跑的程序）
+    var companionExpected = 0
+    var companionTarget = 0                   // 这一轮主桌宠页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（companionOrigin）
+    var eggAllowed = true                     // 有别的桌宠在场时页面发 false：右键「召唤彩蛋」变灰
+    var friendshipRows: [Any] = []            // 主桌宠页面最后一次发来的友谊行，设置页显示
+    var clientStateSeen: Set<String> = []     // 读到过按客户端状态（<角色>@<客户端>-state.json）的角色
+    var clientStates: [String: (text: String, at: Date)] = [:]   // key → 最后一次按客户端的状态（新开的窗口先演上）
+    var charStates: [String: (text: String, at: Date)] = [:]     // 角色 → 最后一次按角色的状态（旧钩子没有按客户端的那份时给额外那只）
+    var sessionsText: [String: String] = [:]  // 角色 → 最后一次的会话表（按客户端过滤后给额外那只）
+    var quotaCode: [String: (seq: Int, code: String)] = [:]   // 「角色|函数名」→ 最后一次给主桌宠的额度调用和它的先后序号（显示额度的那只照样来一遍）
+    var quotaSeq = 0
+    var sentRunning: String?
 
     // 反馈问题 用的
     let launchedAt = Date()
@@ -198,7 +215,12 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.screensAsleep = asleep; self?.updatePageHidden() }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in self?.pollStates() }
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.updateClickThrough() }
+        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            self?.updateClickThrough()
+            self?.companions.values.forEach { $0.updateClickThrough() }
+        }
+        // 多桌宠：每 5 秒告诉主桌宠页面哪些有窗口的 AI 程序在跑（开关打开或正集合时才做）
+        Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in self?.pushRunning() }
         quotaTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.refreshCodexQuota(.tick); self?.refreshAntigravityQuota() }
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.watchClaudeConfig() }
         // 检查更新：启动后 20 秒、之后每 3 小时，电脑从睡眠中醒来时也查一次（很多人的电脑一直不关机，只是合盖）

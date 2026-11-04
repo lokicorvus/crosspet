@@ -10,3 +10,8 @@ tests/windows/*/bin/
 tests/windows/*/obj/
 docs/prompts/时段与节日/*/
 docs/prompts/多会话/*/
+# 立绘生产线：成品图、对比页、原图存档都很大，不进 git（art/README.md）
+art/任务/*/成品/
+art/任务/*/对比.html
+art/任务/*/缩略图/
+art/原图/

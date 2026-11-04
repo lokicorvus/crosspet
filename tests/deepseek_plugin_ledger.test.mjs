@@ -14,10 +14,16 @@ function harness() {
     credentials: { resolve: async () => ({ value: 'sk-test' }) } }
   apply(ctx, { stateDir: join(dataDir, 'state'), dataDir, autostart: false, balanceGapMs: 1e9 })
   const fire = async (n, ...a) => { for (const h of handlers[n] || []) await h(...a, async () => {}) }
-  const rows = async () => {
-    await new Promise((r) => setTimeout(r, 80))
+  // 记录是排队异步写的：等到 ok(行) 成立再返回（最多 5 秒），不靠固定等多少毫秒（多写了 @ 状态文件后 80ms 不够）
+  const rows = async (ok = () => true) => {
     const p = join(dataDir, 'events', 'deepseek.jsonl')
-    return existsSync(p) ? readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
+    const read = () => existsSync(p) ? readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []
+    await new Promise((r) => setTimeout(r, 80))
+    for (const end = Date.now() + 5000; Date.now() < end; await new Promise((r) => setTimeout(r, 20))) {
+      const v = read()
+      if (ok(v)) return v
+    }
+    return read()
   }
   return { fire, rows, dataDir }
 }
@@ -45,7 +51,7 @@ test('不记内容：消息、工具参数都不进记录', async () => {
 test('超过 240 行截回 200 行，最后一行是最新的', async () => {
   const h = harness()
   for (let i = 0; i < 245; i++) await h.fire('tools/pre-execute', { name: `t${i}`, arguments: {} })
-  const rows = await h.rows()
+  const rows = await h.rows((v) => v.at(-1)?.tool === 't244')
   assert.ok(rows.length >= 200 && rows.length <= 240, String(rows.length))
   assert.equal(rows.at(-1).tool, 't244')
 })

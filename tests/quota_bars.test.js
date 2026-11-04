@@ -61,3 +61,19 @@ test('没有额度 → null', () => {
   assert.equal(B.of(null, now), null)
   assert.equal(B.of({ text: '' }, now), null)
 })
+
+// 名牌下的额度表是固定四列的网格（名字、条、百分比、时间）。两条都过了重置时间（都没时间）时，
+// 每行只画三格会让下一行的名字挤进上一行的第四格：「5小时 ▬ 100% 本周」，第二行只剩条和百分比
+test('每行都占满四格：都没有重置时间时也留空的时间格，不会串到下一行', () => {
+  const el = fakeEl()
+  B.render(el, B.of({ text: 'x', bars: [{ label: '5小时', left: 1, reset: now - 60 }, { label: '本周', left: 1, reset: now - 60 }] }, now))
+  assert.deepStrictEqual(el.children.map(r => r.children.map(c => c.className)),
+    [['ql', 'qtrack', 'qp', 'qt'], ['ql', 'qtrack', 'qp', 'qt']])
+})
+
+function fakeEl() {
+  const make = tag => ({ tag, className: '', textContent: '', style: {}, children: [],
+    append(...xs) { this.children.push(...xs) }, replaceChildren(...xs) { this.children = xs } })
+  global.document = { createElement: make }
+  return make('div')
+}

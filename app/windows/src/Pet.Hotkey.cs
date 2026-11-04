@@ -40,10 +40,11 @@ namespace CrossPet
             hotkeyFailed = !RegisterHotKey(hwnd, HotKeyId, 0x0001 | 0x0002 | 0x4000, choice.vk);   // Alt | Ctrl | 不连发
             if (hotkeyFailed) Store.Log($"快捷键 {choice.label} 注册失败（被别的程序占用了）");
         }
-        IntPtr HotKeyHook(IntPtr h, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        bool HotKeyHook(int msg, IntPtr wParam)
         {
-            if (msg == 0x0312 && wParam.ToInt32() == HotKeyId) { SetUserHidden(!userHidden); handled = true; }   // WM_HOTKEY
-            return IntPtr.Zero;
+            if (msg != 0x0312 || wParam.ToInt32() != HotKeyId) return false;   // WM_HOTKEY
+            SetUserHidden(!userHidden);
+            return true;
         }
         void SetUserHidden(bool hidden)
         {

@@ -9,6 +9,7 @@ final class DragView: NSView {
     var onDragStart: (() -> Void)?
     var onDragEnd: (() -> Void)?
     var onShake: (() -> Void)?        // 按住快速来回甩（惹她生气）
+    var originKey = "origin"          // 松手时位置记在哪：主桌宠 origin，额外那只 origin-<角色>@<客户端>
     private var shook = false          // 这次拖动甩过：松手不贴边
     private var swingX: CGFloat = 0, swingDir: CGFloat = 0, swings: [Date] = [], shakeSaid = Date.distantPast
     private var downAt: NSPoint = .zero
@@ -46,7 +47,7 @@ final class DragView: NSView {
     }
     override func mouseUp(with event: NSEvent) {
         if dragged {
-            if let o = window?.frame.origin { defaults.set([o.x, o.y], forKey: "origin") }
+            if let o = window?.frame.origin { defaults.set([o.x, o.y], forKey: originKey) }
             if !shook { onDragEnd?() }   // 甩她的时候松手不贴边
         } else {
             onClick?(convert(event.locationInWindow, from: nil))

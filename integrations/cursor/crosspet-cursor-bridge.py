@@ -25,6 +25,8 @@ if os.name == 'nt':
 else:
     ROOT = Path(os.environ.get('CROSSPET_DATA_DIR') or Path.home() / 'Library/Application Support/CrossPet')
     STATE = Path(os.environ.get('CROSSPET_STATE_DIR') or '/tmp/crosspet')
+# 多桌宠按客户端分：会话条目带 client，另写 <角色>@cursor-state.json（同 crosspet-hook.py 的 detect_client）
+CLIENT = 'cursor'
 BIG_JOB_TOOLS = 8  # Same as crosspet-hook.py: a turn with this many tools ends 'proud'.
 # Poses that mean a conversation is not working right now.
 RESTING = ('idle', 'happy', 'proud', 'oops', 'surprised')
@@ -314,6 +316,12 @@ def handle(event):
         atomic(STATE / 'cursor-host.json', {'character': None if character == 'current' else character,
                                             'model': model, 'source': 'cursor', 'ts': now})
         atomic(STATE / f'{character}-state.json', activity)
+        # 多桌宠：另外按客户端写一份 <角色>@cursor-state.json（同 crosspet-hook.py，不管开关开没开都写）。
+        # 主文件先写好；这份是附加的，写不了就算了，不能影响主文件和 Cursor
+        try:
+            atomic(STATE / f'{character}@{CLIENT}-state.json', {**activity, 'client': CLIENT})
+        except Exception:
+            pass
         atomic(STATE / 'cursor-bridge-status.json', {'installed': True, 'last_event': kind,
                'artwork_ready': character == 'current' or installed(character), 'ts': now})
 
@@ -339,7 +347,7 @@ def _write_cards_locked(character, sessions, now):
             continue   # 这个会话用的是别的模型，卡片在那个角色的文件里
         state = value['state']
         pose = state.get('after') or state['pose'] if state['pose'] == 'thinking' else state['pose']
-        cards[k] = {'pose': pose, 'event': state['event'], 'ts': state['ts']}
+        cards[k] = {'pose': pose, 'event': state['event'], 'ts': state['ts'], 'client': CLIENT}
     atomic(path, {**others, **cards})
 
 

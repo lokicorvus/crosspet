@@ -102,6 +102,13 @@ static class Program
         Check("缩放修正：100% 时偏小 0.8 不像算两遍，不修", ZoomCheck.Fix(280, 372, 224, 298, 1.0, 1) == null);
         Check("缩放修正：修过以后又好了（偏大回去）→ 撤销成 1", Near(ZoomCheck.Fix(280, 372, 350, 465, 1.25, 0.8), 1));
         Check("缩放修正：量到的数不对劲不修", ZoomCheck.Fix(280, 372, 0, 0, 1.25, 1) == null);
+        // 10-29 反馈：系统缩放 100%，网页始终是应有的 2/3——WebView2 把 Windows「文本大小 150%」也算进了缩放
+        Check("文本大小：100% 缩放、文本 150%、网页 2/3 → 修正 0.667", Near(ZoomCheck.Fix(260, 362, 174, 242, 1.0, 1, 1.5), 0.667));
+        Check("文本大小：人物 160% 时也一样（173×241）", Near(ZoomCheck.Fix(260, 362, 173, 241, 1.0, 1, 1.5), 0.667));
+        Check("文本大小：读不到（100%）时照旧不修", ZoomCheck.Fix(260, 362, 174, 242, 1.0, 1) == null);
+        Check("文本大小：文本 125% 对不上 2/3 不修", ZoomCheck.Fix(260, 362, 174, 242, 1.0, 1, 1.25) == null);
+        Check("文本大小：125% 缩放 × 文本 120% → 修正 1/1.5", Near(ZoomCheck.Fix(300, 300, 200, 200, 1.25, 1, 1.2), 0.667));
+        Check("文本大小：修过以后对上了不再改", ZoomCheck.Fix(260, 362, 260, 362, 1.0, 0.667, 1.5) == null);
         // #28：换缩放后网页区域还停在旧缩放的像素上（虚拟显示器 + 混合显卡）：偏差正好是「旧缩放 ÷ 新缩放」
         Check("旧缩放：150%→200% 网页 195×271（应为 260×362）认得出", ZoomCheck.StuckAtOldDpi(260, 362, 195, 271, 1.5, 2.0));
         Check("旧缩放：200%→150% 网页 346×483 认得出", ZoomCheck.StuckAtOldDpi(260, 362, 346, 483, 2.0, 1.5));
@@ -151,6 +158,10 @@ static class Program
         try { Directory.Delete(icRoot, true); } catch { }
 
         // 「跟着 AI」取消置顶时插到谁下面（1.3.7 用户反馈：右键几次 / 换角色后她不见了——前台是桌面时被插到了壁纸下面）
+        Check("全屏：任务栏自动隐藏时最大化的普通窗口（有标题栏）不算全屏", ZOrderRule.JustMaximized(true, 0x16CF0000));
+        Check("全屏：最大化的无边框程序（只有可拖边框，如 Electron）不算全屏", ZOrderRule.JustMaximized(true, unchecked((int)0x96040000)));
+        Check("全屏：浏览器 F11 / 视频全屏（去掉了标题栏和边框）算全屏", !ZOrderRule.JustMaximized(false, unchecked((int)0x96000000)));
+        Check("全屏：最大化的无边框弹出窗口（部分游戏、播放器）算全屏", !ZOrderRule.JustMaximized(true, unchecked((int)0x91000000)));
         Check("层级：前台是普通程序，插到它下面", ZOrderRule.TuckBelow("Chrome_WidgetWin_1", false));
         Check("层级：前台是桌面（Progman），不插", !ZOrderRule.TuckBelow("Progman", false));
         Check("层级：前台是桌面（WorkerW），不插", !ZOrderRule.TuckBelow("WorkerW", false));
@@ -203,6 +214,71 @@ static class Program
         Directory.Delete(cardRoot, true);
         Check("缩放：#28 的 200% 下 195×271 是 0.75 倍，不冒充重复 DPI 的 0.5 倍", ZoomCheck.Off(260, 362, 195, 271, 195, 271)
             && ZoomCheck.Fix(260, 362, 195, 271, 2, 1) == null);
+
+        // 多桌宠：额外那几只第一次出现放在哪（CompanionPlace.Slots，物理像素、y 向下；规则同 macOS 的 companionSlots，
+        // 那边测试 tests/companion_place_probe.sh）。都要整个在可见区里、两两不重叠、不压着主桌宠
+        // bodies：只比去掉顶上气泡空白的那部分（屏幕放不下整窗口时允许压着气泡空白）
+        // cores：再去掉左右两边的透明边（排不下时左右相邻压着这截，见 CompanionPlace.SideShare）
+        string Layout(CompanionPlace.Rect main, int n, CompanionPlace.Size size, CompanionPlace.Rect vis, bool bodies = false, bool cores = false)
+        {
+            var s = CompanionPlace.Slots(main, n, size, vis);
+            CompanionPlace.Rect B(CompanionPlace.Rect r) => cores ? CompanionPlace.Core(r) : bodies ? CompanionPlace.Body(r) : r;
+            if (s.Length != n) return $"只有 {s.Length} 只（要 {n} 只）";
+            bool Over(CompanionPlace.Rect a, CompanionPlace.Rect b) => a.X < b.X + b.W - 0.01 && b.X < a.X + a.W - 0.01 && a.Y < b.Y + b.H - 0.01 && b.Y < a.Y + a.H - 0.01;
+            for (int i = 0; i < n; i++)
+            {
+                var r = s[i];
+                if (r.X < vis.X - 0.01 || r.Y < vis.Y - 0.01 || r.X + r.W > vis.X + vis.W + 0.01 || r.Y + r.H > vis.Y + vis.H + 0.01) return $"第 {i + 1} 只出了可见区：{r.X} {r.Y}";
+                if (Over(B(r), B(main))) return $"第 {i + 1} 只压着主桌宠";
+                for (int j = 0; j < i; j++) if (Over(B(r), B(s[j]))) return $"第 {j + 1} 和第 {i + 1} 只重叠";
+            }
+            return "ok";
+        }
+        CompanionPlace.Rect R(double x, double y, double w, double h) => new CompanionPlace.Rect(x, y, w, h);
+        var pet1 = new CompanionPlace.Size(260, 362);
+        // 1920×1080、任务栏 40：主桌宠在默认位置（右边留 40、底下留 100），叫出 12 只
+        var vis1080 = R(0, 0, 1920, 1040);
+        var mainBR = R(1920 - 260 - 40, 1040 - 362 - 100, 260, 362);
+        var l12 = Layout(mainBR, 12, pet1, vis1080);
+        Check("多桌宠位置：12 只都在可见区里、两两不重叠（" + l12 + "）", l12 == "ok");
+        var first = CompanionPlace.Slots(mainBR, 1, pet1, vis1080);
+        Check("多桌宠位置：第一只紧挨在主桌宠左边、底边对齐", first.Length == 1 && first[0].X == 1620 - 260 && first[0].Y == 578);
+        var seven = CompanionPlace.Slots(mainBR, 7, pet1, vis1080);
+        Check("多桌宠位置：左边排满 6 只后第 7 只往上一排、在主桌宠正上方", seven.Length == 7 && seven[6].X == 1620 && seven[6].Y == 578 - 362);
+        var leftEdge = CompanionPlace.Slots(R(40, 578, 260, 362), 1, pet1, vis1080);
+        Check("多桌宠位置：主桌宠在最左边时放右边", leftEdge.Length == 1 && leftEdge[0].X == 300 && leftEdge[0].Y == 578);
+        // 1280×720 的小屏（任务栏 40）：人物最小（0.6 倍，156×217）时 12 只也都放得下、不重叠
+        var vis720 = R(0, 0, 1280, 680);
+        var small = new CompanionPlace.Size(156, 217);
+        var l720 = Layout(R(1280 - 156 - 40, 680 - 217 - 100, 156, 217), 12, small, vis720);
+        Check("多桌宠位置：1280×720 屏幕上 12 只都在可见区里、两两不重叠（" + l720 + "）", l720 == "ok");
+        // 副屏在左边（负坐标）、主桌宠贴边缩出屏幕一半：照样都在可见区里
+        var lSecond = Layout(R(-1920 - 130, 300, 260, 362), 6, pet1, R(-1920, 0, 1920, 1040));
+        Check("多桌宠位置：副屏 + 主桌宠缩出屏幕（" + lSecond + "）", lSecond == "ok");
+        // 文字放大后画布比人物宽：主桌宠比额外那只宽 / 窄都不重叠
+        var lWide = Layout(R(1500, 600, 348, 341), 8, pet1, vis1080);
+        var lNarrow = Layout(mainBR, 8, new CompanionPlace.Size(348, 341), vis1080);
+        Check("多桌宠位置：主桌宠和额外那只宽窄不同（" + lWide + " / " + lNarrow + "）", lWide == "ok" && lNarrow == "ok");
+        // 笔记本屏幕（可见区高 859，两排整窗口要 862）、主桌宠在右上：整窗口只排得下一排 3 格；
+        // 6 只要压着气泡空白排成两排，人物不重叠（以前后 3 只叠在前 3 只上）
+        var lLaptop = Layout(R(1164, 38, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true);
+        var lLaptop3 = Layout(R(1164, 38, 310, 431), 3, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859));
+        Check("多桌宠位置：笔记本屏幕上 6 只压着气泡空白排两排（" + lLaptop + " / " + lLaptop3 + "）", lLaptop == "ok" && lLaptop3 == "ok");
+        // 主桌宠在屏幕中间（11-02 截图）：和她底边对齐往上、往下都差一点排不下第二排，以前后 3 只错开叠在前 3 只上
+        var lMid = string.Join(" / ", new[] { 151, 251, 351 }.Select(y => Layout(R(1164, y, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 38, 1512, 859), bodies: true)));
+        Check("多桌宠位置：主桌宠在屏幕中间也排得下两排（" + lMid + "）", lMid == "ok / ok / ok");
+        // 主桌宠在屏幕正中间（11-03 截图）：左边放两列整窗口差 2 点，以前只排得下 4 格，第 5、6 只错开叠在前面那只上；
+        // 现在左右相邻压着两边的透明边排（人物、名牌、额度条不压）
+        var lCenter = Layout(R(618, 213, 310, 431), 6, new CompanionPlace.Size(310, 431), R(0, 25, 1512, 871), cores: true);
+        Check("多桌宠位置：主桌宠在正中间时 6 只左右压着透明边排（" + lCenter + "）", lCenter == "ok");
+        // 默认大小在 1280×720 上放不下 12 只：躲不开重叠，但每只都夹在可见区里
+        var crowded = CompanionPlace.Slots(R(1280 - 260 - 40, 680 - 362 - 100, 260, 362), 12, pet1, vis720);
+        Check("多桌宠位置：放不下时 12 只照样都在可见区里", crowded.Length == 12
+            && crowded.All(r => r.X >= -0.01 && r.Y >= -0.01 && r.X + r.W <= 1280.01 && r.Y + r.H <= 680.01));
+        // 叠放时要错开：不能有两只左上角完全重合（完全盖住就只看得见一只）
+        Check("多桌宠位置：放不下时 12 只左上角两两不重合", crowded.Select(r => (r.X, r.Y)).Distinct().Count() == 12);
+        Check("多桌宠位置：0 只、空尺寸不出错", CompanionPlace.Slots(mainBR, 0, pet1, vis1080).Length == 0
+            && CompanionPlace.Slots(mainBR, 3, new CompanionPlace.Size(0, 0), vis1080).Length == 0);
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

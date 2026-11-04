@@ -9,7 +9,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 /* 从下往上排：底栏（名牌 + 额度）固定高度贴着窗口底边，人物在它上面，气泡从人物头顶往上长。
    这样名牌开关、额度有几行、台词有多长，人物都不挪位置，额度也不会被长台词挤出窗口
    （Windows 上微软雅黑行高大，之前开着名牌、台词折两三行时额度会被挤出去） */
-#wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100vh; }
+#wrap { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: var(--fit-h, 100vh); }
+#fit { transform-origin: 0 0; }   /* 网页实际拿到的大小和画布对不上时整体等比缩放（见 refit） */
 #wrap > * { flex-shrink: 0; }
 /* 底栏最小高度按 max(1, k)：字比人小时不缩，人物不往下掉 */
 #foot { min-height: calc(62px * max(1, var(--k))); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
@@ -30,6 +31,8 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #newsCard button.go { color: #c8792f; font-weight: 600; }
 #stage { position: relative; width: 250px; height: 241px; transition: transform .32s ease, opacity .32s ease; }
 #stage.swap { transform: scale(.9) translateY(4%); opacity: 0; }
+/* 额外那只先在屏幕外备着（Windows 预开窗口，见 prepareThen）：整页不显示，登场时 arriveNow() 再噗一下出来 */
+body.parked { visibility: hidden; }
 #aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
   border-radius: 50%; opacity: var(--aura-o);
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
@@ -48,6 +51,7 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
   opacity: 0; transition: opacity .35s ease; }
 #body img.on { opacity: 1; }
 #body img#blink { transition: none; }
+#body img:not([src]), #body img[src=""] { visibility: hidden; }   /* 还没换上立绘：WebKit 会给没图的 img 画一圈灰框（额外那只刚开窗口时闪一下） */
 #fx { position: absolute; inset: 0; transition: opacity .3s; pointer-events: none; }
 /* 闲着久了：身边的特效淡出（见「特效省电」） */
 #fx.rest { opacity: 0; transition: opacity 1.2s; }
@@ -96,6 +100,8 @@ html.tucked-art #body { animation: none !important; transform: none !important; 
   color: #6b4a3a; font-size: calc(11px * var(--k)); min-height: calc(14px * var(--k)); }
 #caption:empty { visibility: hidden; }
 html.no-name #caption { display: none; }
+/* 额外那只：同一个角色站了两只时，名字下面一行小字标客户端（「桌面」「终端」，setRole 的 info.label） */
+#caption[data-label]:not([data-label=""])::after { content: attr(data-label); display: block; text-align: center; font-size: .78em; line-height: 1.2; opacity: .65; }
 #quota { max-width: calc(236px * var(--k)); text-align: center; line-height: 1.35; margin-top: calc(2px * var(--k)); padding: calc(1px * var(--k)) calc(8px * var(--k));
   border-radius: calc(7px * var(--k)); background: rgba(255,255,255,.8); color: #6b4a3a; font-size: calc(10px * var(--k)); }
 #quota:empty { display: none; }
@@ -111,6 +117,7 @@ html.no-name #caption { display: none; }
 #quota .qtrack i { display: block; height: 100%; border-radius: inherit; background: var(--bar); }
 #quota .qp { padding-left: calc(4px * var(--k)); font-weight: 700; color: var(--bar); text-align: right; white-space: nowrap; }
 #quota .qt { padding-left: calc(4px * var(--k)); font-size: calc(8.5px * var(--k)); color: #a8958a; white-space: nowrap; }
+#quota .qt:empty { padding-left: 0; }   /* 都没有重置时间时，第四列空着、不占地方 */
 #quota .qc.qbarcell { display: flex; align-items: center; gap: calc(3px * var(--k)); }   /* 合并显示里的短条格子 */
 #quota .qc.qbarcell .ql { padding-right: 0; }
 #quota .qc.qbarcell .qtrack { width: calc(34px * var(--k)); min-width: 0; flex: none; }
@@ -191,7 +198,7 @@ html.no-name #caption { display: none; }
 @keyframes surface { from { opacity: 0; transform: translateY(5%) scale(.97); } to { opacity: 1; transform: none; } }
 </style></head>
 <body>
-<div id="wrap">
+<div id="fit"><div id="wrap">
   <div id="bubble" class="hide"></div>
   <div id="stage">
     <div id="aura"></div><div id="shadow"></div>
@@ -202,7 +209,7 @@ html.no-name #caption { display: none; }
     <div id="poof"><i style="--dx:-60px;--dy:-30px"></i><i style="--dx:55px;--dy:-35px"></i><i style="--dx:-45px;--dy:40px"></i><i style="--dx:50px;--dy:35px"></i><i style="--dx:0;--dy:-60px"></i></div>
   </div>
   <div id="foot"><div id="caption"></div><div id="quota"></div></div>
-</div>
+</div></div>
 <script>
 // 立绘加载失败：告诉 Windows 外壳记进日志（反馈里能看出是哪张图）。macOS 上没有这个通道，不做任何事
 // 同时记下最近 5 次失败的文件名（只要文件名），反馈时 diagnoseDisplay 交出去
@@ -225,6 +232,9 @@ addEventListener('error', e => {
 <script src="codex-resets.js"></script>
 <script src="whats-new.js"></script>
 <script src="peak-hours.js"></script>
+<script src="companions.js"></script>
+<script src="friendship.js"></script>
+<script src="pair-chat.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -237,6 +247,8 @@ addEventListener('error', e => {
 //   setPeakSkins(map)       按时段换衣服的设置 { 角色: { peak: 皮肤, valley: 皮肤 } }（'' = 原版，没写 = 不换）
 //   handleClick(kind)       单击 = pat（摸摸头），右键菜单「戳一下」= poke
 //   playEgg(force)          彩蛋
+//   多桌宠（设置「几个 AI 各显示一只」，默认关）：setRole、setMultiPets、setForeground、setRunning、applyClientState、
+//   gather、dismiss、sendHome、notePat，见下面「多桌宠」一节；额外那只的页面还有 leaveNow
 
 const MOTION = {
   idle: 'm-bob', listening: 'm-hop', thinking: 'm-rock', reading: 'm-rock', writing: 'm-bob', running: 'm-quick',
@@ -247,6 +259,8 @@ const MOTION = {
   deepthink: 'm-slow', swim: 'm-sway', eat: 'm-bob', slack: 'm-slow', pout: 'm-jolt',
   reset: 'm-jump', feast: 'm-bob', compact: 'm-squish', sorry: 'm-slow', clawd: 'm-sway', float: 'm-float',
   asking: 'm-hop', update: 'm-gift',
+  roll_call: 'm-hop',   // 集合点名举手答「到！」
+  friend_up: 'm-hop',   // 关系升级（每对台词，pair-chat.js）
   // 甩她 / 红温
   annoyed: 'm-rock', puffed: 'm-jolt', redhot: 'm-angry', sulk: 'm-slow', dizzy: 'm-dizzy', coaxed: 'm-sway', forgiven: 'm-hop',
   // 按时段 / 节日打招呼
@@ -264,9 +278,9 @@ Object.assign(LOCAL_LINES, CodexResets.LINES)   // 重置提醒的默认台词�
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
   reset_check: 'thinking', reset_bell: 'reset', reset_hope: 'happy', reset_maybe: 'hum', reset_nope: 'sulk',   // Codex 重置提醒（见 codex-resets.js）
   busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
-  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy' }
+  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy' }
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
-  annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000 }
+  annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000, roll_call: 6000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
 const DWELL = 2500              // 每个状态至少停留这么久，太快的切换合并成最后一个
 const BACK_TO_THINKING = 1500   // 工具做完后等这么久没有新工具，才回到「思考」
@@ -282,6 +296,9 @@ let tucked = null   // 贴边缩着：'left' / 'right'（见「贴边」）
 let tuckedPeek = false   // 缩着时鼠标移上来：探出来、好奇地看着你
 let shownAt = 0, pending = null, thinkTimer = null, revertTimer = null
 let characterGeneration = 0, characterTimer = null, characterTarget = null
+// 这个页面是主桌宠（'main'，默认）还是额外那只（'companion'，外壳 setRole 交来）；roleInfo = { id, key, character, client, label }。
+// 放在最前面：下面不少函数开头要看它（额外那只不做只该做一次的事），有的在脚本加载时就会被调
+let role = 'main', roleInfo = null
 function characterTimeout(fn, ms, owner = charId, generation = characterGeneration) {
   return setTimeout(() => { if (owner === charId && generation === characterGeneration) fn() }, ms)
 }
@@ -334,14 +351,14 @@ setInterval(() => {
   }
 }, 2000)
 
-// instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入
-function setFx(p, instant) {
+// instant：同一个姿态里只是数字变了（比如更新进度），直接换掉，不淡出淡入；as：这个姿态改用别的特效（见 chat）
+function setFx(p, instant, as) {
   const fx = $('fx'), owner = charId, poseAt = p, generation = characterGeneration
   const render = () => {
     if (owner !== charId || generation !== characterGeneration || pose !== poseAt || multi) return
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
-    const named = char()?.fx?.[p]
-    const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(p)
+    const named = char()?.fx?.[as || p]
+    const inner = !window.CrossFx || as === 'none' ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(as || p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
   }
@@ -350,6 +367,7 @@ function setFx(p, instant) {
   setTimeout(render, 220)
 }
 function setPose(p, instant) {
+  if (p === 'sleeping' && neverSleep) p = quota[charId]?.low ? 'tired' : 'idle'   // 设置里关了睡觉：AI 会话结束、闲太久都不睡，醒着待机
   if (tucked) p = `edge_${tucked}${tuckedPeek ? '_peek' : ''}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
@@ -369,7 +387,61 @@ function setShowName(on) { document.documentElement.classList.toggle('no-name', 
 function setSizes(size, textSize, linked) {
   const L = TextSize.layout(size, TextSize.effectiveText(size, textSize, linked))
   document.documentElement.style.setProperty('--k', String(L.k))
+  canvasW = L.w; canvasH = L.h
+  refit()
   return JSON.stringify({ w: L.w, h: L.h, foot: L.foot })
+}
+// ---- 网页自己铺满窗口 ----
+// 外壳按「画布 × 人物大小」设窗口、按人物大小设网页缩放，正常时网页正好是画布大小。Windows 上 WebView2 偶尔多乘一个比例
+// （系统缩放算两遍、换屏后停在旧缩放、系统「文本大小」也算进去……），网页就比画布大或小，气泡和人物被挤出窗口。
+// 与其一种种认原因，不如量自己实际拿到多大：对不上就把整个画面等比缩放、底边居中铺进去。
+// 对外（hitRects、dockCut、handleClick 的坐标）一律用画布坐标，外壳那边的换算不用变；对得上时 fit = 1，什么都不动
+let canvasW = 0, canvasH = 0, fit = 1, fitX = 0, fitY = 0
+function refit() {
+  const box = $('fit'), vw = innerWidth, vh = innerHeight
+  let f = canvasW > 0 && canvasH > 0 && vw > 0 && vh > 0 ? Math.min(vw / canvasW, vh / canvasH) : 1
+  if (Math.abs(f - 1) < 0.015) f = 1   // 取整误差
+  fit = f
+  if (f === 1) {
+    fitX = fitY = 0
+    box.style.width = box.style.height = box.style.transform = ''
+    document.documentElement.style.removeProperty('--fit-h')
+    return
+  }
+  fitX = (vw - canvasW * f) / 2; fitY = vh - canvasH * f   // 左右居中、底边对齐（和平时 #wrap 的排法一样）
+  box.style.width = canvasW + 'px'; box.style.height = canvasH + 'px'
+  box.style.transform = `translate(${fitX}px, ${fitY}px) scale(${f})`
+  document.documentElement.style.setProperty('--fit-h', canvasH + 'px')
+}
+addEventListener('resize', refit)
+// 网页坐标（getBoundingClientRect 量的）→ 画布坐标
+function toCanvas(r) { return { left: (r.left - fitX) / fit, top: (r.top - fitY) / fit, width: r.width / fit, height: r.height / fit } }
+// Windows 系统直接合成的窗口（DirectHost.cs）：网页不再隔着一层接鼠标的透明层，鼠标直接落到网页上。
+// 外壳调 setPointerBridge(true) 后，按下拖动、单击、右键都交给外壳照旧处理（摸头 / 拖窗口 / 甩 / 菜单）：
+//   toShell({ pointer: 'drag' })                 按住移动超过 4 像素：外壳接手拖窗口
+//   toShell({ pointer: 'click', x, y })          单击，x、y 是画布坐标（和以前外壳算好交给 handleClick 的一样）
+//   toShell({ pointer: 'menu', shift })          右键
+// 网页自己不响应这些点击（卡片按钮也照旧由 handleClick 按坐标判断），和以前收不到鼠标时一样
+let pointerBridge = false
+function setPointerBridge(on) { pointerBridge = !!on }
+{
+  let down = null
+  const swallow = e => { if (pointerBridge) { e.preventDefault(); e.stopPropagation() } }
+  addEventListener('mousedown', e => { if (!pointerBridge) return; swallow(e); if (e.button === 0) down = { x: e.screenX, y: e.screenY } }, true)
+  addEventListener('mousemove', e => {
+    if (!pointerBridge || !down) return
+    if (!(e.buttons & 1)) { down = null; return }
+    if (Math.abs(e.screenX - down.x) + Math.abs(e.screenY - down.y) > 4) { down = null; toShell({ pointer: 'drag' }) }
+  }, true)
+  addEventListener('mouseup', e => {
+    if (!pointerBridge) return
+    swallow(e)
+    if (e.button !== 0 || !down) return
+    down = null
+    toShell({ pointer: 'click', x: Math.round((e.clientX - fitX) / fit * 10) / 10, y: Math.round((e.clientY - fitY) / fit * 10) / 10 })
+  }, true)
+  for (const t of ['click', 'dblclick', 'auxclick']) addEventListener(t, swallow, true)
+  addEventListener('contextmenu', e => { if (!pointerBridge) return; swallow(e); toShell({ pointer: 'menu', shift: e.shiftKey }) }, true)
 }
 // 背景光晕：'auto'（跟着系统深浅色）/ 'on' / 'off'，由宿主调用
 function setAuraMode(mode) {
@@ -390,7 +462,7 @@ function hitRects() {
     if (!el || (id === 'bubble' && el.classList.contains('hide')) || el.classList.contains('hidden')) continue
     const cs = getComputedStyle(el)
     if (cs.display === 'none' || cs.visibility === 'hidden') continue
-    const r = el.getBoundingClientRect()
+    const r = toCanvas(el.getBoundingClientRect())
     if (r.width < 1 || r.height < 1) continue
     out.push([r.left - 4, r.top - 4, r.width + 8, r.height + 8].map(Math.round))
   }
@@ -431,6 +503,7 @@ const RESETS_URL = 'https://codex-resets.com/api/v1/status'
 let resetsOn = false, resetsData = null, resetsAt = 0, resetsTimer = null, codexResetSeenAt = 0, resetsWaiting = false
 let devResetsSaved = null   // 开发者控制台预演中：预演前的真实开关（见 devResetsPlay）
 function setCodexResets(on) {
+  if (role !== 'main') return   // 额外那只不查、不提醒（只该做一次的事，见「多桌宠」）
   resetsOn = !!on
   clearTimeout(resetsTimer)
   if (!resetsOn) { resetsData = null; resetsAt = 0; renderQuota(); return }
@@ -439,6 +512,7 @@ function setCodexResets(on) {
 // 查一次：成功更新 resetsData。返回 { ok: 这次查到了没有, wait: 下次多久后再查（毫秒）}。
 // 失败时保留上次查到的（额度下方那一行、主动提醒照用：官方宣布不会因为断网就失效），但问她时照实说连不上
 async function fetchResets() {
+  if (role !== 'main') return { ok: false, wait: 10 * 60 * 1000 }
   const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 10000)
   const fail = { ok: false, wait: 10 * 60 * 1000 }
   try {
@@ -453,6 +527,7 @@ async function fetchResets() {
   } catch { return fail } finally { clearTimeout(timer) }
 }
 async function pollResets() {
+  if (role !== 'main') return
   clearTimeout(resetsTimer)
   const { wait } = await fetchResets()
   if (!resetsOn || devResetsSaved) return   // 关了，或正在预演（演完 devResetsDone 会重新开始查）
@@ -481,6 +556,7 @@ function tellReset(data = resetsData) {
 }
 // 右键「会重置吗？」：先想一下，每次都现查（是你点的、不常点，查一次不费事）；这次没查到就照实说连不上，不拿旧结果顶替
 async function askReset() {
+  if (role !== 'main') return
   if (!resetsOn || charId !== 'gpt' || egg || characterTimer) return
   const generation = characterGeneration
   clearTimeout(revertTimer)
@@ -498,6 +574,7 @@ async function askReset() {
 }
 // 主动说一次：只在她是 GPT、闲着时说；不是 GPT 就等 setCharacter 切到 GPT 时再调
 function announceReset() {
+  if (role !== 'main') return
   if (!resetsOn || charId !== 'gpt' || resetsWaiting) return
   const a = CodexResets.toAnnounce(resetsData, Date.now() / 1000, codexResetSeenAt, resetsTold())
   if (!a) return
@@ -606,6 +683,7 @@ function peakApplied(id, key) {
 }
 // 外壳在网页加载完、设置变化时调。改设置不马上换：先把每个角色记成「这一段已经处理过」，等下一段
 function setPeakSkins(map) {
+  if (role !== 'main') return   // 换衣服只由主桌宠页面判（记号存在共用的 localStorage 里）
   const startup = peakSkins === null
   peakSkins = map && typeof map === 'object' ? map : {}
   if (!startup) for (const id of Object.keys(PeakHours.RULES)) peakApplied(id, PeakHours.decide(PeakHours.RULES[id], peakNow(), null, null).key)
@@ -616,6 +694,7 @@ function peakBusy() {
   return !!(egg || multi || updatingNow || farewellLine !== null || tucked || characterTimer || aiActivity() || !$('bubble').classList.contains('hide'))
 }
 function checkPeakOutfits(startup) {
+  if (role !== 'main') return
   if (!peakSkins || !window.PeakHours) return
   for (const [id, rule] of Object.entries(PeakHours.RULES)) {
     const c = manifest.characters[id]
@@ -732,8 +811,27 @@ function init(m) {
   // 正在换角色、要换上的那个还在新清单里：让它换完（换衣服时外壳会重新 init）
   if (characterTarget && manifest.characters[characterTarget]) return
   if (characterTarget) { ++characterGeneration; clearTimeout(characterTimer); characterTimer = null; characterTarget = null; $('stage').classList.remove('swap') }
-  if (!charId || !manifest.characters[charId]) setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
-  else { $('caption').textContent = char().name }
+  if (!charId || !manifest.characters[charId]) {
+    // 额外那只：直接换上外壳要的角色、不 quiet（噗一下、说登场招呼）。不能先悄悄换上排第一的：
+    // 她正好是排第一的那个时，外壳接着的 setCharacter(同一个) 就成了空操作，没有噗也没有招呼
+    // 屏幕外备着的（roleInfo.parked）：悄悄换上、整页藏着，登场时外壳调 arriveNow()
+    const want = role === 'companion' && roleInfo?.character
+    if (want && roleInfo?.parked) document.body.classList.add('parked')
+    if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want, !!roleInfo?.parked)
+    else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
+  } else { $('caption').textContent = char().name }
+  sendStoredFriendship()
+  restoreGathered()
+}
+// 主桌宠页面第一次 init 完：存着友谊就交一次给外壳（不管开关开没开），重启后开关关着设置页也能显示灰的列表。额外那只不发
+let storedFriendshipSent = false
+function sendStoredFriendship() {
+  if (role !== 'main' || storedFriendshipSent) return
+  storedFriendshipSent = true
+  const store = friendStoreRead()
+  if (!Object.keys(store).length) return
+  const names = Object.fromEntries(Object.entries(manifest.characters || {}).map(([id, c]) => [id, c.name]))
+  toShell({ friendship: Friendship.rows(store, names) })
 }
 
 // 登场台词冷却：同一个角色 30 分钟内只打一次招呼，在几个 AI 的 App 之间来回切时不用每次都听「XX 来了」
@@ -743,6 +841,39 @@ function greetDue(id) {
   if (Date.now() - (greetedAt[id] || 0) < GREET_COOLDOWN) return false
   greetedAt[id] = Date.now()
   return true
+}
+
+// 登场招呼。集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
+function arrivalGreeting(id, c, busy) {
+  const roll = role === 'companion' && /@gather(#\d+)?$/.test(roleInfo?.id || '')
+  if (roll) rollCall(c, busy)
+  else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
+}
+// 举手答到：有专属图就用（art/姿态/roll_call.md），没有用 proud；show 会按 TRANSIENT 回到常态。正在干活不换图、只说
+function rollCall(c, busy) { if (!busy) show(hasPose('roll_call') ? 'roll_call' : 'proud', true); say(`${c.name}到！`) }
+const busyNow = () => { const s = charState[charId]; return !!(s && Date.now() / 1000 - s.ts < 60 && !TRANSIENT[s.pose] && s.pose !== 'idle') }
+// 由主桌宠调（companionCall）：集合时她已经站着（干活冒出来的、程序开着就在的），不另开窗口，就地答到。演彩蛋、道别、更新时不答
+function answerRoll() {
+  const c = char()
+  if (!c || egg || farewellLine !== null || updatingNow || leavingNow) return
+  rollCall(c, busyNow() || aiActivity())
+}
+// 由外壳调（额外那只，屏幕外备好的窗口挪到位置了）：和换角色一样噗一下出来、说登场招呼
+function arriveNow() {
+  if (!document.body.classList.contains('parked')) return
+  // 先不带过渡直接藏好再放出整页：#stage 有淡出过渡，带着过渡的话会先看到她站着、淡出、再噗出来（1.3.9-test.12 看到的闪一下）
+  const stage = $('stage')
+  stage.style.transition = 'none'
+  stage.classList.add('swap')
+  void stage.offsetWidth
+  stage.style.transition = ''
+  document.body.classList.remove('parked')
+  const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
+  setTimeout(() => {
+    stage.classList.remove('swap')
+    const c = char()
+    if (c) arrivalGreeting(charId, c, busyNow())
+  }, 330)
 }
 
 function setCharacter(id, quiet) {
@@ -762,6 +893,7 @@ function setCharacter(id, quiet) {
   }
   dropTimers()
   characterTarget = id
+  if (role === 'main' && companionsRunning()) updateCompanions()   // 换成了站着的那只的角色：马上对调，和她同时噗
   endMulti()
   characterTimeout(refreshMulti, 700, id, generation)   // 换过去的角色如果也有好几个对话在干活，接着演
   characterTimeout(preloadEdges, 900, id, generation)
@@ -787,8 +919,9 @@ function setCharacter(id, quiet) {
     if (busy) watchStuck()   // 接着演她自己的活：卡住兜底按她自己的时间重新算
     if (busy && s.pose === 'listening') thinkTimer = characterTimeout(() => show('thinking'), LISTEN_TO_THINKING)
     // 这个时段 / 节日还没打过招呼：演专属的登场动作；打过了就用平常那句（30 分钟冷却）
+    // 集合来的那只（窗口 id <角色>@gather）：大家演同一个得意动作、说「（名字）到！」，不用各自的招呼（也不看冷却）
     if (quiet) say('')
-    else if (!timeGreet(id, busy)) say(greetDue(id) ? (c.greeting || `${c.name} 在这儿～`) : '')
+    else arrivalGreeting(id, c, busy)
     renderQuota()
     if (id === 'gpt') characterTimeout(announceReset, 2000)   // 不是 GPT 时攒下的重置提醒，切过来再说
     const pend = pendingCelebration[id]
@@ -839,6 +972,7 @@ function greetMemory(update) {
 }
 // 返回 true = 打过招呼了（演了专属动作或说了专属台词）
 function timeGreet(id, busy) {
+  if (role !== 'main') return false   // 额外那只不演时段 / 节日招呼（记号在共用的 localStorage 里），只说平常那句
   const c = manifest.characters[id]
   if (!c || c.egg) return false
   const now = new Date(), fest = festivalOf(now), slot = timeSlot(now)
@@ -868,6 +1002,7 @@ setInterval(() => {
 // 装好后新版会自己重新打开，所以不用收尾；更新失败时宿主调 endUpdate() 回到常态
 let updatingNow = false
 function setUpdateProgress(pct, line) {
+  if (role !== 'main') return
   updatingNow = true
   if (egg) endEgg()
   clearTimeout(pending); clearTimeout(revertTimer)
@@ -886,6 +1021,7 @@ function endUpdate() {
 
 // 有新版本：演几秒「收到礼物」（没画 update 立绘时用 happy），气泡一直留着，等下次说别的话再换掉
 function notifyUpdate(tag) {
+  if (role !== 'main') return
   if (egg) return
   show('update', true)
   say(`有新版本 ${tag} 啦～右键菜单里点「更新」就好`)
@@ -954,12 +1090,12 @@ function preloadEdges() {
   for (const p of ['edge_left', 'edge_right', 'edge_left_peek', 'edge_right_peek', 'idle', 'tired']) for (const u of framesFor(p)) { const i = new Image(); i.src = u }
 }
 // 正在显示的立绘实际画出来的范围（object-fit: contain，按 object-position 对齐）
-function shownRect() {
-  const img = active, r = img.getBoundingClientRect(), nw = img.naturalWidth, nh = img.naturalHeight
+function shownRect() {   // 画布坐标
+  const img = active, r = toCanvas(img.getBoundingClientRect()), nw = img.naturalWidth, nh = img.naturalHeight
   if (!nw || !nh) return null
   const scale = Math.min(r.width / nw, r.height / nh), w = nw * scale, h = nh * scale
   const px = parseFloat(getComputedStyle(img).objectPosition) / 100
-  return { left: r.left + (r.width - w) * (isNaN(px) ? 0.5 : px), top: r.bottom - h, width: w, height: h }
+  return { left: r.left + (r.width - w) * (isNaN(px) ? 0.5 : px), top: r.top + r.height - h, width: w, height: h }
 }
 function dockCut(side) {
   const b = shownRect()
@@ -972,6 +1108,7 @@ function dockCut(side) {
 // 刚更新完（外壳检测到这次打开的版本比上次新）：这版有新功能就在头顶弹一张卡片「这次多了 N 个新功能」（去看看 / 知道了），
 // 没有（纯修 bug 的版本）就照旧说一句。last：上次的版本（跳过几版的合在一起算）。文案和判断在 whats-new.js
 function justUpdated(version, last) {
+  if (role !== 'main') return   // 刚更新完的开心、「新功能」卡片只由主桌宠来
   const n = window.WhatsNew ? WhatsNew.since(WhatsNew.LIST, last, version).length : 0
   if (!n) {
     setTimeout(() => {
@@ -983,8 +1120,20 @@ function justUpdated(version, last) {
   }
   queueNews(n, 6000)
 }
+// Windows 渲染出错后自动重启回来（外壳在网页就绪后调）：她说一声，免得以为「无缘无故不见了」（10-29 反馈）。
+// 以前是托盘通知，Windows 11 常常直接收进通知中心，用户看不到
+function justRecovered() {
+  setTimeout(() => {
+    if (egg || farewellLine !== null) return
+    show('oops', true)
+    say('刚才画面出错了，我重启了一下～')
+    clearTimeout(revertTimer)
+    revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, 8000)
+  }, 2500)
+}
 // 等她闲下来再弹：不在彩蛋、AI 没在干活、没在道别 / 更新、没缩在边上；等不到就过一会儿再看，最多等 10 分钟（设置里的小红点还在）
 function queueNews(n, first) {
+  if (role !== 'main') return
   let tries = 0
   const attempt = () => {
     const calm = (pose === 'idle' || pose === 'tired') && !egg && aiActivity() !== 'work' && farewellLine === null && !updatingNow && !tucked
@@ -995,6 +1144,7 @@ function queueNews(n, first) {
 }
 let newsTimer = null, newsShown = 0
 function showNews(n) {
+  if (role !== 'main') return
   newsShown = n
   $('newsText').textContent = `更新好啦～这次多了 ${n} 个新功能`
   show('happy', true)
@@ -1110,6 +1260,12 @@ function noteRest(p) {
   if (RESTING.has(p)) restTimer = setTimeout(() => { if (RESTING.has(pose)) { fxResting = true; applyFxRate() } }, powerSave ? 10000 : 30000)
 }
 function setPowerSave(on) { powerSave = !!on; fxFps = -1; noteRest(pose); applyFxRate() }
+// 不睡觉（设置里，默认关）：闲着太久、AI 会话结束都不睡；正睡着时打开就醒过来
+let neverSleep = false
+function setNeverSleep(on) {
+  neverSleep = !!on
+  if (neverSleep && pose === 'sleeping') setPose('sleeping')
+}
 function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
 applyFxRate()
 
@@ -1117,14 +1273,16 @@ applyFxRate()
 // 外壳把 <角色>-sessions.json（{会话id: {pose, event, ts}}）交过来。两个以上同时在干活时她「手忙脚乱」：
 // 左右两帧来回切（busy_left / busy_right；三个以上换更崩溃的 swamped_*），每个对话一张小卡片演它正在做的事，
 // 她转向哪边，哪边的卡片就亮。干完的卡片打绿勾、出错的变红抖一下，停几秒后消失；有对话在等你回答时她换成「等你回答」
-const sessions = {}         // 角色 → {会话id: {pose, event, ts}}
+// sessions.current 是多模型宿主（Cursor 等）认不出角色的那些模型的会话（current-sessions.json），不改名、单独放：
+// 它们归主桌宠演（设计第一节），不算主桌宠角色的另一个客户端，不进多桌宠的判断，也不盖掉她自己的会话
+const sessions = {}         // 角色（或 'current'）→ {会话id: {pose, event, ts}}
 const SESSION_DONE_SHOW = 4  // 干完 / 出错的卡片停几秒
 const SESSION_FLIP = 1500    // 左右两帧多久换一次
 let multi = null             // 正在演：{ side, flipTimer, cards: Map(会话id → {el, pose, shownAt, pending}), order: [会话id] }
 
 function setSessions(id, map) {
-  if (id === 'current') id = charId
   sessions[id] = map || {}
+  updateCompanions()   // 先算主桌宠占着哪个客户端，refreshMulti 只演那个客户端的会话
   refreshMulti()
 }
 function sessionKind(e, now) {
@@ -1135,11 +1293,12 @@ function sessionKind(e, now) {
   if (e.pose === 'idle' || e.pose === 'sleeping') return null
   return age < STUCK_AFTER / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
 }
-// 当前角色要演的会话：她自己的，加上她响应的各家 AI 的（会话 id 各家不重复，直接合在一起）
+// 当前角色要演的会话：她自己的，加上她响应的各家 AI 的，再加上 current 的（会话 id 各家不重复，直接合在一起）。
+// current 的整个归主桌宠，不按她占着的客户端筛
 function currentSessions() {
-  const out = { ...(sessions[charId] || {}) }
-  for (const [host, map] of Object.entries(sessions)) if (standsIn(host)) Object.assign(out, map)
-  return out
+  const out = { ...claimedOnly(charId, sessions[charId] || {}) }
+  for (const [host, map] of Object.entries(sessions)) if (host !== 'current' && standsIn(host)) Object.assign(out, map)
+  return Object.assign(out, sessions.current || {})
 }
 function refreshMulti() {
   const map = currentSessions(), now = Date.now() / 1000
@@ -1277,7 +1436,14 @@ function diagnoseDisplay() {
   }
 }
 function applyCharState(id, s) {
-  if (id === 'current') id = charId   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由当前角色来演
+  // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由主桌宠（当前角色）来演。
+  // 要先于 playsByClient 判断：外壳不转发 current@* 文件，换成角色名再判会被当成「改由按客户端那份演」吞掉（设计第一节：未知模型算主桌宠占着的客户端）
+  if (id === 'current') { playCharState(charId, s); return }
+  // 多桌宠打开、这个角色有按客户端的状态：主桌宠改由 applyClientState 只演她占着的那个客户端（按角色的这份谁最后写就是谁的）
+  if (playsByClient(id)) { noteVerdict(id, s, 'by-client'); return }
+  playCharState(id, s)
+}
+function playCharState(id, s) {
   const own = id                      // 事件原本属于哪家 AI：先按它记下状态，切回那家的角色时看到的才是最新的
   charState[own] = s
   if (standsIn(id)) id = charId       // 代演（reactTo）：别家 AI 的状态当成她自己的（多个会话同时干活时，由 refreshMulti 合并）
@@ -1330,6 +1496,466 @@ function applyCharState(id, s) {
   }
 }
 
+// ---- 多桌宠：几个 AI 各显示一只（设置里的开关，默认关）----
+// 谁站着、谁走都在 companions.js 判断；这里只收外壳交来的东西、按时调 decide、把结果告诉外壳：
+//   toShell({ companions: [{ id, key, character, client, quota, label }], gathering })   该站着的额外桌宠。总是完整列表，变了才发
+//     gathering  正集合着（还有集合来的，或集合 / 解散正一只只错开）：外壳菜单显示「解散」、开关关着时也转发。
+//                列表没变、只有它变了也发
+//     id     窗口身份，外壳按它管窗口。集合来的那只始终是「<角色>@gather」（收编客户端后 key 会变，id 不变，
+//            不然外壳会关掉重开一只）；干活冒出来的 id = key
+//     key    「<角色>@<客户端>」，位置 / 贴边按它记
+//     quota  这只显示不显示额度（同一角色只有一只显示）
+//     label  同一个角色站了两只（主桌宠也算）时标「桌面」「终端」，否则 ''
+//   toShell({ companionLeave: id })                              这只说 bye 走（外壳调她页面的 leaveNow）
+//   toShell({ companionCall: { id, fn: 'celebrate', args } })   让那只演（额度庆祝交给显示这个角色额度的那只）
+//   toShell({ eggAllowed })                                      右键「召唤彩蛋」变灰用：有别的桌宠在场时 false
+//   toShell({ companionsPrepare: { batch, characters } })        要叫来的这几只先在屏幕外开好（只有说过 setShellPrepares(true) 的外壳）；
+//                                                                外壳备好了调 companionsPrepared(batch)，这边才开始一只只登场
+// 开关关着时这些一律不发、applyClientState 不演，行为和以前一样；只有你主动「集合」时例外（只叫集合来的，不冒干活的，
+// 解散完发一次空列表就停）。这一套只在主桌宠页面（role 'main'）做。
+// role / roleInfo 在脚本最前面声明
+let multiPets = { on: false, rest: 'auto', mainPet: '' }
+let foreground = null            // 前台 { kind: 'ai' | 'terminal' | 'ours' | 'other', character?, client? }
+let runningKeys = null           // 有窗口的 AI 程序在跑的「角色@客户端」（Set）；null = 外壳还没交，decide 当作不知道
+let claim = null                 // 主桌宠占着她角色的哪个客户端 { key, since }（Companions.mainClaim）
+// 每个程序（客户端）上次在里面的角色：「AI 程序开着就在」时，程序刚打开、还没会话就按它出（Companions.clientCharacter）
+const CLIENT_CHARS_KEY = 'crosspet-client-characters'
+let clientChars = null
+function rememberedClientChars() {
+  if (clientChars == null) { try { clientChars = JSON.parse(localStorage.getItem(CLIENT_CHARS_KEY)) || {} } catch { clientChars = {} } }
+  return clientChars
+}
+let companionsState = null       // decide 上次的 state；pets 里多记一个 id，decide 复制时会带着
+let gathered = [], gatherTimers = []   // 集合来 / 叫出来的角色；存在 localStorage（crosspet-gathered），重启、页面重载后再叫回来（restoreGathered）
+const GATHERED_KEY = 'crosspet-gathered'
+// 改 gathered 一律走这里：顺手存下来（只有主桌宠页面存）
+function setGathered(list) {
+  gathered = list
+  if (role === 'main') { try { localStorage.setItem(GATHERED_KEY, JSON.stringify(gathered)) } catch {} }
+}
+let sentCompanions = null        // 上次发出去的列表（JSON）；null = 还没发过，所以页面重载后第一次一定发完整列表
+let gatherPending = 0, sentGathering = false   // 集合 / 解散还没轮到的那几步；上次告诉外壳的 gathering
+const gatheringNow = () => gathered.length > 0 || gatherPending > 0
+let eggAllowedSent = true
+let companionsReadyAt = 0
+const clientStateSeen = {}       // 交来过按客户端状态（<角色>@<客户端>-state.json）的角色；旧钩子没有，主桌宠照旧按角色那份演
+const patAt = {}                 // 角色 → 最近一次被摸头的时间（友谊记账用）
+// 刚打开开关 / 页面刚重载时，外壳要一会儿才把会话、前台交齐；这时就算，会先发出一个空列表，外壳就会把还该站着的窗口关掉再重开
+const COMPANIONS_WARMUP = 1500
+const GATHER_STEP = 1000         // 集合 / 解散时一只接一只的间隔
+// 先备好再登场：Windows 每开一个新窗口，网页控件第一次画画面时要把整个界面卡住 0.3 秒左右（1.3.9-test.11 实测），
+// 一只只登场就成了「卡一下出来一只」。所以外壳说能预开（setShellPrepares）时，先把要来的几只在屏幕外一起开好，
+// 卡顿集中在主桌宠举手答到的那一下；备好了（或等太久）再按原来的节奏一只只挪过来。macOS 的外壳不说，照旧直接登场
+const PREPARE_MAX_MS = 5000
+let shellPrepares = false, prepareBatch = 0
+const prepareWaits = new Map()   // batch → 备好后要做的事
+function setShellPrepares(on) { shellPrepares = !!on }
+function prepareThen(characters, start) {
+  if (!shellPrepares || !characters.length) { start(); return }
+  const batch = ++prepareBatch
+  const go = () => { if (!prepareWaits.has(batch)) return; prepareWaits.delete(batch); start() }
+  prepareWaits.set(batch, go)
+  gatherTimers.push(setTimeout(go, PREPARE_MAX_MS))
+  toShell({ companionsPrepare: { batch, characters } })
+}
+// 由外壳调：那一批备好了
+function companionsPrepared(batch) { prepareWaits.get(batch)?.() }
+
+const mainCharacter = () => egg ? egg.host : (characterTarget || charId)   // 正在换角色时按要换成的算，演彩蛋时按原来的
+const companionsActive = () => role === 'main' && multiPets.on
+// 集合不受开关限制：开关关着时只要还有集合来的（或正在走的），也照样算、照样发
+const companionsRunning = () => role === 'main' && (multiPets.on || gathered.length > 0 || !!companionsState?.pets.length)
+const companionsAround = () => role === 'main' && !!companionsState?.pets.length
+const isCliClient = (character, client) => Companions.isCli({ character, client })
+// 主桌宠只演她占着的那个客户端：这个角色有按客户端的状态时，按角色那份（applyCharState）不演
+const playsByClient = id => companionsActive() && !!clientStateSeen[id] && (id === mainCharacter() || standsIn(id))
+// 多会话卡片也只显示主桌宠占着的那个客户端的会话
+function claimedOnly(character, map) {
+  if (!companionsActive() || !claim?.key || !claim.key.startsWith(character + '@')) return map
+  return Object.fromEntries(Object.entries(map).filter(([, e]) => character + '@' + (e?.client || character) === claim.key))
+}
+function companionLabel(p, pets, main) {
+  const same = pets.filter(x => x.character === p.character).length + (p.character === main ? 1 : 0)
+  if (same < 2 || !p.client) return ''
+  return isCliClient(p.character, p.client) ? '终端' : '桌面'
+}
+
+// 由外壳调：这个页面是主桌宠还是额外那只（默认主桌宠）
+// 外壳必须在 init 之前调 setRole('companion', …)：init 按 role 决定换上哪个角色、要不要交存着的友谊，
+// 晚了页面会按主桌宠演登场招呼、写共用的 crosspet-greeted
+// 额外那只（'companion'）：info = { id, key, character, client, label }；只显示、不做只该做一次的事（各函数开头 role !== 'main' 就返回），
+// 不写 localStorage；摸头、红温、气泡照常。label 显示在名字下面
+function setRole(r, info) {
+  role = r === 'companion' ? 'companion' : 'main'
+  roleInfo = info || null
+  $('caption').dataset.label = role === 'companion' && roleInfo?.label ? String(roleInfo.label) : ''
+}
+// 由外壳调（额外那只的页面，主桌宠页面发了 companionLeave）：说一句道别，冒一团烟不见，然后 toShell({ gone: true }) 让外壳关窗口
+const LEAVE_BYE_MS = 1500
+let leavingNow = false
+function leaveNow() {
+  if (leavingNow) return
+  leavingNow = true
+  clearTimeout(pending); clearTimeout(revertTimer)
+  // 和从菜单退出一样：收起多会话卡片、挥手（bye 姿态）、最后转身走开，再冒烟。道别时别的话盖不掉（见 say）
+  farewell(pick(linesOf('bye') || ['拜拜～']) || '拜拜～', LEAVE_BYE_MS)
+  setTimeout(() => {
+    $('bubble').classList.add('hide')
+    const p = $('poof'); p.classList.remove('go'); void p.offsetWidth; p.classList.add('go')
+    $('stage').classList.add('swap')
+    setTimeout(() => toShell({ gone: true }), 330)
+  }, LEAVE_BYE_MS)
+}
+// 由外壳调：设置里的开关和两个选项。mainPet（固定主桌宠）由外壳自己换角色、换前台时问 FollowPolicy.foregroundTarget，这里只记着
+function setMultiPets(o) {
+  const was = multiPets.on
+  const rest = o?.rest === 'stay' || o?.rest === 'open' ? o.rest : 'auto'
+  multiPets = { on: !!o?.on, rest, mainPet: typeof o?.mainPet === 'string' ? o.mainPet : '' }
+  if (role !== 'main') return
+  if (multiPets.on && !was && gathered.length) updateCompanions()   // 正集合着：页面没重载、状态都在，不用等
+  else if (multiPets.on && !was) {
+    companionsReadyAt = Date.now() + COMPANIONS_WARMUP
+    setTimeout(updateCompanions, COMPANIONS_WARMUP)
+  } else if (!multiPets.on && was && !gathered.length) stopCompanions()
+  else updateCompanions()   // 关掉时正集合着：集合来的留着，干活冒出来的走
+}
+// 关掉开关：发一次空列表让外壳把额外的全关掉，之后不再发
+function stopCompanions() {
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); setGathered([]); gatherPending = 0
+  claim = null; companionsState = null; companionsReadyAt = 0
+  for (const k of Object.keys(clientStateSeen)) delete clientStateSeen[k]
+  toShell({ companions: [], gathering: false }); sentCompanions = null; sentGathering = false
+  if (!eggAllowedSent) { eggAllowedSent = true; toShell({ eggAllowed: true }) }
+  resetFriendship()
+}
+function setForeground(f) { foreground = f && typeof f === 'object' ? { ...f } : null; updateCompanions() }
+function setRunning(keys) { runningKeys = Array.isArray(keys) ? new Set(keys) : null; updateCompanions() }
+// 由外壳调：按客户端的状态（<角色>@<客户端>-state.json，开关打开时才交）。
+// 主桌宠只演她占着的那个客户端；还没占着任何客户端（她这个角色还没有会话）时照旧演。代演（reactTo）的角色各客户端都由她演
+function applyClientState(character, client, s) {
+  if (!companionsActive() || !s || !character || !client) return
+  clientStateSeen[character] = true
+  updateCompanions()
+  const key = character + '@' + client
+  if (character === mainCharacter() ? !claim?.key || claim.key === key : standsIn(character)) playCharState(character, s)
+  else noteVerdict(character, s, 'other-client')
+}
+// 集合！每个角色各叫一只（不含主桌宠正演着的、彩蛋角色），一只接一只登场
+function gather() {
+  if (role !== 'main') return false
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); gatherPending = 0
+  const main = mainCharacter(), chars = manifest.characters || {}
+  const all = Object.keys(chars).sort().filter(id => !chars[id].egg && id !== main)
+  const todo = all.filter(id => !gathered.includes(id))
+  gatherPending = todo.length
+  // 主桌宠先答「到！」（她不是新出场的，以前只有出场的那几只答）；别的照常一只接一只来，新窗口加载要一会儿，她的「到！」自然在前面。
+  // 正在干活不换举手的图、只说；演彩蛋、道别、更新时不说
+  if (todo.length && !egg && farewellLine === null && !updatingNow) {
+    if (!aiActivity()) show(hasPose('roll_call') ? 'roll_call' : 'proud', true)
+    say(`${char().name}到！`)
+  }
+  if (todo.length) updateCompanions()   // gatherPending 变了：先让外壳菜单有「解散」
+  // 按顺序点名：已经叫出来站着的（「叫她出来」的、上次集合留下的）轮到时就地答到（answerRoll），没来的一只只叫来
+  if (todo.length) prepareThen(todo, () => all.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+    if (!todo.includes(id)) {
+      const p = companionsState?.pets.find(x => x.via === 'gather' && x.character === id)
+      if (p) toShell({ companionCall: { id: p.id, fn: 'answerRoll', args: [] } })
+      return
+    }
+    gatherPending = Math.max(0, gatherPending - 1)
+    if (gathered.includes(id)) return
+    setGathered([...gathered, id])
+    updateCompanions()
+  }, i * GATHER_STEP))))
+  return todo.length > 0
+}
+// 主桌宠页面第一次 init 完：上次（退出前 / 页面重载前）集合来、叫出来的那几只再一只接一只叫回来。
+// 角色没了、成了彩蛋、叫的时候正是主桌宠的不叫；额外那只不做
+let gatheredRestored = false
+function restoreGathered() {
+  if (role !== 'main' || gatheredRestored) return
+  gatheredRestored = true
+  let saved = []
+  try { saved = JSON.parse(localStorage.getItem(GATHERED_KEY)) || [] } catch {}
+  // 主桌宠是谁到叫的时候再看：外壳 init 完才 setCharacter 换回上次的角色
+  const chars = manifest.characters || {}
+  const todo = (Array.isArray(saved) ? saved : []).filter(id => typeof id === 'string' && chars[id] && !chars[id].egg && !gathered.includes(id))
+  if (!todo.length) return
+  gatherTimers.push(setTimeout(() => prepareThen(todo.filter(id => id !== mainCharacter()), () => todo.forEach((id, i) => gatherTimers.push(setTimeout(() => {
+    if (gathered.includes(id) || id === mainCharacter()) return
+    setGathered([...gathered, id])
+    updateCompanions()
+  }, i * GATHER_STEP)))), COMPANIONS_WARMUP))
+}
+// 「叫她出来」：只叫一个角色来陪主桌宠（不用两个 AI 同时干活）；和集合来的一样算 gather，一起在场照样攒好感，
+// 「让她先回去」或「解散」送走。主桌宠正演着的、彩蛋角色、已经叫来的不叫
+function callCompanion(id) {
+  if (role !== 'main') return false
+  const c = (manifest.characters || {})[id]
+  if (!c || c.egg || id === mainCharacter() || gathered.includes(id)) return false
+  gatherPending++
+  updateCompanions()
+  prepareThen([id], () => {
+    gatherPending = Math.max(0, gatherPending - 1)
+    if (gathered.includes(id) || id === mainCharacter()) { updateCompanions(); return }
+    setGathered([...gathered, id])
+    updateCompanions()
+  })
+  return true
+}
+// 解散：集合来的轮流说 bye、一只只离开（后来的先走），主桌宠留下；收编的客户端还在干活的那只不走，转成干活那只（decide 里）
+function dismiss() {
+  gatherTimers.forEach(clearTimeout); gatherTimers = []; prepareWaits.clear(); gatherPending = 0
+  const order = (companionsState?.pets || []).filter(p => p.via === 'gather').map(p => p.character).reverse()
+  setGathered(gathered.filter(ch => order.includes(ch)))   // 还没登场的不用再叫
+  if (!order.length) { updateCompanions(); return }      // 没有站着的（比如还在热身）：直接收尾
+  gatherPending = order.length
+  order.forEach((ch, i) => gatherTimers.push(setTimeout(() => {
+    gatherPending = Math.max(0, gatherPending - 1)
+    setGathered(gathered.filter(x => x !== ch))
+    updateCompanions()
+  }, i * GATHER_STEP)))
+}
+// 「让她先回去」：外壳按窗口的 id 交来（给 key 也认）。集合来的同时从集合里去掉
+function sendHome(k) {
+  if (!companionsRunning() || !companionsState) return
+  // 先按窗口 id 认，认不到再按 key：集合接管后 id 留着旧 key，可能正好是别的那只的 key
+  const p = companionsState.pets.find(x => x.id === k) || companionsState.pets.find(x => x.key === k)
+  if (!p) return
+  companionsState = Companions.sendHome(companionsState, p.key, Date.now())
+  if (p.via === 'gather') setGathered(gathered.filter(ch => ch !== p.character))
+  updateCompanions()
+}
+// 额外那只被摸了头（外壳转来；主桌宠自己被摸也记）：记下时间。5 分钟内摸了两个不同的角色就 +2（记过的那几下清掉，不重复算）
+function notePat(character) {
+  if (role !== 'main' || !character) return
+  const nowMs = Date.now()
+  patAt[character] = nowMs
+  if (!friendshipOn()) return
+  const partners = Object.keys(patAt).filter(o => o !== character && nowMs - patAt[o] <= Friendship.PATS_MS)
+  if (!partners.length) return
+  friendAward(partners.map(o => [character, o]), 'pats')
+  for (const o of [character, ...partners]) delete patAt[o]
+}
+// 额度庆祝：这个角色站在额外那只（显示她额度的那只）身上，就交给她演
+function handOffCelebration(id, ev) {
+  if (!companionsRunning() || id === mainCharacter() || standsIn(id)) return false
+  const p = companionsState?.pets.find(x => x.character === id && x.quota)
+  if (!p) return false
+  toShell({ companionCall: { id: p.id, fn: 'celebrate', args: [id, ev] } })
+  return true
+}
+// 开关关着、集合的也都走完了：回到单只。空列表没发过就补发一次（彩蛋菜单也恢复），之后不再发
+function windDownCompanions() {
+  if (sentCompanions !== null && (sentCompanions !== '[]' || sentGathering)) toShell({ companions: [], gathering: false })
+  sentGathering = false
+  if (!eggAllowedSent) { eggAllowedSent = true; toShell({ eggAllowed: true }) }
+  companionsState = null; sentCompanions = null; claim = null
+  resetFriendship()
+}
+// 主桌宠的角色有没有会话（占着客户端）：外壳问「跟随前台」换不换时一起带上（FollowPolicy.foregroundTarget）
+const mainClaimed = () => !!claim?.key
+let lastMain = null   // 上次算的时候主桌宠是谁（看出换角色，见 swapMain）
+function updateCompanions() {
+  if (!companionsRunning()) { if (role === 'main' && !multiPets.on && sentCompanions !== null) windDownCompanions(); return }
+  const nowMs = Date.now(), main = mainCharacter(), chars = manifest.characters || {}
+  // 没有立绘的角色（没装 / 彩蛋）开不了窗口，不算
+  // current 的会话不按角色分，归主桌宠演，不进判断（不会冒出一只主桌宠角色、永远没有状态的）
+  const { current: _current, ...byChar } = sessions
+  const clients = Companions.clientsOf(byChar, nowMs).filter(c => chars[c.character] && !chars[c.character].egg)
+  const remembered = Companions.rememberClients(rememberedClientChars(), clients)
+  if (remembered !== clientChars) { clientChars = remembered; try { localStorage.setItem(CLIENT_CHARS_KEY, JSON.stringify(remembered)) } catch {} }
+  // 主桌宠换成了站着的那只的角色：两个对调（swapMain），那只就地换成主桌宠原来的角色，不是两只一样的并排、再走一只
+  const from = lastMain; lastMain = main
+  if (from && from !== main && companionsState && chars[from] && !chars[from].egg) {
+    const sw = Companions.swapMain(companionsState, { from, to: main, fromClaim: claim?.key, gathered })
+    if (sw.state !== companionsState) { companionsState = sw.state; if (sw.gathered !== gathered) setGathered(sw.gathered) }
+  }
+  claim = Companions.mainClaim({ mainCharacter: main, foreground, clients, last: claim, nowMs })
+  if (nowMs < companionsReadyAt) return
+  const reactTo = chars[main]?.reactTo
+  const covered = new Set(Object.keys(chars).filter(id => StandIn.covers(reactTo, main, id)))
+  const prevPets = companionsState?.pets || []
+  const characterOf = {}
+  if (multiPets.rest === 'open' && runningKeys) {
+    const valid = new Set(Object.keys(chars).filter(id => !chars[id].egg))
+    for (const k of runningKeys) { const client = k.slice(k.indexOf('@') + 1); characterOf[client] = Companions.clientCharacter(client, clientChars, valid) }
+  }
+  const r = Companions.decide({
+    nowMs, clients, claimKey: claim.key, mainCharacter: main, inAI: Companions.inAISoftware({ foreground, clients, nowMs }),
+    rest: multiPets.rest, gathered, running: runningKeys, coveredByStandIn: covered, prev: companionsState, workPets: multiPets.on, characterOf,
+  })
+  // 新来的那只的 id 不能和别的撞：集合接管了干活那只后 id 留着旧 key，那个客户端之后可能又冒一只同 key 的。
+  // 这一轮刚走的那几只的 id 也不复用（外壳正让她说 bye）
+  const used = new Set([...r.pets.filter(p => p.id).map(p => p.id), ...prevPets.filter(p => r.leaving.includes(p.key)).map(p => p.id)])
+  r.pets.forEach((p, i) => {
+    if (!p.id) {
+      const base = p.via === 'gather' ? p.character + '@gather' : p.key
+      let id = base
+      for (let n = 2; used.has(id); n++) id = base + '#' + n
+      p.id = id; used.add(id)
+    }
+    r.state.pets[i].id = p.id
+  })
+  companionsState = r.state
+  for (const key of r.leaving) toShell({ companionLeave: prevPets.find(x => x.key === key)?.id || key })
+  // 集合点到已经站着的那只：她不是新开的窗口，没有登场招呼，叫她就地答到
+  for (const key of r.answered || []) { const p = r.pets.find(x => x.key === key); if (p) toShell({ companionCall: { id: p.id, fn: 'answerRoll', args: [] } }) }
+  const list = r.pets.map(p => ({ id: p.id, key: p.key, character: p.character, client: p.client, quota: !!p.quota, label: companionLabel(p, r.pets, main) }))
+  const json = JSON.stringify(list), first = sentCompanions === null
+  const gathering = gatheringNow()
+  // expected：集合是一只接一只登场的，告诉外壳这一轮最后一共几只，第一只就按总数排格子（不然前几只排成一排、后几只换排法就叠了）
+  if (json !== sentCompanions || gathering !== sentGathering) { sentCompanions = json; sentGathering = gathering; toShell({ companions: list, gathering, expected: list.length + gatherPending }) }
+  // 第一次（打开开关、页面重载后）也发：外壳菜单里可能还是上一个页面留下的灰
+  const eggOk = !list.length
+  if (first || eggOk !== eggAllowedSent) { eggAllowedSent = eggOk; toShell({ eggAllowed: eggOk }) }
+  if (egg && !eggOk) endEgg()   // 彩蛋正演着时冒出了别的桌宠：马上收掉、换回原来的角色
+  noteFriendshipWork(clients, nowMs)
+  // 开关关着、解散完了：空列表上面已经发过，回到单只，不再发
+  if (!multiPets.on && !gathered.length && !list.length) windDownCompanions()
+}
+// 没有新事件时「离开满 1 分钟才走」也要有人看：每 5 秒算一次（没变不发）
+setInterval(updateCompanions, 5000)
+
+// ---- 友谊记账（判断在 friendship.js）----
+// 只在主桌宠页面、多桌宠在跑（开关开着或正集合着）时记；只有一只时没有「一对」，不记。
+// 在场 = 主桌宠的角色 + 额外那几只的角色（去重；同一个角色的两只不算，pairKey 是 null）。
+//   一起在场（窗口没藏起来）：每分钟给每对攒 1 分钟，满 10 分钟 together
+//   同时干活：在场的两个角色都在干活 → cowork（同一对 10 分钟一次，friendship.js 管）
+//   前后脚干完：一个角色从干活变成不干活时记下时间，5 分钟内另一个也这样 → cofinish
+//   分别摸头：见 notePat
+// 存 localStorage['crosspet-friendship']（坏了 / 没有就当空的），外壳在数据目录另存一份 friendship.json；设置页从外壳拿：toShell({ friendship: Friendship.rows(...) })，
+// 和 companions 一样只在变化时发，开始记账后第一次一定发
+const FRIEND_KEY = 'crosspet-friendship', FRIEND_TICK = 60_000
+const togetherMs = {}            // 一对（pairKey）→ 攒下的一起在场时间
+const friendWorking = {}         // 在场的角色上次看是不是在干活
+const finishedAt = {}            // 角色 → 最近一次干完一轮的时间
+let sentFriendship = null        // 上次发出去的 rows（JSON）
+const friendshipOn = () => companionsRunning()
+const presentCharacters = () => [...new Set([mainCharacter(), ...(companionsState?.pets || []).map(p => p.character)].filter(Boolean))]
+function pairsOf(list) {
+  const out = []
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (Friendship.pairKey(list[i], list[j])) out.push([list[i], list[j]])
+  return out
+}
+function friendStoreRead() {
+  try { const v = JSON.parse(localStorage.getItem(FRIEND_KEY)); return v && typeof v === 'object' && !Array.isArray(v) ? v : {} } catch { return {} }
+}
+// 每次写都顺手交给外壳存一份 friendship.json（数据目录里，和设置、角色放一起），网页的存储丢了靠它找回（见 restoreFriendship）
+function friendStoreWrite(store) {
+  try { localStorage.setItem(FRIEND_KEY, JSON.stringify(store)) } catch {}
+  if (role === 'main') toShell({ friendshipStore: store })
+}
+// 外壳载入完、init 之前调：saved 是 friendship.json 的内容（没有就是 null）。并进网页的存储；
+// 网页这边有备份里没有的（或更高的）也回写一次，备份跟上
+function restoreFriendship(saved) {
+  const local = friendStoreRead(), merged = Friendship.merge(local, saved)
+  if (merged !== local) { try { localStorage.setItem(FRIEND_KEY, JSON.stringify(merged)) } catch {} }
+  if (Object.keys(merged).length && JSON.stringify(Friendship.merge(saved || {}, merged)) !== JSON.stringify(saved || {})) toShell({ friendshipStore: merged })
+  if (storedFriendshipSent) sendFriendship(merged)
+}
+function friendAward(pairs, kind) {
+  const before = friendStoreRead(), nowMs = Date.now()
+  let store = before
+  for (const [a, b] of pairs) store = Friendship.award(store, a, b, kind, nowMs)
+  if (store !== before && JSON.stringify(store) !== JSON.stringify(before)) friendStoreWrite(store)
+  sendFriendship(store)
+}
+function sendFriendship(store = friendStoreRead()) {
+  const names = Object.fromEntries(Object.entries(manifest.characters || {}).map(([id, c]) => [id, c.name]))
+  const rows = Friendship.rows(store, names), json = JSON.stringify(rows)
+  if (json !== sentFriendship) { sentFriendship = json; toShell({ friendship: rows }) }
+}
+function resetFriendship() {
+  sentFriendship = null
+  for (const k of Object.keys(friendWorking)) delete friendWorking[k]
+}
+// updateCompanions 每次算完调：clients 是 Companions.clientsOf 的结果
+function noteFriendshipWork(clients, nowMs) {
+  if (!friendshipOn()) return
+  const present = presentCharacters()
+  const working = present.filter(ch => clients.some(c => c.character === ch && c.working))
+  if (working.length >= 2) friendAward(pairsOf(working), 'cowork')
+  for (const ch of present) {
+    if (!friendWorking[ch] || working.includes(ch)) continue
+    const partners = Object.keys(finishedAt).filter(o => o !== ch && nowMs - finishedAt[o] <= Friendship.COFINISH_MS)
+    finishedAt[ch] = nowMs
+    if (!partners.length) continue
+    friendAward(partners.map(o => [ch, o]), 'cofinish')
+    for (const o of [ch, ...partners]) delete finishedAt[o]   // 记过的清掉（同 notePat）：同一对不能靠一个人反复干完一直 +2
+  }
+  for (const k of Object.keys(friendWorking)) delete friendWorking[k]
+  for (const ch of present) friendWorking[ch] = working.includes(ch)
+  if (sentFriendship === null) sendFriendship()
+}
+setInterval(() => {
+  if (!friendshipOn() || pageHidden) return
+  const due = []
+  for (const [a, b] of pairsOf(presentCharacters())) {
+    const k = Friendship.pairKey(a, b)
+    togetherMs[k] = (togetherMs[k] || 0) + FRIEND_TICK
+    if (togetherMs[k] >= Friendship.TOGETHER_MS) { togetherMs[k] -= Friendship.TOGETHER_MS; due.push([a, b]) }
+  }
+  if (due.length) friendAward(due, 'together')
+  else if (sentFriendship === null) sendFriendship()
+}, FRIEND_TICK)
+
+// ---- 每对台词（台词和挑法在 pair-chat.js）----
+// 多桌宠在跑、两只都在场又都闲着时，隔一阵子（至少 12 分钟、每分钟掷一次）挑一对一问一答；按这一对的心数分档说不同的话。
+// 主桌宠自己说走 chat()，额外那只说交给外壳转（companionCall，fn = chat）。只由主桌宠页面挑，额外那只只管说
+let pairChatAt = 0
+const LEVEL_UP_GAP = 30_000
+const pairChatRecent = []
+function tryPairChat() {
+  if (role !== 'main' || !friendshipOn() || pageHidden || egg) return
+  const store = friendStoreRead(), nowMs = Date.now()
+  const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
+  if (aiActivity()) busy.push(mainCharacter())
+  const wear = ch => manifest.characters?.[ch]?.skin || ''
+  // 先看有没有升了级还没演的（不等 12 分钟、不掷骰子；和上一段至少隔半分钟）。演过的最高关系记在这一对的 shown 里
+  if (nowMs - pairChatAt >= LEVEL_UP_GAP) {
+    const up = PairChat.levelUp({ present: presentCharacters(), busy, wear, levelOf: key => Friendship.level(store[key]?.points || 0), shownOf: key => store[key]?.shown || 0 })
+    if (up) {
+      pairChatAt = nowMs
+      friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
+      up.lines.forEach(([who, line, pose, fx], i) => setTimeout(() => chatAs(who, line, pose, fx), i * PairChat.REPLY_MS))
+      return
+    }
+  }
+  const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
+                             hearts10: key => Friendship.hearts(store[key]?.points || 0), wear })
+  if (!got) return
+  pairChatAt = nowMs
+  pairChatRecent.push(got.id)
+  if (pairChatRecent.length > 12) pairChatRecent.shift()
+  got.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
+}
+function chatAs(character, line, pose, fx) {
+  if (!friendshipOn()) return
+  if (character === mainCharacter()) { chat(line, pose, fx); return }
+  const p = companionsState?.pets.find(x => x.character === character)
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: fx ? [line, pose || null, fx] : [line, pose || null] } })
+}
+// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
+// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换。
+// fx：换上 look 时改用这个特效（关系升级：飘心）；没给就不要特效——这些图平时配的是干活的特效（清单、奖杯、对话卡片），聊天时看着像在偷偷干活
+const CHAT_MS = 6000
+let chatTimer = null
+function chat(line, look, fx) {
+  if (egg || farewellLine !== null || updatingNow || aiActivity() || typeof line !== 'string') return
+  if (typeof look === 'string' && MOTION[look] && !tucked) {
+    clearTimeout(pending); clearTimeout(revertTimer)
+    shownAt = Date.now()
+    setPose(look)
+    setFx(look, false, typeof fx === 'string' ? fx : 'none')
+    revertTimer = characterTimeout(() => { if (pose === look) setPose(restPose()) }, CHAT_MS)
+  }
+  say(line)
+  clearTimeout(chatTimer)
+  chatTimer = setTimeout(() => { if ($('bubble').textContent === line) say('') }, CHAT_MS)
+}
+setInterval(tryPairChat, FRIEND_TICK)
+
 // ---- 额度里的「社区梗」时刻 ----
 // GPT：某个额度窗口在预定重置时间之前突然恢复一大截（官方 reset / 重置卡）→ reset
 // DeepSeek：余额比上次多了（充值）→ feast 大口吃白饭
@@ -1349,6 +1975,7 @@ function feastByCurrency(prev, now) {
   return Object.entries(now).some(([c, v]) => typeof v === 'number' && v - (Number(prev[c]) || 0) >= (FEAST_STEP[c] ?? 0.5))
 }
 function quotaEvent(id, q) {
+  if (role !== 'main') return null   // 只由主桌宠判（上次的数值在共用的 localStorage 里）；额外那只的额度庆祝由主桌宠交过来（companionCall）
   if (!q) return null
   let ev = null
   quotaMemory(m => {
@@ -1376,6 +2003,7 @@ function quotaEvent(id, q) {
   return ev
 }
 function celebrate(id, ev) {
+  if (handOffCelebration(id, ev)) return   // 这个角色站在额外那只身上：交给她演
   if (standsIn(id)) id = charId   // 代演（reactTo）：她响应的 AI 额度刷新了，她来演
   if (id !== charId || egg || characterTimer) { pendingCelebration[id] = { ev, at: Date.now() }; return }  // 正在换成别人：等切回她时再演
   // 正在干活：额度记录是 AI 回复的半路写下的，这时演会被紧跟着的干活动作盖掉，看不见——留到这一轮干完（Stop）再演
@@ -1409,9 +2037,9 @@ function setQuota(id, q) {
 function handleClick(kind, x, y) {
   const card = $('newsCard')
   if (x != null && y != null && !card.classList.contains('hidden')) {
-    const r = card.getBoundingClientRect()
-    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {   // 点在卡片上：按钮照按钮办，空白处什么都不做（不摸头）
-      const action = document.elementFromPoint(x, y)?.closest('[data-action]')?.dataset.action
+    const r = toCanvas(card.getBoundingClientRect())   // x、y 是画布坐标
+    if (x >= r.left && x <= r.left + r.width && y >= r.top && y <= r.top + r.height) {   // 点在卡片上：按钮照按钮办，空白处什么都不做（不摸头）
+      const action = document.elementFromPoint(x * fit + fitX, y * fit + fitY)?.closest('[data-action]')?.dataset.action
       if (action === 'news-open') { hideNews(); toShell({ openSettings: 'news' }) }
       else if (action === 'news-close') hideNews()
       return
@@ -1419,6 +2047,8 @@ function handleClick(kind, x, y) {
   }
   if (egg) { catchEgg(); return }
   lastActive = Date.now()
+  // 摸头记给友谊：主桌宠自己记；额外那只告诉外壳，外壳转给主桌宠页面 notePat(角色)
+  if (kind === 'pat') { if (role === 'main') notePat(mainCharacter()); else toShell({ patted: true }) }
   if (kind === 'pat' && Math.random() < EGG_CLICK_CHANCE && playEgg(true)) return
   if (pose === 'sleeping') { show('yawn', true); say('唔…你回来啦'); return }
   if (kind === 'pat' && (sulking || angerNow() >= 20)) { coaxHer(); return }   // 生着气的时候摸她 = 哄她
@@ -1494,6 +2124,7 @@ function resumeWork() {
 // 每次打开桌宠最多说一次（设置页「接入 AI」那一行会一直挂着提醒）。只提醒，不替用户改配置
 let pluginTold = false
 function setPluginUpdates(list) {
+  if (role !== 'main') return
   const tip = (list || []).map(p => window.PluginUpdate && PluginUpdate.advice(p)).find(Boolean)
   if (!tip || pluginTold) return
   pluginTold = true
@@ -1589,7 +2220,7 @@ function devStatus() {
 setInterval(() => {
   if (devHeld() || egg || (pose !== 'idle' && pose !== 'tired')) return
   const quiet = Date.now() - lastActive
-  if (quiet > SLEEP_AFTER) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
+  if (quiet > SLEEP_AFTER && !neverSleep) { setPose('sleeping'); say(pick(linesOf('sleeping') || [''])); return }
   if (Math.random() > .42) return
   const builtin = ['hum', 'stretch', ...(quiet > 3 * 60 * 1000 ? ['yawn'] : [])]
   const own = (char()?.idleActions || []).filter(hasPose)
@@ -1634,7 +2265,9 @@ function eggStep(step) {
   document.documentElement.style.setProperty('--aura', char().aura || '#bcd4ff')
 }
 function playEgg(force) {
+  if (role !== 'main') return false
   if (egg || tucked || !charId || char()?.egg || $('stage').classList.contains('swap')) return false   // 缩在边上、正在换角色时不演：彩蛋角色没有贴边立绘
+  if (companionsAround()) return false   // 有别的桌宠在场时不演（几只同框时彩蛋出戏）
   const eggId = eggFor(charId)
   if (!eggId) return false
   if (!force && pose !== 'idle') return false

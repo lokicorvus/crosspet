@@ -32,6 +32,7 @@ extension App {
         let hint = aiAutostart && !defaults.bool(forKey: "quitHinted")
         if hint { defaults.set(true, forKey: "quitHinted") }
         js(hint ? "farewell('我先走啦～下次重新打开 AI 我再出来', 5000)" : "farewell(null, 2000)")
+        companionsJS("farewell(null, \(hint ? 5000 : 2000))")   // 多桌宠：额外那几只也一起挥手、同一时刻走开
         DispatchQueue.main.asyncAfter(deadline: .now() + (hint ? 5 : 2)) { NSApp.terminate(nil) }
     }
 

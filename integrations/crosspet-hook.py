@@ -17,6 +17,7 @@
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -47,6 +48,15 @@ def integration_name(argv) -> str:
     if host == "gemini" and len(argv) > 2:   # Antigravity 多带一个事件名参数
         return "antigravity"
     return host
+
+
+def detect_client(host: str) -> str:
+    """这条事件来自哪个客户端（多桌宠按「角色 + 客户端」各站一只）。Claude Code 桌面 App 和终端用的是同一份钩子，
+    只能看它给子进程的 CLAUDE_CODE_ENTRYPOINT 分：claude-desktop 是桌面，其他值（cli、sdk、IDE 插件）或没有都算终端。
+    别的宿主一个程序就是一个客户端，用接入名（Codex 是 codex；Grok Build 借 Claude 钩子来的，host 已换成 grok）"""
+    if host == "claude":
+        return "claude-desktop" if os.environ.get("CLAUDE_CODE_ENTRYPOINT") == "claude-desktop" else "claude-cli"
+    return integration_name([sys.argv[0], host, *sys.argv[2:]])
 
 
 def _lock(f) -> None:
@@ -328,7 +338,7 @@ _call = event.get("toolCall") if isinstance(event.get("toolCall"), dict) else {}
 ledger_info.update(ev=str(event.get("hook_event_name") or (sys.argv[2] if len(sys.argv) > 2 else ""))[:60],
                    tool=str(event.get("tool_name") or _call.get("name", "")).lower()[:60],
                    sid=hashlib.sha1(_sid.encode("utf-8")).hexdigest()[:6] if _sid else "",
-                   turn=bool(event.get("turn_id")))
+                   turn=bool(event.get("turn_id")), client=detect_client(character))
 _prev_excepthook = sys.excepthook
 
 
@@ -379,12 +389,14 @@ if os.environ.get("GROK_HOOK_EVENT"):
             event[snake] = event[camel]
 
 # Codex 会在对话结束后自己在后台整理记忆（工作目录在 ~/.codex/memories），也会调工具，但不是你让它干的活，
-# 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管
+# 而且没有开始 / 结束事件，演了会一直停在思考：工作目录在 Codex 自己的配置目录里的事件都不管。
+# 例外：ChatGPT 桌面版的本地项目也放在这里（~/.codex/.chatgpt-projects/<项目>），那是你让它干的活，照常演（#38）
 if character == "gpt":
     try:
         codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").resolve()
         cwd = Path(str(event.get("cwd") or "")).resolve() if event.get("cwd") else None
-        if cwd and (cwd == codex_home or codex_home in cwd.parents):
+        projects = codex_home / ".chatgpt-projects"
+        if cwd and (cwd == codex_home or codex_home in cwd.parents) and projects not in cwd.parents:
             ledger("dropped", "codex-memory")
             sys.exit(0)
     except (OSError, ValueError):
@@ -412,6 +424,8 @@ if character == "gpt" and "transcript_path" in event:
 arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
 name = event.get("hook_event_name") or arg_event
 source_host = character  # 不能用按模型换过的角色来分会话 / 工具计数
+client = detect_client(source_host)
+ledger_info["client"] = client   # 上面 Grok 可能把宿主换掉了，以这里为准
 
 
 # 从门禁到状态、模型路由、会话卡片写完共用一把宿主锁。只锁 turn_gate 会留下
@@ -845,14 +859,21 @@ elif name in ("BeforeModel", "PreInvocation"):
 elif name in ("SessionEnd",):
     pose = "sleeping"
 
+# 按客户端的状态文件 <角色>@<客户端>-state.json：角色用按模型换过之后的（和主文件同名同角色）。
+# 客户端名要拼进文件名：只认小写字母、数字和连字符，别的（理论上不会有）不写这份，免得拼出奇怪路径
+client_state = state_dir / f"{character}@{client}-state.json" if re.fullmatch(r"[a-z0-9-]+", client) else None
+
 state = {"pose": pose, "event": name, "tool": tool, "ts": time.time(),
          "host": source_host, "session": turn_sid, "turn": effective_turn}
 if pose == "thinking" and name in ("PreInvocation", "PostToolUse", "AfterTool"):
     # 快的工具（ls、读文件、grep）从开始到结束常常不到 0.3 秒，桌宠每 0.3 秒才读一次，
     # 刚写的工具动作会被「回去思考」直接盖掉（Antigravity 甚至几毫秒内就开始下一轮思考）。
     # 所以把它捎带上：桌宠先演完那个动作再进入思考；已经演过的（同一个 afterTs）桌宠会跳过。
+    # 按客户端那份读上一条：Claude 桌面和终端同时干活时，主文件里可能是另一边刚写的工具动作。
+    # 还没有这份（刚升级、第一次写）就退回读主文件，host / session / turn 的比对照样把别人的挡掉
     try:
-        prev = json.loads((state_dir / f"{character}-state.json").read_text())
+        prev_path = client_state if client_state and client_state.exists() else state_dir / f"{character}-state.json"
+        prev = json.loads(prev_path.read_text())
         if (prev.get("event") == "PreToolUse" and time.time() - float(prev.get("ts", 0)) < 3
                 and (prev.get("host"), prev.get("session"), prev.get("turn")) == (source_host, turn_sid, effective_turn)):
             state.update(after=prev.get("pose"), afterTs=prev.get("ts"), tool=prev.get("tool", ""))
@@ -864,19 +885,30 @@ if name == "SessionStart" and str(event.get("source", "")).lower() in ("compact"
     ledger("dropped", "session-restart")
     sys.exit(0)
 
-if pose:
+def write_state(path: Path, data: dict) -> None:
     # 临时文件名带进程号：同一个角色的几个钩子同时写（好几个对话一起干活）时不会抢同一个临时文件
-    tmp = state_dir / f".{character}-state.{os.getpid()}.json"
-    tmp.write_text(json.dumps(state))
+    tmp = state_dir / f".{path.stem}.{os.getpid()}.json"
+    tmp.write_text(json.dumps(data))
     for attempt in range(8):
         try:
-            tmp.replace(state_dir / f"{character}-state.json")
+            tmp.replace(path)
             break
         except PermissionError:
             # Windows 上桌宠可能正读着上一份状态。等一下再换，不要让观察者钩子报错退出。
             if attempt == 7:
                 raise
             time.sleep(0.05)
+
+
+if pose:
+    write_state(state_dir / f"{character}-state.json", state)
+    # 另外按客户端写一份（多桌宠时额外那只读它）：不管桌宠开没开多桌宠都写，钩子不知道设置。
+    # 这份是附加的，写不了只记一笔，主文件已经写好了，不能因为它让钩子报错
+    if client_state:
+        try:
+            write_state(client_state, {**state, "client": client})
+        except Exception:
+            ledger("error", "client-state-write")
 
 
 # 同一个 AI 同时开着好几个对话在干活：按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
@@ -925,7 +957,8 @@ session_id = str(event.get("session_id") or event.get("sessionId") or event.get(
 if session_id and (pose or name == "SessionEnd"):
     try:
         update_sessions(session_id, None if name == "SessionEnd" else
-                        {"pose": state.get("after") or pose if pose == "thinking" else pose, "event": name, "ts": time.time()})
+                        {"pose": state.get("after") or pose if pose == "thinking" else pose, "event": name, "ts": time.time(),
+                         "client": client})
     except Exception:
         pass
 

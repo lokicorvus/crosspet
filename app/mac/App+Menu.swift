@@ -22,12 +22,53 @@ extension App {
         }
         add(menu, "摸摸头", #selector(pat))
         add(menu, "戳一下", #selector(poke))
-        add(menu, "召唤彩蛋", #selector(egg))
+        let eggItem = add(menu, "召唤彩蛋", #selector(egg))
+        if !eggAllowed { eggItem.action = nil }   // 有别的桌宠在场时不演彩蛋（页面发 eggAllowed:false）：没有动作的菜单项自动变灰
+        // 集合不受开关限制，一直在；正集合着（包括叫了一只出来）时多一项「解散」，「集合！」把还没来的都叫来
+        add(menu, "集合！", #selector(gatherCompanions))
+        if pageGathering { add(menu, "解散", #selector(dismissCompanions)) }
+        // 叫她出来：只叫一个角色来陪着（不用两个 AI 同时干活）。主桌宠演着的不列，已经站着的打勾、点不了（送走用她的「让她先回去」）
+        let others = characterIds.filter { $0 != currentId }
+        if !others.isEmpty {
+            let standing = Set(companions.values.map { $0.character })
+            let callItem = NSMenuItem(title: "叫她出来", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            sub.autoenablesItems = false
+            for id in others {
+                let item = NSMenuItem(title: displayNames[id] ?? id, action: #selector(callCompanion(_:)), keyEquivalent: "")
+                item.target = self
+                item.representedObject = id
+                if standing.contains(id) { item.state = .on; item.isEnabled = false }
+                sub.addItem(item)
+            }
+            callItem.submenu = sub
+            menu.addItem(callItem)
+        }
         if codexResets && currentId == "gpt" { add(menu, "会重置吗？", #selector(askReset)) }   // 只有 GPT 有这个需求
         if characterIds.count > 1 {
             menu.addItem(.separator())
-            // 角色和衣服多了，名单一长串要翻半天：改成打开设置的角色页（卡片墙），看着图选
-            add(menu, "换角色…", #selector(openCharacterPage))
+            // 右键直接换（用户要回来的）：一项一套，有别的衣服（皮肤）的角色展开成几项：「DeepSeek · 女仆装」「DeepSeek · Claude 卫衣」。
+            // 最下面「看图选…」打开角色窗口（卡片墙）
+            let switchItem = NSMenuItem(title: "换角色", action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            let worn = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
+            for id in characterIds {
+                let name = displayNames[id] ?? id
+                let outfits: [(skin: String, title: String)] = skinChoices[id].flatMap { $0.isEmpty ? nil : $0 }.map { skins in
+                    [("", "\(name) · \(baseOutfit[id] ?? "原版")")] + skins.map { ($0.id, "\(name) · \($0.name)") }
+                } ?? [("", name)]
+                for o in outfits {
+                    let item = NSMenuItem(title: o.title, action: #selector(switchCharacter(_:)), keyEquivalent: "")
+                    item.representedObject = "\(id)|\(o.skin)"
+                    item.target = self
+                    item.state = id == currentId && (worn[id] ?? "") == o.skin ? .on : .off
+                    sub.addItem(item)
+                }
+            }
+            sub.addItem(.separator())
+            add(sub, "看图选…", #selector(openCharacterPage))
+            switchItem.submenu = sub
+            menu.addItem(switchItem)
         }
         menu.addItem(.separator())
         let layerItem = NSMenuItem(title: "显示层级", action: nil, keyEquivalent: "")

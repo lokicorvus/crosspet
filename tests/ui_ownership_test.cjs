@@ -58,16 +58,18 @@ function makeEnv(html) {
     const standsIn=id=>id!==charId && (char()?.reactTo||[]).includes(id)
     function setPose(p){if(p===pose)return;pose=p;poseSince=Date.now();history.push({at:Date.now(),charId,pose});setFx(p)}
     function say(line){$('bubble').textContent=line||'';if(line)$('bubble').classList.remove('hide');else $('bubble').classList.add('hide')}
-    function applyLook(){} function renderQuota(){} function preloadEdges(){} function clearEggTimers(){}
+    function applyLook(){} function renderQuota(){} function preloadEdges(){} function clearEggTimers(){} function companionsRunning(){return false} function updateCompanions(){}
     function timeGreet(){return false}function greetDue(){return true}function announceReset(){}
+    const role='main',roleInfo=null
     function angerLevel(){return null}function angerNow(){return 0}function react(){}
     function celebrate(id){if(id===charId)show('happy',true)}
     function refreshMulti(){refreshes.push({at:Date.now(),charId,map:currentSessions()})}
     function currentSessions(){const out={...(sessions[charId]||{})};for(const [host,map]of Object.entries(sessions))if(standsIn(host))Object.assign(out,map);return out}
     function capture(){return {charId,pose,bubble:$('bubble').textContent,fx:$('fx').innerHTML,fxHidden:$('fx').classList.contains('hide'),charState:JSON.parse(JSON.stringify(charState)),history:[...history],effectHistory:[...effectHistory],generation:characterGeneration}}
     function hook(id,p,event,extra={}){applyCharState(id,{pose:p,event,ts:Date.now()/1000,...extra})}
+    function playsByClient(){return false}function updateCompanions(){}
   `
-  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','setCharacter','watchStuck','applyCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
+  const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','arrivalGreeting','setCharacter','watchStuck','applyCharState','playCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
   vm.runInContext(setup + '\n' + funcs, context)
   const run = code => vm.runInContext(code, context)
   run(`hook('grok','idle','SessionStart');hook('claude','idle','SessionStart')`)
@@ -180,8 +182,39 @@ function runSuite(file) {
  for(const [name,test]of cases){const env=makeEnv(html);try{test(env);results.push({name,passed:true})}catch(e){results.push({name,passed:false,error:e.message,state:env.state()})}}
  return {file,sha256:crypto.createHash('sha256').update(html).digest('hex'),passed:results.filter(x=>x.passed).length,failed:results.filter(x=>!x.passed).length,results}
 }
+// 额外那只（companion）的页面不弹「新功能」卡片：刚更新完那一下由主桌宠弹。主桌宠页面作对照
+function newsCardShown(html, role) {
+  const t = clock()
+  class FakeDate extends Date { constructor(...a) { super(...(a.length ? a : [t.now()])) } static now() { return t.now() } }
+  const context = vm.createContext({ Date: FakeDate, setTimeout: t.set, clearTimeout: t.clear, setInterval: t.set, clearInterval: t.clear, console })
+  const setup = `
+    let role = ${JSON.stringify(role)}, pose = 'idle', egg = null, farewellLine = null, updatingNow = false, tucked = null
+    let newsTimer = null, newsShown = 0
+    const elements = new Map()
+    function element(id) {
+      if (elements.has(id)) return elements.get(id)
+      const classes = new Set(id === 'newsCard' ? ['hidden'] : [])
+      const el = { id, textContent: '', classList: { add: (...a) => a.forEach(x => classes.add(x)), remove: (...a) => a.forEach(x => classes.delete(x)), contains: x => classes.has(x) } }
+      elements.set(id, el); return el
+    }
+    const $ = element
+    const WhatsNew = { LIST: [], since: () => ['a', 'b'] }, window = { WhatsNew }
+    function show() {} function say() {} function aiActivity() { return null }
+  `
+  const funcs = ['justUpdated', 'queueNews', 'showNews', 'hideNews'].map(n => fn(html, n)).join('\n')
+  vm.runInContext(setup + '\n' + funcs, context)
+  vm.runInContext(`justUpdated('1.3.8', '1.3.6')`, context)
+  t.advance(7000)
+  return !vm.runInContext(`$('newsCard').classList.contains('hidden')`, context)
+}
 const page = path.join(root, '..', 'app', 'web', 'index.html')
 const current = runSuite(page)
+{
+  const html = fs.readFileSync(page, 'utf8').replace(/\r\n/g, '\n')
+  const check = (name, ok, error) => { current.results.push(ok ? { name, passed: true } : { name, passed: false, error }); if (ok) current.passed++; else current.failed++ }
+  check('main_shows_news_card', newsCardShown(html, 'main'), 'control: main page did not show the news card')
+  check('companion_has_no_news_card', !newsCardShown(html, 'companion'), 'companion page showed the news card')
+}
 const failed = current.results.filter(item => !item.passed)
 console.log(JSON.stringify({file: page, passed: current.passed, failed: current.failed, failures: failed}, null, 2))
 if (current.failed) process.exitCode = 1

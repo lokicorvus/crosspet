@@ -1,7 +1,7 @@
 // CrossPet × DeepSeek Harness
 // - 监听 Harness 的工作事件（收到消息 / 调工具 / 子任务 / 一轮结束），写 <状态目录>/<角色>-state.json
 //   Harness 能接好几家模型：按会话实际在用的模型选角色（DeepSeek / GPT / Claude / Gemini），
-//   当前角色另外记在 deepseek-host.json，桌宠切到 Harness 窗口时按它换角色
+//   另按客户端写一份 <角色>@deepseek-state.json（带 client，多桌宠用）；当前角色另外记在 deepseek-host.json，桌宠切到 Harness 窗口时按它换角色
 // - 每 1 分钟查一次余额（发消息、一轮结束时也查，30 秒内只查一次）（有 API Key 用 Key；没有就用 Harness 里登录的账号），写 <状态目录>/deepseek-quota.json
 // - 跟着 AI 出现：Harness 启动、新会话、发消息时，桌宠没开着就把它打开（用户从菜单退出后到 Harness 重开前不管；在设置 / 插件配置 autostart: false 里关掉了也不管）
 // 状态目录默认 /tmp/crosspet，可在插件配置里改 stateDir。插件只观察，不改变 DeepSeek 的任何行为。
@@ -16,7 +16,8 @@ export const name = "crosspet";
 export const inject = ["credentials"];
 
 const ID = "deepseek";
-const PLUGIN_VERSION = "1.3.9";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
+const CLIENT = "deepseek";   // 多桌宠按「角色 + 客户端」各站一只：Harness 本身就是一个客户端（同 crosspet-hook.py 的 detect_client 用接入名）
+const PLUGIN_VERSION = "1.3.10";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 60 * 1000;   // 定时查余额：充了值、没再对话，最多等 1 分钟（以前 10 分钟，用户充值后半天没变）。只是要一次账户余额，不耗 token
 
@@ -85,22 +86,30 @@ export function apply(ctx, config = {}) {
       provider = route.provider;
       publishQuota();   // 换了服务商：余额该显示还是该藏起来
     }
-    if (next === character && !switched) return;
+    if (next === character && !switched) {
+      writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 }).catch(() => {});
+      return;
+    }
     character = next;
     writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
       .catch(() => {});
   }
 
   let seenAt = 0;
+  let clientChain = Promise.resolve();
   function state(pose, event, tool = "") {
     if (Date.now() - seenAt > 10000) {   // 心跳：最近一次收到消息（桌宠记下来，设置和反馈里看）
       seenAt = Date.now();
       mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "seen-deepseek"), String(Math.floor(seenAt / 1000)))).catch(() => {});
     }
     ledger(event, tool, "shown", `${character} ${pose}`);
-    writeJson(`${character}-state.json`, { pose, event, tool, ts: Date.now() / 1000 }).catch((e) =>
-      ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`),
-    );
+    const s = { pose, event, tool, ts: Date.now() / 1000 }, who = character;
+    const warn = (e) => ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`);
+    const main = writeJson(`${who}-state.json`, s).catch(warn);
+    // 主文件写完再按客户端另写一份 <角色>@deepseek-state.json（多桌宠时额外那只读它，带 client）。
+    // 不管桌宠开没开多桌宠都写，插件不知道设置；写失败和主文件一样只记个警告。
+    // 这份单独排队：几次主文件写入同时进行、完成先后不定，不排队的话旧状态可能最后落盘、盖掉新的
+    clientChain = clientChain.then(() => main).then(() => writeJson(`${who}@${CLIENT}-state.json`, { ...s, client: CLIENT })).catch(warn);
   }
 
   // ---- 跟着 AI 出现 ----
@@ -210,7 +219,7 @@ export function apply(ctx, config = {}) {
   });
   ctx.on("subagent/start", () => state("delegating", "SubagentStart"));
   // 压缩上下文：会话日志里的 compaction/start、compaction/end
-  // ---- 多会话：按对话另记 <角色>-sessions.json（{会话id: {pose, event, ts}}）----
+  // ---- 多会话：按对话另记 <角色>-sessions.json（{会话id: {pose, event, ts, client}}）----
   // 好几个对话同时在干活时桌宠演「手忙脚乱」，每个对话一张小卡片。全靠 session/event：每条都带着是哪个对话，
   // 一轮开始 / 调工具 / 工具结果 / 请求授权 / 一轮结束都有。子任务（subagent）的会话不算单独的对话
   const perChar = {};      // 角色 → {会话id: 状态}
@@ -224,7 +233,7 @@ export function apply(ctx, config = {}) {
     const now = Date.now() / 1000;
     for (const [c, map] of Object.entries(perChar)) if (c !== who && map[session.id]) { delete map[session.id]; sessionsDirty.add(c); }   // 中途换了模型
     const map = (perChar[who] ??= {});
-    map[session.id] = { pose, event: ev, ts: now };
+    map[session.id] = { pose, event: ev, ts: now, client: CLIENT };
     for (const [k, v] of Object.entries(map)) if (now - v.ts > 600) delete map[k];
     sessionsDirty.add(who);
     // 合并 0.2 秒内的连续事件再写盘

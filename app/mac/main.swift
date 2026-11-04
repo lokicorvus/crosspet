@@ -49,6 +49,34 @@ if let i = CommandLine.arguments.firstIndex(of: "--window-place-probe") {
     print([r.minX, r.minY, r.width, r.height].map { String(format: "%g", Double($0)) }.joined(separator: " ")); exit(0)
 }
 
+// 测试用：额外那几只第一次出现放在哪，每行打印一只的 x y 宽 高就退出（tests/companion_place_probe.sh）。
+// 参数：主桌宠 x y 宽 高、几只、每只宽 高、可见区 x y 宽 高
+if let i = CommandLine.arguments.firstIndex(of: "--companion-place-probe") {
+    let n = CommandLine.arguments.dropFirst(i + 1).compactMap { Double($0) }.map { CGFloat($0) }
+    guard n.count == 11 else { print("参数不对"); exit(1) }
+    let slots = App.companionSlots(main: NSRect(x: n[0], y: n[1], width: n[2], height: n[3]), count: Int(n[4]),
+                                   size: NSSize(width: n[5], height: n[6]), visible: NSRect(x: n[7], y: n[8], width: n[9], height: n[10]))
+    for r in slots { print([r.minX, r.minY, r.width, r.height].map { String(format: "%g", Double($0)) }.joined(separator: " ")) }
+    exit(0)
+}
+
+// 测试用：一只一只放（companionOrigin 的纯计算），参数同上，第 5 个是这一轮一共几只；后面每两个数是第几只记过的位置（-1 -1 = 没记过）
+if let i = CommandLine.arguments.firstIndex(of: "--companion-seq-probe") {
+    let n = CommandLine.arguments.dropFirst(i + 1).compactMap { Double($0) }.map { CGFloat($0) }
+    guard n.count >= 11 else { print("参数不对"); exit(1) }
+    let main = NSRect(x: n[0], y: n[1], width: n[2], height: n[3]), size = NSSize(width: n[5], height: n[6])
+    let vf = NSRect(x: n[7], y: n[8], width: n[9], height: n[10]), total = Int(n[4])
+    var placed: [NSRect] = []
+    for k in 0..<total {
+        let j = 11 + 2 * k
+        let saved = j + 1 < n.count && n[j] >= 0 ? NSRect(x: n[j], y: n[j + 1], width: size.width, height: size.height) : nil
+        let r = App.companionPick(main: main, others: placed, saved: saved, total: total, size: size, visible: vf)
+        placed.append(r)
+        print([r.minX, r.minY, r.width, r.height].map { String(format: "%g", Double($0)) }.joined(separator: " "))
+    }
+    exit(0)
+}
+
 let app = NSApplication.shared
 let delegate = App()
 app.delegate = delegate

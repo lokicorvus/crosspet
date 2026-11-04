@@ -4,9 +4,9 @@
 <title>CrossPet 设置</title>
 <style>
 /* 和开发者控制台同一套配色；跟着系统深浅色 */
-:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; }
+:root { --bg: #f6f3ee; --panel: #fff; --ink: #3b2a22; --muted: #8a7a70; --line: #e7dfd5; --accent: #c8792f; --ok: #2f9e5b; --warn: #b07a00; --field: #fffdfa; --hover: #faf5ee; --heart: #e0303f; --heart-line: #5a1f1f; --heart-empty: #d9cfc4; --heart-empty-hi: #ebe3da; --frame: #a9744a; --frame-hi: #e7c59a; --face-bg: #f3e6d2; }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; }
+  :root { --bg: #1f1b18; --panel: #2a2522; --ink: #efe6dd; --muted: #a8998d; --line: #3d3631; --accent: #e09a52; --ok: #5cc184; --warn: #e3b341; --field: #241f1c; --hover: #332c28; --heart: #ee3d4c; --heart-line: #1c0f0f; --heart-empty: #4a403a; --heart-empty-hi: #574c45; --frame: #8a5c38; --frame-hi: #b98b5e; --face-bg: #3a302a; }
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); }
@@ -32,7 +32,7 @@ h1 { font-size: 15px; margin: 0 0 2px; }
 .news-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--hover); display: flex; align-items: center; justify-content: center; flex: none; }
 .news-item b { display: block; }
 .news-item small { display: block; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
-.news-qq { margin-top: 6px; }
+.news-qq-btn { margin-top: 6px; }
 .news-go { margin-left: auto; align-self: center; border: none; background: none; color: var(--accent); padding: 2px 0; white-space: nowrap; font-size: 12px; }
 .news-old { display: flex; justify-content: space-between; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--muted); text-align: left; padding: 8px 14px; }
 .news-more { display: block; width: 100%; border: none; border-top: 1px solid var(--line); border-radius: 0; background: none; color: var(--accent); text-align: right; padding: 8px 14px; font-size: 12px; }
@@ -78,6 +78,39 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .tag.ok { color: var(--ok); }
 .item .label small.warn { color: #c0392b; }
 .hidden { display: none !important; }
+/* 多桌宠（角色页）：开关下面的两个选项缩进一点；单选按钮 */
+.item.indent { padding-left: 28px; }
+.choices { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.choices.stack { flex-direction: column; align-items: flex-start; gap: 3px; margin-top: 4px; }
+.choices label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.choices input[type=radio] { margin: 0; accent-color: var(--accent); }
+.card.dim { opacity: .5; }
+/* 她们的友谊：仿星露谷的好感度——左边两只的头像框，右边名字、关系，下面一排 10 颗像素心（亮的是红心，没到的是暗的空心） */
+#friendRows > .item:first-child { border-top: none; }
+.friend { gap: 12px; }
+.friend-faces { display: flex; flex: none; }
+.friend-face { width: 38px; height: 38px; box-sizing: border-box; border: 2px solid var(--frame); border-radius: 3px; background: var(--face-bg);
+  overflow: hidden; box-shadow: inset 0 0 0 1px var(--frame-hi); }
+.friend-face + .friend-face { margin-left: -6px; }
+.friend-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 100%; transform: scale(1.35); transform-origin: 50% 85%; display: block; }
+.friend-text { flex: 1; min-width: 0; }
+.friend-name { font-weight: 600; }
+.friend-name small { font-weight: normal; color: var(--muted); margin-left: 6px; }
+.pixel-hearts { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+/* 一颗心三层，形状都是 HEART_PIXELS 生成的遮罩（--heart-o / --heart-f / --heart-s，脚本里设），颜色用配色变量，深浅色都跟着变 */
+.pixel-heart { position: relative; width: 18px; height: 16px; flex: none; background: var(--heart-line);
+  -webkit-mask: var(--heart-o) 0 0 / 100% 100% no-repeat; mask: var(--heart-o) 0 0 / 100% 100% no-repeat; }
+.pixel-heart::before, .pixel-heart::after { content: ''; position: absolute; inset: 0; }
+.pixel-heart::before { background: var(--heart-empty); -webkit-mask: var(--heart-f) 0 0 / 100% 100% no-repeat; mask: var(--heart-f) 0 0 / 100% 100% no-repeat; }
+.pixel-heart::after { background: var(--heart-empty-hi); -webkit-mask: var(--heart-s) 0 0 / 100% 100% no-repeat; mask: var(--heart-s) 0 0 / 100% 100% no-repeat; }
+.pixel-heart.on::before { background: var(--heart); }
+.pixel-heart.on::after { background: #fff; opacity: .75; }
+/* 正在攒的那颗：左边涂红一部分（¼ / ½ / ¾）。心里面能涂的是第 1–7 列（共 9 列），中间几列高、两边矮，按面积切：
+   ¼ 涂 2 列（7/24 格）、½ 从正中那列劈开（12/24）、¾ 涂 5 列（17/24） */
+.pixel-heart.q1::before { background: linear-gradient(to right, var(--heart) 33.34%, var(--heart-empty) 33.34%); }
+.pixel-heart.q2::before { background: linear-gradient(to right, var(--heart) 50%, var(--heart-empty) 50%); }
+.pixel-heart.q3::before { background: linear-gradient(to right, var(--heart) 66.67%, var(--heart-empty) 66.67%); }
+.pixel-heart.q1::after, .pixel-heart.q2::after, .pixel-heart.q3::after { background: #fff; opacity: .75; }
 #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
 #toast.show { opacity: .92; }
 </style></head>
@@ -115,6 +148,20 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="followEvents"><span></span></label></div></div>
   <div class="item"><div class="label">随机彩蛋<small>偶尔有别的角色冒出来捣乱；关掉后右键「召唤彩蛋」还能手动看</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="eggs"><span></span></label></div></div>
+  <div class="item"><div class="label">几个 AI 各显示一只<small>同时开着几个 AI 时，每个各来一只</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="multiPets"><span></span></label></div></div>
+  <div class="item indent" id="mainPetRow"><div class="label">主桌宠</div>
+    <div class="ctl choices"><label><input type="radio" name="mainPet" value="rule">先来的当</label>
+      <label><input type="radio" name="mainPet" value="fixed">固定为</label><select id="mainPetSelect" aria-label="固定的主桌宠"></select></div></div>
+  <div class="item indent" id="petsRestRow"><div class="label">她们什么时候在
+      <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干活时出来，闲下来就走</label>
+        <label><input type="radio" name="petsRest" value="stay">干活时出来，程序关了才走</label>
+        <label><input type="radio" name="petsRest" value="open">程序开着就在，关了才走</label></div></div></div>
+</div>
+
+<div class="card hidden" data-tab="character" id="friendship">
+  <h2>她们的友谊</h2>
+  <div id="friendRows"></div>
 </div>
 
 <div class="card" data-tab="quota">
@@ -153,6 +200,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><select id="hideHotkey" aria-label="隐藏快捷键"></select></div></div>
   <div class="item"><div class="label">省电模式<small>身边的小特效刷新慢一点、闲着时更快停下；人物动作照旧。笔记本用电池时可以打开</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="powerSave"><span></span></label></div></div>
+  <div class="item"><div class="label">不睡觉<small>平时 10 分钟没动静、AI 会话结束时她会睡着；打开后一直醒着待机，偶尔哼歌、伸懒腰</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="noSleep"><span></span></label></div></div>
   <div class="item"><div class="label">检查更新</div>
     <div class="ctl"><button data-action="checkUpdate">检查</button></div></div>
   <div class="item"><div class="label">文件夹<small>换立绘、加角色看「自定义角色」文档</small></div>
@@ -214,6 +263,88 @@ function setState(s) {
   gn.textContent = s.gptQuotaNote || '让电脑上的 Codex 自己查用量（不对话、不耗额度，不碰登录凭据）'
   gn.classList.toggle('warn', !!s.gptQuotaNote)
   renderIntegrations(s.integrations)
+  renderMultiPets(s)
+}
+
+// ---- 多桌宠（角色页）：开关关着时两个选项收起；「她们的友谊」开关打开过、又有记录才显示，关着时灰掉 ----
+// 「打开过」记在设置页自己的本机存储里（存不下就只在开着时显示）
+const MULTI_SEEN = 'crosspet-multi-pets-seen'
+function renderMultiPets(s) {
+  const on = !!s.multiPets
+  let seen = on
+  try { if (on) localStorage.setItem(MULTI_SEEN, '1'); else seen = localStorage.getItem(MULTI_SEEN) === '1' } catch {}
+  $('mainPetRow').classList.toggle('hidden', !on)
+  $('petsRestRow').classList.toggle('hidden', !on)
+  // 主桌宠：""= 跟着规则换，否则固定的角色 id；下拉是外壳给的可切换角色（不含彩蛋）。固定的角色不在列表里了也列出来，免得悄悄换掉
+  const main = s.mainPet || '', sel = $('mainPetSelect')
+  if (document.activeElement !== sel) {
+    const chars = (s.characters || []).map(c => [c.id, c.name || c.id])
+    if (main && !chars.some(c => c[0] === main)) chars.push([main, main])
+    sel.replaceChildren(...chars.map(([id, name]) => new Option(name, id, false, id === main)))
+  }
+  // 下拉是空的（外壳没给角色）：「固定为」点了也只能发 ""，干脆灰掉
+  document.querySelector('input[name=mainPet][value=fixed]').disabled = sel.disabled = !sel.options.length
+  for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
+  const rest = s.petsRest === 'stay' || s.petsRest === 'open' ? s.petsRest : 'auto'
+  for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
+  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts, partial }]，hearts 0–10 颗整心，partial 正在攒的那颗攒到几分之几（0 / .25 / .5 / .75）
+  const rows = Array.isArray(s.friendship) ? s.friendship : []
+  $('friendship').classList.toggle('hidden', !seen || !rows.length)
+  $('friendship').classList.toggle('dim', !on)
+  friendFaces = Object.fromEntries((s.characters || []).map(c => [c.id, { name: c.name || c.id, src: c.images?.avatar || c.images?.idle || '' }]))
+  $('friendRows').replaceChildren(...rows.map(friendRow))
+}
+let friendFaces = {}
+// 关系称呼：和台词分档一样（0–3 / 4–7 / 8–10 颗心）
+const FRIEND_TIERS = [[8, '挚友'], [4, '好朋友'], [1, '认识了'], [0, '刚见面']]
+// 像素心（9×8 格，自己画的）：o 描边，f 填色，s 左上角的高光；画成遮罩见 heartMasks
+const HEART_PIXELS = [
+  '.oo...oo.',
+  'osfo.offo',
+  'osffffffo',
+  'offfffffo',
+  '.offfffo.',
+  '..offfo..',
+  '...ofo...',
+  '....o....',
+]
+// 每种格子各生成一张遮罩：描边 o 是整颗心的外形（o、f、s 都算），f 填色区（含高光那格），s 高光
+;(function heartMasks() {
+  const svg = keep => `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 8' shape-rendering='crispEdges'>${
+    HEART_PIXELS.flatMap((line, y) => [...line].map((c, x) => keep.includes(c) ? `<rect x='${x}' y='${y}' width='1' height='1'/>` : '')).join('')}</svg>`)}")`
+  const root = document.documentElement.style
+  root.setProperty('--heart-o', svg('ofs')); root.setProperty('--heart-f', svg('fs')); root.setProperty('--heart-s', svg('s'))
+})()
+// on：整颗；q：不满一颗时攒到几个四分之一（1–3）
+function pixelHeart(on, q = 0) {
+  const c = document.createElement('span'); c.className = 'pixel-heart' + (on ? ' on' : q ? ' q' + q : '')
+  return c
+}
+function friendFace(id) {
+  const box = document.createElement('div'); box.className = 'friend-face'
+  const f = friendFaces[id]
+  if (f?.src) { const img = document.createElement('img'); img.src = f.src; img.alt = f.name; box.append(img) }
+  box.title = f?.name || id
+  return box
+}
+function friendRow(r) {
+  const row = document.createElement('div'); row.className = 'item friend'
+  const faces = document.createElement('div'); faces.className = 'friend-faces'
+  faces.append(friendFace(r.a), friendFace(r.b))
+  const n = Math.round(Math.max(0, Math.min(10, Number(r.hearts) || 0)))
+  const text = document.createElement('div'); text.className = 'friend-text'
+  const name = document.createElement('div'); name.className = 'friend-name'
+  // 名字用 rows 里的 label（「A ♥ B」，带你改过的名字），拆不开再退到角色名 / id
+  const [na, nb] = String(r.label ?? '').split(' \u2665 ')
+  name.textContent = `${nb ? na : friendFaces[r.a]?.name || r.a} & ${nb || friendFaces[r.b]?.name || r.b}`
+  const tier = document.createElement('small'); tier.textContent = FRIEND_TIERS.find(([min]) => n >= min)[1]
+  name.append(tier)
+  const q = n < 10 ? Math.max(0, Math.min(3, Math.floor((Number(r.partial) || 0) * 4))) : 0
+  const hearts = document.createElement('div'); hearts.className = 'pixel-hearts'; hearts.title = `${n || !q ? n : ''}${['', '¼', '½', '¾'][q]} / 10`
+  for (let i = 0; i < 10; i++) hearts.append(pixelHeart(i < n, i === n ? q : 0))
+  text.append(name, hearts)
+  row.append(faces, text)
+  return row
 }
 
 // 接上了但从没收到过这个 AI 的消息：多半是还没在它里面用过，或者某一步没生效。按 AI 给一句排查提示
@@ -294,6 +425,10 @@ $('textLink').onclick = () => state?.textLinked === false
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
+// 主桌宠：点「固定为」用下拉里选着的角色；换下拉就直接固定为那个角色
+for (const r of document.querySelectorAll('input[name=mainPet]')) r.onchange = () => post({ cmd: 'set', key: 'mainPet', value: r.value === 'fixed' ? $('mainPetSelect').value : '' })
+$('mainPetSelect').onchange = () => post({ cmd: 'set', key: 'mainPet', value: $('mainPetSelect').value })
+for (const r of document.querySelectorAll('input[name=petsRest]')) r.onchange = () => post({ cmd: 'set', key: 'petsRest', value: r.value })
 
 // 标签页：记住上次看的是哪一页（每个人自己的小习惯，存不下也没关系）
 function showTab(tab) {
@@ -332,7 +467,6 @@ function renderNews() {
     row.append(el('div', 'news-icon', x.icon))
     const body = el('div'); body.append(el('b', '', x.title), el('small', '', x.text)); row.append(body)
     if (x.go) { const b = el('button', 'news-go', '去设置 ›'); b.onclick = () => goSetting(x.go); row.append(b) }
-    if (x.qq) { const w = el('div', 'news-qq'); w.append(QQGroup.button()); body.append(w) }
     return row
   }
   const versions = WhatsNew.recent(WhatsNew.LIST, state.appVersion)
@@ -350,6 +484,12 @@ function renderNews() {
     toggle.onclick = () => { open ? newsOpen.delete(v.version) : newsOpen.add(v.version); renderNews() }
     box.append(toggle, ...(open ? v.items.map(itemRow) : []))
   })
+  // QQ 群：不跟着哪一版，一直在最下面（版本收起来也看得到）
+  const qq = el('div', 'news-item news-qq')
+  const qqBody = el('div'); qqBody.append(el('b', '', 'QQ 交流群'), el('small', '', '用着有问题、想要新角色、想先看到新版本，都可以来群里聊。点群号就能复制。'))
+  const qqBtn = el('div', 'news-qq-btn'); qqBtn.append(QQGroup.button()); qqBody.append(qqBtn)
+  qq.append(el('div', 'news-icon', '💬'), qqBody)
+  box.append(qq)
   const more = el('button', 'news-more', '更早的更新记录 ›')
   more.onclick = () => post({ cmd: 'action', name: 'openReleases' })
   box.append(more)

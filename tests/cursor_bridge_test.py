@@ -134,6 +134,21 @@ class CursorBridgeTest(unittest.TestCase):
         self.fire([], "afterAgentThought", conv="A", gen="G2", model="gpt-5")
         self.assertEqual((len(cards("claude")), len(cards("gpt"))), (0, 2))
 
+    # ---- 多桌宠：按客户端分（和 crosspet-hook.py 一样，会话带 client，另写一份 <角色>@cursor-state.json）----
+    def test_sessions_and_client_state_carry_cursor(self):
+        self.install("claude")
+        self.fire([], "afterAgentThought", conv="A", model="claude-opus-4-7")
+        main, by_client = self.read("claude-state.json"), self.read("claude@cursor-state.json")
+        self.assertEqual(by_client, {**main, "client": "cursor"})
+        cards = self.read("claude-sessions.json")
+        self.assertEqual({v.get("client") for k, v in cards.items() if k.startswith("cursor_")}, {"cursor"})
+
+    def test_client_state_failure_keeps_main_state(self):
+        # @ 那份写不了（这里放一个同名目录）：主文件照样写好，钩子不报错
+        self.state.mkdir(parents=True)
+        (self.state / "grok@cursor-state.json").mkdir()
+        self.assertEqual(self.send("afterAgentThought")["pose"], "thinking")
+
     def test_turn_shows_tools_then_finishes(self):
         self.assertEqual(self.send("afterAgentThought")["pose"], "thinking")
         state = self.send("postToolUse", tool_name="Read")

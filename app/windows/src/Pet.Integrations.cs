@@ -88,7 +88,7 @@ namespace CrossPet
                 try { healed = (Store.Json.DeserializeObject(output.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
                 if (healed == null || healed.Count == 0) return;
                 Store.Log("接回被冲掉的接入: " + string.Join(", ", healed));
-                Window.Dispatcher.Invoke(() => { healTimes.Add(DateTime.UtcNow); Js("configHealed()"); RefreshIntegrated(); });
+                ui.Invoke(() => { healTimes.Add(DateTime.UtcNow); Js("configHealed()"); RefreshIntegrated(); });
             });
         }
 
@@ -99,7 +99,7 @@ namespace CrossPet
                 var r = RunIntegrate("installed").output;
                 List<string> list = null;
                 try { list = (Store.Json.DeserializeObject(r.Trim().Split('\n').Last()) as object[])?.OfType<string>().ToList(); } catch { }
-                Window.Dispatcher.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
+                ui.Invoke(() => { integrated = list ?? new List<string>(); PushSettings(); done?.Invoke(); });
             });
             RefreshPlugins();
         }
@@ -114,7 +114,7 @@ namespace CrossPet
                 var (output, code) = RunIntegrate("plugins");
                 var last = (output ?? "").Trim().Split('\n').Last().Trim();
                 try { if (code != 0 || !(Store.Json.DeserializeObject(last) is object[])) return; } catch { return; }
-                Window.Dispatcher.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
+                ui.Invoke(() => { pluginStatus = last; if (tellPet) Js($"setPluginUpdates({last})"); PushSettings(); });
             });
         }
 
@@ -142,8 +142,10 @@ namespace CrossPet
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
-                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave,
+                ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
+                // 多桌宠（设置页「角色」页）：开关、她们什么时候去休息、固定主桌宠、友谊（主桌宠页面最后一次发来的）
+                ["multiPets"] = MultiPetsOn, ["petsRest"] = PetsRest, ["mainPet"] = MainPet, ["friendship"] = friendshipRows ?? new object[0],
                 ["hotkeys"] = new[] { new Dictionary<string, object> { ["id"] = "off", ["label"] = "不用快捷键" } }.Concat(HotkeyChoices.Select(h => new Dictionary<string, object> { ["id"] = h.id, ["label"] = h.label })).ToList(), ["aiAutostart"] = AIAutostart, ["character"] = current, ["updating"] = updating,
                 ["characters"] = Characters().Select(c =>
                 {
@@ -186,6 +188,7 @@ namespace CrossPet
                     var key = msg.TryGetValue("key", out var k) ? k as string : null;
                     msg.TryGetValue("value", out var value);
                     var on = value is bool b && b;
+                    if (SetCompanionSetting(key, value)) break;   // 多桌宠的三个键（Pet.Companions.cs）
                     switch (key)
                     {
                         case "size":
@@ -211,6 +214,7 @@ namespace CrossPet
                             if (value is string ps && (ps == "bar" || ps == "text" || ps == "off")) { Store.Settings["peakStyle"] = ps; Store.SaveSettings(); Js($"setPeakStyle({Q(ps)})"); }
                             break;
                         case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Js($"setPowerSave({(on ? "true" : "false")})"); break;
+                        case "noSleep": Store.Settings["noSleep"] = on; Store.SaveSettings(); Js($"setNeverSleep({(on ? "true" : "false")})"); break;
                         case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
@@ -218,22 +222,23 @@ namespace CrossPet
                         case "followApps": case "followEvents": Store.Settings[key] = on; Store.SaveSettings(); break;
                         case "gptQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) RefreshCodexQuota(CodexWhy.Now); else Js("setCodexQuota(null)");
+                            if (on) RefreshCodexQuota(CodexWhy.Now); else QuotaJS("gpt", "setCodexQuota(null)");
                             break;
                         case "agyQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) _ = RefreshGeminiQuota(); else Js("setQuota('gemini', null)");
+                            if (on) _ = RefreshGeminiQuota(); else QuotaJS("gemini", "setQuota('gemini', null)");
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
                         case "dsQuota":
                             Store.Settings["dsQuota"] = on; Store.SaveSettings();
                             stamps.Remove("deepseek-quota");   // 重新打开时马上读一次
-                            if (!on) Js("setQuota('deepseek', null)");
+                            if (!on) QuotaJS("deepseek", "setQuota('deepseek', null)");
                             break;
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id, "manual", "settings"); break;
                     }
+                    CompanionsSettingChanged(key);   // 共用的设置额外那几只跟着
                     break;
                 case "skin":   // 换衣服：记下来，重新载入立绘，并换成这个角色
                     if (msg.TryGetValue("id", out var kid) && kid is string skinId && Characters().Any(x => x.id == skinId) && msg.TryGetValue("skin", out var kv) && kv is string skinName)
@@ -247,6 +252,7 @@ namespace CrossPet
                         Store.SaveSettings();
                         LoadCharacters();
                         Js($"setName({Q(cid)}, {Q(Characters().First(x => x.id == cid).name)})");
+                        CompanionsJs($"setName({Q(cid)}, {Q(Characters().First(x => x.id == cid).name)})");   // 多桌宠：额外那只是她也改
                         dev?.Boot();
                     }
                     break;
@@ -287,7 +293,7 @@ namespace CrossPet
             {
                 var (output, code) = RunIntegrate($"{action} {target}");
                 Store.Log($"接入 {action} {target} → {code}\n{output}");
-                Window.Dispatcher.Invoke(() =>
+                ui.Invoke(() =>
                 {
                     // 没找到 AI 的配置目录时脚本正常退出但什么都没改，不能显示成「已更新」
                     var missing = output.Contains("没找到");

@@ -42,6 +42,7 @@ namespace CrossPet
         [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hWnd, uint cmd);
         [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
         [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
+        [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr hWnd);
         [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr hwnd, int attr, out int value, int size);
 
         /// <summary>桌宠中间那块有没有被它上面的窗口挡住（顺着 Z 序往上看可见、没最小化、没被系统藏起来的窗口）</summary>
@@ -104,7 +105,7 @@ namespace CrossPet
                 if (!GetMonitorInfo(mon, ref info) || !GetWindowRect(front, out var r)) return false;
                 var m = info.rcMonitor;
                 var covers = r.Left <= m.Left && r.Top <= m.Top && r.Right >= m.Right && r.Bottom >= m.Bottom;   // 盖住整块屏幕（连任务栏）
-                if (covers) return true;
+                if (covers) return !ZOrderRule.JustMaximized(IsZoomed(front), GetWindowLong(front, -16));   // GWL_STYLE；任务栏自动隐藏时最大化窗口也盖满屏幕
                 // D3D 独占全屏 / 演示模式：系统状态说了算，但也得是这块屏幕上的前台窗口
                 return SHQueryUserNotificationState(out var s) == 0 && (s == 3 || s == 4) && r.Right - r.Left >= m.Right - m.Left - 2;
             }

@@ -32,16 +32,22 @@ namespace CrossPet
         /// 网页按「人物大小 × 系统缩放 × 系统缩放」画，宽高都正好小了一个系统缩放倍，气泡被挤出窗口。
         /// 返回网页缩放该乘的系数（给网页的缩放 = 人物大小 × 系数），不用改返回 null。
         /// 只认这一种指纹，免得像 1.3.5 那样拖滑块时量早了改错：宽高偏得一样多，而且修完的系数是 1（修过又好了，撤销）或 1 / 系统缩放。
-        /// w、h 是已经两次量过、稳定的网页大小（先过 Off）；fix 是现在用着的系数</summary>
-        public static double? Fix(double expectedW, double expectedH, double w, double h, double dpi, double fix)
+        /// w、h 是已经两次量过、稳定的网页大小（先过 Off）；fix 是现在用着的系数。
+        /// textScale：Windows「辅助功能 → 文本大小」（1.5 = 150%）。WebView2 的渲染缩放把它也算进去，WPF 不算——
+        /// 10-29 反馈：系统缩放 100%，人物大小从 0.6 调到 1.6，网页始终正好是应有的 2/3（174×242 应为 260×362），
+        /// 所以偏差正好是 1 / 文本大小（或 1 / (系统缩放 × 文本大小)）时也修</summary>
+        public static double? Fix(double expectedW, double expectedH, double w, double h, double dpi, double fix, double textScale = 1)
         {
             if (expectedW <= 0 || expectedH <= 0 || w <= 0 || h <= 0 || dpi <= 0 || fix <= 0) return null;
+            if (textScale <= 0) textScale = 1;
             double rw = w / expectedW, rh = h / expectedH;
             if (Math.Abs(rw / rh - 1) > 0.015) return null;   // 宽高偏得不一样：不是缩放的事
             var next = fix * (rw + rh) / 2;
             if (Math.Abs(next / fix - 1) < 0.02) return null;   // 差不多对得上
             if (Math.Abs(next - 1) < 0.02) return 1;
             if (dpi > 1.01 && Math.Abs(next * dpi - 1) < 0.02) return 1 / dpi;
+            if (textScale > 1.01 && Math.Abs(next * textScale - 1) < 0.02) return 1 / textScale;
+            if (textScale > 1.01 && dpi > 1.01 && Math.Abs(next * dpi * textScale - 1) < 0.02) return 1 / (dpi * textScale);
             return null;
         }
     }

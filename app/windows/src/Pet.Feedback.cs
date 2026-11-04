@@ -106,11 +106,11 @@ namespace CrossPet
                                 var on = Forms.Screen.AllScreens.Any(sc => sc.WorkingArea.IntersectsWith(new System.Drawing.Rectangle(r.Left + 40, r.Top + 40, Math.Max(1, r.Right - r.Left - 80), Math.Max(1, r.Bottom - r.Top - 80))));
                                 rect = $"位置 {r.Left},{r.Top} {r.Right - r.Left}×{r.Bottom - r.Top}{(on ? "" : "（不在任何屏幕里）")}；";
                             }
-                            o[id] = $"{rect}显示中 {(Window?.IsVisible == true && !concealed ? "是" : "否")}，透明度 {Num(Math.Round(Window?.Opacity ?? 0, 2))}，置顶 {(Window?.Topmost == true ? "是" : "否")}；层级 {LayerMode}；贴边 {dock ?? "无"}{(dock != null ? (dockOut ? "·跑出来了" : "·缩着") : "")}；大小 {(int)(Scale * 100)}%；网页 {(ready ? "就绪" : "没就绪")}";
+                            o[id] = $"{rect}显示中 {(Host?.Visible == true && !concealed ? "是" : "否")}，透明度 {Num(Math.Round((Host?.Alpha ?? 0) / 255.0, 2))}，置顶 {(Host?.Topmost == true ? "是" : "否")}；层级 {LayerMode}；贴边 {dock ?? "无"}{(dock != null ? (dockOut ? "·跑出来了" : "·缩着") : "")}；大小 {(int)(Scale * 100)}%；网页 {(ready ? "就绪" : "没就绪")}";
                             break;
                         case "displays": o[id] = DisplaysSummary(); break;
                         case "dpi":
-                            o[id] = DisplaysSummary() + $"\n系统缩放 {(Window != null ? Math.Round(VisualTreeHelper.GetDpi(Window).DpiScaleX * 100) : 0)}%，网页缩放 {Num(Math.Round(web?.ZoomFactor ?? 0, 3))}{(Math.Abs(zoomFix - 1) > 0.001 ? $"（自动修正 ×{Num(Math.Round(zoomFix, 3))}）" : "")}，"
+                            o[id] = DisplaysSummary() + $"\n系统缩放 {(Host != null ? Math.Round(Host.DpiScale * 100) : 0)}%，网页缩放 {Num(Math.Round(web?.ZoomFactor ?? 0, 3))}{(Math.Abs(zoomFix - 1) > 0.001 ? $"（自动修正 ×{Num(Math.Round(zoomFix, 3))}）" : "")}，"
                                 + $"画布 {Math.Round(pageW)}×{Math.Round(pageH)}，人物大小 {(int)(Scale * 100)}%，文字 {(TextLinked ? "跟着" : (int)(TextScale * 100) + "%")}";
                             break;
                         case "front": o[id] = $"前台 {Native.ForegroundExe()}，是桌面或任务栏 {(Native.ForegroundIsShell() ? "是" : "否")}；被别的窗口挡住 {(hwnd != IntPtr.Zero && Native.Covered(hwnd) ? "是" : "否")}"; break;
@@ -215,7 +215,7 @@ namespace CrossPet
                 if (hwnd != IntPtr.Zero && Native.GetWindowRect(hwnd, out var wr))
                 {
                     var onAny = all.Any(sc => sc.WorkingArea.IntersectsWith(new System.Drawing.Rectangle(wr.Left + 40, wr.Top + 40, Math.Max(1, wr.Right - wr.Left - 80), Math.Max(1, wr.Bottom - wr.Top - 80))));
-                    flags.Add($"窗口 {wr.Left},{wr.Top} {wr.Right - wr.Left}×{wr.Bottom - wr.Top}{(onAny ? "" : "（不在任何屏幕里）")}{(Window.IsVisible && !concealed ? "" : "（隐藏）")}");
+                    flags.Add($"窗口 {wr.Left},{wr.Top} {wr.Right - wr.Left}×{wr.Bottom - wr.Top}{(onAny ? "" : "（不在任何屏幕里）")}{(Host.Visible && !concealed ? "" : "（隐藏）")}");
                 }
                 return $"{all.Length} 块：{string.Join("、", parts)}；{string.Join("，", flags)}";
             }
@@ -229,7 +229,7 @@ namespace CrossPet
             {
                 var want = (msg.TryGetValue("want", out var wv) ? wv as object[] : null)?.OfType<string>().ToList() ?? new List<string>();
                 var key = msg.TryGetValue("key", out var kv) ? kv as string : null;
-                _ = Window.Dispatcher.InvokeAsync(async () =>
+                _ = ui.InvokeAsync(async () =>
                 {
                     try { PushFacts(await CollectFeedback(want), key); }
                     catch (Exception e) { Store.Log("收集反馈信息出错: " + e); }   // 不然异常进了没人看的 Task，什么痕迹都不留
@@ -246,7 +246,7 @@ namespace CrossPet
             var endpoint = Store.Settings.TryGetValue("feedbackURL", out var u) && u is string us && us != "" ? us : FeedbackEndpoint;
             void Done(bool ok, string text)
             {
-                Window.Dispatcher.BeginInvoke(new Action(() =>
+                ui.BeginInvoke(new Action(() =>
                 {
                     feedback?.Run($"onSent({(ok ? "true" : "false")}, {Q(text)})");
                     if (ok) Js("show('happy', true); say('收到反馈啦，谢谢你！')");
@@ -270,7 +270,7 @@ namespace CrossPet
                     var code = reply != null && reply.TryGetValue("code", out var c2) ? Convert.ToInt32(c2) : -1;
                     if (code == 0)
                     {
-                        await Window.Dispatcher.BeginInvoke(new Action(() =>
+                        await ui.BeginInvoke(new Action(() =>
                         {
                             recent.Add(now);
                             Store.Settings["feedbackTimes"] = recent.Cast<object>().ToArray(); Store.SaveSettings();

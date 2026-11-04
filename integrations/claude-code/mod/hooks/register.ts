@@ -1,7 +1,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 // CrossPet × Claude Code（增强版 mod）
-// 和标准钩子输出同一种状态（<状态目录>/claude-state.json），另外多两样：
+// 和标准钩子输出同一种状态（<状态目录>/claude-state.json，另按客户端写 claude@<客户端>-state.json），另外多两样：
 // - 额度：session.measure 推来的 5 小时 / 每周窗口 → claude-quota.json
 // - 被打断 / 出错：turn.complete 的 reason
 // - 压缩上下文：session.compact
@@ -94,7 +94,15 @@ async function writeLedger($: EngineInterface, ev: string, tool: string, sid: st
   } catch {}   // 记录写不了不能影响 Claude
 }
 
-// 写状态；同时按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts}}），
+// 这条事件来自哪个客户端（多桌宠按「角色 + 客户端」各站一只），规则同 crosspet-hook.py 的 detect_client：
+// Claude 桌面 App 和终端加载的是同一个 mod，只能看 CLAUDE_CODE_ENTRYPOINT 分，claude-desktop 是桌面，其他值（cli、sdk、IDE 插件）或没有都算终端
+async function clientOf($: EngineInterface): Promise<string> {
+  let entry: string | undefined
+  try { entry = await $.env.get('CLAUDE_CODE_ENTRYPOINT') } catch {}
+  return entry === 'claude-desktop' ? 'claude-desktop' : 'claude-cli'
+}
+
+// 写状态；同时按会话另外记一份 <角色>-sessions.json（{会话id: {pose, event, ts, client}}），
 // 同时开着好几个会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
 type State = { pose: string; event: string; tool: string; ts: number }
 async function setState($: EngineInterface, state: State): Promise<void> {
@@ -102,13 +110,17 @@ async function setState($: EngineInterface, state: State): Promise<void> {
   let sid = ''
   try { sid = await $.session.id() } catch {}
   const who = actors.get(sid) ?? ID
+  const client = await clientOf($)
   await write($, `${who}-state.json`, state)
+  // 另外按客户端写一份 <角色>@<客户端>-state.json（多桌宠时额外那只读它）：不管桌宠开没开多桌宠都写，mod 不知道设置。
+  // 主文件已经写好了，这份写不了就算了，不能因为它让 Claude 的事件报错
+  await write($, `${who}@${client}-state.json`, { ...state, client }).catch(() => {})
   ledger($, state.event, state.tool, sid, 'shown', `${who} ${state.pose}`)   // 不等它写完：记录不该拖慢状态更新
   try {
     const file = `${await stateDir($)}/${who}-sessions.json`
-    let known: Record<string, { pose: string; event: string; ts: number }> = {}
+    let known: Record<string, { pose: string; event: string; ts: number; client?: string }> = {}
     try { known = JSON.parse(await $.fs.read(file)) } catch {}
-    known[sid] = { pose: state.pose, event: state.event, ts: state.ts }
+    known[sid] = { pose: state.pose, event: state.event, ts: state.ts, client }
     const now = Date.now() / 1000
     for (const k of Object.keys(known)) if (now - known[k].ts > 600) delete known[k]
     await $.fs.write(file, JSON.stringify(known))

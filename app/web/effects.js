@@ -593,6 +593,9 @@ const surroundings = (p      )         => {
     case 'puffed': return angerPuff
     case 'dizzy': return dizzyStars
     case 'coaxed': case 'forgiven': return heart(440, 160, 1.4, '0s') + heart(110, 200, 1.1, '0.8s')
+    // 关系升级：两边一圈心接连飘起来，再加两颗闪光
+    case 'friend_up': return heart(450, 170, 1.9, '0s') + heart(100, 200, 1.7, '0.4s') + heart(500, 260, 1.3, '0.8s') + heart(70, 300, 1.2, '1.2s') +
+      heart(430, 330, 1.0, '1.6s') + star(520, 150, 1, '0.3s', '#ff8fab') + star(60, 160, 0.9, '0.9s', '#ff8fab')
   }
   return GREET_FX[p]
 }
