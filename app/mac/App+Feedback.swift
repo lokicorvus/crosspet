@@ -144,6 +144,15 @@ extension App {
                 let finish = { (text: String) in if !answered { answered = true; out["page"] = text; group.leave() } }
                 web.evaluateJavaScript("JSON.stringify(diagnoseDisplay())") { r, _ in finish(r as? String ?? "网页没有回应") }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { finish("网页没有回应") }
+            case "pets":
+                // 多桌宠：网页算出的名单 + 外壳实际开着的窗口（对不上时 FeedbackPlan.formatPets 标出来）
+                group.enter()
+                var answered = false
+                let finish = { (text: String) in if !answered { answered = true; out["pets"] = text; group.leave() } }
+                let wins = companions.map { ["id": $0.key, "character": $0.value.character] }
+                let winsJson = (try? JSONSerialization.data(withJSONObject: wins)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+                web.evaluateJavaScript("JSON.stringify(diagnosePets(\(winsJson)))") { r, _ in finish(r as? String ?? "网页没有回应") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { finish("网页没有回应") }
             case "diag":
                 if diagText.isEmpty, pythonReady, integrateScript != nil {
                     // 诊断要跑 python，卡住的话整份反馈都等不来：最多等 3 秒，到点先写「诊断超时」

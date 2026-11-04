@@ -1435,6 +1435,22 @@ function diagnoseDisplay() {
     imageErrors: imageErrors.slice(), verdicts: petVerdicts.slice(),
   }
 }
+// 反馈「几只桌宠不对」附的多桌宠状态（FeedbackPlan.formatPets 排版）：设置、主桌宠占着谁、开着的程序、会话、网页算出来的那几只；
+// windows 是外壳实际开着的窗口 [{ id, character }]，和网页的名单对不上时一眼能看出来。只有角色名、客户端名，没有会话内容
+function diagnosePets(windows) {
+  const nowMs = Date.now(), { current: _c, ...byChar } = sessions
+  const clients = Companions.clientsOf(byChar, nowMs)
+  const characterOf = {}, chars = manifest.characters || {}, valid = new Set(Object.keys(chars).filter(id => !chars[id].egg))
+  if (runningKeys) for (const k of runningKeys) { const cl = k.slice(k.indexOf('@') + 1); characterOf[cl] = Companions.clientCharacter(cl, rememberedClientChars(), valid) }
+  return {
+    on: multiPets.on, rest: multiPets.rest, mainPet: multiPets.mainPet, main: mainCharacter(), claim: claim?.key || null,
+    running: runningKeys == null ? null : Object.keys(characterOf).sort(), characterOf,
+    clients: clients.map(c => ({ key: c.key, working: !!c.working, ago: Math.round(nowMs / 1000 - c.lastTs), cli: Companions.isCli(c) })),
+    pets: (companionsState?.pets || []).map(p => ({ id: p.id, key: p.key, character: p.character, via: p.via, quota: !!p.quota })),
+    gathered: gathered.slice(), sentHome: Object.keys(companionsState?.sentHome || {}),
+    windows: Array.isArray(windows) ? windows : null,
+  }
+}
 function applyCharState(id, s) {
   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由主桌宠（当前角色）来演。
   // 要先于 playsByClient 判断：外壳不转发 current@* 文件，换成角色名再判会被当成「改由按客户端那份演」吞掉（设计第一节：未知模型算主桌宠占着的客户端）

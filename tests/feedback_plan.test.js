@@ -26,8 +26,8 @@ const facts = (sections = {}) => ({
   sections,
 })
 
-test('九个类型，文案和顺序照设计', () => {
-  assert.deepEqual(P.KINDS.map(k => k.id), ['gone', 'action', 'character', 'quota', 'display', 'update', 'perf', 'idea', 'other'])
+test('十个类型，文案和顺序照设计（1.3.10 加「几只桌宠不对」，紧跟换角色）', () => {
+  assert.deepEqual(P.KINDS.map(k => k.id), ['gone', 'action', 'character', 'pets', 'quota', 'display', 'update', 'perf', 'idea', 'other'])
   assert.equal(P.KINDS.find(k => k.id === 'action').label, 'AI 干活时她没反应')
   assert.equal(P.KINDS.find(k => k.id === 'idea').askStill, false)
   assert.equal(P.KINDS.find(k => k.id === 'gone').askStill, true)
@@ -160,4 +160,30 @@ test('「其他」是说不清哪类时用的：每类都带一点，已接入�
   const many = Array.from({ length: 50 }, (_, i) => JSON.stringify({ t: 1792571450 + i, ev: 'E' + i, tool: '', sid: '', turn: false, result: 'shown', detail: 'gpt idle' })).join('\n')
   const body = JSON.stringify(P.buildCard({ kind: 'other', target: '', still: 'now', text: 'x', attach: true, facts: facts({ 'events:codex': many, seen: '{}' }) }))
   assert.ok(body.includes('E49') && !body.includes('E39 '), '每家只附最近 10 条')
+})
+
+test('几只桌宠不对：附多桌宠状态、换角色记录、前台、设置、日志；换角色、其他也带多桌宠状态', () => {
+  assert.deepEqual(P.sectionsFor('pets', ''), ['pets', 'switches', 'front', 'settings', 'log'])
+  assert.ok(P.sectionsFor('character', 'gpt').includes('pets'))
+  assert.ok(P.sectionsFor('other', '', facts()).includes('pets'))
+  assert.equal(P.KINDS.find(k => k.id === 'pets').askStill, true)
+})
+
+test('多桌宠状态排成几行；网页名单和外壳窗口对不上时标出来', () => {
+  const d = {
+    on: true, rest: 'open', mainPet: 'grok', main: 'grok', claim: null, running: ['codex', 'gpt'], characterOf: { codex: 'gpt', gpt: 'gpt' },
+    clients: [{ key: 'gpt@codex', working: false, ago: 30, cli: true }],
+    pets: [{ id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', via: 'work', quota: true }, { id: 'gpt@gpt', key: 'gpt@gpt', character: 'gpt', via: 'work', quota: false }],
+    gathered: [], sentHome: [], windows: [{ id: 'gpt@codex', character: 'gpt' }, { id: 'gpt@gpt', character: 'gpt' }, { id: 'claude@claude-desktop', character: 'claude' }],
+  }
+  const t = P.formatPets(JSON.stringify(d))
+  assert.match(t, /程序开着就在，主桌宠 固定为 grok/)
+  assert.match(t, /开着的程序：codex→gpt、gpt→gpt/)
+  assert.match(t, /会话：gpt@codex（30 秒前，终端）/)
+  assert.match(t, /网页算出的额外几只：gpt@codex\[work·额度\]、gpt@gpt\[work\]/)
+  assert.match(t, /和网页对不上：claude@claude-desktop/)
+  assert.equal(P.formatPets('网页没有回应'), '网页没有回应')
+  // 进卡片：标题「多桌宠」
+  const card = JSON.stringify(P.buildCard({ kind: 'pets', target: '', still: 'now', text: '两只 GPT', attach: true, facts: facts({ pets: JSON.stringify(d) }) }))
+  assert.ok(card.includes('多桌宠：') && card.includes('几只桌宠不对'), card.slice(0, 300))
 })

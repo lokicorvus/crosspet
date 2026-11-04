@@ -147,6 +147,13 @@ namespace CrossPet
                             var raw = await Task.WhenAny(eval, Task.Delay(2000)) == eval ? eval.Result : "null";
                             o[id] = Store.Json.DeserializeObject(raw) as string ?? "网页没有回应";
                             break;
+                        case "pets":
+                            // 多桌宠：网页算出的名单 + 外壳实际开着的窗口（对不上时 FeedbackPlan.formatPets 标出来）
+                            var wins = Store.Json.Serialize(companions.Select(kv => new Dictionary<string, object> { ["id"] = kv.Key, ["character"] = kv.Value.Character }).ToArray());
+                            var petsEval = Eval($"JSON.stringify(diagnosePets({wins}))");
+                            var petsRaw = await Task.WhenAny(petsEval, Task.Delay(2000)) == petsEval ? petsEval.Result : "null";
+                            o[id] = Store.Json.DeserializeObject(petsRaw) as string ?? "网页没有回应";
+                            break;
                         case "diag":
                             // 诊断要跑 python，卡住的话整份反馈都等不来：最多等 3 秒，到点先写「诊断超时」（跑完的结果留着下次用）
                             if (diagText == "" && File.Exists(Store.Python))

@@ -747,6 +747,19 @@ const multiCases = [
     assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/gpt"]', `back: ${JSON.stringify(lastCompanions(e))}`)
     assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
   }],
+  ['feedback_diagnose_pets', async e => {
+    // 反馈「几只桌宠不对」附的状态：网页算出的那几只、外壳交来的窗口、开着的程序都在，能 JSON 化
+    await multiOn(e, 'claude')
+    e.run(`callCompanion('gpt')`)
+    await e.advance(3000)
+    e.run(`setRunning(['gpt@codex', 'claude@codex'])`)
+    const d = JSON.parse(e.run(`JSON.stringify(diagnosePets([{ id: 'gpt@gather', character: 'gpt' }]))`))
+    assert(d.on === true && d.main === 'claude', `head: ${JSON.stringify(d)}`)
+    assert(JSON.stringify(d.pets.map(p => p.id + '/' + p.character + '/' + p.via)) === '["gpt@gather/gpt/gather"]', `pets: ${JSON.stringify(d.pets)}`)
+    assert(JSON.stringify(d.running) === '["codex"]' && d.characterOf.codex, `running: ${JSON.stringify(d)}`)
+    assert(JSON.stringify(d.gathered) === '["gpt"]' && d.windows.length === 1, `rest: ${JSON.stringify(d)}`)
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
   ['gather_answers_called_pet', async e => {
     // 先「叫她出来」一只，再集合：她不另开，轮到她时就地答到，别的照常一只只来
     await multiOn(e, 'claude')

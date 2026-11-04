@@ -6,6 +6,7 @@
     { id: 'gone', label: '她不见了 / 打不开', sub: '崩溃、闪退、找不到她', follow: null, askStill: true, hint: '什么时候不见的、之前在做什么？例：右键换了个角色她就没了' },
     { id: 'action', label: 'AI 干活时她没反应', sub: '或者动作、表情不对', follow: 'ai', askStill: true, hint: '它在干什么的时候？例：它在思考时，她还在睡觉' },
     { id: 'character', label: '角色换得不对', sub: '换错人、少了角色', follow: 'character', askStill: true, hint: '换成了谁、应该是谁？例：用 Codex 时变成了 DeepSeek' },
+    { id: 'pets', label: '几只桌宠不对', sub: '多出一只、该走的不走、叫不出来', follow: null, askStill: true, hint: '有几只、各是谁、应该是怎样？例：开着 ChatGPT 时出现了两只 GPT' },
     { id: 'quota', label: '额度 / 余额不对', sub: '', follow: 'quota', askStill: true, hint: '显示成了什么、应该是多少？例：余额一直显示 0' },
     { id: 'display', label: '画面不对', sub: '错位、模糊、大小不对', follow: null, askStill: true, hint: '哪里不对？例：气泡被挤到窗口外面' },
     { id: 'update', label: '更新失败', sub: '', follow: null, askStill: true, hint: '到哪一步出的问题、提示了什么？' },
@@ -26,11 +27,12 @@
     qwen: '[Qwen Code]', antigravity: '[Antigravity]', zcode: '[ZCode]', hermes: '[Hermes]', workbuddy: '[WorkBuddy]', grok: '[Grok Build]' }
   const TITLES = { window: '窗口', displays: '显示器', front: '前台', hidden: '藏起来的原因', page: '网页自报', renderRestart: '渲染重启记录', crashes: '崩溃报告',
     install: '安装', log: '相关日志', updateLog: '更新日志', seen: '最近收到消息', diag: '接入诊断', petEvents: '桌宠收到事件后的处理', switches: '最近换角色',
-    settings: '设置', characters: '角色文件夹', perf: '性能', dpi: '缩放和画布' }
+    settings: '设置', characters: '角色文件夹', perf: '性能', dpi: '缩放和画布', pets: '多桌宠' }
   const LOG_WORDS = {
     gone: ['全屏', '窗口', '置顶', '层级', '渲染', '启动', '崩溃', '界面异常', '藏', '立绘加载失败', '接班', '安装不完整'],
     action: ['状态', '接入', '自动出现', '钩子'],
     character: ['同步角色', '换角色', '角色'],
+    pets: ['额外桌宠', '多桌宠', '换角色'],
     quota: ['额度', '余额'],
     display: ['缩放', '画布', '网页大小'],
     perf: ['渲染', '定时任务'],
@@ -54,13 +56,14 @@
         const host = hostOf(target)
         return ['diag', 'seen', 'events:' + host, 'petEvents', 'page', `state:${STATE_OF[host] || host}|${HOST_OF[host] || host}`, 'settings', 'log']
       }
-      case 'character': return ['characters', 'switches', 'front', 'settings', 'log']
+      case 'character': return ['characters', 'switches', 'front', 'settings', 'pets', 'log']
+      case 'pets': return ['pets', 'switches', 'front', 'settings', 'log']
       case 'quota': return ['quota:' + target, 'settings', 'log']
       case 'display': return ['dpi', 'displays', 'page', 'log']
       case 'update': return ['updateLog', 'install']
       case 'perf': return ['perf', 'settings', 'log']
       // 其他：说不清是哪类时用，每类都带一点（体积由 buildCard 的缩减兜着）
-      case 'other': return ['window', 'displays', 'front', 'hidden', 'page', 'settings', 'seen', ...(facts?.integrations || []).map(i => 'events:' + i), 'petEvents', 'switches', 'install', 'log']
+      case 'other': return ['window', 'displays', 'front', 'hidden', 'page', 'settings', 'pets', 'seen', ...(facts?.integrations || []).map(i => 'events:' + i), 'petEvents', 'switches', 'install', 'log']
       default: return []
     }
   }
@@ -110,6 +113,29 @@
     return [head, errors && '图片加载失败：' + errors, verdicts && '网页的判断：\n' + verdicts].filter(Boolean).join('\n')
   }
 
+  const REST_NAMES = { auto: '干活时出来闲下来就走', stay: '干活时出来程序关了才走', open: '程序开着就在' }
+  // 多桌宠状态（网页 diagnosePets 交来的 JSON）：一行一项，网页名单和外壳窗口对不上时标出来
+  function formatPets(json) {
+    let d; try { d = JSON.parse(json) } catch { return String(json || '') }
+    if (!d || typeof d !== 'object') return String(json || '')
+    const list = (xs, f) => (xs && xs.length ? xs.map(f).join('、') : '无')
+    const lines = [
+      `开关 ${d.on ? '开' : '关'}，她们什么时候在：${REST_NAMES[d.rest] || d.rest}，主桌宠 ${d.mainPet ? '固定为 ' + d.mainPet : '先来的当'}`,
+      `主桌宠 ${d.main || '—'}，占着 ${d.claim || '—'}`,
+      `开着的程序：${d.running == null ? '外壳还没交' : list(d.running, c => `${c}→${(d.characterOf || {})[c] || '?'}`)}`,
+      `会话：${list(d.clients, c => `${c.key}（${c.working ? '干活中' : c.ago + ' 秒前'}${c.cli ? '，终端' : ''}）`)}`,
+      `网页算出的额外几只：${list(d.pets, p => `${p.key}[${p.via}${p.quota ? '·额度' : ''}${p.id !== p.key ? '·窗口 ' + p.id : ''}]`)}`,
+    ]
+    if (d.windows) {
+      const ids = new Set((d.pets || []).map(p => p.id + '|' + p.character))
+      const odd = d.windows.filter(w => !ids.has(w.id + '|' + w.character))
+      lines.push(`外壳开着的窗口：${list(d.windows, w => `${w.id}→${w.character}`)}${odd.length ? `（和网页对不上：${odd.map(w => w.id).join('、')}）` : ''}`)
+    }
+    if ((d.gathered || []).length) lines.push(`叫出来 / 集合的：${d.gathered.join('、')}`)
+    if ((d.sentHome || []).length) lines.push(`让她先回去的：${d.sentHome.join('、')}`)
+    return lines.join('\n')
+  }
+
   // 某一家没有事件记录：结合「最近收到消息」分清是收到过却没记（插件比这次改版旧、或写不了数据目录）还是从没收到
   function emptyEvents(integration, seenJson) {
     let seen = 0; try { seen = Number(JSON.parse(seenJson || '{}')[integration]) || 0 } catch {}
@@ -124,6 +150,7 @@
     if (id === 'seen') return formatSeen(raw)
     if (id === 'page') return formatPage(raw, n.ledger)
     if (id === 'switches') return formatSwitches(raw, n.ledger)
+    if (id === 'pets') return formatPets(raw)
     if (id === 'petEvents') return formatLedger(raw, n.ledger, '没有记录')
     if (id.startsWith('events:')) return formatLedger(raw, target === 'unsure' || kind === 'other' ? Math.min(10, n.ledger) : n.ledger, emptyEvents(id.slice(7), sections.seen))
     return String(raw).slice(0, n.text)
@@ -167,7 +194,7 @@
     return card
   }
 
-  const api = { KINDS, STILL, followOptions, sectionsFor, sliceDiag, filterLog, formatLedger, buildCard }
+  const api = { KINDS, STILL, followOptions, sectionsFor, sliceDiag, filterLog, formatLedger, formatPets, buildCard }
   root.FeedbackPlan = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
