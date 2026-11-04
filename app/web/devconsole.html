@@ -79,7 +79,7 @@ textarea { min-height: 300px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
     <div class="row">
       <b style="font-size:15px">CrossPet 开发者控制台</b><span class="pill" id="ver"></span>
       <span style="flex:1"></span>
-      <button id="pause" class="on" title="测试时先不把真实 AI 的状态交给桌宠（事件仍会记在「实时事件」里）">⏸ 暂停真实 AI 事件</button>
+      <button id="pause" title="测试时先不把真实 AI 的状态交给桌宠（事件仍会记在「实时事件」里）；点了测试动作会自动暂停">▶ 真实 AI 事件照常</button>
       <button id="release" title="松开保持，桌宠回到正常运行">↩︎ 让桌宠恢复正常</button>
       <button id="reloadPet">⟳ 重新载入桌宠</button>
     </div>
@@ -128,7 +128,8 @@ textarea { min-height: 300px; font: 12px/1.5 ui-monospace, Menlo, monospace; }
 const $ = id => document.getElementById(id)
 // macOS：WKWebView 的 webkit.messageHandlers；Windows：WebView2 的 chrome.webview
 const post = msg => window.chrome?.webview ? window.chrome.webview.postMessage(msg) : window.webkit?.messageHandlers?.dev?.postMessage(msg)
-const pet = code => post({ cmd: 'pet', code })
+// 测试动作：先暂停真实 AI 事件，免得演到一半被真实状态盖掉。只打开控制台看看时不暂停（以前一打开就暂停，忘了关控制台她就不跟着 AI 动了）
+const pet = code => { setPaused(true); post({ cmd: 'pet', code }) }
 const wait = ms => new Promise(r => setTimeout(r, ms))
 const J = v => JSON.stringify(v)
 let manifest = { characters: {} }, appInfo = {}, sel = null, status = null, fallback = {}
@@ -436,9 +437,14 @@ $('clearMarks').onclick = () => { if (confirm('清空所有 ✓ / ✗ 标记和�
 function onSaved(path) { $('savedTo').textContent = '已保存到 ' + path + '，也复制到了剪贴板' }
 
 // ---- 顶部按钮 / 标签页 ----
-let paused = true
-$('pause').onclick = () => { paused = !paused; post({ cmd: 'pause', on: paused }); $('pause').classList.toggle('on', paused); $('pause').textContent = paused ? '⏸ 暂停真实 AI 事件' : '▶ 真实 AI 事件照常' }
-$('release').onclick = () => { tiles[playingIdx]?.el.classList.remove('playing'); playingIdx = -1; pet('devRelease()') }
+let paused = false
+function setPaused(on) {
+  if (on !== paused) { paused = on; post({ cmd: 'pause', on }) }
+  $('pause').classList.toggle('on', paused); $('pause').textContent = paused ? '⏸ 暂停真实 AI 事件' : '▶ 真实 AI 事件照常'
+}
+$('pause').onclick = () => setPaused(!paused)
+// 恢复正常：松开保持，真实 AI 事件也照常交给她
+$('release').onclick = () => { tiles[playingIdx]?.el.classList.remove('playing'); playingIdx = -1; post({ cmd: 'pet', code: 'devRelease()' }); setPaused(false) }
 $('reloadPet').onclick = () => post({ cmd: 'reload' })
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('sel', x === b))
