@@ -358,7 +358,7 @@ function setFx(p, instant, as) {
     if (owner !== charId || generation !== characterGeneration || pose !== poseAt || multi) return
     // 角色可以在 character.json 的 fx 里把某个姿态的特效换成 effects.js 里的其他特效，比如 DeepSeek 思考时冒泡泡
     const named = char()?.fx?.[as || p]
-    const inner = !window.CrossFx ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(as || p)
+    const inner = !window.CrossFx || as === 'none' ? '' : named && CrossFx.named?.[named] ? CrossFx.named[named] : CrossFx.surroundings(as || p)
     fx.innerHTML = inner ? `<svg viewBox="0 0 ${CrossFx.CW} ${CrossFx.CH}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>` : ''
     fx.classList.remove('hide')
   }
@@ -1931,7 +1931,7 @@ function chatAs(character, line, pose, fx) {
 }
 // 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
 // look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换。
-// fx：换上 look 时改用这个特效（关系升级：图按台词挑，特效统一飘心）
+// fx：换上 look 时改用这个特效（关系升级：飘心）；没给就不要特效——这些图平时配的是干活的特效（清单、奖杯、对话卡片），聊天时看着像在偷偷干活
 const CHAT_MS = 6000
 let chatTimer = null
 function chat(line, look, fx) {
@@ -1940,7 +1940,7 @@ function chat(line, look, fx) {
     clearTimeout(pending); clearTimeout(revertTimer)
     shownAt = Date.now()
     setPose(look)
-    if (typeof fx === 'string') setFx(look, false, fx)
+    setFx(look, false, typeof fx === 'string' ? fx : 'none')
     revertTimer = characterTimeout(() => { if (pose === look) setPose(restPose()) }, CHAT_MS)
   }
   say(line)

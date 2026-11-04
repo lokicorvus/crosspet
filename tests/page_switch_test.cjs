@@ -542,9 +542,14 @@ const multiCases = [
     assert(c.state().pose === before, `no look given but pose changed: ${c.state().pose}`)
     await c.advance(6500)
     assert(c.state().bubble !== '一起喝茶？', 'companion chat not cleared')
-    // 带立绘：说的时候换上，6 秒后回到常态
+    // 带立绘：说的时候换上，6 秒后回到常态；不带干活的特效（happy 平时配清单彩带）
     c.run(`chat('好耶 :3', 'happy')`)
     assert(c.state().pose === 'happy', `chat look: ${c.state().pose}`)
+    await c.advance(300)
+    assert(c.run(`$('fx').innerHTML`) === '', `chat fx: ${c.run(`$('fx').innerHTML`)}`)
+    c.run(`chat('好朋友！', 'proud', 'friend_up')`)
+    await c.advance(300)
+    assert(c.run(`$('fx').innerHTML`).includes(c.run(`CrossFx.surroundings('friend_up')`)), 'companion level-up fx not hearts')
     await c.advance(6500)
     assert(c.state().pose !== 'happy', `chat look not reverted: ${c.state().pose}`)
     c.run(`chat('乱写的', 'nope')`)
