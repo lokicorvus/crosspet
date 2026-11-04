@@ -279,6 +279,11 @@ static class Program
         Check("多桌宠位置：放不下时 12 只左上角两两不重合", crowded.Select(r => (r.X, r.Y)).Distinct().Count() == 12);
         Check("多桌宠位置：0 只、空尺寸不出错", CompanionPlace.Slots(mainBR, 0, pet1, vis1080).Length == 0
             && CompanionPlace.Slots(mainBR, 3, new CompanionPlace.Size(0, 0), vis1080).Length == 0);
+        // 在跑的程序算哪个客户端：要和钩子写的 client 一致。ChatGPT 桌面版里跑的是 Codex，算 codex（不然 ChatGPT 开着时多一只 gpt@gpt）
+        Check("在跑的程序：ChatGPT 桌面版算 codex", RunningClient.Of("chatgpt.exe", "gpt", false) == "codex");
+        Check("在跑的程序：Codex 算 codex", RunningClient.Of("codex.exe", "gpt", true) == "codex");
+        Check("在跑的程序：有窗口的 Claude 是桌面，没窗口的不算", RunningClient.Of("claude.exe", "claude", true) == "claude-desktop" && RunningClient.Of("claude.exe", "claude", false) == null);
+        Check("在跑的程序：Antigravity、其余按对照表", RunningClient.Of("antigravity.exe", "gemini", true) == "antigravity" && RunningClient.Of("workbuddy.exe", "workbuddy", true) == "workbuddy");
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

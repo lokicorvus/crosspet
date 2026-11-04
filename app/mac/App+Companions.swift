@@ -444,7 +444,8 @@ extension App {
         for a in NSWorkspace.shared.runningApplications {
             guard let b = a.bundleIdentifier else { continue }
             if b == Self.claudeDesktopBundle { clients.insert("claude-desktop") }
-            else if b == "com.openai.codex" { clients.insert("codex") }
+            // ChatGPT 桌面版里跑的就是 Codex（包里带着 Codex Framework），钩子写的 client 是 codex：算同一个，不然开着它时多一只不动的 GPT
+            else if b == "com.openai.codex" || b == "com.openai.chat" { clients.insert("codex") }
             else if b == "com.google.antigravity" { clients.insert("antigravity") }
             else if let host = hostApp(b) { clients.insert(host) }
             else if let ch = appToCharacter[b] { clients.insert(ch) }
