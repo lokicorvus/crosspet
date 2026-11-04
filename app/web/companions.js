@@ -165,12 +165,23 @@
     const covered = coveredByStandIn || new Set()
     const open = rest === 'open'
     const list = [...(clients || [])]
+    const aliasOpen = new Set()
     if (open && running != null) {
       const has = new Set(list.map(c => c.client))
       const runningClients = new Set([...running].map(k => k.slice(k.indexOf('@') + 1)))
       for (const client of runningClients) {
         const character = !has.has(client) && (characterOf || {})[client]
-        if (character) list.push({ key: character + '@' + client, character, client, working: false, lastTs: 0 })
+        if (!character) continue
+        // 旧钩子写的会话不带 client（key 是 角色@角色）：多半就是这个开着的程序写的，算同一只，不另补一只。
+        // 会话过期清掉后，上次站着的、主桌宠占着的这只旧 key 也留着，外壳照旧按这个 key 喂她旧会话
+        const legacyKey = character + '@' + character
+        if (list.some(c => c.key === legacyKey)) { aliasOpen.add(legacyKey); continue }
+        if ((p.pets || []).some(x => x.key === legacyKey)) {
+          list.push({ key: legacyKey, character, client: character, working: false, lastTs: 0 })
+          aliasOpen.add(legacyKey)
+          continue
+        }
+        list.push({ key: character + '@' + client, character, client, working: false, lastTs: 0 })
       }
     }
     const byKey = new Map(list.map(c => [c.key, c]))
@@ -199,6 +210,7 @@
     const programClosed = c => rest === 'stay' && running != null && !isCli(c) && runningSeen.has(c.key) && !running.has(c.key)
     const isOpen = c => {
       if (running != null && running.has(c.key)) return true
+      if (aliasOpen.has(c.key)) return true
       if (running != null && !isCli(c) && runningSeen.has(c.key)) return false
       return c.working || nowMs - c.lastTs * 1000 < CLI_RECENT
     }
