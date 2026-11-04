@@ -442,7 +442,7 @@ namespace CrossPet
         }
 
         /// <summary>在跑的 AI 程序的「角色@客户端」（「一直留着」时，程序关掉她才走）。程序经 apps.json（windows-apps.json）换成客户端名：
-        /// Claude 桌面（claude.exe，有窗口的）claude-desktop、codex.exe codex、antigravity.exe antigravity，其余用它在对照表里的名字
+        /// 客户端名见 RunningClient.Of（Codex 和 ChatGPT 桌面版都是 codex），其余用它在对照表里的名字
         /// （多模型宿主是宿主名，其余是角色名，和钩子写的接入名一致）。同一个程序里可能跑着好几个模型的角色（Codex 接了 DeepSeek 接口就是
         /// deepseek@codex），所以每个客户端都和所有角色配一遍。枚举进程放到后台</summary>
         static List<string> RunningKeys(Dictionary<string, object> map, List<string> characterIds)
@@ -458,10 +458,8 @@ namespace CrossPet
                     var exe = p.ProcessName + ".exe";
                     if (!byExe.TryGetValue(exe, out var mapped)) continue;
                     var name = exe.ToLowerInvariant();
-                    if (name == "claude.exe") { if (p.MainWindowHandle != IntPtr.Zero) clients.Add("claude-desktop"); }   // 没窗口的是终端里的 Claude Code
-                    else if (name == "codex.exe") clients.Add("codex");
-                    else if (name == "antigravity.exe") clients.Add("antigravity");
-                    else clients.Add(mapped);
+                    var client = RunningClient.Of(name, mapped, name == "claude.exe" && p.MainWindowHandle != IntPtr.Zero);
+                    if (client != null) clients.Add(client);
                 }
                 catch { }
                 finally { p.Dispose(); }

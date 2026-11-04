@@ -115,6 +115,10 @@ extension App {
     /// 新开的那只放哪：记过位置（origin-<key>，还在某块屏幕上）就回到那里；没记过就挑主桌宠旁边第一个空着的格子
     /// 记过的位置夹进那块屏幕的可见区；压着站着的窗口（主桌宠或别的额外那只），或者占了后面几只要用的格子（剩下的不够放），就不用它，改挑格子。
     /// 格子按这一轮一共要站几只（companionTarget）排：以前按已经站着几只排，前几只排在主桌宠那一排、后几只换成贴屏幕底边的排法，两套格子对不上就叠在一起了（11-02）
+    /// 窗口上面空着的比例（没有气泡时）：画布 362 高，人物区域从 59（气泡）+ 241 × 21.1% ≈ 110 开始，可点区域再往外 4 → 约 106 / 362。
+    /// 拖到顶时窗口最多伸出屏幕这么多（DragView 按实际量的算），重新出现时按它夹回屏幕
+    static let headRoom: CGFloat = 0.29
+
     func companionOrigin(key: String, size: NSSize) -> NSPoint {
         let others = (Array(companions.values) + leavingCompanions).map { $0.panel.frame }
         var saved: NSRect?
@@ -122,7 +126,7 @@ extension App {
             var r = NSRect(x: o[0], y: o[1], width: size.width, height: size.height)
             if let svf = NSScreen.screens.first(where: { $0.visibleFrame.intersects(r.insetBy(dx: 40, dy: 40)) })?.visibleFrame {
                 r.origin.x = min(max(r.minX, svf.minX), max(svf.minX, svf.maxX - size.width))
-                r.origin.y = min(max(r.minY, svf.minY), max(svf.minY, svf.maxY - size.height))
+                r.origin.y = min(max(r.minY, svf.minY), max(svf.minY, svf.maxY - size.height * (1 - Self.headRoom)))   // 上面那截透明的可以伸到菜单栏后面（见 PetPanel）
                 saved = r
             }
         }
@@ -440,7 +444,9 @@ extension App {
         for a in NSWorkspace.shared.runningApplications {
             guard let b = a.bundleIdentifier else { continue }
             if b == Self.claudeDesktopBundle { clients.insert("claude-desktop") }
-            else if b == "com.openai.codex" { clients.insert("codex") }
+            // 新的「ChatGPT」就是改了名的 Codex 程序（包名还是 com.openai.codex）；旧的聊天版改叫 ChatGPT Classic（com.openai.chat），里面没有 Codex、
+            // 普通聊天也没接入，但开着时也算 codex：和 Codex 算同一只，不然「程序开着就在」时多一只永远不动的 GPT
+            else if b == "com.openai.codex" || b == "com.openai.chat" { clients.insert("codex") }
             else if b == "com.google.antigravity" { clients.insert("antigravity") }
             else if let host = hostApp(b) { clients.insert(host) }
             else if let ch = appToCharacter[b] { clients.insert(ch) }

@@ -289,6 +289,14 @@ const cases = [
     p.$('mainPetSelect').value = 'gpt'; p.$('mainPetSelect').onchange()
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: 'gpt' }), '换下拉该直接固定为那个角色')
   }],
+  ['主桌宠：固定 GPT → 点「先来的当」→ 再点「固定为」：还是 GPT，不落回第一个（Claude）', p => {
+    p.push({ multiPets: true, mainPet: 'gpt' })
+    click(p.q('input[name=mainPet][value=rule]'))
+    p.push({ multiPets: true, mainPet: '' })
+    assert(p.$('mainPetSelect').value === 'gpt', '先来的当时下拉该留着 gpt：' + p.$('mainPetSelect').value)
+    click(p.q('input[name=mainPet][value=fixed]'))
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'mainPet', value: 'gpt' }), '再点固定为该发 gpt：' + JSON.stringify(p.posted.at(-1)))
+  }],
   ['主桌宠：固定的角色不在了（删掉了）还列着，免得悄悄换掉', p => {
     p.push({ multiPets: true, mainPet: 'grok' })
     assert(p.$('mainPetSelect').value === 'grok', '下拉该显示 grok')

@@ -640,3 +640,26 @@ test("swapMain：没有 to 的那只、或者 from 已经站着 → 不对调", 
   const both = { pets: [{ id: 'a', key: 'gpt@gather', character: 'gpt', via: 'gather' }, { id: 'b', key: 'claude@claude-cli', character: 'claude', client: 'claude-cli', via: 'work' }] }
   assert.equal(C.swapMain(both, { from: 'claude', to: 'gpt', gathered: ['gpt'] }).state, both)
 })
+
+// ---- rest:'open' + 旧钩子（会话没写 client，key 是 角色@角色）----
+// 用户没在「接入 AI」里点「更新」时，Codex、Claude 桌面写的会话还是旧格式。程序开着补的那只不能另算一只
+
+test("rest:'open' 旧钩子：Codex 开着、旧会话 gpt@gpt 也在 → 只有一只 GPT（就是 gpt@gpt），不另补 gpt@codex", () => {
+  const base = { ...openBase, mainCharacter: 'grok', claimKey: null, characterOf: { codex: 'gpt' } }
+  const running = new Set(['gpt@codex', 'claude@codex', 'grok@codex'])
+  const a = run({ ...base, running, clients: cl(0, sess('gpt', undefined, 'proud', 30, 0, 'Stop')) })
+  assert.deepEqual(keys(a), ['gpt@gpt'])
+  // 旧会话 10 分钟没动静被钩子清掉了：程序还开着，她还在（还是 gpt@gpt，不换成另一只）
+  const b = run({ ...base, t: 900_000, running, clients: [], prev: a.state })
+  assert.deepEqual(keys(b), ['gpt@gpt'])
+  assert.deepEqual(b.leaving, [])
+  // 点了「更新」：新钩子写的会话带 client → 按客户端分，旧的那只换成 gpt@codex
+  const c = run({ ...base, t: 1_000_000, running, clients: cl(1_000_000, sess('gpt', 'codex', 'thinking', 1, 1_000_000)), prev: b.state })
+  assert.deepEqual(keys(c), ['gpt@codex'])
+})
+
+test("rest:'open' 旧钩子：主桌宠 Claude 占着旧会话 claude@claude，Claude 桌面开着 → 不另冒一只「桌面」的 Claude", () => {
+  const base = { ...openBase, mainCharacter: 'claude', claimKey: 'claude@claude', characterOf: { 'claude-desktop': 'claude' } }
+  const a = run({ ...base, running: new Set(['claude@claude-desktop']), clients: cl(0, sess('claude', undefined, 'running', 2, 0)) })
+  assert.deepEqual(keys(a), [])
+})
