@@ -105,6 +105,12 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .pixel-heart::after { background: var(--heart-empty-hi); -webkit-mask: var(--heart-s) 0 0 / 100% 100% no-repeat; mask: var(--heart-s) 0 0 / 100% 100% no-repeat; }
 .pixel-heart.on::before { background: var(--heart); }
 .pixel-heart.on::after { background: #fff; opacity: .75; }
+/* 正在攒的那颗：左边涂红一部分（¼ / ½ / ¾）。心里面能涂的是第 1–7 列（共 9 列），中间几列高、两边矮，按面积切：
+   ¼ 涂 2 列（7/24 格）、½ 从正中那列劈开（12/24）、¾ 涂 5 列（17/24） */
+.pixel-heart.q1::before { background: linear-gradient(to right, var(--heart) 33.34%, var(--heart-empty) 33.34%); }
+.pixel-heart.q2::before { background: linear-gradient(to right, var(--heart) 50%, var(--heart-empty) 50%); }
+.pixel-heart.q3::before { background: linear-gradient(to right, var(--heart) 66.67%, var(--heart-empty) 66.67%); }
+.pixel-heart.q1::after, .pixel-heart.q2::after, .pixel-heart.q3::after { background: #fff; opacity: .75; }
 #toast { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 6px 14px; border-radius: 8px; font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90%; }
 #toast.show { opacity: .92; }
 </style></head>
@@ -281,7 +287,7 @@ function renderMultiPets(s) {
   for (const r of document.querySelectorAll('input[name=mainPet]')) r.checked = (r.value === 'fixed') === !!main
   const rest = s.petsRest === 'stay' || s.petsRest === 'open' ? s.petsRest : 'auto'
   for (const r of document.querySelectorAll('input[name=petsRest]')) r.checked = r.value === rest
-  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts }]，hearts 0–10 颗整心
+  // 友谊：外壳交来 Friendship.rows 的结果 [{ a, b, label, hearts, partial }]，hearts 0–10 颗整心，partial 正在攒的那颗攒到几分之几（0 / .25 / .5 / .75）
   const rows = Array.isArray(s.friendship) ? s.friendship : []
   $('friendship').classList.toggle('hidden', !seen || !rows.length)
   $('friendship').classList.toggle('dim', !on)
@@ -309,8 +315,9 @@ const HEART_PIXELS = [
   const root = document.documentElement.style
   root.setProperty('--heart-o', svg('ofs')); root.setProperty('--heart-f', svg('fs')); root.setProperty('--heart-s', svg('s'))
 })()
-function pixelHeart(on) {
-  const c = document.createElement('span'); c.className = 'pixel-heart' + (on ? ' on' : '')
+// on：整颗；q：不满一颗时攒到几个四分之一（1–3）
+function pixelHeart(on, q = 0) {
+  const c = document.createElement('span'); c.className = 'pixel-heart' + (on ? ' on' : q ? ' q' + q : '')
   return c
 }
 function friendFace(id) {
@@ -332,8 +339,9 @@ function friendRow(r) {
   name.textContent = `${nb ? na : friendFaces[r.a]?.name || r.a} & ${nb || friendFaces[r.b]?.name || r.b}`
   const tier = document.createElement('small'); tier.textContent = FRIEND_TIERS.find(([min]) => n >= min)[1]
   name.append(tier)
-  const hearts = document.createElement('div'); hearts.className = 'pixel-hearts'; hearts.title = `${n} / 10`
-  for (let i = 0; i < 10; i++) hearts.append(pixelHeart(i < n))
+  const q = n < 10 ? Math.max(0, Math.min(3, Math.floor((Number(r.partial) || 0) * 4))) : 0
+  const hearts = document.createElement('div'); hearts.className = 'pixel-hearts'; hearts.title = `${n || !q ? n : ''}${['', '¼', '½', '¾'][q]} / 10`
+  for (let i = 0; i < 10; i++) hearts.append(pixelHeart(i < n, i === n ? q : 0))
   text.append(name, hearts)
   row.append(faces, text)
   return row

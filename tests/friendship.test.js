@@ -68,6 +68,13 @@ test('hearts：0–10 颗整心，门槛 15/35/65/105/150/200/255/315/380/450（
   for (const [p, h] of cases) assert.equal(F.hearts(p), h, `points ${p}`)
 })
 
+test('partial：正在攒的那颗攒到几分之几，往下取到 ¼；满 10 颗是 0', () => {
+  // 第 1 颗 0–15；第 5 颗 105–150（要 45 分）
+  const cases = [[0, 0], [3, 0], [4, 0.25], [7, 0.25], [8, 0.5], [12, 0.75], [14, 0.75], [15, 0],
+    [105, 0], [116, 0], [117, 0.25], [127, 0.25], [128, 0.5], [138, 0.5], [139, 0.75], [149, 0.75], [150, 0], [449, 0.75], [450, 0], [9999, 0]]
+  for (const [p, q] of cases) assert.equal(F.partial(p), q, `points ${p}`)
+})
+
 test('level：0 刚见面、1 认识了（1 颗心）、2 好朋友（4 颗）、3 挚友（8 颗）', () => {
   assert.deepEqual([0, 14, 15, 104, 105, 314, 315, 9999].map(F.level), [0, 0, 1, 1, 2, 2, 3, 3])
 })
@@ -86,9 +93,9 @@ test('rows：只列 points > 0，按点数从高到低，label 用名字（没�
   }
   const names = { claude: 'Claude', gpt: 'GPT', deepseek: 'DeepSeek' }
   assert.deepEqual(F.rows(store, names), [
-    { a: 'deepseek', b: 'gpt', label: 'DeepSeek ♥ GPT', hearts: 2 },
-    { a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 1 },
-    { a: 'claude', b: 'qwen', label: 'Claude ♥ qwen', hearts: 0 },
+    { a: 'deepseek', b: 'gpt', label: 'DeepSeek ♥ GPT', hearts: 2, partial: 0 },
+    { a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 1, partial: 0.25 },
+    { a: 'claude', b: 'qwen', label: 'Claude ♥ qwen', hearts: 0, partial: 0 },
   ])
   assert.deepEqual(F.rows({}, names), [])
 })

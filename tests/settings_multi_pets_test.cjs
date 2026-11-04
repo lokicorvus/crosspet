@@ -218,6 +218,16 @@ const cases = [
     assert(rows[0].querySelectorAll('.pixel-heart.on').length === 10 && rows[0].textContent.includes('挚友'), '10 颗心该全亮、挚友')
     assert(rows[1].querySelectorAll('.pixel-heart.on').length === 1 && rows[1].querySelectorAll('.pixel-heart').length === 10, '1 颗心该亮 1 颗')
   }],
+  ['友谊：正在攒的那颗按 ¼ ½ ¾ 涂一部分，鼠标提示写几分之几；满 10 颗不涂', p => {
+    p.push({ multiPets: true, friendship: [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 4, partial: 0.75 }, { a: 'claude', b: 'deepseek', label: 'Claude ♥ 小鲸', hearts: 0, partial: 0.5 },
+                                           { a: 'deepseek', b: 'gpt', label: '小鲸 ♥ GPT', hearts: 10, partial: 0.5 }] })
+    const rows = [...p.$('friendRows').querySelectorAll('.friend')]
+    const hearts = r => [...r.querySelectorAll('.pixel-heart')].map(h => h.className.replace('pixel-heart', '').trim())
+    assert(JSON.stringify(hearts(rows[0])) === JSON.stringify(['on', 'on', 'on', 'on', 'q3', '', '', '', '', '']), '4¾：' + JSON.stringify(hearts(rows[0])))
+    assert(rows[0].querySelector('.pixel-hearts').title === '4¾ / 10', '提示：' + rows[0].querySelector('.pixel-hearts').title)
+    assert(hearts(rows[1])[0] === 'q2' && rows[1].querySelector('.pixel-hearts').title === '½ / 10', '½：' + JSON.stringify(hearts(rows[1])))
+    assert(hearts(rows[2]).every(c => c === 'on') && rows[2].querySelector('.pixel-hearts').title === '10 / 10', '满 10 颗')
+  }],
   ['没有记录：整块不显示', p => {
     p.push({ multiPets: true, friendship: [] })
     assert(hidden(p.$('friendship')), '空数组时友谊区该藏起来')

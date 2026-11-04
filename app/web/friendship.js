@@ -45,6 +45,13 @@
   function hearts(points) {
     return THRESHOLDS.filter(t => points >= t).length
   }
+  // 正在攒的那颗心攒到几分之几：这颗心已经攒到的分 ÷ 这颗心一共要的分，往下取到四分之一（0 / 0.25 / 0.5 / 0.75）；满 10 颗是 0
+  function partial(points) {
+    const h = hearts(points)
+    if (h >= THRESHOLDS.length) return 0
+    const from = h ? THRESHOLDS[h - 1] : 0, to = THRESHOLDS[h]
+    return Math.floor(Math.max(0, points - from) / (to - from) * 4) / 4
+  }
 
   // 关系：0 刚见面、1 认识了（1 颗心）、2 好朋友（4 颗）、3 挚友（8 颗）。升到新的一档时两只演一次「关系升级」（pair-chat.js）
   const LEVEL_HEARTS = [1, 4, 8]
@@ -60,7 +67,7 @@
       .map(key => {
         const [a, b] = key.split('+')
         const name = id => (names && names[id]) || id
-        return { a, b, label: `${name(a)} ♥ ${name(b)}`, hearts: hearts(store[key].points) }
+        return { a, b, label: `${name(a)} ♥ ${name(b)}`, hearts: hearts(store[key].points), partial: partial(store[key].points) }
       })
   }
 
@@ -79,7 +86,7 @@
     return out
   }
 
-  const api = { pairKey, award, hearts, level, rows, merge, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
+  const api = { pairKey, award, hearts, partial, level, rows, merge, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
   root.Friendship = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
