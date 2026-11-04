@@ -86,7 +86,10 @@ export function apply(ctx, config = {}) {
       provider = route.provider;
       publishQuota();   // 换了服务商：余额该显示还是该藏起来
     }
-    if (next === character && !switched) return;
+    if (next === character && !switched) {
+      writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 }).catch(() => {});
+      return;
+    }
     character = next;
     writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
       .catch(() => {});
