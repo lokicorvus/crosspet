@@ -312,6 +312,15 @@ const cases = [
     p.push({ multiPets: true, petsRest: 'whatever' })
     assert(p.q('input[name=petsRest][value=auto]').checked, '不认得的值该当 auto')
   }],
+  ['新功能页：QQ 群一直在最下面，不跟着某一版（旧版本收起来也看得到）', p => {
+    p.push({ appVersion: '1.3.9', whatsNewSeen: '1.3.9' })
+    const list = p.$('newsList')
+    const qq = list.querySelector('.news-qq')
+    assert(qq && qq.textContent.includes('QQ 交流群') && qq.querySelector('button.qq-copy'), '没有 QQ 群那一行')
+    assert(list.querySelectorAll('button.qq-copy').length === 1, 'QQ 群按钮不止一个')
+    const kids = list.children
+    assert(kids[kids.length - 2] === qq && kids[kids.length - 1].classList.contains('news-more'), 'QQ 群该在「更早的更新记录」上面')
+  }],
   ['现有开关照旧', p => {
     p.push({ followApps: true })
     const f = p.q('input[data-key=followApps]')

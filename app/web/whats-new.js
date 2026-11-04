@@ -1,6 +1,6 @@
 // 「新功能」（What's New）：每版的新功能，写给普通用户看的短文案——只写新功能，不写修了什么（修复看 CHANGELOG）。
 // 更新后桌宠头顶的卡片（index.html）数条数，设置里的「新功能」页（settings.html）列出来。两个平台共用，随包发布。
-// 发版前在最上面加一版（没有新功能的版本不写）；go：「去设置 ›」跳到哪个标签页、哪个开关（key 是设置页里 data-key 的名字）。
+// 发版前在最上面加一版（没有新功能的版本不写）；QQ 群不写在这里，设置页「新功能」最下面一直有一行（1.3.8 时写在那一版里，收起来就看不到了）；go：「去设置 ›」跳到哪个标签页、哪个开关（key 是设置页里 data-key 的名字）。
 // 设计见 docs/superpowers/specs/2026-10-16-whats-new-design.md；测试 tests/whats_new.test.js
 ;(function (root) {
   const LIST = [
@@ -13,7 +13,6 @@
       { icon: '🔌', title: '接入 Cursor', text: 'Cursor 里干活时她也会跟着动：用 Claude 模型演 Claude、GPT 模型演 GPT……换模型她就换人，Cursor 自家的模型由当前角色来演。在「接入 AI」页点一下 Cursor 就好，新开的对话生效。', go: { tab: 'ai' } },
       { icon: '🃏', title: '换角色窗口', text: '右键「换角色…」打开一个大窗口：左边是这套衣服的大立绘，下面是她的每套衣服和所有角色，鼠标停在卡片上先预览，点一下就换。改名字、峰谷换装也在这里。', go: { tab: 'character' } },
       { icon: '📊', title: '额度条', text: '额度可以换成进度条显示：每个额度一条，后面是剩余百分比和重置时间，剩得越少颜色越暖（蓝 → 橙 → 红）。在「额度」页把「额度显示样式」换成「额度条」。', go: { tab: 'quota', key: 'quotaStyle' } },
-      { icon: '💬', title: 'QQ 交流群', text: 'CrossPet 有 QQ 群了！用着有问题、想要新角色、想先看到新版本，都可以来群里聊。点下面的群号就能复制。', qq: true },
     ] },
     { version: '1.3.7', items: [
       { icon: '🪭', title: '新角色：Qwen（千问）', text: '温柔大方的富家千金：大活干完请你喝奶茶，额度快用完时掏出金卡，闲着会分小礼物给大家。在 Qwen Code 里用千问模型时自动换成她，也可以在「角色」页手动选。千问桌面客户端没有对外接口，她跟不了它干活。', go: { tab: 'character' } },
