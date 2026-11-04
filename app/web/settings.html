@@ -280,7 +280,9 @@ function renderMultiPets(s) {
   if (document.activeElement !== sel) {
     const chars = (s.characters || []).map(c => [c.id, c.name || c.id])
     if (main && !chars.some(c => c[0] === main)) chars.push([main, main])
-    sel.replaceChildren(...chars.map(([id, name]) => new Option(name, id, false, id === main)))
+    // 「先来的当」时下拉留着上次选的那个：不然重画后落回第一个（Claude），再点「固定为」就固定成了 Claude
+    const pick = main || sel.value
+    sel.replaceChildren(...chars.map(([id, name]) => new Option(name, id, false, id === pick)))
   }
   // 下拉是空的（外壳没给角色）：「固定为」点了也只能发 ""，干脆灰掉
   document.querySelector('input[name=mainPet][value=fixed]').disabled = sel.disabled = !sel.options.length
