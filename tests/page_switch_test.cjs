@@ -747,6 +747,14 @@ const multiCases = [
     assert(JSON.stringify(lastCompanions(e).map(p => p.id + '/' + p.character)) === '["gpt@gather/gpt"]', `back: ${JSON.stringify(lastCompanions(e))}`)
     assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
   }],
+  ['yield_fades_page', async e => {
+    // 外壳调 setYield：整页变透明（html.yield），再调一次回来
+    e.run(`setYield(true)`)
+    assert(e.run(`document.documentElement.classList.contains('yield')`) === true, 'yield on')
+    e.run(`setYield(false)`)
+    assert(e.run(`document.documentElement.classList.contains('yield')`) === false, 'yield off')
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
   ['feedback_diagnose_pets', async e => {
     // 反馈「几只桌宠不对」附的状态：网页算出的那几只、外壳交来的窗口、开着的程序都在，能 JSON 化
     await multiOn(e, 'claude')

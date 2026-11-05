@@ -33,6 +33,9 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #stage.swap { transform: scale(.9) translateY(4%); opacity: 0; }
 /* 额外那只先在屏幕外备着（Windows 预开窗口，见 prepareThen）：整页不显示，登场时 arriveNow() 再噗一下出来 */
 body.parked { visibility: hidden; }
+/* 让开：鼠标在她身上时按一下 ⌥（Windows 是 Ctrl），她变透明、鼠标穿过她点到后面；鼠标离开她就回来（外壳判断，调 setYield） */
+body { transition: opacity .15s ease; }
+html.yield body { opacity: .25; }
 #aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
   border-radius: 50%; opacity: var(--aura-o);
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
@@ -451,6 +454,8 @@ function setAuraMode(mode) {
 }
 // 能点到的区域（网页像素，[x, y, 宽, 高]）：桌宠本体、气泡、名牌、额度。窗口其余透明的地方让点击穿过去，
 // 点到后面的窗口（窗口比桌宠大，是给动作、气泡留的空间）
+// 外壳调：让开（变透明，外壳同时让鼠标穿过窗口）/ 回来
+function setYield(on) { document.documentElement.classList.toggle('yield', !!on) }
 function hitRects() {
   const out = []
   if (tucked) {   // 缩在边上：只有露出来的那截能点 / 能让她探出来

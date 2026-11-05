@@ -284,6 +284,13 @@ static class Program
         Check("在跑的程序：Codex 算 codex", RunningClient.Of("codex.exe", "gpt", true) == "codex");
         Check("在跑的程序：有窗口的 Claude 是桌面，没窗口的不算", RunningClient.Of("claude.exe", "claude", true) == "claude-desktop" && RunningClient.Of("claude.exe", "claude", false) == null);
         Check("在跑的程序：Antigravity、其余按对照表", RunningClient.Of("antigravity.exe", "gemini", true) == "antigravity" && RunningClient.Of("workbuddy.exe", "workbuddy", true) == "workbuddy");
+        // 让开：鼠标在她身上按一下 Ctrl 让开，松开键也保持，鼠标离开才回来；不在她身上按 Ctrl 不算
+        Check("让开：在她身上按 Ctrl → 让开", YieldRule.Next(false, true, true));
+        Check("让开：不在她身上按 Ctrl → 不让开", !YieldRule.Next(false, false, true));
+        Check("让开：让开后松开 Ctrl、鼠标还在她身上 → 保持", YieldRule.Next(true, true, false));
+        Check("让开：鼠标离开她 → 回来", !YieldRule.Next(true, false, false) && !YieldRule.Next(true, false, true));
+        Check("让开：只认单按 Ctrl，Ctrl+Shift / Ctrl+Alt 不算", YieldRule.OnlyCtrl(vk => vk == 0x11) && !YieldRule.OnlyCtrl(vk => vk == 0x11 || vk == 0x10)
+            && !YieldRule.OnlyCtrl(vk => vk == 0x11 || vk == 0x12) && !YieldRule.OnlyCtrl(vk => false));
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

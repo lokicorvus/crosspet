@@ -92,6 +92,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // 点击穿透 用的
     var hitRects: [CGRect] = []
     var hitRectsAt = Date.distantPast
+    var yielding = false   // 让开着（见 App+ClickThrough.swift）
     var hiddenForFullscreen = false {
         didSet {   // 透明度 / 鼠标 / 动画都跟着这个标记走
             guard hiddenForFullscreen != oldValue else { return }

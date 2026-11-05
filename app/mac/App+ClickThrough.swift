@@ -10,10 +10,11 @@ extension App {
     func updateClickThrough() {
         if userHidden || hiddenForFullscreen {   // 收着：透明的窗口不能接鼠标（下面会按命中区域反复切换，这里先拦住）
             if !panel.ignoresMouseEvents { panel.ignoresMouseEvents = true }
+            setYield(false)
             return
         }
         let p = NSEvent.mouseLocation, f = panel.frame
-        guard f.contains(p) else { updateDockHover(false); return }
+        guard f.contains(p) else { setYield(false); updateDockHover(false); return }
         if NSEvent.pressedMouseButtons != 0 { return }   // 正在拖、正在点：别中途换
         // 贴着边时量得勤一点：探出来 / 缩回去要马上跟着鼠标
         if Date().timeIntervalSince(hitRectsAt) > (dock != nil ? 0.08 : 0.25) {
@@ -27,8 +28,25 @@ extension App {
         let zoom = f.width / pageSize.width   // 网页像素 → 屏幕点（画布可能因为文字大小比 260 宽）
         let point = CGPoint(x: (p.x - f.minX) / zoom, y: (f.maxY - p.y) / zoom)
         let over = hitRects.isEmpty || hitRects.contains { $0.contains(point) }
-        if panel.ignoresMouseEvents == over { panel.ignoresMouseEvents = !over }
+        setYield(Self.yieldNext(yielding, over: over && !hitRects.isEmpty, key: Self.yieldKeyDown))
+        let accept = over && !yielding
+        if panel.ignoresMouseEvents == accept { panel.ignoresMouseEvents = !accept }
         updateDockHover(over && !hitRects.isEmpty)   // 缩着时鼠标在露出来的那截上：探出来
+    }
+
+    // MARK: 让开：鼠标在她身上时按一下 ⌥，她变透明、鼠标穿过她；松开键也保持，鼠标离开她才回来。
+    // 不用 Ctrl：Mac 上 Ctrl+点击是右键；松开键再点，后面的程序收到的是普通点击。规则同 Windows 的 YieldRule
+
+    /// 只按着 ⌥（没有别的修饰键，免得撞上 ⌥⌘ 之类的快捷键）。读的是全局键盘状态，不用辅助功能权限
+    static var yieldKeyDown: Bool { NSEvent.modifierFlags.intersection([.shift, .control, .option, .command]) == .option }
+
+    /// 没让开：鼠标在她身上 + 按着键 → 让开；让开着：鼠标还在她身上就一直让开
+    static func yieldNext(_ yielding: Bool, over: Bool, key: Bool) -> Bool { yielding ? over : over && key }
+
+    func setYield(_ on: Bool) {
+        guard on != yielding else { return }
+        yielding = on
+        js("setYield(\(on))")
     }
 
     /// 降到普通层级后还排在所有普通窗口最前面、压在你正在用的窗口上：挪到前台程序最前面那个窗口的后面

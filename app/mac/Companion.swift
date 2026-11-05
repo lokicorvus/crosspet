@@ -26,6 +26,7 @@ final class Companion: NSObject, WKNavigationDelegate {
     // 点击穿透
     var hitRects: [CGRect] = []
     var hitRectsAt = Date.distantPast
+    var yielding = false   // 让开着（规则同主桌宠，见 App+ClickThrough.swift）
     // 贴边
     var dock: String?
     var dockOut = false, dockHover = false, dockTucked = false
@@ -304,10 +305,11 @@ final class Companion: NSObject, WKNavigationDelegate {
         guard !closed else { return }
         if app.userHidden || app.hiddenForFullscreen {
             if !panel.ignoresMouseEvents { panel.ignoresMouseEvents = true }
+            setYield(false)
             return
         }
         let p = NSEvent.mouseLocation, f = panel.frame
-        guard f.contains(p) else { updateDockHover(false); return }
+        guard f.contains(p) else { setYield(false); updateDockHover(false); return }
         if NSEvent.pressedMouseButtons != 0 { return }
         if ready, Date().timeIntervalSince(hitRectsAt) > (dock != nil ? 0.08 : 0.25) {
             hitRectsAt = Date()
@@ -320,8 +322,16 @@ final class Companion: NSObject, WKNavigationDelegate {
         let zoom = f.width / pageSize.width
         let point = CGPoint(x: (p.x - f.minX) / zoom, y: (f.maxY - p.y) / zoom)
         let over = hitRects.isEmpty || hitRects.contains { $0.contains(point) }
-        if panel.ignoresMouseEvents == over { panel.ignoresMouseEvents = !over }
+        if ready { setYield(App.yieldNext(yielding, over: over && !hitRects.isEmpty, key: App.yieldKeyDown)) }
+        let accept = over && !yielding
+        if panel.ignoresMouseEvents == accept { panel.ignoresMouseEvents = !accept }
         updateDockHover(over && !hitRects.isEmpty)
+    }
+
+    func setYield(_ on: Bool) {
+        guard on != yielding else { return }
+        yielding = on
+        js("setYield(\(on))")
     }
 
     // MARK: 贴边（规则同主桌宠，见 App+Dock.swift；跑不跑出来只看她自己的状态）
