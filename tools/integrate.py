@@ -52,8 +52,13 @@ def save_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def is_crosspet_hook(h: dict) -> bool:
+    # exec-form hooks keep the script in args, not in command.
+    return any(MARK in str(value) for value in [h.get("command", ""), *h.get("args", [])])
+
+
 def ours(group: dict) -> bool:
-    return any(MARK in str(h.get("command", "")) for h in group.get("hooks", []))
+    return any(is_crosspet_hook(h) for h in group.get("hooks", []))
 
 
 def without_ours(groups: list) -> list:
@@ -63,7 +68,7 @@ def without_ours(groups: list) -> list:
         if not ours(group):
             kept.append(group)
             continue
-        hooks = [h for h in group.get("hooks", []) if MARK not in str(h.get("command", ""))]
+        hooks = [h for h in group.get("hooks", []) if not is_crosspet_hook(h)]
         if hooks:
             kept.append({**group, "hooks": hooks})
     return kept
@@ -103,6 +108,14 @@ def load_template(template: Path, via_cmd: bool = False) -> dict:
 
     def adapt(obj):
         if isinstance(obj, dict):
+            value = obj.get("command")
+            # Claude observer hooks need no shell. Explicit argv also handles
+            # spaces in Windows paths without depending on Git Bash or 8.3 names.
+            if template.parent.name == "claude-code" and isinstance(value, str) and value.startswith(original):
+                import shlex
+                return {**obj, "command": str(Path(sys.executable)),
+                        "args": ["-I", str(SUPPORT / MARK), *shlex.split(value[len(original):])],
+                        "onFailure": "continue"}
             return {key: (command(value) if key == "command" and isinstance(value, str) and value.startswith(original) else adapt(value))
                     for key, value in obj.items()}
         if isinstance(obj, list):
