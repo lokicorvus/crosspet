@@ -1070,7 +1070,8 @@ def ago(ts: float) -> str:
 def seen(target: str) -> str:
     f = STATE_DIR / f"seen-{SEEN_KEY[target]}"
     try:
-        return ago(float(f.read_text().strip() or f.stat().st_mtime))
+        # 增强版 mod 1.3.10 及以前把心跳写成了 JSON 字符串（带引号，#44），去掉引号也认
+        return ago(float(f.read_text().strip().strip('"') or f.stat().st_mtime))
     except Exception:
         return "没有记录"
 

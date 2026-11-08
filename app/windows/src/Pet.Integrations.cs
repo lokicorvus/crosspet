@@ -46,8 +46,8 @@ namespace CrossPet
             {
                 try
                 {
-                    var f = Path.Combine(Store.State, "seen-" + key);
-                    if (!File.Exists(f) || !double.TryParse(File.ReadAllText(f).Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ts)) continue;
+                    var f = Path.Combine(Store.State, "seen-" + key);   // 旧增强版 mod 写成了带引号的字符串（#44）：去掉引号也认
+                    if (!File.Exists(f) || !double.TryParse(File.ReadAllText(f).Trim().Trim('"'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var ts)) continue;
                     if (seen.TryGetValue(key, out var old) && Convert.ToDouble(old) >= ts) continue;
                     seen[key] = ts; changed = true;
                 }

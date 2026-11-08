@@ -72,7 +72,7 @@ extension App {
         var seen = lastSeen, changed = false
         for key in Set(Self.seenKeys.values) {
             guard let text = try? String(contentsOf: stateDir.appendingPathComponent("seen-\(key)"), encoding: .utf8),
-                  let ts = Double(text.trimmingCharacters(in: .whitespacesAndNewlines)), ts > (seen[key] ?? 0) else { continue }
+                  let ts = Double(text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"")))), ts > (seen[key] ?? 0) else { continue }   // 旧增强版 mod 写成了带引号的字符串（#44）
             seen[key] = ts; changed = true
         }
         if changed { lastSeen = seen; if settingsWeb != nil { pushSettings() } }

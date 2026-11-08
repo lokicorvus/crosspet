@@ -134,6 +134,17 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn(f'"{event}"', hook, event)
 
 
+class SeenTests(unittest.TestCase):
+    # #44：增强版 mod 的心跳写成了带引号的字符串（"1793979559"），诊断读不出、一直「没有记录」；旧 mod 写的文件也要认
+    def test_seen_reads_plain_and_quoted(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(integrate, 'STATE_DIR', Path(tmp)):
+            now = int(integrate.time.time()) if hasattr(integrate, 'time') else int(__import__('time').time())
+            (Path(tmp) / 'seen-claude-mod').write_text(f'"{now}"')
+            self.assertNotEqual(integrate.seen('claude-mod'), '没有记录')
+            (Path(tmp) / 'seen-claude-mod').write_text(str(now))
+            self.assertNotEqual(integrate.seen('claude-mod'), '没有记录')
+
+
 class CursorIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix='crosspet-cursor-integration-')
