@@ -134,6 +134,33 @@ class IntegrationTests(unittest.TestCase):
             self.assertIn(f'"{event}"', hook, event)
 
 
+class WindowsClaudeExecFormTests(unittest.TestCase):
+    # #45：Windows 上 Claude Code 的钩子写成 exec 形式（command 是随包 Python、args 是参数），不经过命令行壳；
+    # 在 macOS 上假装成 Windows 跑一遍 load_template（os 换成只把 name 改成 nt 的代理，SUPPORT 指到临时目录）
+    class _Os:
+        name = 'nt'
+        def __getattr__(self, k): return getattr(os, k)
+    def _template(self, tmp):
+        with mock.patch.object(integrate, 'os', self._Os()), mock.patch.object(integrate, 'SUPPORT', Path(tmp)):
+            return integrate.load_template(integrate.REPO / 'integrations/claude-code/hooks.json')
+    def test_claude_hooks_are_exec_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hooks = [h for groups in self._template(tmp)['hooks'].values() for g in groups for h in g['hooks']]
+            self.assertTrue(hooks)
+            for h in hooks:
+                self.assertEqual(h['command'], str(Path(sys.executable)))
+                self.assertEqual(h['args'], ['-I', str(Path(tmp) / integrate.MARK), 'claude'])
+                self.assertNotIn('onFailure', h)   # 不写：默认就不拦，旧版 Claude Code 也不认这个字段
+                self.assertEqual(h['timeout'], 5)
+    def test_exec_form_entries_are_ours_and_user_hooks_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ours = self._template(tmp)['hooks']['PreToolUse'][0]
+            mine = {'matcher': 'Bash', 'hooks': [{'type': 'command', 'command': 'node', 'args': ['check.js']}]}
+            mixed = {'matcher': '*', 'hooks': [ours['hooks'][0], {'type': 'command', 'command': 'echo hi'}]}
+            kept = integrate.without_ours([mine, ours, mixed])
+            self.assertEqual(kept, [mine, {'matcher': '*', 'hooks': [{'type': 'command', 'command': 'echo hi'}]}])
+
+
 class SeenTests(unittest.TestCase):
     # #44：增强版 mod 的心跳写成了带引号的字符串（"1793979559"），诊断读不出、一直「没有记录」；旧 mod 写的文件也要认
     def test_seen_reads_plain_and_quoted(self):

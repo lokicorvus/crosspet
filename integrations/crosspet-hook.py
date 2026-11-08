@@ -59,16 +59,24 @@ def detect_client(host: str) -> str:
     return integration_name([sys.argv[0], host, *sys.argv[2:]])
 
 
-def _lock(f) -> None:
-    try:
-        if os.name == "nt":
-            import msvcrt
-            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(f, fcntl.LOCK_EX)
-    except Exception:
-        pass
+def _lock(f, timeout: float = .15) -> None:
+    """排队写共享文件。等不到就抛 TimeoutError，调用的地方跳过这次记录：观察者不能拖住 AI。
+    Windows 上以前用 LK_LOCK，每次重试隔 1 秒、最多 10 秒，超过 Claude 给钩子的 5 秒（#45 @Ink-Stained-Clouds）"""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            f.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("observer lock busy")
+            time.sleep(.005)
 
 
 def ledger(result: str, detail: str) -> None:
@@ -595,12 +603,7 @@ def remember_session_model(host: str, fallback: str = "") -> str:
             # 同一宿主的几个会话会同时启动：锁住「读旧表 → 加新项 → 替换」整段。
             # 临时文件也按目标文件命名，不能与 update_sessions 的 .qwen-sessions.json 抢同一路径。
             with open(state_dir / f".{host}-models.lock", "a+b") as lock:
-                if os.name == "nt":
-                    import msvcrt
-                    msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-                else:
-                    import fcntl
-                    fcntl.flock(lock, fcntl.LOCK_EX)
+                _lock(lock)
                 try:
                     try:
                         known = json.loads(path.read_text())
@@ -919,16 +922,7 @@ SESSION_KEEP = 10 * 60   # 多久没动静的会话不再记
 def update_sessions(sid: str, entry) -> None:
     path = state_dir / f"{character}-sessions.json"
     with open(state_dir / f".{character}-sessions.lock", "a+") as lock:
-        try:
-            if os.name == "nt":
-                import msvcrt
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock, fcntl.LOCK_EX)
-        except Exception:
-            raise  # 没拿到共享会话锁时不能继续读改写，避免覆盖 Cursor 的卡片。
+        _lock(lock)  # 拿不到锁就跳过这次会话卡片（外面 except 兜着）：不能拖住 AI，也不能不加锁就改，会覆盖 Cursor 的卡片
         try:
             known = json.loads(path.read_text())
         except Exception:

@@ -13,6 +13,7 @@
 import json
 import re
 import os
+import shlex
 import shutil
 import sys
 import time
@@ -52,8 +53,13 @@ def save_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def is_crosspet_hook(h: dict) -> bool:
+    # exec 形式的钩子（Windows 上的 Claude Code）脚本路径在 args 里，不在 command 里
+    return any(MARK in str(value) for value in [h.get("command", ""), *h.get("args", [])])
+
+
 def ours(group: dict) -> bool:
-    return any(MARK in str(h.get("command", "")) for h in group.get("hooks", []))
+    return any(is_crosspet_hook(h) for h in group.get("hooks", []))
 
 
 def without_ours(groups: list) -> list:
@@ -63,7 +69,7 @@ def without_ours(groups: list) -> list:
         if not ours(group):
             kept.append(group)
             continue
-        hooks = [h for h in group.get("hooks", []) if MARK not in str(h.get("command", ""))]
+        hooks = [h for h in group.get("hooks", []) if not is_crosspet_hook(h)]
         if hooks:
             kept.append({**group, "hooks": hooks})
     return kept
@@ -103,6 +109,13 @@ def load_template(template: Path, via_cmd: bool = False) -> dict:
 
     def adapt(obj):
         if isinstance(obj, dict):
+            value = obj.get("command")
+            # Claude Code 的钩子用 exec 形式（command 是程序、args 是参数，不经过命令行壳；Claude Code 2.1.139 起支持）：
+            # 没装 Git Bash 的 Windows 上，走 PowerShell 的钩子一出错就会拦住工具调用（#45 @Ink-Stained-Clouds）；
+            # 参数分开传也不怕路径里有空格。不写 onFailure：不写时默认就是不拦，这个字段还要 2.1.295 以上才认
+            if template.parent.name == "claude-code" and isinstance(value, str) and value.startswith(original):
+                return {**obj, "command": str(Path(sys.executable)),
+                        "args": ["-I", str(SUPPORT / MARK), *shlex.split(value[len(original):])]}
             return {key: (command(value) if key == "command" and isinstance(value, str) and value.startswith(original) else adapt(value))
                     for key, value in obj.items()}
         if isinstance(obj, list):
