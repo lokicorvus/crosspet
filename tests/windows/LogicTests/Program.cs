@@ -12,6 +12,18 @@ static class Program
 
     static int Main()
     {
+        Check("悬停默认延迟", HoverMenuLayout.Delay(null) == 3000 && HoverMenuLayout.Delay("2000") == 3000);
+        Check("悬停延迟上下界及步长", HoverMenuLayout.Delay(-10) == 1000 && HoverMenuLayout.Delay(30000) == 10000 && HoverMenuLayout.Delay(3250) == 3500);
+        Check("悬停异常延迟", HoverMenuLayout.Delay(double.NaN) == 3000 && HoverMenuLayout.Delay(double.PositiveInfinity) == 3000);
+        var work = new System.Drawing.Rectangle(-1920, 0, 1920, 1080);
+        var pet = new System.Drawing.Rectangle(-240, 800, 200, 280);
+        var menu = HoverMenuLayout.Place(pet, work, 360, 284);
+        Check("悬停菜单靠右翻到左侧并避开任务栏", work.Contains(menu) && menu.Right < pet.Right && menu.Bottom == work.Bottom);
+        menu = HoverMenuLayout.Place(new System.Drawing.Rectangle(-1910, 20, 200, 280), work, 360, 284);
+        Check("悬停菜单负坐标显示器", work.Contains(menu) && menu.Left > -1910);
+        var hoverSmallWork = new System.Drawing.Rectangle(50, 20, 200, 150);
+        Check("悬停菜单小工作区", HoverMenuLayout.Place(pet, hoverSmallWork, 360, 284) == hoverSmallWork);
+
         var root = Path.Combine(Path.GetTempPath(), "crosspet-sprite-test", "characters");
         string file, mime;
 

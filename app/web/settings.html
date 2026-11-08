@@ -196,6 +196,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="hideFullscreen"><span></span></label></div></div>
   <div class="item"><div class="label">拖到屏幕边缘时贴边<small>拖到屏幕左右边缘松手，她就缩到边上只露半个身子；AI 干活时自己跑出来，干完缩回去</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="edgeDock"><span></span></label></div></div>
+  <div class="item hidden" data-only="hoverMenuSupported"><div class="label">悬停展开专属菜单<small>鼠标停在人物身上时展开；每个角色有自己的样式，右键菜单照常可用</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="hoverMenu"><span></span></label></div></div>
+  <div class="item hidden" data-only="hoverMenuSupported"><div class="label">悬停等待时间<small>移开或拖动人物会取消本次等待</small></div>
+    <div class="ctl"><input id="hoverMenuDelay" aria-label="悬停等待时间" type="range" min="1000" max="10000" step="500"><span id="hoverMenuDelayVal"></span></div></div>
   <div class="item hidden" data-only="hotkeys"><div class="label">隐藏 / 显示的快捷键<small id="hotkeyNote">按一下藏起来，再按一下出来；也可以点菜单栏的爪印（Windows 双击托盘图标）叫她出来</small></div>
     <div class="ctl"><select id="hideHotkey" aria-label="隐藏快捷键"></select></div></div>
   <div class="item"><div class="label">省电模式<small>身边的小特效刷新慢一点、闲着时更快停下；人物动作照旧。笔记本用电池时可以打开</small></div>
@@ -246,6 +250,10 @@ function setState(s) {
   if (document.activeElement !== $('textSize')) $('textSize').value = text
   $('textSizeVal').textContent = Math.round(text * 100) + '%'
   showLink(linked)
+  if (document.activeElement !== $('hoverMenuDelay')) $('hoverMenuDelay').value = s.hoverMenuDelay || 3000
+  $('hoverMenuDelay').disabled = !s.hoverMenu
+  $('hoverMenuDelayVal').textContent = ((s.hoverMenuDelay || 3000) / 1000) + ' 秒'
+
   for (const el of document.querySelectorAll('input[data-key]')) el.checked = !!s[el.dataset.key]
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
@@ -426,6 +434,8 @@ $('textLink').onclick = () => state?.textLinked === false
   : post({ cmd: 'set', key: 'textSize', value: +$('size').value })
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
+$('hoverMenuDelay').oninput = e => { $('hoverMenuDelayVal').textContent = (+e.target.value / 1000) + ' 秒' }
+$('hoverMenuDelay').onchange = e => post({ cmd: 'set', key: 'hoverMenuDelay', value: +e.target.value })
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
 // 主桌宠：点「固定为」用下拉里选着的角色；换下拉就直接固定为那个角色
 for (const r of document.querySelectorAll('input[name=mainPet]')) r.onchange = () => post({ cmd: 'set', key: 'mainPet', value: r.value === 'fixed' ? $('mainPetSelect').value : '' })

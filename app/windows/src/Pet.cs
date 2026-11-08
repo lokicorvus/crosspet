@@ -81,6 +81,7 @@ namespace CrossPet
             // 鼠标只在桌宠本体、气泡、名牌、额度上才接（hitRects），窗口其余地方穿过去，点击直接落到后面的窗口
             Every(TimeSpan.FromMilliseconds(250), () => { _ = UpdateHitRects(); });
             Every(TimeSpan.FromMilliseconds(80), UpdateDockHover);
+            Every(TimeSpan.FromMilliseconds(80), HoverMenuTick);
             // 换了系统缩放（改了缩放、拖到缩放不同的另一块屏幕）：窗口按新缩放重设物理像素大小，脚底不动
             Host.DpiChanged += (_, __) => ui.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
             {
@@ -170,7 +171,7 @@ namespace CrossPet
                     if (!a.IsSuccess) { Store.Log("桌宠页面加载失败: " + a.WebErrorStatus); return; }
                     LoadCharacters();
                     // 不再 setShellPrepares(true)：副桌宠换成 DirectHost 后一秒开一只不卡，一起预开好几只反而卡（试验 C：同时开 6 只停 206ms，1.3.9-test.13 集合时主桌宠卡很久）
-                    await core.ExecuteScriptAsync($"restoreFriendship({SavedFriendshipJson()}); init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)}); setPointerBridge(true)");
+                    await core.ExecuteScriptAsync($"restoreFriendship({SavedFriendshipJson()}); init({ManifestJson}); setCharacter({Q(current)}, true); setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setEggsEnabled({(EggsEnabled ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate({(QuotaAggregate ? "true" : "false")}); setCodexResets({(CodexResets ? "true" : "false")}); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); setPeakSkins({Store.Json.Serialize(PeakSkins)}); setPointerBridge(true); {HoverMenuOptionsJs}");
                     if (Store.Settings.TryGetValue("dock", out var dk) && dk is string side && EdgeDockEnabled) After(1500, () => SetDock(side));   // 上次是贴着边的
                     // 刚更新完（上次打开的是别的版本）：让她说一声
                     var last = Store.Settings.TryGetValue("lastVersion", out var lv) ? lv as string : null;
@@ -203,6 +204,7 @@ namespace CrossPet
                     try
                     {
                         if (!(Store.Json.DeserializeObject(a.WebMessageAsJson) is Dictionary<string, object> m)) return;
+                        if (HandleHoverMenu(m)) return;
                         if (HandlePointer(m)) return;
                         HandleCompanionMessage(m);   // 多桌宠：companions / companionLeave / companionCall / eggAllowed / friendship
                         // 「新功能」卡片点了「去看看」：打开设置停在「新功能」页

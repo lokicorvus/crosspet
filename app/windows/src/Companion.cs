@@ -208,6 +208,8 @@ namespace CrossPet
         /// <summary>她的页面发来的消息：鼠标（pointer，见 index.html 的 setPointerBridge）；摸头记给主桌宠页面（友谊记账只在那里做）；道别演完了关窗口</summary>
         void HandleMessage(Dictionary<string, object> m)
         {
+            if (m.TryGetValue("hoverMenu", out var hover) && Equals(hover, "open"))
+            { pet.OpenCompanionHover(this); return; }
             if (m.TryGetValue("pointer", out var pv) && pv is string pointer)
             {
                 // 拖窗口要进系统的移动循环（松手才返回）：排到网页控件的回调返回之后
@@ -233,6 +235,7 @@ namespace CrossPet
             var characterChanged = newCharacter != Character;
             var roleChanged = newKey != Key || newClient != Client || newLabel != Label || characterChanged;
             var clientChanged = newClient != Client || characterChanged;
+            if (roleChanged) pet.CloseCompanionHover(this);
             Character = newCharacter;
             var quotaChanged = newQuota != Quota;
             if (newKey != Key)
@@ -265,6 +268,7 @@ namespace CrossPet
         public void Close()
         {
             if (closed) return;
+            pet.CloseCompanionHover(this);
             closed = true;
             ready = false;
             foreach (var t in timers) t.Stop();
@@ -319,6 +323,7 @@ namespace CrossPet
         // ---------------- 鼠标：单击摸头、拖动换位置（甩她会生气）、右键精简菜单（网页交来，见 HandleMessage） ----------------
         void Drag()
         {
+            pet.CloseCompanionHover(this);
             if (closed) return;
             Undock();
             // 甩：拖动时横向来回反转方向（往回超过 18（按 100% 缩放算）算一次反转），0.9 秒内两次以上就算在甩
@@ -345,11 +350,12 @@ namespace CrossPet
             if (!shook) CheckDock();
         }
 
-        /// <summary>精简菜单：换角色、彩蛋、集合、更新、退出只在主桌宠菜单里</summary>
-        void ShowMenu()
+        internal bool HoverReady => ready && !closed && !leaving && !parked && openMenu == null &&
+                                    Host != null && !Host.IsDisposed && !Host.ForcePassThrough && Host.Alpha != 0;
+        /// <summary>右键和悬停共用精简菜单；集合、更新、退出等操作只在主桌宠上</summary>
+        internal void FillHoverMenu(Forms.ContextMenuStrip menu)
         {
-            openMenu?.Close();
-            var menu = new Forms.ContextMenuStrip();
+            menu.Items.Clear();
             void Add(string text, Action click)
             {
                 var i = new Forms.ToolStripMenuItem(text);
@@ -378,6 +384,14 @@ namespace CrossPet
             }
             menu.Items.Add(new Forms.ToolStripSeparator());
             Add("设置…", () => pet.OpenSettingsFromCompanion());
+        }
+
+        void ShowMenu()
+        {
+            pet.CloseCompanionHover(this);
+            openMenu?.Close();
+            var menu = new Forms.ContextMenuStrip();
+            FillHoverMenu(menu);
             // 和主桌宠一样：窗口从不拿焦点，菜单收不到「失去焦点」，鼠标在菜单外面按下就自己关
             var watch = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             watch.Tick += (_, ___) => { if (Forms.Control.MouseButtons != Forms.MouseButtons.None && !MenuCovers(menu, Forms.Cursor.Position)) menu.Close(); };

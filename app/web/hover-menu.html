@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CrossPet · 角色悬停菜单</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;user-select:none;font-family:"Microsoft YaHei UI","Segoe UI",sans-serif;color:#684533}
+body{padding:15px 13px 17px;--gold:#c5934b;--accent:#bf773f}
+.book{height:100%;position:relative;filter:drop-shadow(0 9px 7px #44291838);transform-origin:15% 72%;animation:unfold .32s cubic-bezier(.2,.8,.2,1) both}
+body[data-side=left] .book{transform-origin:85% 72%}
+.cover{position:absolute;inset:3px -4px -5px;background:linear-gradient(110deg,#986348,#be865c 48%,#966146 51%,#b57d51);border:1px solid #855638;border-radius:12px 12px 16px 16px;box-shadow:inset 0 0 0 3px #dfb475,inset 0 0 0 5px #a36e45}
+.paper{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;border-radius:9px 9px 12px 12px;border:1px solid #dbc59b;background:#fff8e8;overflow:hidden}
+.paper:after{content:"";position:absolute;inset:0 auto 0 50%;width:15px;transform:translateX(-50%);background:linear-gradient(90deg,#98734700,#98734722 42%,#98734740 50%,#ffffff80 58%,#98734700);pointer-events:none}
+.leaf{background:linear-gradient(100deg,#fff7e4,#fffdf3 85%,#f3e6c8);padding:46px 12px 35px 16px;position:relative}
+.leaf.right{background:linear-gradient(90deg,#f0e1c2,#fffaf0 12%,#fff9e9);padding:46px 16px 35px 12px}
+.ornament{position:absolute;inset:9px;border:1px solid #caa86675;border-radius:3px;pointer-events:none}
+.ornament:before,.ornament:after{content:"✧";position:absolute;color:#c79a58;background:#fff8e8;line-height:15px;font-size:16px}
+.ornament:before{left:-5px;top:-7px}.ornament:after{right:-5px;bottom:-7px}
+.heading{position:absolute;left:24px;right:34px;top:12px;z-index:2;display:flex;align-items:center;gap:6px;font-size:13px;line-height:24px;font-weight:600;white-space:nowrap}
+.heading .flower{color:#c48743;font-size:19px;font-weight:400}.heading .title{overflow:hidden;text-overflow:ellipsis}
+button{font:inherit;cursor:pointer}button:focus-visible{outline:2px solid #b4783b;outline-offset:2px}
+.close{position:absolute;right:6px;top:5px;z-index:4;border:0;background:transparent;color:#9d7855;border-radius:50%;width:25px;height:25px;font-size:20px;line-height:20px}
+.close:hover{background:#b57b3220;color:#75451f}
+.entry{position:relative;width:100%;height:36px;display:flex;align-items:center;gap:5px;border:0;border-bottom:1px solid #ceac6c32;background:transparent;color:#684533;text-align:left;padding:0 3px;font-size:12px;border-radius:4px;line-height:1.25;transition:background .15s,transform .15s}
+.entry .mark{font-size:13px;color:#b3884c;flex:0 0 13px}.entry .label{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.entry .arrow{margin-left:auto;color:#b39468;font-size:16px}
+.entry:hover:enabled{background:#eac58335;transform:translateX(2px)}.entry:disabled{opacity:.4;cursor:default}.entry.checked{color:#a16127}
+.footer{position:absolute;left:19px;right:19px;bottom:7px;z-index:3;display:flex;justify-content:space-between;align-items:center;color:#ab8a5d;font-size:10px}
+.footer button{border:0;background:transparent;color:#986f40;padding:3px 5px;border-radius:4px;font-size:11px}.footer button:hover:enabled{background:#d6ae6a28}.footer button:disabled{opacity:.3;cursor:default}.footer .count{font-family:Georgia,serif;font-size:12px;letter-spacing:1px}
+.ribbon{position:absolute;left:47%;top:-3px;width:9px;height:23px;background:linear-gradient(90deg,#cb8b52,#e3b16a);z-index:3;clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);filter:drop-shadow(0 1px 1px #805c3655)}
+@keyframes unfold{from{opacity:0;transform:translateY(7px) scale(.85) rotate(-3deg)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.book{animation:none}.entry{transition:none}}
+</style><link rel="stylesheet" href="hover-themes.css"></head><body data-side="right" data-theme="claude">
+<main class="book" role="dialog" aria-label="角色悬停菜单"><div class="cover"></div><div id="themeDecor" aria-hidden="true"></div><div class="paper"><section class="leaf"><div class="ornament"></div><div id="left"></div></section><section class="leaf right"><div class="ornament"></div><div id="right"></div></section></div><div class="ribbon"></div><header class="heading"><span class="flower">❀</span><span class="title" id="title">随身手册</span></header><button class="close" aria-label="收起书本" title="收起">×</button><footer class="footer"><button id="back">‹ 目录</button><button id="prev" aria-label="上一页">‹</button><span class="count" id="count">1 / 1</span><button id="next" aria-label="下一页">›</button><span aria-hidden="true">✧</span></footer></main>
+<script src="hover-themes.js"></script>
+<script src="hover-menu.js"></script></body></html>
