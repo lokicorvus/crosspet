@@ -51,6 +51,7 @@ namespace CrossPet
 
         public void Quit()
         {
+            CloseHoverMenu(); hoverHost?.Dispose();
             foreground?.Dispose();
             tray.Visible = false; tray.Dispose();
             Application.Current.Shutdown();

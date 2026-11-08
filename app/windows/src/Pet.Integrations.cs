@@ -140,6 +140,7 @@ namespace CrossPet
             {
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
+                ["hoverMenuSupported"] = true, ["hoverMenu"] = HoverMenuEnabled, ["hoverMenuDelay"] = HoverMenuDelay,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
@@ -234,6 +235,7 @@ namespace CrossPet
                             stamps.Remove("deepseek-quota");   // 重新打开时马上读一次
                             if (!on) QuotaJS("deepseek", "setQuota('deepseek', null)");
                             break;
+                        case "hoverMenu": case "hoverMenuDelay": SetHoverMenuSetting(key, value); break;
                         case "edgeDock": Store.Settings["edgeDock"] = on; Store.SaveSettings(); if (!on) Undock(); break;
                         case "login": if (on != LoginEnabled) ToggleLogin(); break;
                         case "character": if (value is string id) SwitchTo(id, "manual", "settings"); break;

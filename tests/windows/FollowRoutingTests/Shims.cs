@@ -46,7 +46,7 @@ namespace CrossPet
         public readonly List<PendingEval> Pending = new List<PendingEval>();
         public Task<string> ExecuteScriptAsync(string code)
         {
-            if (!code.StartsWith("FollowPolicy.eventTarget(")) return Task.FromResult("null");
+            if (!code.StartsWith("FollowPolicy.eventSkip(")) return Task.FromResult("null");
             var request = new PendingEval { Code = code };
             Pending.Add(request);
             return request.Reply.Task;
@@ -56,6 +56,7 @@ namespace CrossPet
     sealed class FakeWeb { public FakeCore CoreWebView2 = new FakeCore(); }
     sealed class FakeSettings { public void Push() { } }
     sealed class FakeDev { public void Js(string code) { } }
+    sealed class FakeCompanion { public void UpdateDock() { } }
 
     sealed partial class Pet
     {
@@ -73,6 +74,21 @@ namespace CrossPet
         public List<(string id, string name)> Catalog = new List<(string, string)> {
             ("gpt", "GPT"), ("claude", "Claude"), ("deepseek", "DeepSeek"), ("grok", "Custom Grok") };
         List<(string id, string name)> Characters() => Catalog;
+        // Native menus are outside these routing tests; keep their UI boundary inert.
+        void CloseHoverMenu() { }
+        void CloseHoverMenuForLookChange(bool mainOnly = false) { }
+        // These cases cover the single-pet routing path. Companion transport and
+        // diagnostics are UI boundaries; foreground selection still runs SwitchTo.
+        static bool MultiPetsOn => false;
+        readonly Dictionary<string, FakeCompanion> companions = new Dictionary<string, FakeCompanion>();
+        void PushForeground() { }
+        void FollowTo(string id, string why, string exe) => SwitchTo(id, why, exe);
+        void CompanionsJs(string code) { }
+        void PushSettings() => settings?.Push();
+        void NoteSessions(string id, string json) { }
+        void NoteCharState(string id, string json, string pose, DateTime at) { }
+        void QuotaJS(string id, string code) => Js(code);
+        void PollClientStates() { }
         void ApplyLayer() { }
         void UpdateDock() { }
         void ApplyDock() { }

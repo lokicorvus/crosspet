@@ -162,6 +162,24 @@ const sw = p => p.q('input[data-key=multiPets]')
 const click = el => { if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.type === 'radio' ? true : !el.checked; (el.onchange || el.onclick)?.() }
 
 const cases = [
+  ['不支持悬停菜单的外壳不显示相关设置', p => {
+    p.push({})
+    assert(hidden(p.q('input[data-key=hoverMenu]')), 'macOS / 旧外壳不该显示开关')
+    assert(hidden(p.$('hoverMenuDelay')), '不支持时不该显示延迟')
+  }],
+  ['Windows 悬停菜单开关和等待时间', p => {
+    p.push({hoverMenuSupported: true, hoverMenu: false, hoverMenuDelay: 3000})
+    const sw = p.q('input[data-key=hoverMenu]')
+    assert(!hidden(sw) && !sw.checked && p.$('hoverMenuDelay').disabled, '默认应关闭且延迟禁用')
+    click(sw)
+    assert(p.sets('hoverMenu').at(-1) === true, '开关该发 true')
+    p.push({hoverMenuSupported: true, hoverMenu: true, hoverMenuDelay: 4500})
+    assert(!p.$('hoverMenuDelay').disabled && +p.$('hoverMenuDelay').value === 4500, '等待时间没有同步')
+    assert(p.$('hoverMenuDelayVal').textContent === '4.5 秒', '延迟单位错误')
+    p.$('hoverMenuDelay').value = 1500
+    p.$('hoverMenuDelay').onchange({target:p.$('hoverMenuDelay')})
+    assert(p.sets('hoverMenuDelay').at(-1) === 1500, '延迟要发数值毫秒')
+  }],
   ['开关在「角色」页，文案照设计稿', p => {
     const s = sw(p); assert(s, '没有 data-key=multiPets 的开关')
     const card = s.closest('.card'); assert(card && card.dataset.tab === 'character', '开关不在「角色」页')

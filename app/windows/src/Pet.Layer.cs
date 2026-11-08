@@ -48,7 +48,7 @@ namespace CrossPet
             if (Host == null || concealed == c) return;
             concealed = c;
             Host.ForcePassThrough = c;   // 藏着时鼠标穿过整个窗口
-            if (c) { openMenu?.Close(); Host.SetVisible(false); if (hwnd != IntPtr.Zero) Native.DropFromTop(hwnd); }
+            if (c) { CloseHoverMenu(); openMenu?.Close(); Host.SetVisible(false); if (hwnd != IntPtr.Zero) Native.DropFromTop(hwnd); }
             else { Host.SetVisible(true); Raise(); }
             UpdatePageHidden();
             SyncCompanionWindows();   // 多桌宠：额外那几只一起藏 / 一起出来

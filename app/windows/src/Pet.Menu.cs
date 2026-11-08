@@ -94,6 +94,10 @@ namespace CrossPet
                 layer.DropDownItems.Add(Item(title, () => { Store.Settings["layer"] = m; Store.SaveSettings(); ApplyLayer(); }, LayerMode == m));
             }
             menu.Items.Add(layer);
+            menu.Items.Add(Item("悬停展开专属菜单", () => {
+                SetHoverMenuSetting("hoverMenu", !HoverMenuEnabled);
+                PushSettings();
+            }, HoverMenuEnabled));
             menu.Items.Add(Item("设置…", () => OpenSettings()));
             menu.Items.Add(Item("反馈问题…", OpenFeedback));
             if (developer)

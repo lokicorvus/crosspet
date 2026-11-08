@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../../app/windows/src/SpritePath.cs" />
+    <Compile Include="../../../app/windows/src/HoverMenuLayout.cs" />
     <Compile Include="../../../app/windows/src/ConcealStyle.cs" />
     <Compile Include="../../../app/windows/src/AntigravityQuota.Parse.cs" />
     <Compile Include="../../../app/windows/src/ZoomCheck.cs" />

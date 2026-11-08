@@ -51,6 +51,7 @@ namespace CrossPet
 
         void Drag()
         {
+            CloseHoverMenu();
             Undock();
             // 甩：拖动时横向来回反转方向（记住这个方向上的最远点，往回超过 18（按 100% 缩放算）算一次反转），0.9 秒内两次以上就算在甩（惹她生气）
             var turn = 18 * Host.DpiScale;
@@ -77,6 +78,7 @@ namespace CrossPet
 
         void ShowMenu(bool shift)
         {
+            CloseHoverMenu();
             openMenu?.Close();
             var menu = new Forms.ContextMenuStrip();
             FillMenu(menu, shift);

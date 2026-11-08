@@ -31,7 +31,7 @@ namespace CrossPet
             try { return web?.CoreWebView2 == null ? "null" : await web.CoreWebView2.ExecuteScriptAsync(code); }
             catch { return "null"; }
         }
-        public void Reload() { ++followEventGeneration; ready = false; web?.CoreWebView2?.Reload(); }
+        public void Reload() { CloseHoverMenu(); ++followEventGeneration; ready = false; web?.CoreWebView2?.Reload(); }
         public static string Q(string s) => Store.Json.Serialize(s);
 
         /// <summary>换衣服（皮肤）：记下来，重新载入立绘；正在显示的就是她的话马上换上</summary>
@@ -39,6 +39,7 @@ namespace CrossPet
         {
             if (!(Store.Settings.TryGetValue("skins", out var sv) && sv is Dictionary<string, object> sd)) Store.Settings["skins"] = sd = new Dictionary<string, object>();
             if ((sd.TryGetValue(id, out var cur) ? cur as string ?? "" : "") == skin) return;
+            CloseHoverMenuForLookChange();
             if (skin == "") sd.Remove(id); else sd[id] = skin;
             Store.SaveSettings();
             LoadCharacters();
@@ -52,6 +53,7 @@ namespace CrossPet
         {
             ++followEventGeneration;  // 同一个角色也算新的手动选择，不能让旧的异步跟随请求盖回来。
             if (!Characters().Any(c => c.id == id)) return;
+            CloseHoverMenuForLookChange(mainOnly: true);
             var skin = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
             Ledger.Append(SwitchesFile, new Dictionary<string, object> { ["from"] = current ?? "", ["to"] = id, ["skin"] = skin, ["why"] = why, ["via"] = via });
             if (id != current) Store.Log($"换角色 {current} → {id}（{why}{(via == "" ? "" : " " + via)}）");

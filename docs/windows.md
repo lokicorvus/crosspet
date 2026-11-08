@@ -40,6 +40,27 @@
 - 桌宠始终在最上层，切换窗口时会重新置顶。
 - 每 3 小时（以及电脑从睡眠中醒来时）检查一次新版本，有新版时她会举着礼物提醒，右键菜单顶上出现「更新到 …」。
 
+
+### 角色专属悬停菜单
+
+默认关闭。在右键菜单或「设置 → 常规」开启「悬停展开专属菜单」，鼠标连续停在人物身上 3 秒即可展开；等待时间可在设置中调为 1–10 秒。拖动或点击会取消本次等待，离开人物后再回来才会重新计时。
+
+| 角色 | 菜单样式 |
+|---|---|
+| Claude | 翻开的随身书页 |
+| DeepSeek | 海洋气泡 |
+| GPT | 六角冰晶 |
+| Gemini | 星座光点 |
+| GLM | 月光云朵 |
+| Grok | 王冠卡牌 |
+| Qwen | 展开的折扇 |
+
+![七个角色的悬停菜单预览](images/character-hover-menu.png)
+
+菜单沿用现有操作，支持分页、子菜单、选中和禁用状态。集合后的额外桌宠只显示自己的操作。移到菜单上可以继续选择，离开人物和菜单约 0.9 秒、按 Esc 或点击外部会收起；换角色、换衣服、隐藏或拖动时也会收起。服装沿用所属角色的主题，未知角色使用书页样式。菜单附近会按可用屏幕区域调整位置。
+
+这项功能仅接入 Windows 外壳，macOS 不显示相关设置。没有新增立绘；菜单展开时临时使用已有姿态，收起后恢复最新工作动作。
+
 ## 接入 AI
 
 | AI | 接入后 |
@@ -77,3 +98,21 @@ tools/build-windows.sh
 ```
 
 输出 `build/CrossPet-Windows.zip`。外壳在 `app/windows/`（C# + WPF，跑在 Windows 自带的 .NET Framework 4.8 上），桌宠画面、开发者控制台、钩子脚本、接入工具都和 macOS 版共用。
+
+### 悬停菜单的回归检查
+
+在仓库根目录运行：
+
+```sh
+node tests/hover_dwell_test.cjs
+node tests/page_switch_test.cjs
+node tests/ui_ownership_test.cjs
+node tests/settings_multi_pets_test.cjs
+dotnet run --project tests/windows/LogicTests/LogicTests.csproj -c Release
+```
+
+现有单桌宠会话路由检查可在 Windows 上运行 `dotnet run --project tests/windows/FollowRoutingTests/FollowRoutingTests.csproj -c Release`，覆盖前台切换、过期请求、手动切换和重载后的异步答复失效。
+
+Windows 上还可以运行 `dotnet run --project tests/windows/HoverMenuTests/HoverMenuTests.csproj -c Release`，直接检查构建后的原生菜单：待加载菜单的归属和取消、无关桌宠隔离、禁用分支、原操作复用、旧操作 ID 清理，以及 SDK 生成的 .NET Framework 目标。测试不弹出桌面窗口。
+
+可选的真实浏览器检查：安装 Playwright 及其 Chromium 后运行 `node tests/hover_menu_browser_test.cjs`。也可用 `PLAYWRIGHT_MODULE` 指定已有 Playwright 模块、`BROWSER_EXECUTABLE` 指定已有 Chromium / Edge；结果和截图输出到被 Git 忽略的 `build/hover-menu/`。覆盖七个主题、菜单分页和操作、额外桌宠的独立消息、换装主题、姿态恢复，以及实际 DOM 的悬停和拖动取消；这些测试不代替 Windows 桌面上的焦点、系统缩放和多显示器交互实测。

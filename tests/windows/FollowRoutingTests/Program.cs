@@ -46,7 +46,7 @@ static class Program
     }
     static async Task Complete(Pet pet, int index, bool allowed = true)
     {
-        pet.Requests[index].Reply.SetResult(allowed ? "true" : "false");
+        pet.Requests[index].Reply.SetResult(Store.Json.Serialize(allowed ? "ok" : "blocked"));
         await Task.Delay(30);
     }
     static async Task Check(string name, Func<Task> body)
@@ -74,6 +74,12 @@ static class Program
                 Native.Exe = "cursor.exe"; f.Host("grok"); f.Pet.Tick();
                 f.Host("deepseek"); f.Pet.Tick(); Equal("deepseek", f.Pet.Selected);
             } return Task.CompletedTask;
+        });
+        await Check("eventSkip denial preserves the current character", async () => {
+            using (var f = new Fixture()) {
+                f.State("claude"); f.Pet.Tick(); Count(1, f.Pet.Requests.Count);
+                await Complete(f.Pet, 0, allowed: false); Equal("gpt", f.Pet.Selected);
+            }
         });
         await Check("B then C evaluations only apply newest event when B returns first", async () => {
             using (var f = new Fixture()) {

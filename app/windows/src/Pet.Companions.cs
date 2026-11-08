@@ -305,7 +305,7 @@ namespace CrossPet
 
         /// <summary>额外那只的外观设置（共用的那几项）。合并额度表只在主桌宠身上，所以她的关着</summary>
         internal string CompanionLookJs =>
-            $"setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate(false); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)})";
+            $"setAuraMode({Q(AuraMode)}); setShowName({(ShowName ? "true" : "false")}); setPowerSave({(PowerSave ? "true" : "false")}); setNeverSleep({(NoSleep ? "true" : "false")}); setQuotaAggregate(false); setPeakStyle({Q(PeakStyle)}); setQuotaStyle({Q(QuotaStyle)}); {HoverMenuOptionsJs}";
 
         void CompanionsJs(string code) { foreach (var c in AllCompanions) c.Js(code); }
 

@@ -114,7 +114,7 @@ function makePage() {
   for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js', 'pair-chat.js'])
     vm.runInContext(fs.readFileSync(path.join(WEB, f), 'utf8'), ctx, { filename: f })
   const html = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8').replace(/\r\n/g, '\n')
-  const start = html.lastIndexOf('<script>\n'), end = html.lastIndexOf('</script>')
+  const start = html.lastIndexOf('<script>\n'), end = html.indexOf('</script>', start)
   if (start < 0 || end < start) throw Error('cannot find the inline script of index.html')
   vm.runInContext(html.slice(start + '<script>'.length, end), ctx, { filename: 'index.html' })
   const run = code => vm.runInContext(code, ctx)
