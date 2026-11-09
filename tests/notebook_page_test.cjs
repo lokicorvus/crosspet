@@ -193,6 +193,22 @@ const cases = [
     assert(typeof v.signPicked === 'string' && v.signPicked, v.signPicked)
     assert(v.notes[0] === '一' && v.sign === '今天也加油', 'character.json 的照旧带上')
   }],
+  ['notebookFor_has_page2', async e => {
+    // 一起站过（集合出来站一会儿）、是好朋友：第二页有她，留言用的是挑好的文案；刚说过的一段在「最近聊了什么」里
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 1e6, shown: 3 } })})`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false`)
+    await e.advance(120000)
+    e.run(`noteChat([['claude', '你好'], ['gpt', '嗯。']])`)
+    const p = nb(e).page2
+    assert(p && p.friends.length === 1 && p.friends[0].id === 'gpt', JSON.stringify(p))
+    assert(p.friends[0].levelName === '挚友' && p.friends[0].block.lines.length >= 2, JSON.stringify(p.friends[0]))
+    assert(p.friends[0].image === 'gpt/idle.webp' && p.ownerImage === 'claude/idle.webp', JSON.stringify(p))
+    assert(p.chats.length === 1 && p.chats[0].lines[1].name === 'GPT', JSON.stringify(p.chats))
+    const empty = nb(e, 'grok')
+    assert(empty.page2 && empty.page2.friends.length === 0, JSON.stringify(empty.page2))
+  }],
   ['group_chat_when_gathered', async e => {
     // 三只两两都是挚友（升级都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
     const max = 1e6

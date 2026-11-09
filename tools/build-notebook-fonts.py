@@ -2,7 +2,7 @@
 """小本子的七款角色字体：按面板上会用到的字做子集，出 app/web/fonts/notebook/*.woff2。
 
 只在开发机上跑（要 fontTools 和 brotli：pip install fonttools brotli）。源字体放 ~/.cache/crosspet-fonts/，
-没有就打印下载地址退出。用到的字 = notebook-themes.js、notebook.js 里的所有字 + 各角色 character.json 的
+没有就打印下载地址退出。用到的字 = notebook-themes.js、notebook.js、notebook-lines.js、notebook-friends.js、pair-chat.js、pet-talk.js 里的所有字 + 各角色 character.json 的
 name / notebook / milestones + ASCII、常用中文标点。子集里没有的字（比如以后新写的批注）会回退到系统字体，
 改了台词重跑一次就好：
 
@@ -32,7 +32,8 @@ FONTS = [
 
 def wanted_text() -> str:
     parts = []
-    for name in ("notebook-themes.js", "notebook.js", "notebook.html"):
+    # 第二页用各人的字写留言、回复和「最近她们聊了什么」（每对台词、群聊、反应），这些文案都要进子集
+    for name in ("notebook-themes.js", "notebook.js", "notebook.html", "notebook-lines.js", "notebook-friends.js", "pair-chat.js", "pet-talk.js"):
         parts.append((ROOT / "app" / "web" / name).read_text(encoding="utf-8"))
     for cj in sorted((ROOT / "characters").glob("*/character.json")):
         try:

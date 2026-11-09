@@ -81,3 +81,64 @@ test('panel：名字里的尖括号不当成标签', () => {
 test('panel：带封面（翻书动画用）', () => {
   for (const id of IDS) assert.ok(T.panel(view({ id }), T.themeFor(id)).includes('class="cover'), id)
 })
+
+// ---- 第二页 ----
+const NOW = new Date(2026, 10, 9, 16, 0).getTime()
+const blk = (who, owner, extra = {}) => ({ lines: [{ who, text: '你好呀' }, { who: owner, text: '你好' }], sticker: '🍚', photo: null, hint: '再好一点', ...extra })
+const page2 = (o = {}) => ({ now: NOW, ownerImage: '../characters/claude/idle.webp', cameo: null, chats: [],
+  friends: [{ id: 'deepseek', name: 'DeepSeek', image: '../characters/deepseek/idle.webp', levelName: '好朋友', hearts: 5, block: blk('deepseek', 'claude') }], ...o })
+const count = (html, s) => html.split(s).length - 1
+
+test('panel_has_two_pages_and_tabs：两页叠在一起，右边两个书签、每页一个翻页角', () => {
+  const html = T.panel(view({ page2: page2() }), T.themeFor('claude'))
+  assert.equal(count(html, 'class="sheet pg pg1'), 1)
+  assert.equal(count(html, 'class="sheet pg pg2'), 1)
+  assert.ok(html.includes('data-page="1"') && html.includes('data-page="2"'))
+  assert.ok(html.includes('class="tabs"'))
+  assert.equal(count(html, 'class="corner"'), 2)
+  // 没给 page2（旧外壳 / 旧数据）也有第二页，写着还没有朋友
+  assert.ok(T.panel(view(), T.themeFor('claude')).includes('还没有一起站过的朋友'))
+})
+
+test('friends_page_writer_fonts：留言用写的人的字，回复用本子主人的字', () => {
+  for (const id of IDS) {
+    const fr = id === 'deepseek' ? 'claude' : 'deepseek'
+    const html = T.panel(view({ id, page2: page2({ friends: [{ id: fr, name: fr, image: 'x.webp', levelName: '好朋友', hearts: 5, block: blk(fr, id) }] }) }), T.themeFor(id))
+    assert.ok(html.includes(`class="ln w-${fr}"`), id)
+    assert.ok(html.includes(`class="ln w-${id} reply"`), id)
+  }
+  const css = require('fs').readFileSync(require('path').join(__dirname, '..', 'app', 'web', 'notebook-themes.css'), 'utf8')
+  for (const id of IDS) assert.ok(css.includes(`.w-${id} {`), `css .w-${id}`)
+  assert.ok(css.includes('.w-other {'))
+})
+
+test('custom_writer_font：写的人是自定义角色（kimi）→ w-other', () => {
+  const html = T.panel(view({ page2: page2({ friends: [{ id: 'kimi', name: 'Kimi', image: null, levelName: '认识了', hearts: 1, block: { lines: [{ who: 'kimi', text: '嗨' }], sticker: null, photo: null, hint: 'x' } }] }) }), T.themeFor('claude'))
+  assert.ok(html.includes('class="ln w-other"'))
+})
+
+test('empty_friends_message：一个朋友都没有', () => {
+  const html = T.panel(view({ page2: page2({ friends: [] }) }), T.themeFor('grok'))
+  assert.ok(html.includes('还没有一起站过的朋友，多叫她们出来玩吧'))
+})
+
+test('贴纸、合照、提示、插嘴、留言里的字都转义', () => {
+  const b = blk('deepseek', 'claude', { photo: { date: new Date(2026, 9, 28).getTime() }, hint: null, lines: [{ who: 'deepseek', text: '<b>x</b>' }] })
+  const html = T.panel(view({ page2: page2({ friends: [{ id: 'deepseek', name: 'DeepSeek', image: 'd.webp', levelName: '挚友', hearts: 9, block: b }], cameo: { who: 'grok', name: 'Grok', stamp: '已阅·还行' } }) }), T.themeFor('claude'))
+  assert.ok(html.includes('🍚'))
+  assert.ok(html.includes('10 月 28 日') && html.includes('class="photo'))
+  assert.ok(html.includes('class="stamp w-grok"') && html.includes('已阅·还行'))
+  assert.ok(!html.includes('<b>x</b>') && html.includes('&lt;b&gt;x&lt;/b&gt;'))
+  const hint = T.panel(view({ page2: page2() }), T.themeFor('claude'))
+  assert.ok(hint.includes('class="locked"') && hint.includes('再好一点'))
+})
+
+test('chats_section_five_max：最近聊了什么最多 5 段，今天的写时间、别的天写日子', () => {
+  const chat = (t, i) => ({ t, lines: [{ who: 'claude', name: 'Claude', text: `第${i}句` }, { who: 'gpt', name: 'GPT', text: '嗯。' }] })
+  const chats = [0, 1, 2, 3, 4, 5, 6].map(i => chat(NOW - i * 3_600_000 * 5, i))
+  const html = T.panel(view({ page2: page2({ chats }) }), T.themeFor('claude'))
+  assert.equal(count(html, '<li class="chat">'), 5)
+  assert.ok(html.includes('今天 16:00'))
+  assert.ok(html.includes('11 月 8 日'))
+  assert.ok(html.includes('class="w-gpt"'))
+})

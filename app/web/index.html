@@ -241,6 +241,7 @@ addEventListener('error', e => {
 <script src="pet-talk.js"></script>
 <script src="notebook.js"></script>
 <script src="notebook-lines.js"></script>
+<script src="notebook-friends.js"></script>
 <script src="notebook-backfill.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
@@ -2058,7 +2059,22 @@ function notebookFor(ch) {
   // 批注每次打开随机挑一句（按数字的档），落款按深夜 / 忙 / 好久不见 / 纪念日换（notebook-lines.js）；character.json 写了的照旧优先
   const nowMs = Date.now()
   return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null,
-           notesPicked: NotebookLines.notesFor(ch, v), signPicked: NotebookLines.signFor(ch, v, nowMs) }
+           notesPicked: NotebookLines.notesFor(ch, v), signPicked: NotebookLines.signFor(ch, v, nowMs), page2: notebookPage2(ch, v, names, nowMs) }
+}
+// 第二页：和她一起站过的朋友（最多 4 个，心多的在前）各写的一块、路过插一嘴的、最近她参与的几段对话（notebook-friends.js 挑文案）
+function notebookPage2(ch, v, names, nowMs) {
+  const chars = manifest.characters || {}, store = noteStore(), day = Notebook.localDay(nowMs)
+  const installed = Object.keys(chars).filter(id => !chars[id].egg)
+  const list = Notebook.friendsOf(store, ch, { friendship: friendStoreRead(), installed })
+  const idle = id => chars[id]?.poses?.idle?.[0] || null
+  const friends = list.map(f => ({
+    id: f.id, name: names[f.id] || f.id, image: idle(f.id), levelName: Notebook.LEVEL_NAMES[f.level], hearts: f.hearts,
+    block: NotebookFriends.block({ owner: ch, friend: f.id, level: f.level, day,
+      facts: { first: f.first, minutes: f.minutes, days: f.first ? Math.floor((nowMs - f.first) / 86_400_000) : 0, rounds: v.rounds, pats: v.pats } }),
+  }))
+  const c = NotebookFriends.cameo({ owner: ch, friends: list, day })
+  const chats = Notebook.chatsOf(store, ch).map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who] || who, text })) }))
+  return { now: nowMs, ownerImage: idle(ch), friends, cameo: c && { ...c, name: names[c.who] || c.who }, chats }
 }
 
 // ---- 每对台词（台词和挑法在 pair-chat.js）----

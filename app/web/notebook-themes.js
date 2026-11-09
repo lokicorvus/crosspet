@@ -301,6 +301,39 @@
     return `<img src="${esc(avatar)}" data-fallback="${esc(image)}" alt="">`
   }
 
+  // ---- 第二页：朋友们的留言 ----
+  // v.page2 = { now, ownerImage, friends: [{ id, name, image, levelName, hearts, block }], cameo, chats: [{ t, lines: [{ who, name, text }] }] }
+  // 每个人的字用 .w-<她>（七个角色各自本子的字体和批注色，别的角色 .w-other）
+  const WRITERS = new Set(Object.keys(BOOKS))
+  const hand = id => `w-${WRITERS.has(id) ? id : 'other'}`
+  const hhmm = ms => { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }
+  const sameDay = (a, b) => { const x = new Date(a), y = new Date(b); return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate() }
+  const CHATS_MAX = 5
+  function friendsPage(v, t) {
+    const p = v.page2 || {}, owner = v.id, friends = p.friends || []
+    const block = (f, i) => {
+      const b = f.block || { lines: [] }
+      const lines = b.lines.map(l => `<div class="ln ${hand(l.who)}${l.who === owner ? ' reply' : ''}">${esc(l.text)}</div>`).join('')
+      // 合照只贴第一个（心最多的）挚友那块，本子别太长
+      const photo = b.photo && i === 0 ? `<div class="photo"><div class="pics">${p.ownerImage ? `<img src="${esc(p.ownerImage)}" alt="">` : ''}${f.image ? `<img src="${esc(f.image)}" alt="">` : ''}</div><div class="cap ${hand(f.id)}" title="第一次一起站在桌面上">${mdOf(b.photo.date)} · 第一次同框</div></div>` : ''
+      return `<div class="msg">${avatarImg(f.image)}<div class="body"><div class="who"><b>${esc(f.name)}</b> · ${esc(f.levelName)}<span class="hearts">${hearts(f.hearts || 0)}</span></div>${photo}${lines}${b.hint ? `<div class="locked">${esc(b.hint)}</div>` : ''}</div>${b.sticker ? `<span class="sticker">${esc(b.sticker)}</span>` : ''}</div>`
+    }
+    const c = p.cameo
+    const cameo = !c ? '' : c.stamp ? `<span class="stamp ${hand(c.who)}">${esc(c.stamp)}</span>` : `<div class="cameo"><span class="${hand(c.who)}">${esc(c.name || c.who)}：${esc(c.text)}</span></div>`
+    const when = ms => sameDay(ms, p.now || Date.now()) ? `今天 ${hhmm(ms)}` : mdOf(ms)
+    const chats = (p.chats || []).slice(0, CHATS_MAX)
+    const chatList = chats.length ? `<div class="rule">${svg(t.icon)}最近她们聊了什么</div><ul class="chats">${chats.map(ch => `<li class="chat"><span class="when">${when(ch.t)}</span>${ch.lines.map(l => `<span class="${hand(l.who)}">${esc(l.name)}：${esc(l.text)}</span>`).join('')}</li>`).join('')}</ul>` : ''
+    return `<div class="sheet pg pg2">
+      <button class="close" title="收起" data-action="close">×</button>
+      <div class="hd hd2"><div class="kicker">${svg(t.icon)}第 2 页</div><div class="title">朋友们的留言</div></div>
+      ${cameo}
+      ${friends.length ? friends.map(block).join('') : '<p class="empty">还没有一起站过的朋友，多叫她们出来玩吧</p>'}
+      ${chatList}
+      <div class="pn">— 2 —</div>
+      <button class="corner" title="翻回我们这一页" data-page="1" aria-label="翻回上一页"></button>
+    </div>`
+  }
+
   function panel(v, t) {
     const a = t.art
     const ring = `<svg class="ring" viewBox="0 0 100 44" preserveAspectRatio="none"><path d="M14 24C10 10 40 3 66 6s26 18 12 26-58 8-66-2c-4-6 2-12 14-16" fill="none" stroke="#ef4a4a" stroke-width="1.6" stroke-linecap="round" opacity=".9"/></svg>`
@@ -323,7 +356,8 @@
     const sign = signFor(t, v)
     return `<div class="wrap">${a.outer ? a.outer() : ''}<section class="nb t-${t.id}">
     <div class="bg">${a.bg ? a.bg() : ''}</div>
-    <div class="sheet">
+    <div class="pages">
+    <div class="sheet pg pg1">
       <button class="close" title="收起" data-action="close">×</button>
       ${head}
       <div class="stats">${stat(0, num(v.rounds), '轮', '一起干的活')}${stat(1, work[0], work[1], '干活时长')}${stat(2, num(v.pats), '次', '摸头')}</div>
@@ -337,7 +371,12 @@
       <div class="rule">${svg('sparkle')}小成就</div>
       ${ms}
       <div class="foot">和大家一起 <b>${num(v.total && v.total.days)}</b> 天 · 一共 <b>${num(v.total && v.total.rounds)}</b> 轮${extra}</div>${sign ? `<span class="sign">${esc(sign)}</span>` : ''}
+      <button class="corner" title="翻到朋友们的留言" data-page="2" aria-label="翻到下一页"></button>
     </div>
+    ${friendsPage(v, t)}
+    </div>
+    <div class="tabs"><button class="tab t1" data-page="1">我们</button><button class="tab t2" data-page="2">朋友</button></div>
+    <div class="flip" aria-hidden="true"><div class="leaf"></div></div>
     <div class="fg">${a.fg ? a.fg() : ''}</div>
     <div class="turn" aria-hidden="true"><div class="leaf l2"></div><div class="leaf l1"></div><div class="cover c-${t.cover}">${COVER[t.cover]()}</div></div>
   </section></div>`

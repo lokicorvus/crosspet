@@ -236,3 +236,80 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 .t-qwen .cv-vertical { box-shadow: inset 0 0 0 3px #f6ecd6, inset 0 0 0 4px #c9a24a, 0 1px 2px #0005; }
 .t-qwen .cv-vertical .cv-title { font-size: 23px; letter-spacing: .18em; }
 .cv-seal { position: absolute; right: 30px; bottom: 34px; padding: 5px 4px; writing-mode: vertical-rl; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 13px; font-weight: 700; color: #fff; background: #c23b2e; border-radius: 3px; transform: rotate(-6deg); letter-spacing: 2px; }
+
+/* ================= 第二页「朋友们的留言」 =================
+   两页叠在同一个格子里（高度取高的那页，翻页时窗口不跳）；#root.p2 显示第二页。翻页时一张纸从右往左翻过去（.flip，同打开时的纸） */
+.nb .pages { display: grid; }
+.nb .pages > .pg { grid-area: 1 / 1; }
+.nb .pg2 { visibility: hidden; }
+.p2 .nb .pg1 { visibility: hidden; }
+.p2 .nb .pg2 { visibility: visible; }
+.nb .hd2 { min-height: 0; padding-right: 30px; margin-bottom: 12px; }
+
+/* 书签：本子右边两张，当前页的那张颜色深 */
+.nb .tabs { position: absolute; right: 0; top: 58px; z-index: 5; display: flex; flex-direction: column; gap: 4px; }
+.nb .tab { display: block; width: 19px; padding: 7px 0; border: 0; border-radius: 6px 0 0 6px; writing-mode: vertical-rl; font: 600 10.5px/1 -apple-system, "PingFang SC", "Microsoft YaHei UI", sans-serif; letter-spacing: .1em;
+  background: var(--tint); color: var(--muted); cursor: pointer; box-shadow: inset -2px 0 3px -2px #0003; }
+.nb .tab:hover { color: var(--ink); }
+#root:not(.p2) .nb .t1, .p2 .nb .t2 { background: var(--accent); color: var(--paper-solid, #fff); }
+.t-claude .tabs { right: 10px; }
+/* 翻页角：右下角折起来的一角 */
+.nb .corner { position: absolute; right: 0; bottom: 0; z-index: 4; width: 26px; height: 26px; border: 0; padding: 0; cursor: pointer; background: linear-gradient(135deg, transparent 50%, var(--line-strong, var(--line)) 50%, var(--tint) 75%); border-radius: 0 0 var(--radius, 18px) 0; opacity: .85; }
+.nb .corner:hover { opacity: 1; width: 30px; height: 30px; }
+.t-claude .corner { border-radius: 0 0 9px 0; }
+.nb .pn { text-align: center; margin-top: 12px; color: var(--muted); font-size: 11px; letter-spacing: .2em; }
+
+/* 一个朋友的留言 */
+.nb .msg { position: relative; display: flex; gap: 9px; margin: 0 0 13px; }
+.nb .msg > img { width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--paper-solid, #fff); border: 2px solid var(--avatar-ring, #fff); object-fit: cover; object-position: top; box-shadow: 0 1px 3px #0002; }
+.nb .msg .body { flex: 1; min-width: 0; padding-right: 18px; }
+.nb .msg .who { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.nb .msg .who b { color: var(--ink); font-weight: 600; }
+.nb .msg .who .hearts { margin-left: 4px; }
+.nb .msg .who .hearts svg { width: 9px; height: 9px; }
+.nb .ln { margin-top: 2px; line-height: 1.45; font-family: var(--wf); font-size: var(--ws, 15px); color: var(--wc); overflow-wrap: anywhere; }
+.nb .ln.reply { margin-left: 12px; font-size: calc(var(--ws, 15px) - 1px); }
+.nb .ln.reply:before { content: "↳ "; color: var(--muted); font-family: -apple-system, sans-serif; font-size: 11px; }
+.nb .locked { margin-top: 7px; padding: 5px 8px; border: 1.5px dashed var(--line-strong, var(--line)); border-radius: 9px; font-size: 11px; color: var(--muted); text-align: center; }
+.nb .sticker { position: absolute; right: -2px; top: 16px; font-size: 22px; transform: rotate(12deg); filter: drop-shadow(0 1px 1px #0003); pointer-events: none; }
+/* 合照：两只的待机图并排，下面写第一次一起站在桌面上的日子 */
+.nb .photo { position: relative; width: 168px; margin: 6px 0 8px 2px; padding: 7px 7px 24px; background: #fff; box-shadow: 0 3px 9px #0003; transform: rotate(-3deg); }
+.nb .photo:before { content: ""; position: absolute; left: 56px; top: -8px; width: 54px; height: 15px; background: #f3d98a99; transform: rotate(-6deg); }
+.nb .photo .pics { display: flex; justify-content: center; align-items: flex-end; height: 74px; overflow: hidden; background: linear-gradient(#cfe8f5, #f8eed8); }
+.nb .photo .pics img { height: 70px; }
+.nb .photo .cap { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: 12px; white-space: nowrap; font-family: var(--wf); color: var(--wc); }   /* 合照纸是白的：深色本子上也用原色 */
+/* 路过插一嘴：说一句，或者盖个章 */
+.nb .cameo { margin: -4px 0 10px; text-align: right; font-size: 13px; }
+.nb .cameo span, .nb .stamp { font-family: var(--wf); color: var(--wc); }
+.nb .stamp { position: absolute; right: 34px; top: 22px; z-index: 2; padding: 1px 8px; border: 2px solid currentColor; border-radius: 4px; font-size: 17px; transform: rotate(12deg); opacity: .85; pointer-events: none; }
+/* 最近她们聊了什么 */
+.nb .chats { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.nb .chat { display: flex; flex-wrap: wrap; column-gap: 8px; row-gap: 1px; align-items: baseline; font-size: 12.5px; line-height: 1.4; }
+.nb .chat .when { flex: none; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.nb .chat > span:not(.when) { font-family: var(--wf); color: var(--wc); font-size: calc(var(--ws, 15px) - 2px); }
+
+/* 每个人的字：她自己本子用的那款字体、批注色（--wf 字体、--wc 颜色、--ws 字号）。深色的本子（Gemini、Grok）上调亮一点 */
+.w-claude { --wf: "Notebook Kai", "Kaiti SC", serif; --wc: #8d6a50; --ws: 15px; }
+.w-deepseek { --wf: "ZCOOL KuaiLe", sans-serif; --wc: #2c7fc0; --ws: 15px; }
+.w-gpt { --wf: "ZCOOL XiaoWei", serif; --wc: #4f6890; --ws: 14.5px; }
+.w-gemini { --wf: "ZCOOL QingKe HuangYou", sans-serif; --wc: #a8741c; --ws: 15.5px; }
+.w-glm { --wf: "Ma Shan Zheng", "Kaiti SC", serif; --wc: #b8322a; --ws: 16.5px; }
+.w-grok { --wf: "Long Cang", "Kaiti SC", cursive; --wc: #d63c3c; --ws: 17.5px; }
+.w-qwen { --wf: "Zhi Mang Xing", "Kaiti SC", serif; --wc: #3e4c9c; --ws: 17px; }
+.w-other { --wf: "Kaiti SC", "STKaiti", "KaiTi", cursive; --wc: var(--ink); --ws: 15px; }
+.t-gemini [class*="w-"], .t-grok [class*="w-"] { --wc-dark: color-mix(in srgb, var(--wc) 45%, #fff); }
+.t-gemini .ln, .t-gemini .chat > span:not(.when), .t-gemini .cameo span, .t-gemini .stamp,
+.t-grok .ln, .t-grok .chat > span:not(.when), .t-grok .cameo span, .t-grok .stamp { color: var(--wc-dark, var(--wc)); }
+.t-gemini .w-gemini { --wc-dark: #ffd88f; }
+.t-grok .w-grok { --wc-dark: #ff5a5a; }
+.t-gemini .w-other, .t-grok .w-other { --wc-dark: var(--ink); }
+
+/* 翻页 */
+.nb .flip { position: absolute; inset: 0; z-index: 6; pointer-events: none; display: none; perspective: 900px; perspective-origin: 0 50%; border-radius: inherit; }
+.flipping .nb .flip, .flipping-back .nb .flip { display: block; }
+.nb .flip .leaf { position: absolute; inset: 0; transform-origin: 0 50%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: inherit;
+  background: linear-gradient(90deg, #0000000f, #0000 12%), var(--paper-solid, #fff); box-shadow: inset -1px 0 0 #0000001a; }
+.t-claude .flip .leaf { inset: 10px; border-radius: 9px; }
+.flipping .nb .flip .leaf { animation: nb-turn .52s cubic-bezier(.45,.05,.3,1) both; }
+.flipping-back .nb .flip .leaf { animation: nb-turn .52s cubic-bezier(.45,.05,.3,1) reverse both; }
+@media (prefers-reduced-motion: reduce) { .nb .flip { display: none !important; } }
