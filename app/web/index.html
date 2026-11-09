@@ -240,6 +240,7 @@ addEventListener('error', e => {
 <script src="pair-chat.js"></script>
 <script src="pet-talk.js"></script>
 <script src="notebook.js"></script>
+<script src="notebook-lines.js"></script>
 <script src="notebook-backfill.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
@@ -2054,7 +2055,10 @@ function notebookFor(ch) {
   const v = Notebook.view(noteStore(), ch, { names, friendship: friendStoreRead(), nowMs: Date.now() })
   // 好朋友的头像：她的待机图（面板先试同一个文件夹里的探头头像 avatar.webp，没有再用它）
   const friend = v.friend && { ...v.friend, image: chars[v.friend.id]?.poses?.idle?.[0] || null }
-  return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null }
+  // 批注每次打开随机挑一句（按数字的档），落款按深夜 / 忙 / 好久不见 / 纪念日换（notebook-lines.js）；character.json 写了的照旧优先
+  const nowMs = Date.now()
+  return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null,
+           notesPicked: NotebookLines.notesFor(ch, v), signPicked: NotebookLines.signFor(ch, v, nowMs) }
 }
 
 // ---- 每对台词（台词和挑法在 pair-chat.js）----

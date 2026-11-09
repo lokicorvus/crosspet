@@ -139,6 +139,7 @@
       rounds: rec.rounds, workMs: rec.workMs, minutes: rec.minutes, pats: rec.pats, pokes: rec.pokes, angry: rec.angry,
       busiest: rec.busiest, longestMs: rec.longestMs, friend: bestFriend(friendship, ch, names), milestones,
       before: rec.before, backfilled: !!store.backfilled,
+      todayRounds: rec.days[localDay(nowMs)] || 0, lastEnd: rec.lastEnd || 0,
       total: { days: since ? daysBetween(since, nowMs) + 1 : 0, rounds: all.reduce((n, r) => n + (r.rounds || 0), 0) },
     }
   }

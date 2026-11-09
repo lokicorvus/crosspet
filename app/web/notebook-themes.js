@@ -273,8 +273,9 @@
     const a = ART[key]
     return { id: key, book: BOOKS[key], icon: a.icon, notes: a.notes || [null, null, null], sign: a.sign ?? null, cover: key, art: a }
   }
-  const noteFor = (theme, view, i) => (view && Array.isArray(view.notes) && view.notes[i]) || theme.notes[i] || null
-  const signFor = (theme, view) => (view && view.sign) || theme.sign || null
+  // character.json 的 notebook 写了就用她的；没写用打开时按数字挑好的（notebook-lines.js）；都没有用主题自带的
+  const noteFor = (theme, view, i) => (view && Array.isArray(view.notes) && view.notes[i]) || (view && Array.isArray(view.notesPicked) && view.notesPicked[i]) || theme.notes[i] || null
+  const signFor = (theme, view) => (view && view.sign) || (view && view.signPicked) || theme.sign || null
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   const md = s => { const [, m, d] = String(s).split('-').map(Number); return `${m} 月 ${d} 日` }

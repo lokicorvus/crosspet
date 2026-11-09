@@ -183,6 +183,16 @@ const cases = [
     const said = chats.find(c => c.lines[0][0] === 'gpt' && c.lines[1]?.[0] === 'claude')
     assert(said && e.run(`PetTalk.REACT.done.gpt[2]`).includes(said.lines[0][1]), JSON.stringify(chats))
   }],
+  ['notebook_for_picks_notes_and_sign', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 30)
+    const v = nb(e)
+    assert(Array.isArray(v.notesPicked) && v.notesPicked.length === 3, JSON.stringify(v.notesPicked))
+    assert(e.run(`NotebookLines.NOTES.claude.rounds[1]`).includes(v.notesPicked[0]), v.notesPicked[0])
+    assert(typeof v.signPicked === 'string' && v.signPicked, v.signPicked)
+    assert(v.notes[0] === '一' && v.sign === '今天也加油', 'character.json 的照旧带上')
+  }],
   ['group_chat_when_gathered', async e => {
     // 三只两两都是挚友（升级都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
     const max = 1e6

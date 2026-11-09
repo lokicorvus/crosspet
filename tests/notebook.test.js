@@ -159,6 +159,10 @@ test('view：面板要的字段', () => {
   assert.equal(v.before, 0)
   assert.equal(v.backfilled, false)
   assert.deepEqual(v.total, { days: 20, rounds: 2 })
+  // 落款要的：今天几轮（那天没干是 0）、最后一轮结束的时间
+  assert.equal(v.todayRounds, 0)
+  assert.equal(v.lastEnd, at(10, 6, 12))
+  assert.equal(N.view(s, 'claude', { names: {}, friendship, nowMs: at(10, 6, 20) }).todayRounds, 1)
 })
 
 test('view：还没有一起站过的就没有最好的朋友；没见过的角色全是 0', () => {
