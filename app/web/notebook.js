@@ -62,13 +62,22 @@
     })
   }
 
+  const pairKey = (a, b) => (a < b ? `${a}+${b}` : `${b}+${a}`)
+  // 在桌面上的一分钟：每只 +1；同时在场的每一对也 +1（第二页「一起站了多久」「第一次一起」）
   function addMinute(store, chars, nowMs) {
     let out = store
-    for (const ch of chars || []) {
+    const list = [...new Set(chars || [])]
+    for (const ch of list) {
       const rec = recOf(out, ch)
       out = put(out, ch, { ...rec, firstMet: meet(rec, nowMs), minutes: rec.minutes + 1 })
     }
-    return out
+    if (list.length < 2) return out
+    const pairs = { ...(out.pairs || {}) }
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const key = pairKey(list[i], list[j]), p = pairs[key] || { first: nowMs, minutes: 0 }
+      pairs[key] = { first: Math.min(p.first || nowMs, nowMs), minutes: (p.minutes || 0) + 1 }
+    }
+    return { ...out, pairs }
   }
 
   function bump(store, ch, kind, nowMs) {
@@ -134,6 +143,28 @@
     }
   }
 
+  // 第二页的朋友：友谊记录里有分、对方装着的那几对；心多的在前，同心看一起站得久的，最多 FRIENDS_MAX 个
+  const FRIENDS_MAX = 4
+  function friendsOf(store, ch, { friendship, installed }) {
+    if (!Friendship) return []
+    const ok = new Set(installed || [])
+    const out = []
+    for (const [key, r] of Object.entries(friendship || {})) {
+      if (!r || !Number.isFinite(r.points) || r.points <= 0) continue
+      const [a, b] = key.split('+')
+      const other = a === ch ? b : b === ch ? a : null
+      if (!other || !ok.has(other)) continue
+      const p = (store.pairs || {})[pairKey(ch, other)] || {}
+      out.push({ id: other, key: pairKey(ch, other), level: Friendship.level(r.points), points: r.points,
+        hearts: Friendship.hearts(r.points) + Friendship.partial(r.points), first: p.first || 0, minutes: p.minutes || 0 })
+    }
+    out.sort((x, y) => y.points - x.points || y.minutes - x.minutes)
+    return out.slice(0, FRIENDS_MAX).map(({ points, ...f }) => f)
+  }
+  // 她参与的最近几段对话（第二页最下面）
+  const CHATS_SHOWN = 5
+  const chatsOf = (store, ch) => (store.chats || []).filter(c => c.lines.some(([who]) => who === ch)).slice(0, CHATS_SHOWN)
+
   // 外壳存的备份（notebook.json）并回网页的存储：每个角色留「多的那份」，绝不把数往回拉；坏记录丢掉
   const NUMS = ['firstMet', 'minutes', 'rounds', 'workMs', 'longestMs', 'pats', 'pokes', 'angry', 'before', 'lastTs']
   const validRec = r => r && typeof r === 'object' && !Array.isArray(r) && NUMS.every(k => r[k] === undefined || Number.isFinite(r[k]))
@@ -147,8 +178,22 @@
     for (const [ch, r] of Object.entries(saved.chars || {})) if (validRec(r) && (!chars[ch] || size(r) > size(chars[ch]))) chars[ch] = r
     const pos = [local.installedAt, saved.installedAt].filter(x => Number.isFinite(x) && x > 0)
     const live = [local.liveSince, saved.liveSince].filter(Number.isFinite)
-    return { ...local, installedAt: pos.length ? Math.min(...pos) : 0, liveSince: live.length ? Math.min(...live) : local.liveSince,
+    // 每一对：分钟取多的、第一次取早的；对话按时间去重、新的在前
+    const pairs = {}
+    for (const src of [local.pairs, saved.pairs]) for (const [key, p] of Object.entries(isStore(src) ? src : {})) {
+      if (!p || !Number.isFinite(p.minutes)) continue
+      const q = pairs[key]
+      pairs[key] = q ? { first: Math.min(q.first || p.first, p.first || q.first), minutes: Math.max(q.minutes, p.minutes) } : { first: p.first || 0, minutes: p.minutes }
+    }
+    const seen = new Set(), chats = []
+    for (const c of [...(Array.isArray(local.chats) ? local.chats : []), ...(Array.isArray(saved.chats) ? saved.chats : [])])
+      if (c && Number.isFinite(c.t) && Array.isArray(c.lines) && !seen.has(c.t)) { seen.add(c.t); chats.push(c) }
+    chats.sort((x, y) => y.t - x.t)
+    const out = { ...local, installedAt: pos.length ? Math.min(...pos) : 0, liveSince: live.length ? Math.min(...live) : local.liveSince,
       backfilled: !!(local.backfilled || saved.backfilled), chars }
+    if (Object.keys(pairs).length) out.pairs = pairs
+    if (chats.length) out.chats = chats.slice(0, CHAT_KEEP)
+    return out
   }
 
   // 最近她们聊了什么（第二页最下面）：新的在前，全局留 CHAT_KEEP 段，只存角色和台词
@@ -158,7 +203,7 @@
     return { ...store, chats: [entry, ...(store.chats || [])].slice(0, CHAT_KEEP) }
   }
 
-  const api = { logChat, CHAT_KEEP, empty, recordRound, addMinute, bump, checkMilestones, view, merge, MILESTONES, LEVEL_NAMES, localDay }
+  const api = { logChat, CHAT_KEEP, friendsOf, chatsOf, pairKey, empty, recordRound, addMinute, bump, checkMilestones, view, merge, MILESTONES, LEVEL_NAMES, localDay }
   root.Notebook = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

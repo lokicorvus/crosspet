@@ -214,3 +214,53 @@ test('logChat：新的在前，最多留 30 段，只存角色和台词', () => 
   assert.equal(s.chats[0].t, 1034)
   assert.deepEqual(s.chats[0].lines, [['claude', '第34句'], ['gpt', '嗯']])
 })
+
+test('addMinute 顺带记每一对一起在桌面上的分钟和第一次', () => {
+  let s = N.addMinute(N.empty(0), ['claude', 'gpt', 'grok'], 5000)
+  s = N.addMinute(s, ['claude', 'gpt'], 65000)
+  assert.deepEqual(s.pairs['claude+gpt'], { first: 5000, minutes: 2 })
+  assert.deepEqual(s.pairs['gpt+grok'], { first: 5000, minutes: 1 })
+  assert.deepEqual(s.pairs['claude+grok'], { first: 5000, minutes: 1 })
+  assert.equal(N.addMinute(N.empty(0), ['claude'], 1).pairs, undefined)
+})
+
+const fr = (o) => Object.fromEntries(Object.entries(o).map(([k, points]) => [k, { points }]))
+test('friendsOf：按心数排、同心按一起的分钟，最多 4 个', () => {
+  let s = N.empty(0)
+  s = { ...s, pairs: { 'claude+gpt': { first: 1, minutes: 50 }, 'claude+grok': { first: 2, minutes: 90 } } }
+  const friendship = fr({ 'claude+gpt': 40, 'claude+grok': 40, 'claude+deepseek': 400, 'claude+glm': 10, 'claude+qwen': 5, 'gemini+gpt': 99 })
+  const list = N.friendsOf(s, 'claude', { friendship, installed: ['claude', 'gpt', 'grok', 'deepseek', 'glm', 'qwen', 'gemini'] })
+  assert.deepEqual(list.map(f => f.id), ['deepseek', 'grok', 'gpt', 'glm'])
+  assert.equal(list[0].level, F.level(400))
+  assert.equal(list[1].minutes, 90); assert.equal(list[1].first, 2)
+  assert.equal(list[0].minutes, 0); assert.equal(list[0].first, 0)
+})
+test('friendsOf：没装的角色、0 分的对跳过', () => {
+  const friendship = fr({ 'claude+kimi': 300, 'claude+gpt': 0, 'claude+grok': 20 })
+  assert.deepEqual(N.friendsOf(N.empty(0), 'claude', { friendship, installed: ['claude', 'gpt', 'grok'] }).map(f => f.id), ['grok'])
+})
+test('merge：旧的备份没有 pairs / chats 也能合，各取多的', () => {
+  const local = { ...N.empty(0), pairs: { 'claude+gpt': { first: 50, minutes: 3 } }, chats: [{ t: 2, lines: [['claude', 'a']] }] }
+  const saved = { ...N.empty(0), chars: {} }
+  const m = N.merge(local, saved)
+  assert.deepEqual(m.pairs, local.pairs); assert.deepEqual(m.chats, local.chats)
+  const m2 = N.merge(saved, { ...saved, pairs: { 'claude+gpt': { first: 10, minutes: 1 } } })
+  assert.deepEqual(m2.pairs['claude+gpt'], { first: 10, minutes: 1 })
+  const m3 = N.merge(local, { ...saved, pairs: { 'claude+gpt': { first: 10, minutes: 1 } } })
+  assert.deepEqual(m3.pairs['claude+gpt'], { first: 10, minutes: 3 })
+})
+test('merge：chats 按时间去重、新的在前、留 30 段', () => {
+  const a = Array.from({ length: 20 }, (_, i) => ({ t: i * 2, lines: [['claude', 'x']] }))
+  const b = Array.from({ length: 20 }, (_, i) => ({ t: i * 3, lines: [['claude', 'y']] }))
+  const m = N.merge({ ...N.empty(0), chats: a }, { ...N.empty(0), chats: b })
+  assert.equal(m.chats.length, 30)
+  assert.ok(m.chats.every((c, i) => i === 0 || m.chats[i - 1].t > c.t))
+})
+test('chatsOf：只要她参与的，最近 5 段', () => {
+  let s = N.empty(0)
+  for (let i = 0; i < 8; i++) s = N.logChat(s, [['claude', 'a'], ['gpt', 'b']], i)
+  s = N.logChat(s, [['gpt', 'a'], ['grok', 'b']], 100)
+  const got = N.chatsOf(s, 'claude')
+  assert.equal(got.length, 5); assert.equal(got[0].t, 7)
+  assert.equal(N.chatsOf(s, 'grok').length, 1)
+})
