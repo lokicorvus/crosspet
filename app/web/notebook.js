@@ -151,7 +151,14 @@
       backfilled: !!(local.backfilled || saved.backfilled), chars }
   }
 
-  const api = { empty, recordRound, addMinute, bump, checkMilestones, view, merge, MILESTONES, LEVEL_NAMES, localDay }
+  // 最近她们聊了什么（第二页最下面）：新的在前，全局留 CHAT_KEEP 段，只存角色和台词
+  const CHAT_KEEP = 30
+  function logChat(store, lines, nowMs) {
+    const entry = { t: nowMs, lines: lines.map(([who, text]) => [who, text]) }
+    return { ...store, chats: [entry, ...(store.chats || [])].slice(0, CHAT_KEEP) }
+  }
+
+  const api = { logChat, CHAT_KEEP, empty, recordRound, addMinute, bump, checkMilestones, view, merge, MILESTONES, LEVEL_NAMES, localDay }
   root.Notebook = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

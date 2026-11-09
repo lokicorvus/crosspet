@@ -1,12 +1,24 @@
-// 多桌宠的每对台词：两只都在场、都闲着时偶尔一问一答，按这一对的心数（0–10 颗）分三档说不同的话。
+// 多桌宠的每对台词：两只都在场、都闲着时偶尔一问一答（也有 A → B → A 三句的），按这一对的心数（0–10 颗）分三档说不同的话。
 // 纯函数 + 台词数据；主桌宠页面按 FRIEND_TICK 调 pick，挑中了就让两只先后说（见 index.html「每对台词」）。
 // 穿着皮肤时按皮肤换台词（SKIN_PAIRS / COMBOS / OUTFITS），说话时按台词换一张合适的立绘（poseOf）。
 ;(function (root) {
   // 同一场里两段对话至少隔这么久；每次检查时再按 CHANCE 掷一次，别一到点就说
-  const GAP_MS = 12 * 60_000
+  const GAP_MS = 8 * 60_000
   const CHANCE = 0.35
-  // 第二句隔多久接上
+  // 第二句隔多久接上（旧的固定值，关系升级之外不再用；见 replyAfter）
   const REPLY_MS = 3500
+  // 气泡停多久：按字数，最少 12 秒、最多 20 秒（用户反馈：没留意就演完了）
+  const bubbleMs = text => Math.min(20000, Math.max(12000, 12000 + Math.max(0, [...String(text || '')].length - 6) * 600))
+  // 下一只等前一句显示一阵（字多的久一点）再接话：前一句还在，两个气泡同时在
+  const replyAfter = text => 4000 + Math.min([...String(text || '')].length, 14) * 100
+  // 一段的时间表：[{ who, text, pose, at, ms }]，at 从 0 起
+  function schedule(lines) {
+    let at = 0
+    return lines.map(([who, text, pose, fx], i) => {
+      if (i) at += replyAfter(lines[i - 1][1])
+      return { who, text, pose, fx, at, ms: bubbleMs(text) }
+    })
+  }
   // 0–3 颗心客气生疏，4–7 颗熟络，8–10 颗很亲密
   const tierOf = hearts10 => hearts10 >= 8 ? 2 : hearts10 >= 4 ? 1 : 0
 
@@ -424,7 +436,7 @@
     return { key, tier, id: got.id, lines: withPoses(got.lines) }
   }
 
-  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, LEVEL_POSES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS }
+  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, LEVEL_POSES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS, bubbleMs, replyAfter, schedule }
   root.PairChat = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

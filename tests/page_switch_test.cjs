@@ -379,10 +379,10 @@ const multiCases = [
     const otherId = e.run(`companionsState.pets.find(p => p.character === '${other}').id`)
     assert(calls().length === 1 && calls()[0].companionCall.id === otherId && calls()[0].companionCall.args[0] === otherLine, `companion line: ${JSON.stringify(calls())}`)
     assert(e.run(`__said`).includes(ownLine), `main line: ${JSON.stringify(e.run(`__said`))}`)
-    await e.advance(7000)
+    await e.advance(20000)
     assert(e.state().bubble !== ownLine, 'own line not cleared')
-    // 12 分钟内不再说；之后再说时换一段
-    await e.advance(10 * 60000)
+    // 8 分钟内不再说；之后再说时换一段
+    await e.advance(6 * 60000)
     assert(calls().length === 1, `chatted again too soon: ${calls().length}`)
     await e.advance(3 * 60000)
     const later = e.msgs().filter(m => m.companionCall?.fn === 'chat').length + (e.state().bubble ? 1 : 0)
@@ -427,8 +427,10 @@ const multiCases = [
     assert(c.state().bubble === '一起喝茶？', `companion bubble: ${c.state().bubble}`)
     assert(c.state().pose === before, `no look given but pose changed: ${c.state().pose}`)
     await c.advance(6500)
+    assert(c.state().bubble === '一起喝茶？', 'companion chat cleared before 12s')
+    await c.advance(6000)
     assert(c.state().bubble !== '一起喝茶？', 'companion chat not cleared')
-    // 带立绘：说的时候换上，6 秒后回到常态；不带干活的特效（happy 平时配清单彩带）
+    // 带立绘：说的时候换上，气泡收起时回到常态；不带干活的特效（happy 平时配清单彩带）
     c.run(`chat('好耶 :3', 'happy')`)
     assert(c.state().pose === 'happy', `chat look: ${c.state().pose}`)
     await c.advance(300)
@@ -436,7 +438,7 @@ const multiCases = [
     c.run(`chat('好朋友！', 'proud', 'friend_up')`)
     await c.advance(300)
     assert(c.run(`$('fx').innerHTML`).includes(c.run(`CrossFx.surroundings('friend_up')`)), 'companion level-up fx not hearts')
-    await c.advance(6500)
+    await c.advance(12500)
     assert(c.state().pose !== 'happy', `chat look not reverted: ${c.state().pose}`)
     c.run(`chat('乱写的', 'nope')`)
     assert(c.state().pose !== 'nope', 'unknown look applied')

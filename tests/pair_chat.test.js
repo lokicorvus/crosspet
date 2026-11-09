@@ -12,9 +12,10 @@ const CHARS = fs.readdirSync(DIR).filter(id => {
 const seq = list => { let i = 0; return () => list[i++ % list.length] }
 const POSES = ['happy', 'listening', 'puffed', 'pat']
 // 一段：两句、两个人各说一句、都是这一对里的人、每句不长（气泡放得下），写了立绘的必须是认得的
+// 一段两句或三句（A → B → A），相邻两句不是同一个人
 function checkExchange(key, who, lines) {
-  assert.equal(lines.length, 2, key)
-  assert.notEqual(lines[0][0], lines[1][0], `${key} 同一个人自问自答`)
+  assert.ok(lines.length === 2 || lines.length === 3, `${key} 一段 ${lines.length} 句`)
+  for (let i = 1; i < lines.length; i++) assert.notEqual(lines[i - 1][0], lines[i][0], `${key} 同一个人自问自答`)
   for (const [w, text, pose] of lines) {
     assert.ok(who.includes(w), `${key} 里出现了 ${w}`)
     assert.ok(typeof text === 'string' && text.length > 0 && text.length <= 14, `${key} 这句太长：${text}`)
@@ -45,7 +46,7 @@ test('心数分档：0–3 / 4–7 / 8–10', () => {
 
 const base = { present: ['claude', 'gpt'], hearts10: () => 0, nowMs: 100 * 60_000, lastAt: 0 }
 
-test('离上次不到 12 分钟、掷没中、凑不出一对闲着的：不说', () => {
+test('离上次不到 8 分钟、掷没中、凑不出一对闲着的：不说', () => {
   assert.equal(P.pick({ ...base, lastAt: base.nowMs - P.GAP_MS + 1, rnd: () => 0 }), null)
   assert.equal(P.pick({ ...base, rnd: () => P.CHANCE }), null)
   assert.equal(P.pick({ ...base, busy: ['gpt'], rnd: () => 0 }), null)
@@ -168,4 +169,21 @@ test('levelUp：升了级没演过才演；只演最高那档；在忙的不算�
   assert.equal(P.levelUp({ ...base, levelOf: () => 2, shownOf: () => 2 }), null)
   assert.equal(P.levelUp({ ...base, busy: ['grok'], levelOf: k => k === 'gpt+grok' ? 1 : 0 }), null)
   assert.equal(P.levelUp({ ...base, levelOf: () => 3, shownOf: () => 1 }).level, 3)
+})
+
+test('闲聊间隔至少 8 分钟', () => { assert.equal(P.GAP_MS, 8 * 60_000) })
+
+test('气泡停留按字数：最少 12 秒、最多 20 秒', () => {
+  assert.equal(P.bubbleMs('你好'), 12000)
+  assert.equal(P.bubbleMs('一二三四五六七八九十一二三四'), 16800)
+  assert.equal(P.bubbleMs('字'.repeat(40)), 20000)
+})
+
+test('一段的时间表：后一句等前一句显示一阵再接', () => {
+  const lines = [['claude', '吃了吗？'], ['deepseek', '吃了三碗白米饭！'], ['claude', '……']]
+  const s = P.schedule(lines)
+  assert.deepEqual(s.map(x => x.at), [0, P.replyAfter('吃了吗？'), P.replyAfter('吃了吗？') + P.replyAfter('吃了三碗白米饭！')])
+  assert.deepEqual(s.map(x => x.ms), lines.map(([, t]) => P.bubbleMs(t)))
+  assert.equal(P.replyAfter('吃了吗？'), 4400)
+  assert.equal(P.replyAfter('字'.repeat(30)), 5400)
 })

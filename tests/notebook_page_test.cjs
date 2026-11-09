@@ -124,6 +124,19 @@ const cases = [
     assert(c.run(`localStorage.getItem('crosspet-notebook')`) === null, 'companion wrote the notebook')
     assert(!c.msgs().some(m => m.notebookStore || m.notebookBackfill), 'companion did notebook work')
   }],
+  ['pair_chat_logged_and_lingers', async e => {
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false; Math.random = () => 0; pairChatAt = 0; tryPairChat()`)
+    await e.advance(11000)
+    const st = e.state()
+    assert(st.bubble !== '', 'bubble gone before 11s')
+    await e.advance(30000)
+    const chats = e.run(`noteStore().chats`)
+    assert(chats && chats.length === 1 && chats[0].lines.length >= 2, JSON.stringify(chats))
+    const calls = e.msgs().filter(m => m.companionCall && m.companionCall.fn === 'chat')
+    assert(calls.length >= 1 && calls[0].companionCall.args[3] >= 12000, JSON.stringify(calls))
+  }],
 ]
 
 function assert(ok, msg) { if (!ok) throw Error(msg) }

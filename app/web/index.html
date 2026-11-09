@@ -2016,6 +2016,11 @@ function noteNotebookEvent(ch, s) {
   if (noteOpenAt[ch] != null) return
   if (NOTE_START.has(ev) || (s.pose && !NOTE_RESTING.has(s.pose) && ev !== 'SessionEnd' && ev !== 'SessionStart')) noteOpenAt[ch] = ms
 }
+// 说完的一段对话记进小本子（只主桌宠记）
+function noteChat(lines) {
+  if (role !== 'main') return
+  noteStoreWrite(Notebook.logChat(noteStore(), lines, Date.now()))
+}
 function noteBump(ch, kind) {
   if (role !== 'main' || !ch) return
   const nowMs = Date.now()
@@ -2061,7 +2066,7 @@ function tryPairChat() {
     if (up) {
       pairChatAt = nowMs
       friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
-      up.lines.forEach(([who, line, pose, fx], i) => setTimeout(() => chatAs(who, line, pose, fx), i * PairChat.REPLY_MS))
+      speak(up.lines)
       return
     }
   }
@@ -2071,20 +2076,31 @@ function tryPairChat() {
   pairChatAt = nowMs
   pairChatRecent.push(got.id)
   if (pairChatRecent.length > 12) pairChatRecent.shift()
-  got.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
+  speak(got.lines)
 }
-function chatAs(character, line, pose, fx) {
+// 放一段对话：按 PairChat.schedule 一句句说（气泡按字数停 12–20 秒，后一句等前一句显示一阵再接），整段记进小本子「最近她们聊了什么」
+// lines：[[谁, 说什么, 立绘或 null, 特效?]]。speakingUntil：这段说完的时间（反应、群聊看它，别插嘴）
+let speakingUntil = 0
+function speak(lines) {
+  if (!lines || !lines.length) return
+  const plan = PairChat.schedule(lines)
+  for (const x of plan) setTimeout(() => chatAs(x.who, x.text, x.pose, x.fx, x.ms), x.at)
+  const last = plan[plan.length - 1]
+  speakingUntil = Date.now() + last.at + last.ms
+  noteChat(lines)
+}
+function chatAs(character, line, pose, fx, ms) {
   if (!friendshipOn()) return
-  if (character === mainCharacter()) { chat(line, pose, fx); return }
+  if (character === mainCharacter()) { chat(line, pose, fx, ms); return }
   const p = companionsState?.pets.find(x => x.character === character)
-  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: fx ? [line, pose || null, fx] : [line, pose || null] } })
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null, fx || null, ms || PairChat.bubbleMs(line)] } })
 }
-// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
-// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换。
+// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；ms 后收起（没给按字数，PairChat.bubbleMs；气泡已经换成别的话就不管）。
+// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），收起时回到常态；缩在边上时不换。
 // fx：换上 look 时改用这个特效（关系升级：飘心）；没给就不要特效——这些图平时配的是干活的特效（清单、奖杯、对话卡片），聊天时看着像在偷偷干活
-const CHAT_MS = 6000
 let chatTimer = null
-function chat(line, look, fx) {
+function chat(line, look, fx, ms) {
+  const CHAT_MS = Number.isFinite(ms) && ms > 0 ? ms : PairChat.bubbleMs(line)
   if (egg || farewellLine !== null || updatingNow || aiActivity() || typeof line !== 'string') return
   if (typeof look === 'string' && MOTION[look] && !tucked) {
     clearTimeout(pending); clearTimeout(revertTimer)

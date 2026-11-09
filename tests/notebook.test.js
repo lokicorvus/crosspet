@@ -206,3 +206,11 @@ test('写函数都不改入参', () => {
   assert.equal(JSON.stringify(s), snap)
   assert.equal(JSON.stringify(r), snap2)
 })
+
+test('logChat：新的在前，最多留 30 段，只存角色和台词', () => {
+  let s = N.empty(0)
+  for (let i = 0; i < 35; i++) s = N.logChat(s, [['claude', `第${i}句`, 'happy'], ['gpt', '嗯', null]], 1000 + i)
+  assert.equal(s.chats.length, 30)
+  assert.equal(s.chats[0].t, 1034)
+  assert.deepEqual(s.chats[0].lines, [['claude', '第34句'], ['gpt', '嗯']])
+})
