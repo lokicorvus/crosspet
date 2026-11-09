@@ -24,7 +24,7 @@ function checkExchange(key, who, lines) {
 }
 const skinOf = id => { try { return JSON.parse(fs.readFileSync(path.join(DIR, id, 'character.json'), 'utf8')).skinOf } catch { return undefined } }
 
-test('每一对都有台词：三档、每档至少两段，每段一问一答、两个人各说一句', () => {
+test('每一对都有台词：三档、每档至少六段（有三句来回的），两个人轮着说、不重复', () => {
   assert.ok(CHARS.length >= 7)
   for (let i = 0; i < CHARS.length; i++) for (let j = i + 1; j < CHARS.length; j++) {
     const key = F.pairKey(CHARS[i], CHARS[j])
@@ -33,9 +33,12 @@ test('每一对都有台词：三档、每档至少两段，每段一问一答�
     assert.ok(tiers, `缺 ${key}`)
     assert.equal(tiers.length, 3, key)
     for (const tier of tiers) {
-      assert.ok(tier.length >= 2, key)
+      assert.ok(tier.length >= 6, `${key} 一档只有 ${tier.length} 段`)
+      assert.ok(tier.some(lines => lines.length === 3), `${key} 一档没有三句来回的`)
       for (const lines of tier) checkExchange(key, key.split('+'), lines)
     }
+    const said = tiers.flat().flat().map(([, t]) => t)
+    assert.equal(new Set(said).size, said.length, `${key} 有重复的句子：${said.filter((t, i) => said.indexOf(t) !== i)}`)
   }
   assert.equal(Object.keys(P.LINES).length, CHARS.length * (CHARS.length - 1) / 2, '不该有多余的对')
 })
@@ -61,7 +64,8 @@ test('挑中：按心数拿那一档；最近说过的不重复（全说过了�
   assert.equal(high.tier, 2)
   const next = P.pick({ ...base, recent: [low.id], rnd: () => 0 })
   assert.equal(next.id, 'claude+gpt/0/1')
-  const again = P.pick({ ...base, recent: ['claude+gpt/0/0', 'claude+gpt/0/1'], rnd: () => 0 })
+  const all = P.LINES['claude+gpt'][0].map((_, i) => `claude+gpt/0/${i}`)
+  const again = P.pick({ ...base, recent: all, rnd: () => 0 })
   assert.equal(again.id, 'claude+gpt/0/0')
 })
 
