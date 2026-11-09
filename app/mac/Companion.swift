@@ -89,7 +89,7 @@ final class Companion: NSObject, WKNavigationDelegate {
             self.js(String(format: "handleClick('pat', %.1f, %.1f)", p.x / z, (drag.bounds.height - p.y) / z))
         }
         drag.onMenu = { [weak self, weak drag] e in if let self, let drag { self.showMenu(e, in: drag) } }
-        drag.onDragStart = { [weak self] in self?.undock() }
+        drag.onDragStart = { [weak self] in self?.app.closeNotebook(); self?.undock() }
         drag.onDragEnd = { [weak self] in self?.checkDock() }
         drag.onShake = { [weak self] in self?.js("shaken()") }
         drag.topRoom = { [weak self] in self.map { s in (s.hitRects.map(\.minY).min() ?? 0) * s.web.pageZoom } ?? 0 }   // 可点区域是画布坐标（左上角起），× 人物大小 = 窗口里的点
@@ -151,6 +151,9 @@ final class Companion: NSObject, WKNavigationDelegate {
     func handleMessage(_ body: Any) {
         guard let d = body as? [String: Any] else { return }
         if d["patted"] as? Bool == true { app.js("notePat(\(app.quote(character)))") }
+        // 戳一下、惹她生气：记进小本子（同摸头，只在主桌宠页面记）
+        if d["poked"] as? Bool == true { app.js("notePoke(\(app.quote(character)))") }
+        if d["angered"] as? Bool == true { app.js("noteAngry(\(app.quote(character)))") }
         if d["gone"] as? Bool == true { close() }
     }
 
@@ -184,6 +187,7 @@ final class Companion: NSObject, WKNavigationDelegate {
     func leave() {
         guard !leaving, !closed else { return }
         leaving = true
+        if app.notebookOwner == id { app.closeNotebook() }   // 她的小本子跟着收起
         js("leaveNow()")
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in self?.close() }
     }
@@ -214,7 +218,7 @@ final class Companion: NSObject, WKNavigationDelegate {
 
     func showMenu(_ event: NSEvent, in view: NSView) {
         let menu = NSMenu()
-        for (title, action) in [("摸摸头", #selector(pat)), ("戳一下", #selector(poke)), ("让她先回去", #selector(sendHome))] as [(String, Selector)] {
+        for (title, action) in [("摸摸头", #selector(pat)), ("戳一下", #selector(poke)), ("我们的小本子", #selector(openNotebook)), ("让她先回去", #selector(sendHome))] as [(String, Selector)] {
             let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
             item.target = self
             menu.addItem(item)
@@ -242,6 +246,7 @@ final class Companion: NSObject, WKNavigationDelegate {
     }
     @objc func pat() { js("handleClick('pat')") }
     @objc func poke() { js("handleClick('poke')") }
+    @objc func openNotebook() { app.openNotebook(character: character, near: panel.frame, owner: id) }
     /// 让她先回去：交给主桌宠页面判（她这个客户端开始新的一轮活之前不再出现），页面再发 companionLeave 让她走
     @objc func sendHome() { app.js("sendHome(\(app.quote(id)))") }
     @objc func openSettings() { app.openSettings() }

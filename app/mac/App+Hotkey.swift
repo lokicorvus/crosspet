@@ -33,6 +33,7 @@ extension App {
     @objc func toggleHidden() { setUserHidden(!userHidden) }
     func setUserHidden(_ hidden: Bool) {
         userHidden = hidden   // 透明度 / 鼠标 / 动画在 didSet 里处理，不 orderOut（见 applyHiddenState）
+        if hidden { closeNotebook() }   // 藏起来：小本子也收起
         if !hidden {
             fullscreenOverride = true; hiddenForFullscreen = false   // 你主动叫她：全屏时也先出来
             panel.orderFrontRegardless()

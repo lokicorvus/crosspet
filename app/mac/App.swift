@@ -136,6 +136,15 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     var companionTarget = 0                   // 这一轮主桌宠页面发来的列表里一共几只额外桌宠：新开的那只按这个数排格子（companionOrigin）
     var eggAllowed = true                     // 有别的桌宠在场时页面发 false：右键「召唤彩蛋」变灰
     var friendshipRows: [Any] = []            // 主桌宠页面最后一次发来的友谊行，设置页显示
+    // 小本子（App+Notebook.swift）
+    var notebookPanel: NSPanel?
+    var notebookWeb: WKWebView?
+    var notebookCharacter: String?           // 面板上是谁的小本子
+    var notebookOwner: String?               // 谁的右键打开的："main" 或额外那只的 id
+    var notebookNear = NSRect.zero           // 打开时她窗口的位置（摆面板用）
+    var notebookMonitors: [Any] = []         // 点外面收起的监听
+    var notebookClosing = false
+    var notebookBackfilling = false
     var clientStateSeen: Set<String> = []     // 读到过按客户端状态（<角色>@<客户端>-state.json）的角色
     var clientStates: [String: (text: String, at: Date)] = [:]   // key → 最后一次按客户端的状态（新开的窗口先演上）
     var charStates: [String: (text: String, at: Date)] = [:]     // 角色 → 最后一次按角色的状态（旧钩子没有按客户端的那份时给额外那只）
@@ -192,7 +201,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             self.js(String(format: "handleClick('pat', %.1f, %.1f)", p.x / z, (drag.bounds.height - p.y) / z))
         }
         drag.onMenu = { [weak self] e in self?.showMenu(e, in: drag) }
-        drag.onDragStart = { [weak self] in self?.undock() }
+        drag.onDragStart = { [weak self] in self?.closeNotebook(); self?.undock() }   // 拖她：小本子收起
         drag.onDragEnd = { [weak self] in self?.checkDock() }
         drag.onShake = { [weak self] in self?.js("shaken()") }
         drag.topRoom = { [weak self] in self.map { s in (s.hitRects.map(\.minY).min() ?? 0) * s.web.pageZoom } ?? 0 }   // 可点区域是画布坐标（左上角起），× 人物大小 = 窗口里的点
