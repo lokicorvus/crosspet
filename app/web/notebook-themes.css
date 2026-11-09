@@ -1,0 +1,238 @@
+/* 小本子面板：七套角色主题。定稿原型 build/notebook-preview.html（不入库）。
+   角色字体只用在标题、分隔标题、批注、落款；正文和数字用系统字体。字体是按用到的字子集化的（tools/build-notebook-fonts.py），
+   子集里没有的字自动回退到后面的系统字体。 */
+@font-face { font-family: "Notebook Kai"; src: local("LXGW WenKai"), url("fonts/notebook/notebook-kai.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "ZCOOL KuaiLe"; src: local("ZCOOL KuaiLe"), url("fonts/notebook/zcool-kuaile.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "ZCOOL XiaoWei"; src: local("ZCOOL XiaoWei"), url("fonts/notebook/zcool-xiaowei.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "ZCOOL QingKe HuangYou"; src: local("ZCOOL QingKe HuangYou"), url("fonts/notebook/zcool-qingke-huangyou.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "Ma Shan Zheng"; src: local("Ma Shan Zheng"), url("fonts/notebook/ma-shan-zheng.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "Long Cang"; src: local("Long Cang"), url("fonts/notebook/long-cang.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "Zhi Mang Xing"; src: local("Zhi Mang Xing"), url("fonts/notebook/zhi-mang-xing.woff2") format("woff2"); font-display: block; }
+
+html, body { margin: 0; background: transparent; }
+body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Microsoft YaHei UI", "Segoe UI", sans-serif; color: #333;
+  overflow: hidden; -webkit-user-select: none; user-select: none; cursor: default; }
+* { box-sizing: border-box; }
+
+/* ================= 共用骨架 ================= */
+.wrap { width: 364px; filter: var(--drop, drop-shadow(0 12px 18px rgba(60,40,30,.22)) drop-shadow(0 2px 3px rgba(60,40,30,.12))); }
+.nb { position: relative; isolation: isolate; font-size: 12.5px; line-height: 1.45; color: var(--ink); background: var(--paper); border-radius: var(--radius, 18px); overflow: hidden; }
+.nb .bg, .nb .fg { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; overflow: hidden; }
+.nb .bg { z-index: -1; }
+.nb .fg { z-index: 3; }
+.nb .bg > svg, .nb .fg > svg { position: absolute; }
+.nb .sheet { position: relative; padding: 20px 22px 16px; }
+.nb .close { position: absolute; top: 10px; right: 10px; z-index: 4; width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 17px; line-height: 26px; cursor: pointer; }
+.nb .close:hover { background: var(--tint); color: var(--ink); }
+
+.nb .hd { position: relative; padding-right: var(--hd-pad, 112px); min-height: 70px; }
+.t-qwen { --hd-pad: 0; }
+.nb .kicker { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .14em; color: var(--accent); font-weight: 600; }
+.nb .kicker svg { width: 14px; height: 14px; flex: none; }
+.nb .title { margin: 4px 0 2px; font-size: var(--title-size, 19px); font-weight: var(--title-weight, 700); letter-spacing: .02em; font-family: var(--title-font, inherit); color: var(--title, var(--ink)); }
+.nb .meta { color: var(--muted); font-size: 12px; }
+.nb .meta b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.nb .stats { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin: 16px 0 14px; }
+.nb .stat { position: relative; padding: 10px 10px 9px; border-radius: 12px; background: var(--tile); border: 1px solid var(--line); }
+.nb .stat .n { font-family: var(--num-font, inherit); font-size: 23px; font-weight: 700; line-height: 1.1; color: var(--num, var(--ink)); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.nb .stat .n small { font-size: 11px; font-weight: 600; margin-left: 2px; color: var(--muted); letter-spacing: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei UI", sans-serif; }
+.nb .stat .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.nb dl { margin: 0; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 6px; }
+.nb dt { color: var(--muted); }
+.nb dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.nb dd .dim { color: var(--muted); }
+
+.nb .rule { font-family: var(--label-font, inherit); font-size: var(--label-size, 11px) !important; display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: .12em; }
+.nb .rule:before, .nb .rule:after { content: ""; flex: 1; height: var(--rule-h, 1px); background: var(--rule, var(--line)); }
+.nb .rule svg { width: 13px; height: 13px; }
+
+.nb .friend { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 12px; background: var(--tile); border: 1px solid var(--line); }
+.nb .friend img { width: 38px; height: 38px; border-radius: 50%; background: var(--paper-solid, #fff); border: 2px solid var(--avatar-ring, #fff); object-fit: cover; box-shadow: 0 1px 3px #0002; }
+.nb .friend .who { font-weight: 600; }
+.nb .friend .rel { font-size: 11px; color: var(--muted); }
+.nb .hearts { margin-left: auto; display: flex; gap: 1px; flex: none; }
+.nb .friend > div:nth-child(2) { min-width: 0; white-space: nowrap; }
+.nb .hearts svg { width: 12px; height: 12px; }
+.nb .friend .num { margin-left: 6px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.nb .ms { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.nb .ms li { display: flex; align-items: center; gap: 9px; }
+.nb .ms .badge { width: 22px; height: 22px; flex: none; display: grid; place-items: center; background: var(--badge-bg, var(--tint)); color: var(--accent); clip-path: var(--badge-clip, circle(50%)); }
+.nb .ms .badge svg { width: 12px; height: 12px; }
+.nb .ms .date { margin-left: auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.nb .ms li.new .badge { background: var(--accent); color: var(--paper-solid, #fff); }
+.nb .ms li.new .t { font-weight: 600; }
+
+.nb .foot { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line-strong, var(--line)); color: var(--muted); font-size: 11px; text-align: center; }
+.nb .note { position: absolute; right: -6px; top: -13px; font-family: var(--hand); font-size: var(--note-size, 15px); color: var(--note, var(--accent)); transform: rotate(-8deg); white-space: nowrap; pointer-events: none; }
+.nb .sign { display: block; text-align: right; margin: 6px 4px 2px 0; font-family: var(--hand); font-size: var(--note-size, 15px); color: var(--note, var(--accent)); transform: rotate(-3deg); transform-origin: right; }
+.nb .ring { position: absolute; left: 0; top: 0; width: 100%; height: 44px; pointer-events: none; }
+.wrap { position: relative; }
+.nb .foot b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+@keyframes tw { 50% { opacity: .15; } }
+.tw { animation: tw 2.6s ease-in-out infinite; }
+
+/* ======================= Claude：皮面手账 ======================= */
+.t-claude { --title-font: "Notebook Kai", "Kaiti SC", serif; --hand: "Notebook Kai", "Kaiti SC", serif; --label-font: "Notebook Kai", serif; --label-size: 12.5px; --title-size: 20px; --hd-pad: 92px; --note: #8d6a50; --radius: 16px; --paper: radial-gradient(140% 80% at 30% 0%, #9a6440, #6d3f26 70%, #5e351f); --paper-solid: #fbf3e2;
+  --ink: #4c3122; --muted: #977a63; --accent: #b25a32; --num: #8d4524; --title: #5a321f;
+  --tile: #fffaf0; --line: #e4d0ab; --line-strong: #d6bb8e; --tint: #f1e1c2; --num-font: "Iowan Old Style", "Palatino", Georgia, serif; 
+  --badge-bg: #ecd7b4; --rule: linear-gradient(90deg, transparent, #cfae7a 30%, #cfae7a 70%, transparent); padding: 10px; }
+.t-claude .sheet { border-radius: 9px; padding: 22px 22px 16px 34px;
+  background:
+    linear-gradient(90deg, transparent 22px, #e8a68a 22px 23px, transparent 23px 25px, #e8a68a 25px 26px, transparent 26px),
+    repeating-linear-gradient(180deg, transparent 0 23px, #efe2c6 23px 24px),
+    linear-gradient(175deg, #fffbf1, #f8eed8);
+  outline: 1.5px dashed #c99a6a; outline-offset: 4px; box-shadow: inset 0 0 18px #c9a46a33; }
+.t-claude .close { top: 4px; right: 4px; }
+.t-claude .stat { border-color: #e1c99e; background: #fffaf0; box-shadow: 2px 2px 0 #ecdcbc; border-radius: 4px; }
+.t-claude .ribbon { position: absolute; top: -22px; left: -30px; width: 14px; height: 74px; z-index: 2; background: linear-gradient(90deg, #a8462a, #d06a3f 55%, #a8462a); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 86%, 0 100%); filter: drop-shadow(0 2px 2px #5a2a1460); }
+.t-claude .title { padding-bottom: 7px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='8'%3E%3Cpath d='M2 4c20-5 36 5 56 0s38-5 60 0' fill='none' stroke='%23c98a5a' stroke-width='1.2'/%3E%3C/svg%3E") 0 100% no-repeat; }
+
+/* ======================= DeepSeek：浅海 ======================= */
+.t-deepseek { --title-font: "ZCOOL KuaiLe", sans-serif; --hand: "ZCOOL KuaiLe", sans-serif; --label-font: "ZCOOL KuaiLe", sans-serif; --label-size: 13px; --title-size: 23px; --title-weight: 400; --note: #2c7fc0; --radius: 24px; --paper: linear-gradient(180deg, #f1fbff 0%, #dcf2fb 55%, #c5e7f6 100%); --paper-solid: #f3fbff;
+  --ink: #1b4864; --muted: #5f8ca5; --accent: #2582b6; --num: #1a6596; --title: #134a6e;
+  --tile: #ffffffa8; --line: #c6e5f3; --line-strong: #a9d6ec; --tint: #d5eff9; --avatar-ring: #bfe3f3;
+  --rule: radial-gradient(circle, #8fcbe6 1.6px, transparent 2.2px) 0 50% / 9px 6px repeat-x; --rule-h: 6px; }
+.t-deepseek .sheet { padding-top: 30px; }
+.t-deepseek .stats { gap: 6px; justify-items: center; }
+.t-deepseek .stat { width: 92px; height: 92px; border-radius: 50%; display: grid; align-content: center; text-align: center; padding: 0;
+  background: radial-gradient(circle at 30% 24%, #fff 0 9%, #ffffffd0 18%, #eaf8fecc 52%, #cbeaf7cc 100%); border: 1px solid #b3dcef; box-shadow: inset -6px -8px 14px #9fd3ea55, 0 4px 10px -4px #2582b640; }
+.t-deepseek .bubble { position: absolute; bottom: -14px; border: 1px solid #ffffffd9; border-radius: 50%; background: radial-gradient(circle at 32% 30%, #fff, #ffffff30 62%); animation: rise linear infinite; }
+@keyframes rise { 0% { transform: translate(0, 0); opacity: 0; } 10% { opacity: .9; } 100% { transform: translate(10px, -640px); opacity: 0; } }
+.t-deepseek .ms .badge { background: radial-gradient(circle at 32% 30%, #fff, #cdeaf7 70%); }
+
+/* ======================= GPT：冰晶 ======================= */
+.t-gpt { --title-font: "ZCOOL XiaoWei", serif; --hand: "ZCOOL XiaoWei", serif; --label-font: "ZCOOL XiaoWei", serif; --label-size: 13px; --title-size: 22px; --title-weight: 400; --note: #6880aa; --note-size: 14px; --radius: 0; --paper: linear-gradient(155deg, #ffffff 0%, #f1f6fc 45%, #e3edf8 100%); --paper-solid: #fff;
+  --ink: #2f4566; --muted: #7b90ad; --accent: #5577b2; --num: #33558c; --title: #263f68;
+  --tile: linear-gradient(160deg, #ffffffe6, #e9f1fae6); --line: #d3e0ef; --line-strong: #c3d4e8; --tint: #e3edf9;
+  --badge-clip: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); --badge-bg: #dfe9f6;
+  --rule: linear-gradient(90deg, transparent, #b9cce4, transparent);
+  clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px); }
+.t-gpt .stat { border: 0; border-radius: 0; text-align: center; padding: 11px 6px 10px;
+  clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%); background: linear-gradient(160deg, #fff 10%, #d6e2f3); }
+
+/* ======================= Gemini：星夜 ======================= */
+.t-gemini { --title-font: "ZCOOL QingKe HuangYou", sans-serif; --hand: "ZCOOL QingKe HuangYou", sans-serif; --label-font: "ZCOOL QingKe HuangYou", sans-serif; --label-size: 14px; --title-size: 24px; --title-weight: 400; --note: #ffd88f; --radius: 20px; --paper: radial-gradient(90% 60% at 100% 0%, #6a4bb0 0%, transparent 60%), radial-gradient(80% 50% at 0% 100%, #6b3d8f88 0%, transparent 70%), linear-gradient(170deg, #2e2763, #1f1b48 60%, #1a1640);
+  --paper-solid: #241f52; --ink: #efeaff; --muted: #aea4d8; --accent: #f4cb7f; --num: #fff;
+  --tile: linear-gradient(180deg, #ffffff17, #ffffff08); --line: #ffffff22; --line-strong: #ffffff30; --tint: #ffffff1c; --avatar-ring: #f4cb7f;
+  --badge-clip: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); --badge-bg: #ffffff2a;
+  --rule: linear-gradient(90deg, transparent, #f4cb7f88, transparent); }
+.t-gemini .title { background: linear-gradient(90deg, #fff3d6, #f4cb7f 60%, #e9a96a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.t-gemini .stat { border-top-color: #f4cb7f66; }
+.t-gemini .stat:after { content: ""; position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; background: #f4cb7f; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.t-gemini .ms li.new .badge { color: #2a2358; }
+
+/* ======================= GLM：狐狸掌柜的流水账 ======================= */
+.t-glm { --title-font: "Ma Shan Zheng", "Kaiti SC", serif; --hand: "Ma Shan Zheng", "Kaiti SC", serif; --label-font: "Ma Shan Zheng", serif; --label-size: 15px; --title-size: 23px; --hd-pad: 100px; --title-weight: 400; --note: #b8322a; --note-size: 17px;
+  --radius: 6px; --paper: repeating-linear-gradient(180deg, transparent 0 25px, #f0d9cf 25px 26px), linear-gradient(180deg, #fdf8ec, #f8efdc); --paper-solid: #fdf8ec;
+  --ink: #2c3150; --muted: #8a8296; --accent: #b8322a; --num: #2c3a6e; --title: #2c3150;
+  --tile: #fffdf6; --line: #e8cfc3; --line-strong: #dcb8a8; --tint: #f6e6dc; --badge-bg: #f3e2c0; --avatar-ring: #b8322a;
+  --rule: linear-gradient(#b8322a, #b8322a) 0 1px / 100% 1px no-repeat, linear-gradient(#b8322a, #b8322a) 0 4px / 100% 1px no-repeat; --rule-h: 6px; }
+.t-glm .sheet { padding: 22px 26px 18px; }
+.t-glm .stat { border-radius: 2px; border: 1px solid #e3c4b6; border-top: 3px double #b8322a; text-align: center; }
+.t-glm .ms .badge { clip-path: none; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #c9a24a; background: radial-gradient(circle, #fdf8ec 0 3px, #f3e2c0 3.5px); color: #8a5a1c; }
+.t-glm .ms li.new .badge { background: #b8322a; color: #fff; box-shadow: inset 0 0 0 1.5px #e3b866; }
+.t-glm .frame { position: absolute; inset: 7px; border: 2px solid #b8322a; border-radius: 3px; box-shadow: inset 0 0 0 2px #fdf8ec, inset 0 0 0 3px #b8322a99; }
+
+/* ======================= Grok：毒舌批改本 ======================= */
+.t-grok { --radius: 12px; --paper: radial-gradient(circle, #ffffff12 1px, transparent 1.3px) 0 0 / 14px 14px, linear-gradient(175deg, #1d1c21, #141317);
+  --paper-solid: #17161a; --ink: #ecebef; --muted: #98969f; --accent: #ef4a4a; --num: #fff; --title: #fff;
+  --tile: #ffffff08; --line: #ffffff1c; --line-strong: #ffffff2c; --tint: #ffffff14; --avatar-ring: #ef4a4a; --badge-bg: transparent;
+  --num-font: "SF Mono", "Menlo", "Consolas", monospace; --hand: "Long Cang", "Kaiti SC", cursive; --note: #ff5a5a; --note-size: 17px;
+  --rule: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='6'%3E%3Cpath d='M0 3q3-3 6 0t6 0 6 0 6 0' fill='none' stroke='%23ef4a4a' stroke-width='1.2' opacity='.75'/%3E%3C/svg%3E") repeat-x 0 50% / 24px 6px; --rule-h: 6px; }
+.wrap:has(.t-grok) { --drop: drop-shadow(0 14px 18px rgba(0,0,0,.35)) drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
+.t-grok .title { text-decoration: underline wavy #ef4a4a; text-decoration-thickness: 1.5px; text-underline-offset: 6px; text-decoration-skip-ink: none; }
+.t-grok .stat { border-radius: 6px; border-style: dashed; border-color: #ffffff2a; }
+.t-grok .stat .n { font-size: 21px; letter-spacing: -.03em; }
+.t-grok .ms .badge { clip-path: none; border-radius: 50%; box-shadow: inset 0 0 0 1.5px #ef4a4a; color: #ef4a4a; }
+.t-grok .ms li.new .badge { background: #ef4a4a; color: #fff; }
+.t-grok .tape { position: absolute; width: 74px; height: 18px; background: repeating-linear-gradient(-45deg, #e8c46a8c 0 6px, #e8c46a55 6px 12px); box-shadow: 0 1px 2px #0005; }
+
+/* ======================= 千问：扇面 ======================= */
+.t-qwen { --hand: "Zhi Mang Xing", "Kaiti SC", serif; --label-font: "Zhi Mang Xing", serif; --label-size: 15px; --title-size: 28px; --title-weight: 400; --note: #c23b2e; --note-size: 18px; --radius: 8px; --paper: linear-gradient(180deg, #fdfaf2, #f7f0e1); --paper-solid: #fdfaf2;
+  --ink: #2f3557; --muted: #8d8a9c; --accent: #3e4c9c; --num: #2d3b8a; --title: #26306b;
+  --tile: #fffdf7; --line: #e7dcc3; --line-strong: #d9c79e; --tint: #ecebf6; --badge-bg: #e9eaf6;
+  --badge-clip: inset(0 round 3px); --title-font: "Zhi Mang Xing", "Kaiti SC", serif; --num-font: "Iowan Old Style", Georgia, serif;
+  --rule: linear-gradient(90deg, transparent, #c9a24a, transparent); }
+.t-qwen .sheet { padding-top: 12px; }
+.t-qwen .hd { text-align: center; }
+.t-qwen .kicker { justify-content: center; }
+.t-qwen .title { letter-spacing: .08em; }
+.t-qwen .fan { display: block; width: 260px; height: 122px; margin: 0 auto -2px; }
+.t-qwen .seal { position: absolute; right: 4px; top: 124px; width: 26px; padding: 4px 0; display: grid; place-items: center; writing-mode: vertical-rl; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 13px; font-weight: 700; color: #fff; background: #c23b2e; border-radius: 3px; transform: rotate(-6deg); box-shadow: inset 0 0 0 2px #c23b2e, inset 0 0 0 3px #f6d9d0; letter-spacing: 2px; }
+.t-qwen .stat { border-radius: 0; text-align: center; background: #fffdf7; border: 0; box-shadow: inset 0 0 0 1px #d9c79e, inset 0 0 0 4px #fffdf7, inset 0 0 0 5px #e9dcbd; }
+.t-qwen .stat .l { font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 12px; }
+.t-qwen .ms li.new .badge { background: #c23b2e; }
+.t-qwen .frame { position: absolute; inset: 6px; border: 1px solid #d9c79e; border-radius: 4px; }
+
+/* ================= 没有小成就 / 补算说明 ================= */
+.nb .empty { margin: 2px 0 0; text-align: center; color: var(--muted); font-family: var(--hand, inherit); font-size: 13px; }
+.nb .foot .aside { margin-top: 4px; font-size: 10.5px; opacity: .85; }
+
+/* ================= 翻书：打开时封面和两页纸绕左边翻过去，收起时翻回来 =================
+   body.shut 合着（外壳摆好窗口前）；openBook() → body.opening；翻完 → body.open；closeBook() → body.closing */
+
+.nb .turn { position: absolute; inset: 0; z-index: 6; pointer-events: none; display: none; border-radius: inherit; perspective: 760px; perspective-origin: 0 50%; }
+.shut .nb .turn, .opening .nb .turn, .closing .nb .turn { display: block; }
+.nb .turn:before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #0000004d, #0000 55%); opacity: 0; }
+.nb .cover, .nb .leaf { position: absolute; inset: 0; transform-origin: 0 50%; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: inherit; }
+.nb .leaf { background: linear-gradient(90deg, #0000000f, #0000 12%), var(--paper-solid, #fff); box-shadow: inset -1px 0 0 #0000001a; }
+.nb .leaf.l1 { right: 2px; top: 2px; bottom: 2px; }
+.nb .leaf.l2 { right: 4px; top: 4px; bottom: 4px; }
+.nb .cover { overflow: hidden; background: var(--cover-bg); color: var(--cover-ink); box-shadow: inset 0 0 0 1px #00000026, inset 10px 0 14px -10px #0000004d; }
+.nb .cover:after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #0000, #00000059); opacity: 0; }
+.cv-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cv-label { position: absolute; left: 0; right: 0; top: 36%; display: grid; justify-items: center; gap: 7px; text-align: center; color: var(--cover-ink); }
+.cv-icon svg { width: 22px; height: 22px; }
+.cv-title { font-family: var(--title-font, inherit); font-size: 32px; line-height: 1.2; letter-spacing: .14em; }
+.cv-sub { font-size: 10px; letter-spacing: .32em; opacity: .7; }
+.shut .wrap { opacity: 0; }
+.opening .wrap { animation: nb-pop .2s ease-out both; }
+.opening .nb .cover { animation: nb-turn .64s cubic-bezier(.5,.05,.25,1) .16s both; }
+.opening .nb .cover:after { animation: nb-shade .64s ease-in .16s both; }
+.opening .nb .leaf.l1 { animation: nb-turn .5s cubic-bezier(.45,.05,.3,1) .36s both; }
+.opening .nb .leaf.l2 { animation: nb-turn .5s cubic-bezier(.45,.05,.3,1) .5s both; }
+.opening .nb .turn:before { animation: nb-cast .9s ease-out .16s both; }
+.closing .nb .leaf.l2 { animation: nb-turn .3s cubic-bezier(.5,0,.6,1) reverse both; }
+.closing .nb .leaf.l1 { animation: nb-turn .3s cubic-bezier(.5,0,.6,1) .08s reverse both; }
+.closing .nb .cover { animation: nb-turn .4s cubic-bezier(.5,0,.6,1) .16s reverse both; }
+.closing .nb .cover:after { animation: nb-shade .4s ease-in .16s reverse both; }
+.closing .wrap { animation: nb-out .18s ease-in .58s both; }
+@keyframes nb-pop { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+@keyframes nb-out { to { opacity: 0; transform: translateY(4px) scale(.97); } }
+@keyframes nb-turn { from { transform: rotateY(0); } to { transform: rotateY(-180deg); } }
+@keyframes nb-shade { 0% { opacity: 0; } 60%, 100% { opacity: 1; } }
+@keyframes nb-cast { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .nb .turn { display: none !important; }
+  .opening .wrap { animation: nb-pop .15s ease-out both; }
+  .closing .wrap { animation: nb-out .15s ease-in both; }
+}
+
+/* ---- 各自的封面 ---- */
+.t-claude { --cover-bg: radial-gradient(140% 90% at 30% 0%, #a46d46, #6d3f26 62%, #56301a); --cover-ink: #f2d593; }
+.t-claude .leaf { inset: 10px; border-radius: 9px; }
+.t-claude .leaf.l1 { right: 12px; } .t-claude .leaf.l2 { right: 14px; }
+.t-claude .cv-title { text-shadow: 0 1px 0 #3a1d0e, 0 -1px 0 #ffe7b066; }
+.t-deepseek { --cover-bg: linear-gradient(180deg, #4b9ed2, #2471a8 55%, #165783); --cover-ink: #fff; }
+.t-deepseek .cv-title { text-shadow: 0 2px 0 #134a6e66; }
+.t-gpt { --cover-bg: linear-gradient(155deg, #f2f7fd, #c6d9f0 50%, #9fbbe0); --cover-ink: #27447a; }
+.t-gpt .cv-label { top: 66%; }
+.t-gemini { --cover-bg: radial-gradient(80% 50% at 100% 0%, #5b3fa0, transparent 60%), linear-gradient(170deg, #27205a, #19153d 70%, #141133); --cover-ink: #f4cb7f; }
+.t-gemini .cv-label { top: 56%; }
+.t-glm { --cover-bg: repeating-linear-gradient(45deg, #ffffff08 0 2px, transparent 2px 5px), linear-gradient(160deg, #a52c23, #821f18 65%, #6a1812); --cover-ink: #2c3150; }
+.t-glm .cv-coin { position: absolute; right: 30px; bottom: 32px; width: 46px; height: 46px; }
+.cv-vertical { left: 46px; right: auto; top: 26px; padding: 14px 0; width: 42px; writing-mode: vertical-rl; background: #f6ecd6; box-shadow: 0 1px 2px #0005; }
+.cv-vertical .cv-title { font-size: 25px; letter-spacing: .3em; }
+.t-glm .cv-vertical { box-shadow: inset 0 0 0 3px #f6ecd6, inset 0 0 0 4px #b8322a, inset 0 0 0 6px #f6ecd6, inset 0 0 0 7px #b8322a, 0 1px 2px #0005; }
+.t-grok { --cover-bg: radial-gradient(circle, #ffffff10 1px, transparent 1.3px) 0 0 / 14px 14px, linear-gradient(175deg, #242328, #141317); --cover-ink: #1d1c21; }
+.cv-tape { left: 50%; right: auto; top: 34%; transform: translateX(-50%) rotate(-4deg); padding: 12px 30px 9px; background: #efe9da; box-shadow: 0 2px 5px #0007; }
+.t-grok .cv-title { font-family: var(--hand); color: #d93a3a; font-size: 36px; letter-spacing: .06em; }
+.t-grok .cv-sub { color: #555; }
+.t-qwen { --cover-bg: repeating-linear-gradient(135deg, #ffffff07 0 3px, transparent 3px 8px), linear-gradient(160deg, #36448e, #27316e 65%, #1f285c); --cover-ink: #26306b; }
+.t-qwen .cv-vertical { box-shadow: inset 0 0 0 3px #f6ecd6, inset 0 0 0 4px #c9a24a, 0 1px 2px #0005; }
+.t-qwen .cv-vertical .cv-title { font-size: 23px; letter-spacing: .18em; }
+.cv-seal { position: absolute; right: 30px; bottom: 34px; padding: 5px 4px; writing-mode: vertical-rl; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 13px; font-weight: 700; color: #fff; background: #c23b2e; border-radius: 3px; transform: rotate(-6deg); letter-spacing: 2px; }

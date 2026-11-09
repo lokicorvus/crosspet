@@ -110,6 +110,11 @@ const cases = [
     assert(JSON.stringify(v.notes) === '["一",null,"三"]' && v.sign === '今天也加油', JSON.stringify([v.notes, v.sign]))
     assert(nb(e, 'gpt').notes === null && nb(e, 'gpt').name === 'GPT', JSON.stringify(nb(e, 'gpt')))
   }],
+  ['notebookFor_friend_has_image', async e => {
+    e.run(`localStorage.setItem('crosspet-friendship', JSON.stringify({ 'claude+gpt': { points: 40 } }))`)
+    const f = nb(e).friend
+    assert(f && f.id === 'gpt' && f.image === 'gpt/idle.webp', JSON.stringify(f))
+  }],
   ['companion_page_forwards', async () => {
     const c = await page('companion')
     c.run(`handleClick('poke')`)

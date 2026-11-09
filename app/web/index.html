@@ -2038,7 +2038,9 @@ function notebookFor(ch) {
   const chars = manifest.characters || {}
   const names = Object.fromEntries(Object.entries(chars).map(([id, c]) => [id, c.name]))
   const v = Notebook.view(noteStore(), ch, { names, friendship: friendStoreRead(), nowMs: Date.now() })
-  return { ...v, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null }
+  // 好朋友的头像：她的待机图（面板先试同一个文件夹里的探头头像 avatar.webp，没有再用它）
+  const friend = v.friend && { ...v.friend, image: chars[v.friend.id]?.poses?.idle?.[0] || null }
+  return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null }
 }
 
 // ---- 每对台词（台词和挑法在 pair-chat.js）----
