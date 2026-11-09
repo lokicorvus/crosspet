@@ -1,0 +1,136 @@
+// 小本子在主桌宠页面里的记账：一轮、摸头 / 戳 / 生气、在桌面上的分钟、备份、补算、小成就说一句。
+//   node tests/notebook_page_test.cjs
+'use strict'
+const { makePage } = require('./page_harness.cjs')
+const POSES = ['idle', 'thinking', 'listening', 'reading', 'writing', 'happy', 'oops', 'surprised', 'pat', 'sleeping', 'annoyed', 'puffed', 'redhot', 'sulk']
+const frames = id => Object.fromEntries(POSES.map(p => [p, [`${id}/${p}.webp`]]))
+const manifest = () => ({ characters: {
+  claude: { name: 'Claude', greeting: 'hi', lines: {}, poses: frames('claude'), milestones: { round1: 'Claude 的第一轮！' },
+    notebook: { notes: ['一', null, '三'], sign: '今天也加油' } },
+  gpt: { name: 'GPT', greeting: 'hi', lines: {}, poses: frames('gpt') },
+} })
+
+async function page(role = 'main', saved) {
+  const e = makePage()
+  if (role === 'companion') e.run(`setRole('companion', { id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', client: 'codex', label: '终端' })`)
+  if (saved !== undefined) e.run(`restoreNotebook(${JSON.stringify(saved)})`)
+  e.run(`init(${JSON.stringify(manifest())})`)
+  await e.advance(1000)
+  if (role === 'main' && e.state().charId !== 'claude') { e.run(`setCharacter('claude', true)`); await e.advance(1000) }
+  return e
+}
+const nb = (e, ch = 'claude') => e.run(`notebookFor('${ch}')`)
+const hookAt = (e, id, pose, event, ts) => e.run(`applyCharState('${id}', { pose: '${pose}', event: '${event}', ts: ${ts} })`)
+
+const cases = [
+  ['stop_after_prompt_records_round', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    await e.advance(60000)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 60)
+    const v = nb(e)
+    assert(v.rounds === 1, `rounds ${v.rounds}`)
+    assert(v.workMs === 60000, `workMs ${v.workMs}`)
+  }],
+  ['round_without_prompt_starts_at_first_work_event', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'writing', 'PreToolUse', T)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 30)
+    assert(nb(e).rounds === 1 && nb(e).workMs === 30000, JSON.stringify(nb(e)))
+  }],
+  ['current_counts_for_main_character', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'current', 'listening', 'UserPromptSubmit', T)
+    hookAt(e, 'current', 'happy', 'Stop', T + 5)
+    assert(nb(e).rounds === 1, JSON.stringify(nb(e)))
+  }],
+  ['reload_does_not_double_count', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 60)
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 60)
+    assert(nb(e).rounds === 1, `rounds ${nb(e).rounds}`)
+  }],
+  ['pat_poke_angry_counted', async e => {
+    e.run(`handleClick('pat')`)
+    await e.advance(3000)
+    e.run(`handleClick('poke')`)
+    e.run(`notePoke('claude'); noteAngry('claude')`)
+    const v = nb(e)
+    assert(v.pats === 1 && v.pokes === 2 && v.angry === 1, JSON.stringify([v.pats, v.pokes, v.angry]))
+  }],
+  ['redhot_counts_angry', async e => {
+    e.run(`addAnger(90); react()`)
+    assert(nb(e).angry === 1, `angry ${nb(e).angry}`)
+  }],
+  ['minutes_tick_while_visible', async e => {
+    e.run('setPageHidden(false)')
+    await e.advance(180000)
+    const m = nb(e).minutes
+    assert(m === 3, `minutes ${m}`)
+    e.run('setPageHidden(true)')
+    await e.advance(180000)
+    assert(nb(e).minutes === 3, `minutes while hidden ${nb(e).minutes}`)
+  }],
+  ['store_written_and_sent_to_shell', async e => {
+    e.run(`notePoke('claude')`)
+    const raw = e.run(`localStorage.getItem('crosspet-notebook')`)
+    assert(raw && JSON.parse(raw).chars.claude.pokes === 1, `localStorage ${raw}`)
+    const sent = e.msgs().filter(m => m.notebookStore).slice(-1)[0]
+    assert(sent && sent.notebookStore.chars.claude.pokes === 1, 'no notebookStore message')
+  }],
+  ['restore_merges_saved', async () => {
+    const saved = { v: 1, installedAt: 0, liveSince: 1, backfilled: true, chars: { claude: { rounds: 5, firstMet: 1 } } }
+    const e = await page('main', saved)
+    assert(nb(e).rounds === 5, `rounds ${nb(e).rounds}`)
+    assert(!e.msgs().some(m => m.notebookBackfill), 'asked to backfill again')
+  }],
+  ['asks_backfill_once', async e => {
+    assert(e.msgs().filter(m => m.notebookBackfill).length === 1, JSON.stringify(e.msgs().filter(m => m.notebookBackfill)))
+    const T = e.clk.now()
+    e.run(`applyNotebookBackfill({ installedAt: ${T - 30 * 86400000}, files: [{ source: 'codex', events: [{ t: ${T - 86400000}, k: 'r', m: 'gpt-5', end: ${T - 86400000 + 60000} }] }] })`)
+    assert(nb(e, 'gpt').rounds === 1, JSON.stringify(nb(e, 'gpt')))
+    assert(nb(e, 'gpt').backfilled === true, 'not marked backfilled')
+    e.run(`setCharacter('gpt')`)
+    await e.advance(2000)
+    assert(e.msgs().filter(m => m.notebookBackfill).length === 1, 'asked twice')
+    assert(!e.says().some(s => /第一轮/.test(s.line)), 'said a backfilled milestone')
+  }],
+  ['milestone_reached_says_line', async e => {
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 5)
+    await e.advance(500)
+    assert(e.says().some(s => s.line === 'Claude 的第一轮！'), JSON.stringify(e.says().slice(-3)))
+    assert(nb(e).milestones.some(m => m.id === 'round1'), 'milestone not stored')
+  }],
+  ['notebookFor_has_notes_and_sign', async e => {
+    const v = nb(e)
+    assert(JSON.stringify(v.notes) === '["一",null,"三"]' && v.sign === '今天也加油', JSON.stringify([v.notes, v.sign]))
+    assert(nb(e, 'gpt').notes === null && nb(e, 'gpt').name === 'GPT', JSON.stringify(nb(e, 'gpt')))
+  }],
+  ['companion_page_forwards', async () => {
+    const c = await page('companion')
+    c.run(`handleClick('poke')`)
+    assert(c.msgs().some(m => m.poked === true), 'no poked message')
+    c.run(`addAnger(90); react()`)
+    assert(c.msgs().some(m => m.angered === true), 'no angered message')
+    assert(c.run(`localStorage.getItem('crosspet-notebook')`) === null, 'companion wrote the notebook')
+    assert(!c.msgs().some(m => m.notebookStore || m.notebookBackfill), 'companion did notebook work')
+  }],
+]
+
+function assert(ok, msg) { if (!ok) throw Error(msg) }
+;(async () => {
+  const failures = []
+  for (const [name, fn] of cases) {
+    try {
+      const e = await page()
+      await fn(e)
+      if (e.errors.length) throw Error(`page errors: ${JSON.stringify(e.errors)}`)
+    } catch (err) { failures.push({ name, error: err.message }) }
+  }
+  console.log(JSON.stringify({ passed: cases.length - failures.length, failed: failures.length, failures }, null, 2))
+  if (failures.length) process.exitCode = 1
+})()
