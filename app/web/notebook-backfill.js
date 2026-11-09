@@ -1,6 +1,6 @@
 // 小本子补算：外壳从各 AI 程序的本机记录里抽出精简事件（只有时间和模型名，没有内容），这里拼成「轮」记进小本子。
 // 精简事件（毫秒）：{ t, k: 'p' } 你发了一句；{ t, k: 'a', m } 她回了一句；{ t, k: 'r', m, end } 一整轮（Codex 直接给）。
-// 只补装 CrossPet 之后、新版开始记（store.liveSince）之前的；装之前的只进 before。第一次打开小本子时算一次。
+// 只补装 CrossPet 之后、新版开始记（store.liveSince）之前的；装之前的只进 before。新版第一次启动时在后台算一次。
 ;(function (root) {
   const Notebook = root.Notebook || (typeof require === 'function' ? require('./notebook.js') : null)
 
