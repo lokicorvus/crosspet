@@ -90,3 +90,64 @@ test('group_distinct_speakers：三只各说一句，四只时多一句接话；
   const next = T.groupPick({ ...base, present: ['claude', 'gpt', 'grok'], recent: [three.id] })
   assert.notEqual(next.id, three.id)
 })
+
+// ---- 对彼此的事有反应 ----
+const KINDS = ['done', 'redhot', 'jealous', 'sleep', 'poke', 'oops']
+const rbase = { present: ['claude', 'gpt'], busy: [], levelOf: () => 1, nowMs: 100 * 60_000, last: {}, rnd: () => 0 }
+
+test('react_respects_min_level：门槛够了才说（红温刚见面也行，吃醋要好朋友）', () => {
+  assert.equal(T.react({ ...rbase, kind: 'done', actor: 'claude', levelOf: () => 0 }), null)
+  assert.ok(T.react({ ...rbase, kind: 'redhot', actor: 'claude', levelOf: () => 0 }))
+  assert.equal(T.react({ ...rbase, kind: 'jealous', actor: 'claude', levelOf: () => 1 }), null)
+  const got = T.react({ ...rbase, kind: 'jealous', actor: 'claude', levelOf: () => 2 })
+  assert.equal(got.speaker, 'gpt')
+  assert.equal(got.key, 'claude+gpt')
+  assert.deepEqual(got.lines.map(l => l[0]), ['gpt', 'claude'])
+})
+
+test('react_cooldowns：同一种事同一对 10 分钟一次，所有反应合起来 2 分钟一次', () => {
+  const got = T.react({ ...rbase, kind: 'poke', actor: 'claude' })
+  assert.deepEqual(got.marks.sort(), ['*', 'poke:claude+gpt'])
+  const at = ms => Object.fromEntries(got.marks.map(m => [m, ms]))
+  assert.equal(T.react({ ...rbase, kind: 'poke', actor: 'claude', last: at(rbase.nowMs - 9 * 60_000) }), null)
+  assert.ok(T.react({ ...rbase, kind: 'poke', actor: 'claude', last: at(rbase.nowMs - 10 * 60_000) }))
+  assert.equal(T.react({ ...rbase, kind: 'oops', actor: 'claude', last: { '*': rbase.nowMs - 60_000 } }), null)
+  assert.ok(T.react({ ...rbase, kind: 'oops', actor: 'claude', last: { '*': rbase.nowMs - 2 * 60_000 } }))
+})
+
+test('react_excludes_actor_and_patted：事主自己、忙着的、刚被摸过的不说；事主不在场不说', () => {
+  const present = ['claude', 'gpt', 'grok']
+  for (const r of [0, 0.5, 0.99]) {
+    const got = T.react({ ...rbase, present, kind: 'jealous', actor: 'claude', levelOf: () => 2, exclude: ['gpt'], rnd: () => r })
+    assert.equal(got.speaker, 'grok')
+  }
+  assert.equal(T.react({ ...rbase, present, kind: 'poke', actor: 'claude', busy: ['gpt', 'grok'] }), null)
+  assert.equal(T.react({ ...rbase, present: ['gpt', 'grok'], kind: 'poke', actor: 'claude' }), null)
+})
+
+test('react_all_seven_each_kind_three_per_tier：够得着的每档每个角色至少 3 句、不超过 14 字；回话每人至少 2 句', () => {
+  for (const kind of KINDS) for (const ch of [...SEVEN, '*']) {
+    for (let tier = Math.min(T.MIN_LEVEL[kind], 2); tier <= 2; tier++) {
+      const list = T.REACT[kind]?.[ch]?.[tier]
+      assert.ok(list && list.length >= 3, `${kind}/${ch}/${tier}`)
+      for (const s of list) assert.ok(s.length > 0 && [...s].length <= 14, `${kind}/${ch}/${tier}: ${s}`)
+    }
+    if (kind === 'sleep') continue
+    const back = T.REACT_BACK[kind]?.[ch]
+    assert.ok(back && back.length >= 2, `back ${kind}/${ch}`)
+    for (const s of back) assert.ok([...s].length <= 14, `back ${kind}/${ch}: ${s}`)
+  }
+  for (const by of Object.values(T.REACT_PAIR)) for (const list of Object.values(by)) for (const s of list) assert.ok([...s].length <= 14, s)
+})
+
+test('sleep_has_no_reply：睡着的不回话；别的回一句', () => {
+  const sleep = T.react({ ...rbase, kind: 'sleep', actor: 'claude' })
+  assert.equal(sleep.lines.length, 1)
+  assert.equal(sleep.lines[0][0], 'gpt')
+  assert.equal(T.react({ ...rbase, kind: 'oops', actor: 'claude' }).lines.length, 2)
+})
+
+test('按对的特例优先：Grok 看 DeepSeek 红温', () => {
+  const got = T.react({ ...rbase, present: ['deepseek', 'grok'], kind: 'redhot', actor: 'deepseek' })
+  assert.ok(T.REACT_PAIR.redhot['grok>deepseek'].includes(got.lines[0][1]), got.lines[0][1])
+})

@@ -377,6 +377,7 @@ function setPose(p, instant) {
   if (tucked) p = `edge_${tucked}${tuckedPeek ? '_peek' : ''}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
+  if (p === 'sleeping') noteSlept()
   const frames = framesFor(p)
   showImage(instant ? frames[0] : pick(frames), instant)
   $('body').className = MOTION[p] || 'm-bob'
@@ -1758,6 +1759,9 @@ function notePat(character) {
   noteBump(character, 'pats')
   const nowMs = Date.now()
   patAt[character] = nowMs
+  // 吃醋：5 分钟内没被摸过的朋友说一句（被摸过的不说）
+  patSeen[character] = nowMs
+  friendEvent(character, 'jealous', Object.keys(patSeen).filter(o => nowMs - patSeen[o] <= Friendship.PATS_MS))
   if (!friendshipOn()) return
   const partners = Object.keys(patAt).filter(o => o !== character && nowMs - patAt[o] <= Friendship.PATS_MS)
   if (!partners.length) return
@@ -2000,6 +2004,7 @@ function noteCommit(store, ch, nowMs) {
 }
 // applyCharState 每条状态都先过这里：开始干活（你发了一句，或者第一条干活的事件）开一轮，Stop 收一轮。
 // 同一条 Stop 送来两次（页面重载、外壳重发状态文件）只算一次：每个角色记着最后算过的 ts
+const BIG_ROUND_MS = 2 * 60_000, FRESH_MS = 60_000
 function noteNotebookEvent(ch, s) {
   if (role !== 'main' || !ch || !s || !Number.isFinite(s.ts) || !manifest.characters?.[ch] || manifest.characters[ch].egg) return
   const ms = s.ts * 1000, ev = s.event || ''
@@ -2012,8 +2017,11 @@ function noteNotebookEvent(ch, s) {
     let next = Notebook.recordRound(store, ch, start, ms)
     next = { ...next, chars: { ...next.chars, [ch]: { ...next.chars[ch], lastTs: s.ts } } }
     noteCommit(next, ch, ms)
+    // 刚干完一轮大活（≥ 2 分钟；重放的旧状态不算）：朋友夸一句
+    if (ms - start >= BIG_ROUND_MS && Date.now() - ms < FRESH_MS) friendEvent(ch, 'done')
     return
   }
+  if (s.pose === 'oops' && Date.now() - ms < FRESH_MS) friendEvent(ch, 'oops')
   if (noteOpenAt[ch] != null) return
   if (NOTE_START.has(ev) || (s.pose && !NOTE_RESTING.has(s.pose) && ev !== 'SessionEnd' && ev !== 'SessionStart')) noteOpenAt[ch] = ms
 }
@@ -2027,8 +2035,8 @@ function noteBump(ch, kind) {
   const nowMs = Date.now()
   noteCommit(Notebook.bump(noteStore(), ch, kind, nowMs), ch, nowMs)
 }
-function notePoke(character) { noteBump(character, 'pokes') }
-function noteAngry(character) { noteBump(character, 'angry') }
+function notePoke(character) { noteBump(character, 'pokes'); friendEvent(character, 'poke') }
+function noteAngry(character) { noteBump(character, 'angry'); friendEvent(character, 'redhot') }
 // 在桌面上：主桌宠和站着的额外那几只，页面没藏起来（外壳藏起来 / 屏幕睡了会 setPageHidden）每分钟记一分钟
 setInterval(() => {
   if (role !== 'main' || pageHidden || egg || !manifest.characters) return
@@ -2056,7 +2064,7 @@ let pairChatAt = 0
 const LEVEL_UP_GAP = 30_000
 const pairChatRecent = []
 function tryPairChat() {
-  if (role !== 'main' || !friendshipOn() || pageHidden || egg) return
+  if (role !== 'main' || !friendshipOn() || pageHidden || egg || Date.now() < speakingUntil) return
   const store = friendStoreRead(), nowMs = Date.now()
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
@@ -2081,6 +2089,31 @@ function tryPairChat() {
   pairChatRecent.push(got.id)
   if (pairChatRecent.length > 12) pairChatRecent.shift()
   speak(got.lines)
+}
+// ---- 对彼此的事有反应（台词和挑法在 pet-talk.js）----
+// 事主（actor）身上发生了 kind（done 干完大活 / redhot 红温 / jealous 吃醋 / sleep 睡着 / poke 被戳 / oops 出错）：旁边闲着的朋友说一句、她回一句。
+// 演彩蛋、页面藏着、正在说一段时不说，也不记冷却；忙着的（主桌宠在干活也算）不当说话的那只；冷却（每种事每对 10 分钟、全部 2 分钟）记在 reactLast
+const reactLast = {}, patSeen = {}
+const REACT_DELAY = 1500
+function friendEvent(actor, kind, exclude = []) {
+  if (role !== 'main' || !actor || !friendshipOn() || pageHidden || egg) return
+  const nowMs = Date.now()
+  if (nowMs < speakingUntil) return
+  const store = friendStoreRead()
+  // 忙着的不当说话的那只（主桌宠在干活也一样）；事主自己忙不要紧（她刚干完、刚出错，正是朋友接话的时候）
+  const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
+  if (aiActivity()) busy.push(mainCharacter())
+  const got = PetTalk.react({ kind, actor, present: presentCharacters(), busy, exclude, nowMs, last: reactLast,
+                              levelOf: key => Friendship.level(store[key]?.points || 0) })
+  if (!got) return
+  for (const m of got.marks) reactLast[m] = nowMs
+  speakingUntil = nowMs + REACT_DELAY + 1000
+  setTimeout(() => speak(got.lines), REACT_DELAY)
+}
+// 她睡着了：主桌宠自己直接算；额外那只告诉外壳，外壳转给主桌宠页面 friendEvent(她, 'sleep')
+function noteSlept() {
+  if (role === 'main') friendEvent(mainCharacter(), 'sleep')
+  else toShell({ slept: true })
 }
 // 「看数字说话」要的数：两只今天的轮数、摸头次数，这一对一起在桌面上的分钟和认识的天数（小本子记录里的）
 function noteFacts(a, b, nowMs) {

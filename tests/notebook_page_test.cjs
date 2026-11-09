@@ -138,6 +138,51 @@ const cases = [
     const calls = e.msgs().filter(m => m.companionCall && m.companionCall.fn === 'chat')
     assert(calls.length >= 1 && calls[0].companionCall.args[3] >= 12000, JSON.stringify(calls))
   }],
+  ['poke_companion_triggers_reaction', async e => {
+    // 认识了的两只：外壳转来「额外那只被戳了」，主桌宠 1.5 秒后说一句，被戳的那只回一句，记进小本子
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 1e6, shown: 3 } })})`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false; notePoke('gpt')`)
+    await e.advance(1000)
+    assert(!e.run(`noteStore().chats`)?.length, '说之前要等 1.5 秒')
+    await e.advance(20000)
+    const chats = e.run(`noteStore().chats`)
+    assert(chats && chats.length === 1, JSON.stringify(chats))
+    assert(JSON.stringify(chats[0].lines.map(l => l[0])) === '["claude","gpt"]', JSON.stringify(chats[0]))
+    assert(e.run(`PetTalk.REACT.poke.claude[2]`).includes(chats[0].lines[0][1]), chats[0].lines[0][1])
+  }],
+  ['no_reaction_while_busy', async e => {
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 1e6, shown: 3 } })})`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false`)
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'writing', 'PreToolUse', T)
+    e.run(`notePoke('gpt')`)
+    await e.advance(20000)
+    assert(!e.run(`noteStore().chats`)?.length, '主桌宠在干活时不该说')
+    hookAt(e, 'claude', 'idle', 'SessionEnd', T + 21)
+    await e.advance(1000)
+    e.run(`notePoke('gpt')`)
+    await e.advance(20000)
+    assert(e.run(`noteStore().chats`)?.length === 1, '没说成的那次不该记冷却')
+  }],
+  ['main_done_gets_praise', async e => {
+    // 主桌宠自己干完一轮大活（3 分钟）：旁边的朋友夸一句，她回一句
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 1e6, shown: 3 } })})`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false`)
+    const T = e.clk.now() / 1000
+    hookAt(e, 'claude', 'listening', 'UserPromptSubmit', T)
+    await e.advance(180000)
+    hookAt(e, 'claude', 'happy', 'Stop', T + 180)
+    await e.advance(20000)
+    const chats = e.run(`noteStore().chats`) || []
+    const said = chats.find(c => c.lines[0][0] === 'gpt' && c.lines[1]?.[0] === 'claude')
+    assert(said && e.run(`PetTalk.REACT.done.gpt[2]`).includes(said.lines[0][1]), JSON.stringify(chats))
+  }],
   ['group_chat_when_gathered', async e => {
     // 三只两两都是挚友（升级都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
     const max = 1e6

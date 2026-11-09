@@ -222,6 +222,7 @@ namespace CrossPet
             // 戳一下、惹她生气：记进小本子（同摸头，只在主桌宠页面记）
             if (m.TryGetValue("poked", out var pk) && pk is bool pkb && pkb) pet.Js($"notePoke({Pet.Q(Character)})");
             if (m.TryGetValue("angered", out var an) && an is bool anb && anb) pet.Js($"noteAngry({Pet.Q(Character)})");
+            if (m.TryGetValue("slept", out var sl) && sl is bool slb && slb) pet.Js($"friendEvent({Pet.Q(Character)}, 'sleep')");   // 她睡着了：旁边的朋友小声说一句
             // 不能在这个网页控件自己的消息回调里同步 Dispose 它：排到回调返回之后再关（和 ProcessFailed 一样）
             if (m.TryGetValue("gone", out var g) && g is bool gb && gb) ui.BeginInvoke(new Action(Close));
         }

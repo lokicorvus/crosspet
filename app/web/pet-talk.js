@@ -150,7 +150,122 @@
     return { id: `group/${topic.id}`, lines: PC.withPoses(lines) }
   }
 
-  const api = { DATA, DATA_REPLY, TOPICS, GROUP_CHANCE, dataExchanges, groupPick }
+  // ---- 对彼此的事有反应 ----
+  // 旁边站着的朋友对她（事主）身上的事说一句，她回一句（睡着的不回）。
+  // REACT[事][说话的那只][档] = 句子（档 = 这一对的关系，最多到 2）；门槛以下的档用不着，没写。一行写成 '句|句|句'
+  const MIN_LEVEL = { done: 1, redhot: 0, jealous: 2, sleep: 1, poke: 1, oops: 1 }
+  const PAIR_GAP = 10 * 60_000, ALL_GAP = 2 * 60_000
+  const R = (...tiers) => tiers.map(t => t && t.split('|'))
+  const REACT = {
+    // 干完一轮大活（≥ 2 分钟）
+    done: {
+      claude: R(null, '辛苦了，休息一下吧|这轮好长，做完啦|你刚才很专注', '做完啦，喝口水吧|我一直看着呢，好棒|累不累？靠一下'),
+      deepseek: R(null, '干完了！吃饭吗|好厉害，饭都凉了|做完啦！奖励一碗饭', '你最棒！给你留饭了|干完了，去游泳！|呜哇，好久，抱抱'),
+      gpt: R(null, '完了？不错。|嗯。还行。|这轮挺久。', '做得好。|歇会儿。我看着。|比我快。'),
+      gemini: R(null, '干完了喵！陪我玩|好久喵，我都睡醒了|完成！盖个猫爪印', '你好厉害喵 :3|奖励你摸我一下|干完了，晒太阳去'),
+      glm: R(null, '干完了？记账了吗|这轮值不少钱|嗯哼，效率不错', '这轮给你记双倍|辛苦，这单我请|干得漂亮，狐狸点赞'),
+      grok: R(null, '就这？干这么久|完了？我查查对不对|还行，没出错', '行，这轮我认了|干得不赖，别骄傲|今天你最能干'),
+      qwen: R(null, '辛苦啦，喝杯奶茶～|做完啦，真厉害|给你点了甜品哦', '我就知道你能行～|奖励你一个礼物|累了吧，扇扇风～'),
+      '*': R(null, '辛苦了|干完啦，休息下|好厉害', '做得真好|累了吧，歇会儿|你最棒了'),
+    },
+    // 被甩到红温
+    redhot: {
+      claude: R('你、你还好吗？|别生气了，好吗|要喝点水吗？', '深呼吸，慢慢来|他不是故意的吧|我陪你待一会儿', '来，抱一下就好了|别气了，我在呢|气坏了不值得'),
+      deepseek: R('哇，冒烟了！|你脸好红！|别气别气', '吃口饭消消气！|我把饭分你一半|气到饿了吗？', '谁惹你，我咬他！|不气了，摸摸|给你吹吹，呼'),
+      gpt: R('冷静。|别吵。|你脸红了。', '喝水。|等会儿再说。|别理他。', '过来，坐我旁边。|我帮你记着他。|别气了。'),
+      gemini: R('你炸毛了喵|好可怕喵|你在冒烟喵', '我给你舔舔毛|喵，别生气|蹭蹭你就不气了', '我替你挠他 :3|靠着我，呼噜噜|别气，陪你打盹'),
+      glm: R('生气对皮肤不好哦|嗯哼，有意思|别气，不值钱', '气坏了我可不赔|给你打个消气折|账我帮你记上', '谁惹你？我涨他价|消气了吗，免费的|狐狸尾巴借你抱'),
+      grok: R('哈，红温了|就这就气了？|气成这样，好笑', '这都能红温？|我录下来了|你气起来挺凶', '谁惹你？我骂他|行了，别气了|红温也挺可爱'),
+      qwen: R('要喝杯凉茶吗|别气坏身子呀|扇扇风会好些～', '我请你吃甜的～|消消气，买东西去|别气，有我在', '谁欺负你了呀|乖，不气了～|给你买个新的'),
+      '*': R('你还好吗？|别生气了|冷静一下', '消消气|别理他了|没事的', '我在呢|别气啦|抱抱你'),
+    },
+    // 你摸了她、5 分钟内没摸说话的这只
+    jealous: {
+      claude: R(null, null, '他只摸你呀|我也想被摸一下|那个，轮到我了吗'),
+      deepseek: R(null, null, '为什么只摸你！|我也要！我的头圆|我吃醋了，哼'),
+      gpt: R(null, null, '又是你。|他没看见我？|哼。'),
+      gemini: R(null, null, '喵！摸我才对|我更好摸喵|我把头伸过去了 :3'),
+      glm: R(null, null, '摸你免费，摸我收费？|他偏心，记下了|嗯哼，好受宠哦'),
+      grok: R(null, null, '偏心，查证完毕|摸她不摸我？|行，记仇了'),
+      qwen: R(null, null, '我也想被摸摸～|他好偏心呀|下次先摸我好吗'),
+      '*': R(null, null, '我也要摸|偏心|为什么只摸你'),
+    },
+    // 她睡着了：小声说，不吵醒她
+    sleep: {
+      claude: R(null, '嘘，她睡着了|小声一点哦|让她睡会儿吧', '睡吧，我守着|给她盖个被子|睡得好香'),
+      deepseek: R(null, '嘘！她睡了|我也想睡了|轻点轻点', '睡着的样子好乖|我也睡，晚安|偷偷戳一下'),
+      gpt: R(null, '嘘。|睡了。别吵。|让她睡。', '睡吧。|我看着。|盖好。'),
+      gemini: R(null, '嘘喵|她睡了，我也困|我轻轻走开', '我睡她旁边 :3|呼噜噜，晚安|给她暖脚喵'),
+      glm: R(null, '睡着了，算工时吗|嘘，别吵醒她|嗯哼，好机会', '睡吧，账我看着|给她盖件外套|睡着还挺可爱'),
+      grok: R(null, '睡了？就这？|嘘，难得安静|别吵醒她，麻烦', '睡吧，我放哨|谁吵她我骂谁|睡相挺傻的'),
+      qwen: R(null, '嘘，她睡了呢|大家小声些～|我去拿条毯子', '睡吧，好梦～|给她留了夜宵|晚安呀'),
+      '*': R(null, '嘘，她睡了|小声点|让她睡吧', '晚安|睡得真香|我守着她'),
+    },
+    // 她被戳了
+    poke: {
+      claude: R(null, '又被戳了？|他好像很喜欢你|疼不疼？', '我帮你揉揉|戳了几下了？|他今天好皮'),
+      deepseek: R(null, '哈哈，被戳了！|戳脸好玩吗|下一个戳我！', '我替你戳回去！|你的脸好软吧|戳你不戳我'),
+      gpt: R(null, '被戳了。|别动就不戳了。|嗯。', '还好吗。|别理他。|他又来了。'),
+      gemini: R(null, '戳戳戳喵|我也要戳你 :3|你被戳扁了', '我帮你挠他！|戳完要摸摸喵|你是我的，别戳'),
+      glm: R(null, '戳一下收一块|嗯哼，被戳了|戳多了要涨价', '他戳你我收费|戳疼了吗，算我的|帮你记着次数'),
+      grok: R(null, '被戳了，好惨|就这？才一下|哈，戳得好', '谁戳你？我来|戳你等于戳我|他手痒了'),
+      qwen: R(null, '被戳了呀～|疼吗？吹吹|他在逗你玩呢', '给你揉揉脸～|别戳她啦|戳完请喝奶茶'),
+      '*': R(null, '被戳了|疼吗|他在逗你', '揉揉|别戳她了|他好皮'),
+    },
+    // 她出错了
+    oops: {
+      claude: R(null, '没关系，再试一次|出错很正常的|要我帮你看看吗', '我陪你一起查|别急，慢慢来|你已经很好了'),
+      deepseek: R(null, '哎呀，报错了|重启！重启！|没事，吃口饭', '我帮你看！|错了也没关系！|下次一定行'),
+      gpt: R(null, '看日志。|错了。|重来。', '我帮你看看。|不怪你。|再跑一次。'),
+      gemini: R(null, '报错了喵|不是我踩的喵|红字好可怕', '我陪你修喵|摸摸，不哭|错了也是好猫'),
+      glm: R(null, '出错要扣钱哦|嗯哼，翻车了|修 bug 另算', '这次不收你钱|我帮你瞒着|小错，不要紧'),
+      grok: R(null, '哈，翻车了|就这？报错了|我截图了', '错哪了？我查|别慌，小问题|谁说你错，我骂他'),
+      qwen: R(null, '没事的呀～|别着急，慢慢来|喝口茶再改～', '我陪你改～|错了也很可爱|给你加油哦'),
+      '*': R(null, '没关系|再试试|别急', '我陪你|慢慢来|不要紧'),
+    },
+  }
+  // 按对的特例（'说话的>事主'，不分档）：有就先用
+  const REACT_PAIR = {
+    redhot: { 'grok>deepseek': ['气得更圆了哈', '红温鲸鱼，熟了'] },
+    oops: { 'grok>gpt': ['GPT 也会错？截图'], 'deepseek>gpt': ['姐姐也会错耶！'] },
+    done: { 'qwen>deepseek': ['干完了，去吃自助～'] },
+  }
+  // 事主怎么回（睡着的不回）
+  const B = s => s.split('|')
+  const REACT_BACK = {
+    done: { claude: B('嗯，谢谢你。|还好，不算累'), deepseek: B('嘿嘿，饿了！|快夸我！'), gpt: B('嗯。|还行。'), gemini: B('要奖励喵|我好厉害 :3'),
+      glm: B('记得付钱哦|嗯哼，小意思'), grok: B('那当然|就这点活'), qwen: B('谢谢呀～|一起歇会儿吧'), '*': B('谢谢|还好啦') },
+    redhot: { claude: B('我、我没生气|谢谢，好多了'), deepseek: B('我没胖！我是气的|哼！'), gpt: B('没事。|不用管。'), gemini: B('嘶哈！|喵！别碰我'),
+      glm: B('我这是调整情绪|嗯哼，没事'), grok: B('闭嘴！|谁红温了！'), qwen: B('没事的呀～|谢谢你～'), '*': B('我没事|哼') },
+    jealous: { claude: B('我、我分你一半|你也去让他摸'), deepseek: B('嘿嘿，我先的！|我圆嘛'), gpt: B('排队。|我也没办法。'), gemini: B('我先来的喵|嘿嘿 :3'),
+      glm: B('这次是免费的|嗯哼，羡慕吧'), grok: B('因为我是女王|你求他啊'), qwen: B('下次让给你～|别吃醋嘛～'), '*': B('下次轮到你|嘿嘿') },
+    poke: { claude: B('有点痒|没事的'), deepseek: B('别戳我肚子！|我不胖！'), gpt: B('别戳。|烦。'), gemini: B('喵！|再戳咬你'),
+      glm: B('戳一下要付钱|嗯哼，记账'), grok: B('再戳试试|找死吗'), qwen: B('没关系～|好痒呀'), '*': B('别戳啦|痒') },
+    oops: { claude: B('对不起，我再看看|嗯，我会修好'), deepseek: B('呜，我再来！|不是我的错！'), gpt: B('知道。|在修。'), gemini: B('喵呜|是键盘的错'),
+      glm: B('小失误而已|嗯哼，故意的'), grok: B('少废话|要你管'), qwen: B('谢谢你～|我会改好的'), '*': B('我再试试|谢谢') },
+  }
+  // 说话时的立绘：吃醋的鼓嘴、睡觉的不换（别的按台词挑）
+  const REACT_POSE = { jealous: 'sulk', sleep: null }
+
+  // 事主身上发生了 kind：在场、闲着、不是事主、不在 exclude、关系够门槛、冷却过了的朋友里挑一只说
+  // → { speaker, key, marks, lines } 或 null；说了的话把 marks 里每个记上 nowMs（last 由调用的人存）
+  function react({ kind, actor, present, busy = [], levelOf, nowMs, last = {}, exclude = [], rnd = Math.random }) {
+    if (!(kind in MIN_LEVEL) || !present.includes(actor)) return null
+    if (nowMs - (last['*'] ?? -Infinity) < ALL_GAP) return null
+    const ok = [...new Set(present)].filter(ch => ch !== actor && !busy.includes(ch) && !exclude.includes(ch)
+      && levelOf(PC.keyOf(ch, actor)) >= MIN_LEVEL[kind] && nowMs - (last[`${kind}:${PC.keyOf(ch, actor)}`] ?? -Infinity) >= PAIR_GAP)
+    if (!ok.length) return null
+    const speaker = ok[Math.floor(rnd() * ok.length)], key = PC.keyOf(speaker, actor)
+    const tier = Math.min(levelOf(key), 2)
+    const list = REACT_PAIR[kind]?.[`${speaker}>${actor}`] || (REACT[kind][speaker] || REACT[kind]['*'])[tier]
+    const line = list[Math.floor(rnd() * list.length)]
+    const pose = kind in REACT_POSE ? REACT_POSE[kind] : PC.poseOf(line)
+    const lines = [[speaker, line, pose]]
+    if (kind !== 'sleep') { const back = REACT_BACK[kind][actor] || REACT_BACK[kind]['*']; const b = back[Math.floor(rnd() * back.length)]; lines.push([actor, b, PC.poseOf(b)]) }
+    return { speaker, key, marks: ['*', `${kind}:${key}`], lines }
+  }
+
+  const api = { DATA, DATA_REPLY, TOPICS, GROUP_CHANCE, dataExchanges, groupPick, REACT, REACT_PAIR, REACT_BACK, MIN_LEVEL, react }
   root.PetTalk = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

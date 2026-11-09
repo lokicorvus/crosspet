@@ -154,6 +154,7 @@ final class Companion: NSObject, WKNavigationDelegate {
         // 戳一下、惹她生气：记进小本子（同摸头，只在主桌宠页面记）
         if d["poked"] as? Bool == true { app.js("notePoke(\(app.quote(character)))") }
         if d["angered"] as? Bool == true { app.js("noteAngry(\(app.quote(character)))") }
+        if d["slept"] as? Bool == true { app.js("friendEvent(\(app.quote(character)), 'sleep')") }   // 她睡着了：旁边的朋友小声说一句
         if d["gone"] as? Bool == true { close() }
     }
 
