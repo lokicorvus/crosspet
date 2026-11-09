@@ -532,7 +532,8 @@
 
   // 挑一段：present 在场的角色，busy 正在干活的角色，hearts10(键) → 这一对的心数（0–10），wear(角色) → 穿的皮肤，
   // lastAt 上次说的时间，recent 最近说过的段 id 不重复，rnd 随机数（测试用）。返回 { key, tier, id, lines: [[谁, 说什么, 立绘或 null]] }
-  function pick({ present, busy = [], hearts10, wear = () => '', nowMs, lastAt = 0, recent = [], rnd = Math.random }) {
+  // extra(a, b, tier) → [{ id, lines }]：别处给的候选（pet-talk.js 的看数字说话），并进这一对这一档
+  function pick({ present, busy = [], hearts10, wear = () => '', nowMs, lastAt = 0, recent = [], rnd = Math.random, extra }) {
     if (nowMs - lastAt < GAP_MS) return null
     const idle = [...new Set(present)].filter(ch => !busy.includes(ch))
     const pairs = []
@@ -540,14 +541,14 @@
     if (!pairs.length || rnd() >= CHANCE) return null
     const [a, b] = pairs[Math.floor(rnd() * pairs.length)]
     const key = keyOf(a, b), tier = tierOf(hearts10(key) || 0)
-    const all = exchanges(a, b, tier, wear, rnd)
+    const all = [...exchanges(a, b, tier, wear, rnd), ...(extra ? extra(a, b, tier) : [])]
     const fresh = all.filter(x => !recent.includes(x.id))
     const pool = fresh.length ? fresh : all
     const got = pool[Math.floor(rnd() * pool.length)]
     return { key, tier, id: got.id, lines: withPoses(got.lines) }
   }
 
-  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, LEVEL_POSES, pick, levelUp, poseOf, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS, bubbleMs, replyAfter, schedule }
+  const api = { LINES, SKIN_PAIRS, COMBOS, OUTFITS, PRAISE, LEVEL_LINES, LEVEL_POSES, pick, levelUp, poseOf, withPoses, tierOf, keyOf, GAP_MS, CHANCE, REPLY_MS, bubbleMs, replyAfter, schedule }
   root.PairChat = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

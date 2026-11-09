@@ -4,17 +4,18 @@
 const { makePage } = require('./page_harness.cjs')
 const POSES = ['idle', 'thinking', 'listening', 'reading', 'writing', 'happy', 'oops', 'surprised', 'pat', 'sleeping', 'annoyed', 'puffed', 'redhot', 'sulk']
 const frames = id => Object.fromEntries(POSES.map(p => [p, [`${id}/${p}.webp`]]))
-const manifest = () => ({ characters: {
+const manifest = (more = []) => ({ characters: {
+  ...Object.fromEntries(more.map(id => [id, { name: id, greeting: 'hi', lines: {}, poses: frames(id) }])),
   claude: { name: 'Claude', greeting: 'hi', lines: {}, poses: frames('claude'), milestones: { round1: 'Claude 的第一轮！' },
     notebook: { notes: ['一', null, '三'], sign: '今天也加油' } },
   gpt: { name: 'GPT', greeting: 'hi', lines: {}, poses: frames('gpt') },
 } })
 
-async function page(role = 'main', saved) {
+async function page(role = 'main', saved, more) {
   const e = makePage()
   if (role === 'companion') e.run(`setRole('companion', { id: 'gpt@codex', key: 'gpt@codex', character: 'gpt', client: 'codex', label: '终端' })`)
   if (saved !== undefined) e.run(`restoreNotebook(${JSON.stringify(saved)})`)
-  e.run(`init(${JSON.stringify(manifest())})`)
+  e.run(`init(${JSON.stringify(manifest(more))})`)
   await e.advance(1000)
   if (role === 'main' && e.state().charId !== 'claude') { e.run(`setCharacter('claude', true)`); await e.advance(1000) }
   return e
@@ -137,14 +138,29 @@ const cases = [
     const calls = e.msgs().filter(m => m.companionCall && m.companionCall.fn === 'chat')
     assert(calls.length >= 1 && calls[0].companionCall.args[3] >= 12000, JSON.stringify(calls))
   }],
+  ['group_chat_when_gathered', async e => {
+    // 三只两两都是挚友（升级都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
+    const max = 1e6
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: max, shown: 3 }, 'claude+grok': { points: max, shown: 3 }, 'gpt+grok': { points: max, shown: 3 } })})`)
+    e.run(`gather()`)
+    await e.advance(1500)
+    e.run(`pageHidden = false; Math.random = () => 0; pairChatAt = 0; tryPairChat()`)
+    await e.advance(40000)
+    const chats = e.run(`noteStore().chats`)
+    assert(chats && chats.length === 1, JSON.stringify(chats))
+    const who = chats[0].lines.map(l => l[0])
+    assert(who.length === 3 && new Set(who).size === 3, JSON.stringify(chats[0]))
+    const calls = e.msgs().filter(m => m.companionCall && m.companionCall.fn === 'chat')
+    assert(calls.length === 2, `额外那两只各说一句：${JSON.stringify(calls)}`)
+  }, ['grok']],
 ]
 
 function assert(ok, msg) { if (!ok) throw Error(msg) }
 ;(async () => {
   const failures = []
-  for (const [name, fn] of cases) {
+  for (const [name, fn, more] of cases) {
     try {
-      const e = await page()
+      const e = await page('main', undefined, more)
       await fn(e)
       if (e.errors.length) throw Error(`page errors: ${JSON.stringify(e.errors)}`)
     } catch (err) { failures.push({ name, error: err.message }) }

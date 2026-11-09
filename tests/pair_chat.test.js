@@ -69,6 +69,16 @@ test('挑中：按心数拿那一档；最近说过的不重复（全说过了�
   assert.equal(again.id, 'claude+gpt/0/0')
 })
 
+test('pick 的 extra：别处给的候选并进这一对这一档', () => {
+  const n = P.LINES['claude+gpt'][0].length
+  const extra = (a, b, tier) => [{ id: `x/${a}+${b}/${tier}`, lines: [['gpt', '多的一段'], ['claude', '嗯']] }]
+  const recent = P.LINES['claude+gpt'][0].map((_, i) => `claude+gpt/0/${i}`)
+  const got = P.pick({ ...base, recent, extra, rnd: () => 0 })
+  assert.equal(got.id, 'x/claude+gpt/0')
+  assert.equal(got.lines[0][1], '多的一段')
+  assert.ok(n >= 6)
+})
+
 test('三只在场、一只在忙：只在闲着的两只里挑', () => {
   for (const r of [0, 0.5, 0.99]) {
     const got = P.pick({ ...base, present: ['claude', 'gpt', 'grok'], busy: ['claude'], rnd: seq([0, r, 0]) })
