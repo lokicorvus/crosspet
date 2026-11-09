@@ -1,0 +1,9 @@
+{"timestamp":"2026-11-01T12:00:00.000Z","type":"session_meta","payload":{"id":"x"}}
+{"timestamp":"2026-11-01T12:00:01.000Z","type":"event_msg","payload":{"type":"task_complete","duration_ms":1000}}
+{"timestamp":"2026-11-01T12:00:02.000Z","type":"turn_context","payload":{"model":"gpt-6.1-sol"}}
+{"timestamp":"2026-11-01T12:01:00.000Z","type":"event_msg","payload":{"type":"task_started"}}
+broken
+{"timestamp":"2026-11-01T12:02:00.000Z","type":"event_msg","payload":{"type":"task_complete","duration_ms":60000}}
+{"timestamp":"2026-11-01T12:03:00.000Z","type":"turn_context","payload":{"model":"deepseek-v4"}}
+{"timestamp":"2026-11-01T12:05:00.000Z","type":"event_msg","payload":{"type":"turn_aborted","duration_ms":30000}}
+{"timestamp":"2026-11-01T12:06:00.000Z","type":"event_msg","payload":{"type":"task_complete"}}
