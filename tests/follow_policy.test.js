@@ -44,8 +44,9 @@ test('固定主桌宠：前台是别的 AI 也不换', () => {
   assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: 'claude', standing: [] }), null)
 })
 
-test('要换成的角色已经有一只额外的站着：不换（不然两只对调）', () => {
-  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: ['gpt'] }), null)
+test('要换成的角色已经有一只额外的站着、主桌宠没占着：照样换（页面里那只让给主桌宠；Windows 反馈：只用 GPT，主桌宠一直是前天的 DeepSeek）', () => {
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'deepseek', mainPet: '', standing: ['gpt'], mainClaimed: false }), 'gpt')
+  assert.equal(foregroundTarget({ foregroundId: 'gpt', current: 'deepseek', mainPet: '', standing: ['gpt'], mainClaimed: true }), null)
 })
 
 test('不固定、没有站着的：照常换成前台的角色；已经是她就不换', () => {

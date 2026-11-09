@@ -71,6 +71,7 @@ test('导出时间常数', () => {
   assert.equal(C.LEAVE_AFTER, 60_000)
   assert.equal(C.CLI_RECENT, 600_000)
   assert.equal(C.CLAIM_STICK, 60_000)
+  assert.equal(C.CLAIM_FRESH, 1_800_000)
 })
 
 // ---- mainClaim ----
@@ -109,6 +110,20 @@ test('只看主桌宠当前角色的客户端；没有就是 null', () => {
   const clients = C.clientsOf({ gpt: { s: { pose: 'running', ts: ago(1), client: 'codex' } } }, NOW)
   const r = C.mainClaim({ mainCharacter: 'claude', foreground: { kind: 'other' }, clients, last: null, nowMs: NOW })
   assert.equal(r.key, null)
+})
+
+test('主桌宠角色只剩很久以前的会话：不算占着（Windows 反馈：前天的 deepseek@workbuddy 让主桌宠一直是 DeepSeek）', () => {
+  const stale = C.clientsOf({ deepseek: { w: { pose: 'proud', event: 'Stop', ts: ago(230780), client: 'workbuddy' } } }, NOW)
+  assert.equal(C.mainClaim({ mainCharacter: 'deepseek', foreground: { kind: 'ai', character: 'gpt', client: 'codex' }, clients: stale, last: null, nowMs: NOW }).key, null)
+  // 上次占着它也一样：停下早过了粘住期，又没有新的会话
+  const last = { key: 'deepseek@workbuddy', since: NOW - 300_000_000 }
+  assert.equal(C.mainClaim({ mainCharacter: 'deepseek', foreground: { kind: 'other' }, clients: stale, last, nowMs: NOW }).key, null)
+})
+
+test('停下 29 分钟的会话还算占着，31 分钟不算', () => {
+  const at = sec => C.clientsOf({ claude: { a: { pose: 'proud', event: 'Stop', ts: ago(sec), client: 'claude-desktop' } } }, NOW)
+  assert.equal(C.mainClaim({ mainCharacter: 'claude', foreground: { kind: 'other' }, clients: at(29 * 60), last: null, nowMs: NOW }).key, 'claude@claude-desktop')
+  assert.equal(C.mainClaim({ mainCharacter: 'claude', foreground: { kind: 'other' }, clients: at(31 * 60), last: null, nowMs: NOW }).key, null)
 })
 
 test('已经占着桌面、桌面还在干活，终端有更新的事件：不换', () => {
@@ -628,10 +643,10 @@ test("swapMain：干活冒出来的 GPT，主桌宠原来占着 claude@claude-de
   const r = C.swapMain(state, { from: 'claude', to: 'gpt', fromClaim: 'claude@claude-desktop', gathered: [] })
   assert.deepEqual(r.state.pets[0], { id: 'gpt@codex', key: 'claude@claude-desktop', character: 'claude', client: 'claude-desktop', via: 'work', quota: false })
   assert.deepEqual(r.gathered, [])
-  // 主桌宠没占着客户端：当集合来的
+  // 主桌宠没占着客户端（她的角色没有最近的会话）：不对调。主桌宠接着占走这个客户端，干活那只走，旧角色不留下来
   const r2 = C.swapMain(state, { from: 'claude', to: 'gpt', fromClaim: null, gathered: [] })
-  assert.equal(r2.state.pets[0].via, 'gather')
-  assert.deepEqual(r2.gathered, ['claude'])
+  assert.equal(r2.state, state)
+  assert.deepEqual(r2.gathered, [])
 })
 
 test("swapMain：没有 to 的那只、或者 from 已经站着 → 不对调", () => {

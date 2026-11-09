@@ -36,7 +36,7 @@ namespace CrossPet
             if (!ready || Paused || !Store.Flag("followApps") || exe == "") return;
             if (string.IsNullOrWhiteSpace(match)) return;   // 对照表里没有，或者值留空：这个程序不跟随
             match = HostCharacter(match);
-            // 多桌宠开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、她已经有一只站着：不换）；关着时照旧直接换
+            // 多桌宠开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、主桌宠的角色最近有会话：不换）；关着时照旧直接换
             if (match != current) FollowTo(match, why, exe);
         }
 

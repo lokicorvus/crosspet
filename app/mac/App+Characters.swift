@@ -175,7 +175,7 @@ extension App {
         guard id != currentId, characterIds.contains(id) else { return }
         let work = DispatchWorkItem { [weak self] in
             guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
-            // 开关开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、她已经有一只站着：不换）；关着时照旧直接换
+            // 开关开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、主桌宠的角色最近有会话：不换）；关着时照旧直接换
             self?.followForeground(id, why: "front", via: bundle) { NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle }
         }
         pendingSwitch = work

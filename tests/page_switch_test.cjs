@@ -423,6 +423,25 @@ const multiCases = [
     assert(e.run('mainClaimed()') === true, 'claude sessions did not claim the main pet')
     assert(ask() === null, `switched away from the first comer: ${ask()}`)
   }],
+  ['stale_main_yields_to_standing_companion', async e => {
+    // 11-09 Windows 反馈：主桌宠 Claude 只剩前天的会话、GPT 在干活冒成额外那只 → 前台是 GPT 时主桌宠换成 GPT，
+    // 那只说 bye 走，不留一只 Claude 在桌面上
+    await multiOn(e, 'claude')
+    e.run(`setSessions('claude', { w: { pose: 'proud', event: 'Stop', ts: Date.now() / 1000 - 230780, client: 'claude-cli' } })`)
+    e.run(`setSessions('gpt', csess(['s1','writing','codex'])); setForeground({ kind: 'ai', character: 'gpt', client: 'codex' })`)
+    await e.advance(3000)
+    assert(JSON.stringify(lastCompanions(e).map(p => p.id)) === '["gpt@codex"]', `before: ${JSON.stringify(lastCompanions(e))}`)
+    assert(e.run('mainClaimed()') === false, 'a two-day-old session still claims the main pet')
+    const ask = e.run(`FollowPolicy.foregroundTarget(Object.assign({ foregroundId: 'gpt', current: 'claude', mainPet: '', standing: ['gpt'] }, { mainClaimed: mainClaimed() }))`)
+    assert(ask === 'gpt', `did not follow the foreground: ${ask}`)
+    e.run(`setCharacter('gpt')`)
+    await e.advance(3000)
+    assert(e.msgs().some(m => m.companionLeave === 'gpt@codex'), `extra GPT did not leave: ${JSON.stringify(multiMsgs(e).slice(-4))}`)
+    await e.advance(20000)
+    assert(JSON.stringify(lastCompanions(e)) === '[]', `after: ${JSON.stringify(lastCompanions(e))}`)
+    assert(e.run('mainClaimed()') === true, 'main GPT did not take the codex client')
+    assert(!e.errors.length, `page errors: ${JSON.stringify(e.errors)}`)
+  }],
   ['companion_waves_on_quit', async e => {
     // 退出时外壳也让额外那只 farewell：她挥手（bye）、说一句道别，之后状态事件不再打断
     const c = await rolePage('companion')
