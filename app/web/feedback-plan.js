@@ -16,15 +16,15 @@
   ]
   const STILL = [{ id: 'now', label: '还在' }, { id: 'recent', label: '刚过去（几分钟内）' }, { id: 'earlier', label: '更早' }]
   const AI_NAMES = { codex: 'Codex', 'claude-hooks': 'Claude Code', 'claude-mod': 'Claude Code（增强版）', deepseek: 'DeepSeek Harness', antigravity: 'Antigravity',
-    gemini: 'Gemini CLI', qwen: 'Qwen Code', workbuddy: 'WorkBuddy', zcode: 'ZCode', hermes: 'Hermes Agent', grok: 'Grok Build' }
+    gemini: 'Gemini CLI', qwen: 'Qwen Code', workbuddy: 'WorkBuddy', zcode: 'ZCode', hermes: 'Hermes Agent', grok: 'Grok Build', ccgui: 'CC GUI' }
   const QUOTA_NAMES = { gpt: 'GPT（Codex）额度', gemini: 'Gemini（Antigravity）额度', deepseek: 'DeepSeek 余额', claude: 'Claude 额度' }
   // 接入 → 它的状态写在哪个角色名下（多模型宿主认不出的模型写 current）、轮次和换模型记录用的宿主名（<宿主>-turns.json / -host.json）
   const STATE_OF = { codex: 'gpt', 'claude-hooks': 'claude', 'claude-mod': 'claude', deepseek: 'deepseek', antigravity: 'gemini', gemini: 'gemini',
-    qwen: 'qwen', workbuddy: 'current', zcode: 'glm', hermes: 'current', grok: 'grok' }
+    qwen: 'qwen', workbuddy: 'current', zcode: 'glm', hermes: 'current', grok: 'grok', ccgui: 'current' }
   const HOST_OF = { codex: 'gpt', 'claude-hooks': 'claude', 'claude-mod': 'claude', deepseek: 'deepseek', antigravity: 'gemini', gemini: 'gemini',
-    qwen: 'qwen', workbuddy: 'workbuddy', zcode: 'zcode', hermes: 'hermes', grok: 'grok' }
+    qwen: 'qwen', workbuddy: 'workbuddy', zcode: 'zcode', hermes: 'hermes', grok: 'grok', ccgui: 'ccgui' }
   const DIAG_HEADING = { codex: '[Codex]', 'claude-hooks': '[Claude]', 'claude-mod': '[Claude]', deepseek: '[DeepSeek Harness]', gemini: '[Gemini CLI]',
-    qwen: '[Qwen Code]', antigravity: '[Antigravity]', zcode: '[ZCode]', hermes: '[Hermes]', workbuddy: '[WorkBuddy]', grok: '[Grok Build]' }
+    qwen: '[Qwen Code]', antigravity: '[Antigravity]', zcode: '[ZCode]', hermes: '[Hermes]', workbuddy: '[WorkBuddy]', grok: '[Grok Build]', ccgui: '[CC GUI]' }
   const TITLES = { window: '窗口', displays: '显示器', front: '前台', hidden: '藏起来的原因', page: '网页自报', renderRestart: '渲染重启记录', crashes: '崩溃报告',
     install: '安装', log: '相关日志', updateLog: '更新日志', seen: '最近收到消息', diag: '接入诊断', petEvents: '桌宠收到事件后的处理', switches: '最近换角色',
     settings: '设置', characters: '角色文件夹', perf: '性能', dpi: '缩放和画布', pets: '多桌宠' }

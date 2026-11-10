@@ -61,7 +61,7 @@ extension App {
         companions.values.forEach { $0.updateDock() }
         // 多模型宿主（DeepSeek Harness、WorkBuddy、ZCode，以及接了别家接口的 Claude Code、Codex）正在前台、
         // 里面换了模型：马上换成那个模型的角色
-        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "cursor"] {
+        for host in ["deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "cursor", "ccgui"] {
             let url = stateDir.appendingPathComponent("\(host)-host.json")
             guard let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date,
                   stamp != stamps["\(host)-host"] else { continue }

@@ -38,6 +38,7 @@ ask "接入 Hermes Agent（Nous Research，装插件到 ~/.hermes/plugins/crossp
 ask "接入 Qwen Code（阿里，写入 ~/.qwen/settings.json，按当前模型换角色）？" && python3 tools/integrate.py install qwen
 ask "接入 Grok Build（xAI，写入 ~/.grok/hooks/crosspet.json）？" && python3 tools/integrate.py install grok
 ask "接入 Cursor（写入 ~/.cursor/hooks.json，按当前模型换角色）？" && python3 tools/integrate.py install cursor
+ask "接入 CC GUI（一次接入所有 CLI，重开 CC GUI 生效）？" && python3 tools/integrate.py install ccgui
 
 open "$HOME/Applications/CrossPet.app"
 say "装好了！桌宠已经出现在屏幕右下角。"
