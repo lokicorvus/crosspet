@@ -129,6 +129,7 @@ extension App {
         if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
         if bundle == "dev.zcode.app" { return "zcode" }
         if bundle == "com.todesktop.230313mzl4w4u92" { return "cursor" }
+        if bundle == "com.zhukunpenglinyutong.ccgui" { return "ccgui" }
         return nil
     }
 

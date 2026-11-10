@@ -17,7 +17,7 @@ set -euo pipefail
 
 REPO_SLUG="lokicorvus/crosspet"
 ACTION="${1:-install}"
-TARGETS="claude-mod claude-hooks codex deepseek antigravity gemini workbuddy zcode hermes qwen"
+TARGETS="claude-mod claude-hooks codex deepseek antigravity gemini workbuddy zcode hermes qwen ccgui"
 
 bold() { printf "\n\033[1m%s\033[0m\n" "$1"; }
 die() { printf "\n\033[31m%s\033[0m\n" "$1" >&2; exit 1; }
@@ -158,6 +158,7 @@ want workbuddy "接入 WorkBuddy（腾讯，按当前模型换角色）？" && p
 want zcode "接入 ZCode（智谱）？" && python3 "$INTEGRATE" install zcode || true
 want hermes "接入 Hermes Agent（Nous Research，按当前模型换角色）？" && python3 "$INTEGRATE" install hermes || true
 want qwen "接入 Qwen Code（阿里，按当前模型换角色）？" && python3 "$INTEGRATE" install qwen || true
+want ccgui "接入 CC GUI（一次接入所有 CLI，重开 CC GUI 生效）？" && python3 "$INTEGRATE" install ccgui || true
 
 bold "装好了！桌宠在屏幕右下角。"
 echo "· 单击摸摸头，拖动换位置，右键打开菜单（改名、换角色、开机自启……）"

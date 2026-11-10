@@ -35,7 +35,7 @@ namespace CrossPet
         {
             ["claude-hooks"] = "claude", ["claude-mod"] = "claude-mod", ["codex"] = "gpt", ["deepseek"] = "deepseek", ["gemini"] = "gemini",
             ["antigravity"] = "antigravity", ["workbuddy"] = "workbuddy", ["zcode"] = "zcode", ["hermes"] = "hermes",
-            ["qwen"] = "qwen", ["cursor"] = "cursor", ["grok"] = "grok",
+            ["qwen"] = "qwen", ["cursor"] = "cursor", ["grok"] = "grok", ["ccgui"] = "ccgui",
         };
         static Dictionary<string, object> LastSeen => Store.Settings.TryGetValue("seen", out var v) && v is Dictionary<string, object> d ? d : new Dictionary<string, object>();
         static double? SeenAt(string key) => LastSeen.TryGetValue(key, out var v) ? Convert.ToDouble(v) : (double?)null;
@@ -130,6 +130,7 @@ namespace CrossPet
             ("zcode", "ZCode（智谱）", "按会话的模型换角色，GLM 角色没装时由当前角色来演"),
             ("hermes", "Hermes Agent", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
             ("cursor", "Cursor", "按当前模型换角色，认不出的模型由当前角色来演；新开的对话生效"),
+            ("ccgui", "CC GUI", "一次接入所有 CLI；按当前模型换角色；完全退出再打开 CC GUI 生效"),
             ("qwen", "Qwen Code（阿里）", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
             ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
         };

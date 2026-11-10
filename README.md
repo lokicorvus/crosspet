@@ -52,9 +52,12 @@
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
 | **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子（未实测） | — |
 | **Cursor**（多模型） | ✅ 按当前模型 | ✅ 观察钩子（真实 Cursor 会话待验证） | — |
+| **CC GUI**（聚合多个 CLI） | ✅ 按当前模型 | ✅ 统一插件事件（真实桌面会话待验证） | — |
 | **Grok**（xAI Grok Build） | — | ✅ 钩子（待实测） | — |
 
 Cursor 里用哪家的模型，她就换成哪家的角色（每个对话各算各的）；Cursor 自家的 Composer、Auto 这类认不出的模型由当前角色来演，想固定成某个角色，可以在 `~/.cursor/hooks.json` 里本桥每条命令末尾加上角色 id，后续刷新会保留。运行 `python3 tools/integrate.py install cursor`，新开会话生效。使用前需要先打开 CrossPet，当前 Cursor 桥不会自动拉起已退出的桌宠。具体范围见[接入教程](docs/接入教程.md#cursor)。
+
+CC GUI 在「设置… → 接入 AI」里点击「CC GUI → 接入」，完全退出再打开 CC GUI 后生效。Claude、Codex、Pi、oh-my-pi 等 CLI 共用宿主的运行事件，切换 CLI 无需重新接入；认不出的模型由当前角色来演。需要 CC GUI 插件 SDK 0.3.24 以上，详情见[接入教程](docs/接入教程.md#cc-gui)。
 
 Grok Build（xAI 的命令行编程工具）运行 `python3 tools/integrate.py install grok` 接入，写的是它自己的 `~/.grok/hooks/crosspet.json`；在一个文件夹里第一次用时，要先在 Grok 里用 `/hooks-trust` 信任这个文件夹，钩子才会跑。Grok Build 也会读 Claude Code 的钩子：只接了 Claude 钩子的话，Grok 干活时由 Grok 来演，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过，不会演两遍。Grok 和 Cursor 的额度都只能拿登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。
 
