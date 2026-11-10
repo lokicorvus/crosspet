@@ -7,5 +7,7 @@
   "workbuddy ai.exe": "workbuddy",
   "workbuddy.exe": "workbuddy",
   "zcode.exe": "zcode",
-  "cursor.exe": "cursor"
+  "cursor.exe": "cursor",
+  "ccgui-next.exe": "ccgui",
+  "ccgui.exe": "ccgui"
 }

@@ -1,0 +1,9 @@
+{
+  "id": "crosspet",
+  "name": "CrossPet 桌宠联动",
+  "version": "1.0.0",
+  "sdkVersion": ">=0.3.24",
+  "tier": "js",
+  "description": "跟随 CC GUI 内所有 CLI 的工作状态，按当前模型切换桌宠角色。",
+  "permissions": ["events", "runtime.events.read", "session.lifecycle.read", "exec:python3"]
+}

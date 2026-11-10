@@ -73,7 +73,7 @@ namespace CrossPet
         bool HostRoutesChanged()
         {
             var changed = false;
-            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "kimi", "cursor" })
+            foreach (var host in new[] { "deepseek", "workbuddy", "zcode", "claude", "gpt", "qwen", "kimi", "cursor", "ccgui" })
             {
                 try
                 {
