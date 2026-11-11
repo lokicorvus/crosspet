@@ -261,7 +261,7 @@ extension App {
             case "openCharacters": openCharacters()
             case "openCodexResets": NSWorkspace.shared.open(URL(string: "https://codex-resets.com")!)
             case "openData": NSWorkspace.shared.open(root)
-            case "openReleases": NSWorkspace.shared.open(URL(string: "https://github.com/lokicorvus/crosspet/releases")!)
+            case "openReleases": NSWorkspace.shared.open(URL(string: "https://github.com/huochairener/crosspet/releases")!)
             case "devConsole": openDevConsole()
             case "feedback": openFeedback()
             case "characterWindow": openCharacterPage()

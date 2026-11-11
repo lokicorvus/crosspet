@@ -20,7 +20,7 @@ W, H = 1242, 1656
 INK, MUTED = (59, 42, 34), (138, 122, 112)
 ACCENT = {"claude": (232, 163, 61), "gpt": (122, 143, 168), "deepseek": (59, 91, 181), "gemini": (123, 92, 214), "glm": (75, 90, 138)}
 CREDIT = "非官方同人 · 角色原型：溟月（上善无形）、大肥鱼 / 白龙（B站 ZipZipPipe）· 立绘 CC BY-NC-SA 4.0 · 不商用"
-REPO_URL = "github.com/lokicorvus/crosspet"
+REPO_URL = "github.com/huochairener/crosspet"
 
 
 def font(size, bold=False):
@@ -221,7 +221,7 @@ def slide_install():
     art = rounded(cover_art().resize((300, 300), Image.LANCZOS), 40)
     shadowed(bg, art, ((W - 300) // 2, 200), r=40)
     steps = [
-        ("1", "GitHub 搜 lokicorvus/crosspet", "打开项目主页，「快速开始」里按系统选"),
+        ("1", "GitHub 搜 huochairener/crosspet", "打开项目主页，「快速开始」里按系统选"),
         ("2", "Mac：复制那一行命令到终端", "自动下载、安装、接上你用的 AI，不用去系统设置里放行"),
         ("3", "Windows：下载安装包", "解压后双击 install.cmd，不需要管理员权限"),
     ]

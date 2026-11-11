@@ -46,7 +46,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
 
     // 更新 用的
-    let repoSlug = "lokicorvus/crosspet"
+    let repoSlug = "huochairener/crosspet"   // 我们发布的仓库（检查更新、一键更新、发布页都指向这里）
     var lastUpdateCheck = "还没查过"
     var updating = false
 

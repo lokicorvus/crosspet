@@ -1,8 +1,8 @@
 #!/bin/bash
 # CrossPet 一条命令安装 / 更新 / 卸载（不用 git、不用编译、第一次打开也不用去「隐私与安全性」里放行）
 #
-#   安装或更新：curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash
-#   卸载：      curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash -s -- uninstall
+#   安装或更新：curl -fsSL https://raw.githubusercontent.com/huochairener/crosspet/main/get.sh | bash
+#   卸载：      curl -fsSL https://raw.githubusercontent.com/huochairener/crosspet/main/get.sh | bash -s -- uninstall
 #
 # 做的事：从 GitHub Releases 下载最新的 macOS 安装包（CrossPet-macOS.zip，1.2.1 及以前叫 CrossPet.zip）→ 装进「应用程序」→ 打开 → 逐个问你要接入哪些 AI。
 # 为什么不用放行：macOS 只拦带「从网上下载」标记的文件，浏览器下载的会带，curl 下载的不会。
@@ -15,7 +15,7 @@
 #   CROSSPET_TAG=v1.4.0-beta.2             装指定版本（测试版用户在 App 里一键更新到下一个测试版时用）；不设就是最新正式版
 set -euo pipefail
 
-REPO_SLUG="lokicorvus/crosspet"
+REPO_SLUG="huochairener/crosspet"
 ACTION="${1:-install}"
 TARGETS="claude-mod claude-hooks codex deepseek antigravity gemini workbuddy zcode hermes qwen ccgui"
 
