@@ -45,7 +45,7 @@ namespace CrossPet
             }
             if (MessageBox.Show($"{what}\n\n请重新下载安装（设置、角色和 AI 接入都会保留）。要现在打开下载页吗？",
                     "CrossPet", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
-                Process.Start(new ProcessStartInfo("https://github.com/lokicorvus/crosspet/releases/latest") { UseShellExecute = true });
+                Process.Start(new ProcessStartInfo("https://github.com/huochairener/crosspet/releases/latest") { UseShellExecute = true });
             return false;
         }
 

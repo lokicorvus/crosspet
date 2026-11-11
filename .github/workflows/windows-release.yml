@@ -1,0 +1,59 @@
+name: Windows 安装包
+
+# 推 tag（v1.3.11）→ 自动打包并发 GitHub Release；
+# 也可以在 Actions 页面手动跑一次（workflow_dispatch），只上传 artifact 不发 release，用来试水。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 创建 release、上传资产
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: rsync（镜像里没有就补装）
+        run: command -v rsync >/dev/null || { sudo apt-get update && sudo apt-get install -y rsync; }
+
+      # 包里的版本号来自仓库根的 VERSION 文件（build-windows.sh 里 -p:Version/-p:InformationalVersion）。
+      # tag 和 VERSION 不一致的话，装上「新版」还是会认旧版本号、反复提示更新，所以先拦下来。
+      - name: 核对 tag 和 VERSION 一致
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(cat VERSION)"
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag($tag) 和 VERSION($ver) 不一致；先改 VERSION 再打 tag" >&2
+            exit 1
+          fi
+
+      - name: 打包（与本地 tools/build-windows.sh 完全一致）
+        run: DOTNET=dotnet ./tools/build-windows.sh
+        env:
+          DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrossPet-Windows
+          path: build/CrossPet-Windows.zip
+          if-no-files-found: error
+
+      # 资产名固定为 CrossPet-Windows.zip：桌宠「一键更新」按这个名字找
+      # tag 带 - （如 v1.3.11-rc1）→ 标记为 prerelease；releases/latest 不含它，
+      # 正好符合 Pet.Update.cs 的逻辑：正式版用户不收测试版，测试版用户收测试版。
+      - name: 发到 GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/CrossPet-Windows.zip
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

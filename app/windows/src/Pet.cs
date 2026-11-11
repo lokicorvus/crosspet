@@ -26,7 +26,7 @@ namespace CrossPet
     /// </summary>
     sealed partial class Pet
     {
-        const string Repo = "lokicorvus/crosspet";
+        const string Repo = "huochairener/crosspet";   // 我们发布的仓库（检查更新、一键更新、发布页都指向这里）
         CoreWebView2Environment env;   // 浏览器进程崩溃后要换一个新的（见 RecoverWeb）
         public DirectHost Host { get; private set; }
         WebView2 web;

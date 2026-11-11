@@ -17,7 +17,7 @@
     <ApplicationIcon>../icon/AppIcon.ico</ApplicationIcon>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <Product>CrossPet</Product>
-    <Company>lokicorvus</Company>
+    <Company>huochairener</Company>
     <Description>CrossPet 跨 AI 桌宠</Description>
     <DebugType>none</DebugType>
   </PropertyGroup>

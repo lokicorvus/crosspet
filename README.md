@@ -2,7 +2,7 @@
 
 ![CrossPet 跨 AI 桌宠：Claude、GPT、DeepSeek、Gemini 四个角色](docs/images/cover.webp)
 
-[![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
+[![最新版本](https://img.shields.io/github/v/release/huochairener/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/huochairener/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
 ![Windows 10+](https://img.shields.io/badge/Windows-10%2B-lightgrey)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
@@ -52,9 +52,12 @@
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
 | **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子（未实测） | — |
 | **Cursor**（多模型） | ✅ 按当前模型 | ✅ 观察钩子（真实 Cursor 会话待验证） | — |
+| **CC GUI**（聚合多个 CLI） | ✅ 按当前模型 | ✅ 统一插件事件（真实桌面会话待验证） | — |
 | **Grok**（xAI Grok Build） | — | ✅ 钩子（待实测） | — |
 
 Cursor 里用哪家的模型，她就换成哪家的角色（每个对话各算各的）；Cursor 自家的 Composer、Auto 这类认不出的模型由当前角色来演，想固定成某个角色，可以在 `~/.cursor/hooks.json` 里本桥每条命令末尾加上角色 id，后续刷新会保留。运行 `python3 tools/integrate.py install cursor`，新开会话生效。使用前需要先打开 CrossPet，当前 Cursor 桥不会自动拉起已退出的桌宠。具体范围见[接入教程](docs/接入教程.md#cursor)。
+
+CC GUI 在「设置… → 接入 AI」里点击「CC GUI → 接入」，完全退出再打开 CC GUI 后生效。Claude、Codex、Pi、oh-my-pi 等 CLI 共用宿主的运行事件，切换 CLI 无需重新接入；认不出的模型由当前角色来演。需要 CC GUI 插件 SDK 0.3.24 以上，详情见[接入教程](docs/接入教程.md#cc-gui)。
 
 Grok Build（xAI 的命令行编程工具）运行 `python3 tools/integrate.py install grok` 接入，写的是它自己的 `~/.grok/hooks/crosspet.json`；在一个文件夹里第一次用时，要先在 Grok 里用 `/hooks-trust` 信任这个文件夹，钩子才会跑。Grok Build 也会读 Claude Code 的钩子：只接了 Claude 钩子的话，Grok 干活时由 Grok 来演，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过，不会演两遍。Grok 和 Cursor 的额度都只能拿登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。
 
@@ -71,7 +74,7 @@ DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、Qwen Code 里都能用好�
 打开「终端」，粘贴这一行回车：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/huochairener/crosspet/main/get.sh | bash
 ```
 
 它会下载最新版装进「应用程序」并打开，再挨个问你要接入哪些 AI（回答 `y` 或直接回车跳过）。不用 git，不用编译，**第一次打开也不用去系统设置里放行**。
@@ -83,12 +86,12 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
 以后**更新**：再运行一次同一行命令。**卸载**：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | bash -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/huochairener/crosspet/main/get.sh | bash -s -- uninstall
 ```
 
 #### 方式二：手动下载
 
-1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-macOS.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
+1. 到 [Releases](https://github.com/huochairener/crosspet/releases/latest) 下载 `CrossPet-macOS.zip`，解压后把 `CrossPet.app` 拖进「应用程序」。
 2. 第一次打开时 macOS 会拦一下（本项目没有付费的苹果开发者签名），按你的系统版本放行一次，以后就能正常双击：
    - **macOS 15 及以上**：双击 CrossPet，弹出「无法验证」时点「完成」；打开「系统设置 → 隐私与安全性」，拉到最下面，在「已阻止使用 CrossPet」旁边点「仍要打开」，输入开机密码，再点「打开」。
    - **macOS 13、14**：在「应用程序」里**右键点 CrossPet →「打开」→ 再点「打开」**。
@@ -99,7 +102,7 @@ curl -fsSL https://raw.githubusercontent.com/lokicorvus/crosspet/main/get.sh | b
 需要苹果命令行工具（没有的话运行 `xcode-select --install`）：
 
 ```bash
-git clone https://github.com/lokicorvus/crosspet.git
+git clone https://github.com/huochairener/crosspet.git
 cd crosspet
 ./install.sh
 ```
@@ -115,7 +118,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 **要求**：Windows 10（1903 及以上）或 Windows 11，x64 和 ARM64 同一个安装包（约 20 MB）。用系统自带的 WebView2 显示，不用另装运行库；极少数老系统没有 WebView2 的，第一次打开会提示去微软官网装。
 
-1. 到 [Releases](https://github.com/lokicorvus/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
+1. 到 [Releases](https://github.com/huochairener/crosspet/releases/latest) 下载 `CrossPet-Windows.zip`，**解压到本地磁盘**（比如桌面）。
 2. 双击里面的 `install.cmd`：装到 `%LOCALAPPDATA%\Programs\CrossPet`，建开始菜单快捷方式，然后自动打开。不需要管理员权限。
 3. 右键桌宠 →「设置…」→「接入 AI」，把你用的 AI 逐个「接入」。
 

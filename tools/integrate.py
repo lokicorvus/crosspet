@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok | ccgui
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | cursor | grok | ccgui
     python3 tools/integrate.py status
 
 原则：
@@ -16,6 +16,8 @@ import os
 import shutil
 import sys
 import time
+import contextlib
+import uuid
 from pathlib import Path
 
 HOME = Path.home()
@@ -988,7 +990,115 @@ def cursor(install: bool) -> None:
         remove_cursor_hooks(CURSOR_HOOKS)
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "cursor": cursor, "grok": grok}
+# ---- CC GUI（官方插件 SDK 的统一生命周期，不依赖各 CLI 是否提供 hooks）----
+# 便携版可用 CROSSPET_CCGUI_HOME 指向 portable-data.json 的 appHome。
+CCGUI_HOME = Path(os.environ.get("CROSSPET_CCGUI_HOME") or HOME / ".ccgui-next")
+
+
+@contextlib.contextmanager
+def ccgui_lock():
+    """和宿主的 plugins.json.lock 使用同一把内核锁，防止覆盖并发的插件设置。"""
+    with (CCGUI_HOME / "plugins.json.lock").open("a+b") as lock:
+        if os.name == "nt":
+            import msvcrt
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    lock.seek(0)
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("CC GUI 正在保存插件设置，请稍后重试")
+                    time.sleep(.05)
+        else:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+def ccgui_atomic(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+
+
+def has_ccgui() -> bool:
+    try:
+        record = load_json(CCGUI_HOME / "plugins.json").get("plugins", {}).get("crosspet", {})
+        return bool(record.get("enabled") and not record.get("quarantined")
+                    and (CCGUI_HOME / "plugins/crosspet/main.js").is_file()
+                    and (SUPPORT / "ccgui-bridge.json").is_file())
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def existing_ccgui_token(marker: Path):
+    try:
+        saved = json.loads(marker.read_text(encoding="utf-8"))
+        token = saved.get("token") if isinstance(saved, dict) else None
+        if isinstance(token, str) and token:
+            return token
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def ccgui(install: bool) -> None:
+    registry = CCGUI_HOME / "plugins.json"
+    if install:
+        if not found(CCGUI_HOME, "CC GUI", ("plugins", "plugins.json", "plugins.json.lock")):
+            return
+    elif not registry.exists():
+        return
+    with ccgui_lock():
+        data = load_json(registry)  # 无法解析时保留原文件，不用空配置覆盖。
+        plugins = data.setdefault("plugins", {})
+        marker = SUPPORT / "ccgui-bridge.json"
+        if install:
+            manifest = load_json(REPO / "integrations/ccgui/manifest.json")
+            manifest["permissions"][-1] = "exec:powershell" if os.name == "nt" else "exec:python3"
+            SUPPORT.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+            config = {"windows": os.name == "nt", "python": sys.executable,
+                      "hook": str(SUPPORT / MARK), "data": str(SUPPORT), "state": str(STATE_DIR),
+                      "token": existing_ccgui_token(marker) or uuid.uuid4().hex}
+            plugin = CCGUI_HOME / "plugins/crosspet"
+            source = (REPO / "integrations/ccgui/main.js").read_text(encoding="utf-8")
+            for name, content in (("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2)),
+                                  ("main.js", source.replace("const CONFIG = null", "const CONFIG = " + json.dumps(config, ensure_ascii=False), 1))):
+                backup(plugin / name)
+                ccgui_atomic(plugin / name, content + "\n")
+            plugins["crosspet"] = {"version": manifest["version"], "enabled": True, "source": "local",
+                                   "permissions": manifest["permissions"], "quarantined": False,
+                                   "lastError": None, "installedAt": int(time.time())}
+            backup(marker)
+            ccgui_atomic(marker, json.dumps({"token": config["token"]}))
+            print(f"  已安装 CC GUI 桥接插件到 {plugin}")
+            print("  → 完全退出再打开 CC GUI 后生效。所有 CLI 共用这份接入，不用逐个接；按当前模型换角色")
+        else:
+            if "crosspet" not in plugins:
+                return
+            # 先撤销桥接令牌：已在运行的旧插件、排队的事件也不能再写桌宠状态。
+            backup(marker)
+            marker.unlink(missing_ok=True)
+            del plugins["crosspet"]
+            print("  已撤销 CC GUI 桥接；其他插件和 CLI 配置不变")
+        backup(registry)
+        ccgui_atomic(registry, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "cursor": cursor, "grok": grok, "ccgui": ccgui}
 
 
 def has_hooks(p: Path) -> bool:
@@ -1015,6 +1125,7 @@ def installed() -> list:
     if has_hooks(QWEN_SETTINGS) and found(QWEN_SETTINGS.parent, "", ("settings.json",), quiet=True): result.append("qwen")
     if has_cursor() and found(CURSOR_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("cursor")
     if has_grok(): result.append("grok")
+    if has_ccgui(): result.append("ccgui")
     return result
 
 
@@ -1242,6 +1353,7 @@ def diagnose() -> str:
     L.append(f"[Gemini CLI] {file_state(GEMINI_SETTINGS, lambda: has_hooks(GEMINI_SETTINGS))}；最近消息 {seen('gemini')}")
     L.append(f"[Qwen Code] {file_state(QWEN_SETTINGS, lambda: has_hooks(QWEN_SETTINGS))}；最近消息 {seen('qwen')}")
     L.append(f"[Cursor] {file_state(CURSOR_HOOKS, has_cursor)}；最近消息 {seen('cursor')}")
+    L.append(f"[CC GUI] {file_state(CCGUI_HOME / 'plugins.json', has_ccgui)}；最近消息 {seen('ccgui')}")
     L.append(f"[Grok Build] {file_state(GROK_HOOKS, has_grok)}；最近消息 {seen('grok')}")
     L.append(f"[Antigravity] {file_state(ANTIGRAVITY_HOOKS, has_antigravity)}；最近消息 {seen('antigravity')}")
     for d in workbuddy_dirs():
@@ -1295,6 +1407,7 @@ def status() -> None:
     print("Hermes Agent        :", "已接入" if has_hermes() else "未接入")
     print("Qwen Code           :", "已接入" if has_hooks(QWEN_SETTINGS) else "未接入")
     print("Cursor              :", "已接入" if has_cursor() else "未接入")
+    print("CC GUI              :", "已接入" if has_ccgui() else "未接入")
     print("Grok Build          :", "已接入" if has_grok() else "未接入")
 
 
