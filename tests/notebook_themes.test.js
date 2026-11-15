@@ -41,6 +41,14 @@ test('panel：数字、细节、朋友、小成就、合计', () => {
   assert.ok(!html.includes('补算'))
 })
 
+test('标题：用户起的名字 + 的 + 本子名；英文名后空一格', () => {
+  assert.equal(T.bookTitle('白龙', '冰晶匣'), '白龙的冰晶匣')
+  assert.equal(T.bookTitle('GPT', '冰晶匣'), 'GPT 的冰晶匣')
+  assert.equal(T.bookTitle('  ', '冰晶匣'), '冰晶匣')
+  assert.ok(T.panel(view({ id: 'gpt', name: '小冰' }), T.themeFor('gpt')).includes('>小冰的冰晶匣<'))
+  assert.ok(T.panel(view({ id: 'deepseek', name: '大肥鱼' }), T.themeFor('deepseek')).includes('>大肥鱼的潮汐日志<'))
+})
+
 test('panel：最新的小成就标成 new，最多 4 个', () => {
   const ms = [1, 2, 3, 4, 5].map(i => ({ id: 'round1', label: 'm' + i, date: '2026-11-0' + (6 - i) }))
   const html = T.panel(view({ milestones: ms }), T.themeFor('gpt'))
@@ -55,11 +63,11 @@ test('panel：没有朋友整栏不显示；没有小成就显示一句鼓励', 
   assert.ok(html.includes('还没有小成就'))
 })
 
-test('panel：还没见过面、补算过、认识之前有轮数', () => {
+test('panel：还没见过面；补算过、认识之前有轮数也不显示那两行', () => {
   const html = T.panel(view({ firstMet: 0, daysKnown: 0, rounds: 0, workMs: 0, minutes: 0, busiest: null, longestMs: 0, before: 12, backfilled: true }), T.themeFor('qwen'))
   assert.ok(html.includes('还没一起干过活呢'))
-  assert.ok(html.includes('认识你之前，你已经和她干了 <b>12</b> 轮'))
-  assert.ok(html.includes('补算'))
+  assert.ok(!html.includes('认识你之前'))
+  assert.ok(!html.includes('补算'))
   assert.ok(html.includes('>0<'))
 })
 

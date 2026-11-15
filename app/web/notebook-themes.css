@@ -111,7 +111,9 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
   --badge-clip: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); --badge-bg: #dfe9f6;
   --rule: linear-gradient(90deg, transparent, #b9cce4, transparent);
   clip-path: polygon(18px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 18px 100%, 0 calc(100% - 18px), 0 18px); }
-.t-gpt .stat { border: 0; border-radius: 0; text-align: center; padding: 11px 6px 10px;
+/* 六边形只剪背景层（::before）：剪格子本身会把伸出上沿的批注（.note）一起切掉半截 */
+.t-gpt .stat { border: 0; border-radius: 0; text-align: center; padding: 11px 6px 10px; background: none; isolation: isolate; }
+.t-gpt .stat::before { content: ""; position: absolute; inset: 0; z-index: -1;
   clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%); background: linear-gradient(160deg, #fff 10%, #d6e2f3); }
 
 /* ======================= Gemini：星夜 ======================= */
@@ -170,7 +172,6 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 
 /* ================= 没有小成就 / 补算说明 ================= */
 .nb .empty { margin: 2px 0 0; text-align: center; color: var(--muted); font-family: var(--hand, inherit); font-size: 13px; }
-.nb .foot .aside { margin-top: 4px; font-size: 10.5px; opacity: .85; }
 
 /* ================= 翻书：打开时封面和两页纸绕左边翻过去，收起时翻回来 =================
    body.shut 合着（外壳摆好窗口前）；openBook() → body.opening；翻完 → body.open；closeBook() → body.closing */

@@ -264,10 +264,13 @@
         <div class="cv-label cv-vertical"><span class="cv-title">扇底春风录</span></div><div class="cv-seal">千问</div>`,
   }
 
+  // 本子名；标题是「她的名字 + 的 + 本子名」，名字用用户在设置里改的（没改就是默认名），比如「白龙的冰晶匣」
   const BOOKS = {
-    claude: 'Claude 的随身手册', deepseek: '大肥鱼的潮汐日志', gpt: '白龙的冰晶匣', gemini: '星光里的小心愿',
-    glm: '狐狸掌柜的流水账', grok: 'Grok 的毒舌批改本', qwen: '扇底春风录',
+    claude: '随身手册', deepseek: '潮汐日志', gpt: '冰晶匣', gemini: '星光小心愿',
+    glm: '掌柜流水账', grok: '毒舌批改本', qwen: '扇底春风录',
   }
+  // 名字以英文字母或数字结尾时空一格（「Claude 的随身手册」），中文名紧挨着（「白龙的冰晶匣」）
+  const bookTitle = (name, book) => { const n = String(name || '').trim(); return n ? `${n}${/[A-Za-z0-9]$/.test(n) ? ' ' : ''}的${book}` : book }
   function themeFor(id) {
     const key = Object.prototype.hasOwnProperty.call(ART, id) ? id : 'claude'
     const a = ART[key]
@@ -339,7 +342,7 @@
     const ring = `<svg class="ring" viewBox="0 0 100 44" preserveAspectRatio="none"><path d="M14 24C10 10 40 3 66 6s26 18 12 26-58 8-66-2c-4-6 2-12 14-16" fill="none" stroke="#ef4a4a" stroke-width="1.6" stroke-linecap="round" opacity=".9"/></svg>`
     const stat = (i, n, u, l) => { const note = noteFor(t, v, i); return `<div class="stat">${a.ring === i ? ring : ''}<div class="n">${n}<small>${u}</small></div><div class="l">${l}</div>${note ? `<span class="note">${esc(note)}</span>` : ''}</div>` }
     const meta = v.firstMet ? `认识第 <b>${num(v.daysKnown)}</b> 天 · ${mdOf(v.firstMet)}初见` : '还没一起干过活呢'
-    const headText = `<div class="kicker">${svg(a.icon)}我们的小本子</div><div class="title">${esc(t.book)}</div><div class="meta">${meta}</div>`
+    const headText = `<div class="kicker">${svg(a.icon)}我们的小本子</div><div class="title">${esc(bookTitle(v.name, t.book))}</div><div class="meta">${meta}</div>`
     const head = t.id === 'qwen'
       ? `<div class="hd">${a.head()}${headText}<div class="seal">千问</div></div>`
       : `<div class="hd">${a.head ? a.head() : ''}${headText}</div>`
@@ -351,8 +354,7 @@
     const ms = list.length
       ? `<ul class="ms">${list.map((m, i) => `<li${i === 0 ? ' class="new"' : ''}><span class="badge">${svg(MS_ICON[m.id] || 'sparkle')}</span><span class="t">${esc(m.label)}</span><span class="date">${md(m.date)}</span></li>`).join('')}</ul>`
       : `<p class="empty">还没有小成就，一起加油吧</p>`
-    const extra = (v.before > 0 ? `<div class="aside">认识你之前，你已经和她干了 <b>${num(v.before)}</b> 轮</div>` : '')
-      + (v.backfilled ? `<div class="aside">含装 CrossPet 之后、新版之前从 AI 程序记录里补算的部分</div>` : '')
+    // 「认识你之前干了几轮」「含补算的部分」两行不显示（loki 定）；before、backfilled 照旧记着
     const sign = signFor(t, v)
     return `<div class="wrap">${a.outer ? a.outer() : ''}<section class="nb t-${t.id}">
     <div class="bg">${a.bg ? a.bg() : ''}</div>
@@ -370,7 +372,7 @@
       ${friend}
       <div class="rule">${svg('sparkle')}小成就</div>
       ${ms}
-      <div class="foot">和大家一起 <b>${num(v.total && v.total.days)}</b> 天 · 一共 <b>${num(v.total && v.total.rounds)}</b> 轮${extra}</div>${sign ? `<span class="sign">${esc(sign)}</span>` : ''}
+      <div class="foot">和大家一起 <b>${num(v.total && v.total.days)}</b> 天 · 一共 <b>${num(v.total && v.total.rounds)}</b> 轮</div>${sign ? `<span class="sign">${esc(sign)}</span>` : ''}
       <button class="corner" title="翻到朋友们的留言" data-page="2" aria-label="翻到下一页"></button>
     </div>
     ${friendsPage(v, t)}
@@ -382,7 +384,7 @@
   </section></div>`
   }
 
-  const api = { themeFor, noteFor, signFor, panel, hoursOrMinutes, duration, IDS: Object.keys(BOOKS) }
+  const api = { themeFor, noteFor, signFor, panel, bookTitle, hoursOrMinutes, duration, IDS: Object.keys(BOOKS) }
   root.NotebookThemes = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
