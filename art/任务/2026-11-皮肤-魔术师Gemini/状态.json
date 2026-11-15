@@ -1,0 +1,542 @@
+{
+ "about": "idle-blink：idle-blink · 待机·眨眼；listening：listening · 倾听；thinking：thinking · 思考；reading：reading · 读文件；writing：writing · 写代码；running：running · 跑命令；searching：searching · 搜索；asking：asking · 等你回答；happy：happy · 完成；oops：oops · 出错；sleeping：sleeping · 睡着；surprised：surprised · 吓一跳；delegating：delegating · 派小帮手；drawing：drawing · 画图；proud：proud · 大活完成；pat：pat · 摸头；tired：tired · 额度快用完；hum：hum · 哼歌；stretch：stretch · 伸懒腰；yawn：yawn · 打哈欠；compact：compact · 压缩上下文；update：update · 有更新；bye：bye · 道别；annoyed：annoyed · 红温①不耐烦；puffed：puffed · 红温②鼓腮；redhot：redhot · 红温③红温；sulk：sulk · 红温④闹别扭；dizzy：dizzy · 红温·晕；coaxed：coaxed · 红温⑤被哄；forgiven：forgiven · 红温⑥原谅；roll_call：roll_call · 集合点名「到！」；friend_up：friend_up · 关系升级；float：float · 反重力悬浮；busy_left：busy_left · 忙碌（朝左）；swamped_left：swamped_left · 手忙脚乱（朝左）；edge_left：edge_left · 贴边（左）；busy_right：busy_right · 忙碌（朝右）；swamped_right：swamped_right · 手忙脚乱（朝右）；edge_left_peek：edge_left_peek · 探头（左）；edge_right：edge_right · 贴边（右）；edge_right_peek：edge_right_peek · 探头（右）",
+ "items": [
+  {
+   "char": "gemini-magician",
+   "pose": "idle-blink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
+    }
+   ],
+   "version": 3
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "listening",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "thinking",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "reading",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "writing",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "running",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "searching",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3,
+   "pick": 3
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "asking",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "happy",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4,
+   "pick": 4
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "oops",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "sleeping",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "surprised",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "delegating",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "drawing",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "proud",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "pat",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "tired",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "hum",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "stretch",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "yawn",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "compact",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "update",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "bye",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "annoyed",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "puffed",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "redhot",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "sulk",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "warn",
+     "msg": "人物比待机图小 11%（桌面上会忽大忽小）"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "dizzy",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "coaxed",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "forgiven",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "roll_call",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "friend_up",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "float",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "busy_left",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4,
+   "pick": 4
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "swamped_left",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 5
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "edge_left",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "busy_right",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4,
+   "pick": 4
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "swamped_right",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 6
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "edge_left_peek",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "edge_right",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "edge_right_peek",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  }
+ ]
+}

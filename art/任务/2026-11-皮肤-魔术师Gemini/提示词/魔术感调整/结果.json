@@ -1,0 +1,138 @@
+[
+  {
+    "pose": "searching",
+    "version": 2,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__searching__v1.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__searching__v2.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__searching__v2.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "pose": "asking",
+    "version": 2,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__asking__v1.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__asking__v2.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__asking__v2.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "happy",
+    "version": 2,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__happy__v1.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__happy__v2.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__happy__v2.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "compact",
+    "version": 2,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__compact__v1.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__compact__v2.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__compact__v2.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "busy_left",
+    "version": 3,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v2.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v3.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__busy_left__v3.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "swamped_left",
+    "version": 3,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v2.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v3.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__swamped_left__v3.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "busy_right",
+    "version": 3,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v3.png",
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_right__v2.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_right__v3.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__busy_right__v3.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  },
+  {
+    "done": false,
+    "pose": "swamped_right",
+    "version": 4,
+    "refs": [
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v3.png",
+      "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_right__v3.png",
+      "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+    ],
+    "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_right__v4.png",
+    "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/魔术感调整/gemini-magician__swamped_right__v4.md",
+    "checks": [
+      {
+        "level": "ok",
+        "msg": "机检通过"
+      }
+    ]
+  }
+]
