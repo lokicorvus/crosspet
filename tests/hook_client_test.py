@@ -75,6 +75,32 @@ class HookClientTests(unittest.TestCase):
         self.assertEqual(self.read('claude@claude-cli-state.json')['pose'], 'reading')
         self.assertEqual(self.ledger('claude-hooks')[-1]['client'], 'claude-cli')
 
+    def add_character(self, cid):
+        d = self.data / 'characters' / cid
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'character.json').write_text('{"name": "X"}', encoding='utf-8')
+        (d / 'idle.webp').write_bytes(b'x')
+
+    def test_session_moves_to_new_character_when_model_changes(self):
+        # ZCode 旧对话里把模型从 DeepSeek 换成 GLM：这个会话只能算 GLM 的，不能在 DeepSeek 名下还算「干活中」，
+        # 不然多桌宠同时冒出 GLM 和 DeepSeek 两只（用户反馈，1.3.10）
+        for c in ('deepseek', 'glm'):
+            self.add_character(c)
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'deepseek-v3', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('deepseek-sessions.json')['z1']['client'], 'zcode')
+        # 别的会话、别的客户端的同一角色不受影响
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z2', 'model': 'deepseek-v3', 'tool_name': 'Read'})
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'glm-4.6', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('glm-sessions.json')['z1']['client'], 'zcode')
+        self.assertNotIn('z1', self.read('deepseek-sessions.json'))
+        self.assertIn('z2', self.read('deepseek-sessions.json'))
+        # 宿主自己记模型的表（zcode-sessions.json，值是模型名）原样留着
+        self.assertEqual(self.read('zcode-sessions.json')['z1'], 'glm-4.6')
+        # 换回来也一样
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'deepseek-v3', 'tool_name': 'Bash'})
+        self.assertNotIn('z1', self.read('glm-sessions.json'))
+        self.assertIn('z1', self.read('deepseek-sessions.json'))
+
     def test_codex_client(self):
         self.fire('gpt', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'turn_id': 'T1', 'cwd': '/tmp',
                           'model': 'gpt-test', 'tool_name': 'exec_command', 'transcript_path': str(self.transcript)})

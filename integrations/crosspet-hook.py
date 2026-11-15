@@ -919,9 +919,10 @@ if pose:
 SESSION_KEEP = 10 * 60   # 多久没动静的会话不再记
 
 
-def update_sessions(sid: str, entry) -> None:
-    path = state_dir / f"{character}-sessions.json"
-    with open(state_dir / f".{character}-sessions.lock", "a+") as lock:
+def update_sessions(sid: str, entry, who: str = "") -> None:
+    who = who or character
+    path = state_dir / f"{who}-sessions.json"
+    with open(state_dir / f".{who}-sessions.lock", "a+") as lock:
         _lock(lock)  # 拿不到锁就跳过这次会话卡片（外面 except 兜着）：不能拖住 AI，也不能不加锁就改，会覆盖 Cursor 的卡片
         try:
             known = json.loads(path.read_text())
@@ -936,13 +937,33 @@ def update_sessions(sid: str, entry) -> None:
         else:
             known[sid] = entry
         known = {k: v for k, v in known.items() if now - float(v.get("ts", 0)) < SESSION_KEEP}
-        tmp = state_dir / f".{character}-sessions.json"
+        tmp = state_dir / f".{who}-sessions.json"
         tmp.write_text(json.dumps(known))
         tmp.replace(path)
         if os.name == "nt":
             try:
                 lock.seek(0)
                 msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            except Exception:
+                pass
+
+
+def retire_session_elsewhere(sid: str) -> None:
+    """同一个会话中途换了模型（ZCode 旧对话里 DeepSeek → GLM、Claude Code 换接口……）就换了角色：
+    把它从别的角色名下删掉。不然旧角色那份还停在「干活中」，最多留 SESSION_KEEP，多桌宠会同时冒出新旧两只。
+    只删同一个客户端记的条目；宿主自己记模型的表（<宿主>-sessions.json，值是模型名字符串）不是会话卡片，不碰"""
+    for path in state_dir.glob("*-sessions.json"):
+        who = path.name[:-len("-sessions.json")]
+        if who == character or who.startswith("."):
+            continue
+        try:
+            known = json.loads(path.read_text())
+        except Exception:
+            continue
+        old = known.get(sid) if isinstance(known, dict) else None
+        if isinstance(old, dict) and old.get("client") == client:
+            try:
+                update_sessions(sid, None, who)
             except Exception:
                 pass
 
@@ -955,6 +976,8 @@ if session_id and (pose or name == "SessionEnd"):
                          "client": client})
     except Exception:
         pass
+    if name != "SessionEnd":
+        retire_session_elsewhere(session_id)
 
 ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "unknown-event")
 
