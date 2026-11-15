@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 修复（Windows）：开着 GPT 额度时，偶尔弹出 `git.exe` 的「应用程序错误 0xc0000142」窗口。CrossPet 问完额度会马上强行结束 Codex，可能正撞上 Codex 在后台启动 git 刷新插件市场。现在先请 Codex 自己退出，5 秒还没退才强行结束（感谢 @ShiningCrevice 的排查和修法，#48）
 - 修复（Windows）：没装 Git Bash 时，CrossPet 的 Claude Code 钩子超时会拦住 Claude 读文件、开子任务等操作。现在钩子直接调用 Python、不经过命令行壳；几个钩子同时写记录时最多等 0.15 秒，等不到就跳过这一条，不再拖住 AI（以前要等 1–10 秒）。需要在「接入 AI」里点一次「更新」（感谢 @Ink-Stained-Clouds，#45）
 - 修复：用 Claude Code 增强版 mod 接入时，「接入 AI」里一直显示「还没收到过它的消息」，其实她正常在动（mod 写的心跳多了一层引号，读不出来；感谢 @TianlinglingOvO，#44）。旧 mod 写的也认，不用点「更新」
 - 新增：「让开」：鼠标停在桌宠身上按一下 ⌥（Windows 是 Ctrl），她变成半透明、鼠标穿过她，松开键直接点她后面的按钮；鼠标离开她就恢复。多桌宠每一只都一样。Mac 不用 Ctrl（Ctrl+点击是右键），Windows 不用 Alt（单按 Alt 会让菜单栏拿到焦点）

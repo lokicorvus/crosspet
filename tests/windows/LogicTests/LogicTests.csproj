@@ -20,5 +20,6 @@
     <Compile Include="../../../app/windows/src/CompanionPlace.cs" />
     <Compile Include="../../../app/windows/src/RunningClient.cs" />
     <Compile Include="../../../app/windows/src/YieldRule.cs" />
+    <Compile Include="../../../app/windows/src/ProcessStop.cs" />
   </ItemGroup>
 </Project>
