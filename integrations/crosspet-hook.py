@@ -228,17 +228,15 @@ def ensure_pet() -> str:
         exe = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "Programs/CrossPet/CrossPet.exe"
         if not exe.exists():
             return f"不打开：没找到 {exe}"
-        # 独立进程：不挂在 AI 进程下面，AI 退出时桌宠不会被一起关掉
+        # 一律交给已经在跑的资源管理器去打开（和从开始菜单打开一样），不由钩子直接启动：
+        # - 商店装的 AI（Windows 版 ChatGPT / Codex 是打包应用）直接启动的子程序会带着它的沙箱身份，
+        #   桌宠往 %LOCALAPPDATA%\CrossPet 写的好感度、小本子等被系统悄悄转进那个应用的私有目录；
+        #   下次从开始菜单打开读的是真目录，看着像清零了，两份还各涨各的（用户反馈，1.3.10）
+        # - 有的 AI（WorkBuddy）把钩子放进不许脱离的作业对象，一轮结束就把里面的进程全关掉，直接打开的桌宠会跟着闪退
         detached = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-        try:
-            subprocess.Popen([str(exe)], cwd=str(exe.parent), creationflags=detached | 0x01000000, **quiet)  # + CREATE_BREAKAWAY_FROM_JOB
-        except OSError:
-            # 有的 AI（WorkBuddy）把钩子放进不许脱离的作业对象，一轮结束就把里面的进程全关掉，直接打开的桌宠会跟着闪退。
-            # 交给已经在跑的资源管理器去打开（和从开始菜单打开一样），桌宠就不在这个作业对象里了
-            explorer = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "explorer.exe"
-            subprocess.Popen([str(explorer), str(exe)], creationflags=detached, **quiet)
-            return fresh_note + "已打开（由资源管理器打开）"
-        return fresh_note + "已打开"
+        explorer = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "explorer.exe"
+        subprocess.Popen([str(explorer), str(exe)], creationflags=detached, **quiet)
+        return fresh_note + "已打开（由资源管理器打开）"
     else:
         try:
             os.kill(int((state_dir / "pet.pid").read_text().strip()), 0)
