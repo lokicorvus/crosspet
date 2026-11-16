@@ -87,6 +87,14 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 .card.dim { opacity: .5; }
 /* 她们的友谊：仿星露谷的好感度——左边两只的头像框，右边名字、关系，下面一排 10 颗像素心（亮的是红心，没到的是暗的空心） */
 #friendRows > .item:first-child { border-top: none; }
+/* 卡片标题点了整张收起；0 心的对收进最下面一行（friendZeroToggle） */
+.card h2 .fold { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.card h2 .fold:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.fold-mark { font-size: 9px; }
+#friendZeroToggle { all: unset; box-sizing: border-box; display: block; width: 100%; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; cursor: pointer; }
+#friendZeroToggle:hover { background: var(--hover); }
+#friendZeroToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#friendZero > .item:first-child { border-top: 1px solid var(--line); }
 .friend { gap: 12px; }
 .friend-faces { display: flex; flex: none; }
 .friend-face { width: 38px; height: 38px; box-sizing: border-box; border: 2px solid var(--frame); border-radius: 3px; background: var(--face-bg);
@@ -160,7 +168,7 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
 </div>
 
 <div class="card hidden" data-tab="character" id="friendship">
-  <h2>她们的友谊</h2>
+  <h2><button id="friendToggle" class="fold" aria-expanded="true" aria-controls="friendRows">她们的友谊<span class="fold-mark">▾</span></button></h2>
   <div id="friendRows"></div>
 </div>
 
@@ -294,9 +302,36 @@ function renderMultiPets(s) {
   $('friendship').classList.toggle('hidden', !seen || !rows.length)
   $('friendship').classList.toggle('dim', !on)
   friendFaces = Object.fromEntries((s.characters || []).map(c => [c.id, { name: c.name || c.id, src: c.images?.avatar || c.images?.idle || '' }]))
-  $('friendRows').replaceChildren(...rows.map(friendRow))
+  // 有心的照旧（外壳已按心多的在前排好）；一颗都没亮的（hearts、partial 都是 0）收进最下面一行，点开就地展开
+  const zero = r => !(Number(r.hearts) > 0) && !(Number(r.partial) > 0)
+  const lit = rows.filter(r => !zero(r)), dark = rows.filter(zero)
+  const parts = lit.map(friendRow)
+  if (dark.length) {
+    const box = document.createElement('div'); box.id = 'friendZero'; box.append(...dark.map(friendRow))
+    const t = document.createElement('button'); t.id = 'friendZeroToggle'; t.type = 'button'
+    const show = () => { box.classList.toggle('hidden', !zeroOpen); t.textContent = zeroOpen ? '收起 ▴' : `还有 ${dark.length} 对还没亮心 ▸`; t.setAttribute('aria-expanded', String(zeroOpen)) }
+    t.onclick = () => { zeroOpen = !zeroOpen; show() }
+    show(); parts.push(t, box)
+  }
+  $('friendRows').replaceChildren(...parts)
+  showFriendFold()
 }
 let friendFaces = {}
+// 0 心那一行的展开只在这一次打开设置里记着（重开设置都是收着的）；整张卡片收起记在本地存储里
+let zeroOpen = false
+const FOLD_KEY = 'crosspet-friendship-folded'
+let folded = false   // 本地存储读不了时退到只在这一次里记着
+function showFriendFold() {
+  try { folded = localStorage.getItem(FOLD_KEY) === '1' } catch {}
+  $('friendRows').classList.toggle('hidden', folded)
+  $('friendToggle').setAttribute('aria-expanded', String(!folded))
+  $('friendToggle').querySelector('.fold-mark').textContent = folded ? '▸' : '▾'
+}
+$('friendToggle').onclick = () => {
+  folded = !folded
+  try { if (folded) localStorage.setItem(FOLD_KEY, '1'); else localStorage.removeItem(FOLD_KEY) } catch {}
+  showFriendFold()
+}
 // 关系称呼：和台词分档一样（0–3 / 4–7 / 8–10 颗心）
 const FRIEND_TIERS = [[8, '挚友'], [4, '好朋友'], [1, '认识了'], [0, '刚见面']]
 // 像素心（9×8 格，自己画的）：o 描边，f 填色，s 左上角的高光；画成遮罩见 heartMasks

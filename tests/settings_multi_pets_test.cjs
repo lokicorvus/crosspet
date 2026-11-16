@@ -228,6 +228,39 @@ const cases = [
     assert(hearts(rows[1])[0] === 'q2' && rows[1].querySelector('.pixel-hearts').title === '½ / 10', '½：' + JSON.stringify(hearts(rows[1])))
     assert(hearts(rows[2]).every(c => c === 'on') && rows[2].querySelector('.pixel-hearts').title === '10 / 10', '满 10 颗')
   }],
+  ['友谊：0 心的对折叠成一行，点开才显示', p => {
+    p.push({ multiPets: true, friendship: [...ROWS, { a: 'claude', b: 'deepseek', label: 'Claude ♥ 小鲸', hearts: 0, partial: 0 }] })
+    const seen = () => p.$('friendRows').querySelectorAll('.friend').filter(r => !hidden(r)).length
+    assert(seen() === 2, '默认该只看得见有心的 2 行，实际 ' + seen())
+    const t = p.$('friendZeroToggle')
+    assert(t && !hidden(t) && t.textContent.includes('还有 1 对'), '该有一行「还有 1 对……」：' + (t && t.textContent))
+    click(t)
+    assert(seen() === 3 && t.textContent.includes('收起'), '点开后该看得见 3 行、这一行变「收起」')
+    click(t)
+    assert(seen() === 2, '再点收回去')
+    p.push({ multiPets: true, friendship: [{ a: 'claude', b: 'gpt', label: 'Claude ♥ GPT', hearts: 0 }] })
+    assert(seen() === 0 && !hidden(p.$('friendZeroToggle')) && p.$('friendZeroToggle').textContent.includes('还有 1 对'), '全是 0 心时只显示那一行')
+  }],
+  ['友谊：没有 0 心的对时没有折叠那一行', p => {
+    p.push({ multiPets: true, friendship: ROWS })
+    const t = p.$('friendZeroToggle')
+    assert(!t || hidden(t), '全部有心时不该有「还有 N 对」')
+  }],
+  ['友谊：整张卡片收起记得住', p => {
+    p.push({ multiPets: true, friendship: ROWS })
+    const t = p.$('friendToggle')
+    assert(t && t.textContent.includes('她们的友谊') && t.getAttribute('aria-expanded') === 'true', '标题该是能点的按钮、默认展开')
+    click(t)
+    assert(hidden(p.$('friendRows')) && t.getAttribute('aria-expanded') === 'false', '点了该收起')
+    p.push({ multiPets: true, friendship: ROWS })
+    assert(hidden(p.$('friendRows')), '重新推数据后照旧收着')
+    const again = makePage()
+    for (const [k, v] of p.store) again.store.set(k, v)
+    again.push({ multiPets: true, friendship: ROWS })
+    assert(hidden(again.$('friendRows')), '重开设置窗口后照旧收着')
+    click(again.$('friendToggle'))
+    assert(!hidden(again.$('friendRows')), '再点展开')
+  }],
   ['没有记录：整块不显示', p => {
     p.push({ multiPets: true, friendship: [] })
     assert(hidden(p.$('friendship')), '空数组时友谊区该藏起来')
