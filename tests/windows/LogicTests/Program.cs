@@ -326,8 +326,50 @@ static class Program
                 Check("收尾：关输入出错 → 照样超时强杀", killed && p.HasExited);
             }
         }
+
+        // 小本子补算：和 Mac 共用夹具 tests/fixtures/notebook（规则见 app/mac/NotebookScan.swift），输出要和 expected.json 一模一样
+        var nbHome = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../fixtures/notebook/home"));
+        var nbGot = JsonSerializer.Serialize(NotebookScan.ScanAll(nbHome, s => Js(JsonDocument.Parse(s).RootElement), new Dictionary<string, string>()));
+        var nbWant = File.ReadAllText(Path.Combine(nbHome, "../expected.json"));
+        Check("小本子补算：夹具结果和 expected.json 一致（" + nbGot + "）", SameJson(JsonDocument.Parse(nbGot).RootElement, JsonDocument.Parse(nbWant).RootElement));
+        Check("小本子补算：文件夹不存在就是空的", JsonSerializer.Serialize(NotebookScan.ScanAll(Path.Combine(nbHome, "nope"), s => Js(JsonDocument.Parse(s).RootElement), new Dictionary<string, string>()))
+            == "[{\"source\":\"claude-code\",\"events\":[]},{\"source\":\"codex\",\"events\":[]}]");
+        // 小本子放哪（物理像素、y 向下）：她右边、上沿对齐她的上沿，右边放不下放左边，再夹进工作区
+        var nbWork = new CompanionPlace.Rect(0, 0, 1920, 1040);
+        var nbSize = new CompanionPlace.Size(408, 600);
+        var nbRight = NotebookPlace.Place(new CompanionPlace.Rect(800, 300, 260, 362), nbSize, nbWork, 12);
+        Check("小本子位置：右边放得下放右边，压着她 12", nbRight.X == 800 + 260 - 12 && nbRight.Y == 300 && nbRight.W == 408 && nbRight.H == 600);
+        var nbLeft = NotebookPlace.Place(new CompanionPlace.Rect(1600, 300, 260, 362), nbSize, nbWork, 12);
+        Check("小本子位置：右边放不下放左边", nbLeft.X == 1600 - 408 + 12 && nbLeft.Y == 300);
+        var nbLow = NotebookPlace.Place(new CompanionPlace.Rect(800, 700, 260, 362), nbSize, nbWork, 12);
+        Check("小本子位置：太靠下往上挪，底边贴着工作区", nbLow.Y == 1040 - 600);
+        var nbHigh = NotebookPlace.Place(new CompanionPlace.Rect(800, -100, 260, 362), nbSize, nbWork, 12);
+        Check("小本子位置：她探出屏幕上边时顶边贴着工作区", nbHigh.Y == 0);
+        var nbSecond = NotebookPlace.Place(new CompanionPlace.Rect(2000, 300, 260, 362), nbSize, new CompanionPlace.Rect(1920, 0, 1920, 1040), 12);
+        Check("小本子位置：第二块屏幕上照样在她右边", nbSecond.X == 2000 + 260 - 12);
+        var nbTiny = NotebookPlace.Place(new CompanionPlace.Rect(100, 100, 260, 362), nbSize, new CompanionPlace.Rect(0, 0, 300, 500), 12);
+        Check("小本子位置：屏幕比本子还小时贴左上角", nbTiny.X == 0 && nbTiny.Y == 0);
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
+    }
+
+    // 两段 JSON 一样（对象不看键的顺序，数字按值比）
+    static bool SameJson(JsonElement a, JsonElement b)
+    {
+        if (a.ValueKind != b.ValueKind) return false;
+        switch (a.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var pa = a.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+                var pb = b.EnumerateObject().ToDictionary(p => p.Name, p => p.Value);
+                return pa.Count == pb.Count && pa.All(kv => pb.TryGetValue(kv.Key, out var v) && SameJson(kv.Value, v));
+            case JsonValueKind.Array:
+                var la = a.EnumerateArray().ToList(); var lb = b.EnumerateArray().ToList();
+                return la.Count == lb.Count && la.Zip(lb, SameJson).All(x => x);
+            case JsonValueKind.Number: return a.GetDecimal() == b.GetDecimal();
+            case JsonValueKind.String: return a.GetString() == b.GetString();
+            default: return true;
+        }
     }
 
     // 把 JSON 转成和 Windows 上 JavaScriptSerializer 一样的形状：对象 → Dictionary，数组 → object[]，整数 → int，小数 → decimal

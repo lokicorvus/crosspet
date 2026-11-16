@@ -114,6 +114,7 @@ namespace CrossPet
             if (m.TryGetValue("eggAllowed", out var ea) && ea is bool ok) eggAllowed = ok;
             if (m.TryGetValue("friendship", out var fr) && fr is object[] rows) { friendshipRows = rows; PushSettings(); }
             if (m.TryGetValue("friendshipStore", out var fs) && fs is Dictionary<string, object> store) SaveFriendshipFile(store);
+            HandleNotebookMessage(m);   // 小本子：notebookStore、notebookBackfill（Pet.Notebook.cs）
         }
 
         // ---- 友谊的备份（数据目录里的 friendship.json）----

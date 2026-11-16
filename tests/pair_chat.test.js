@@ -12,9 +12,10 @@ const CHARS = fs.readdirSync(DIR).filter(id => {
 const seq = list => { let i = 0; return () => list[i++ % list.length] }
 const POSES = ['happy', 'listening', 'puffed', 'pat']
 // 一段：两句、两个人各说一句、都是这一对里的人、每句不长（气泡放得下），写了立绘的必须是认得的
+// 一段两句或三句（A → B → A），相邻两句不是同一个人
 function checkExchange(key, who, lines) {
-  assert.equal(lines.length, 2, key)
-  assert.notEqual(lines[0][0], lines[1][0], `${key} 同一个人自问自答`)
+  assert.ok(lines.length === 2 || lines.length === 3, `${key} 一段 ${lines.length} 句`)
+  for (let i = 1; i < lines.length; i++) assert.notEqual(lines[i - 1][0], lines[i][0], `${key} 同一个人自问自答`)
   for (const [w, text, pose] of lines) {
     assert.ok(who.includes(w), `${key} 里出现了 ${w}`)
     assert.ok(typeof text === 'string' && text.length > 0 && text.length <= 14, `${key} 这句太长：${text}`)
@@ -23,7 +24,7 @@ function checkExchange(key, who, lines) {
 }
 const skinOf = id => { try { return JSON.parse(fs.readFileSync(path.join(DIR, id, 'character.json'), 'utf8')).skinOf } catch { return undefined } }
 
-test('每一对都有台词：三档、每档至少两段，每段一问一答、两个人各说一句', () => {
+test('每一对都有台词：三档、每档至少六段（有三句来回的），两个人轮着说、不重复', () => {
   assert.ok(CHARS.length >= 7)
   for (let i = 0; i < CHARS.length; i++) for (let j = i + 1; j < CHARS.length; j++) {
     const key = F.pairKey(CHARS[i], CHARS[j])
@@ -32,9 +33,12 @@ test('每一对都有台词：三档、每档至少两段，每段一问一答�
     assert.ok(tiers, `缺 ${key}`)
     assert.equal(tiers.length, 3, key)
     for (const tier of tiers) {
-      assert.ok(tier.length >= 2, key)
+      assert.ok(tier.length >= 6, `${key} 一档只有 ${tier.length} 段`)
+      assert.ok(tier.some(lines => lines.length === 3), `${key} 一档没有三句来回的`)
       for (const lines of tier) checkExchange(key, key.split('+'), lines)
     }
+    const said = tiers.flat().flat().map(([, t]) => t)
+    assert.equal(new Set(said).size, said.length, `${key} 有重复的句子：${said.filter((t, i) => said.indexOf(t) !== i)}`)
   }
   assert.equal(Object.keys(P.LINES).length, CHARS.length * (CHARS.length - 1) / 2, '不该有多余的对')
 })
@@ -45,7 +49,7 @@ test('心数分档：0–3 / 4–7 / 8–10', () => {
 
 const base = { present: ['claude', 'gpt'], hearts10: () => 0, nowMs: 100 * 60_000, lastAt: 0 }
 
-test('离上次不到 12 分钟、掷没中、凑不出一对闲着的：不说', () => {
+test('离上次不到 8 分钟、掷没中、凑不出一对闲着的：不说', () => {
   assert.equal(P.pick({ ...base, lastAt: base.nowMs - P.GAP_MS + 1, rnd: () => 0 }), null)
   assert.equal(P.pick({ ...base, rnd: () => P.CHANCE }), null)
   assert.equal(P.pick({ ...base, busy: ['gpt'], rnd: () => 0 }), null)
@@ -60,8 +64,19 @@ test('挑中：按心数拿那一档；最近说过的不重复（全说过了�
   assert.equal(high.tier, 2)
   const next = P.pick({ ...base, recent: [low.id], rnd: () => 0 })
   assert.equal(next.id, 'claude+gpt/0/1')
-  const again = P.pick({ ...base, recent: ['claude+gpt/0/0', 'claude+gpt/0/1'], rnd: () => 0 })
+  const all = P.LINES['claude+gpt'][0].map((_, i) => `claude+gpt/0/${i}`)
+  const again = P.pick({ ...base, recent: all, rnd: () => 0 })
   assert.equal(again.id, 'claude+gpt/0/0')
+})
+
+test('pick 的 extra：别处给的候选并进这一对这一档', () => {
+  const n = P.LINES['claude+gpt'][0].length
+  const extra = (a, b, tier) => [{ id: `x/${a}+${b}/${tier}`, lines: [['gpt', '多的一段'], ['claude', '嗯']] }]
+  const recent = P.LINES['claude+gpt'][0].map((_, i) => `claude+gpt/0/${i}`)
+  const got = P.pick({ ...base, recent, extra, rnd: () => 0 })
+  assert.equal(got.id, 'x/claude+gpt/0')
+  assert.equal(got.lines[0][1], '多的一段')
+  assert.ok(n >= 6)
 })
 
 test('三只在场、一只在忙：只在闲着的两只里挑', () => {
@@ -168,4 +183,21 @@ test('levelUp：升了级没演过才演；只演最高那档；在忙的不算�
   assert.equal(P.levelUp({ ...base, levelOf: () => 2, shownOf: () => 2 }), null)
   assert.equal(P.levelUp({ ...base, busy: ['grok'], levelOf: k => k === 'gpt+grok' ? 1 : 0 }), null)
   assert.equal(P.levelUp({ ...base, levelOf: () => 3, shownOf: () => 1 }).level, 3)
+})
+
+test('闲聊间隔至少 8 分钟', () => { assert.equal(P.GAP_MS, 8 * 60_000) })
+
+test('气泡停留按字数：最少 12 秒、最多 20 秒', () => {
+  assert.equal(P.bubbleMs('你好'), 12000)
+  assert.equal(P.bubbleMs('一二三四五六七八九十一二三四'), 16800)
+  assert.equal(P.bubbleMs('字'.repeat(40)), 20000)
+})
+
+test('一段的时间表：后一句等前一句显示一阵再接', () => {
+  const lines = [['claude', '吃了吗？'], ['deepseek', '吃了三碗白米饭！'], ['claude', '……']]
+  const s = P.schedule(lines)
+  assert.deepEqual(s.map(x => x.at), [0, P.replyAfter('吃了吗？'), P.replyAfter('吃了吗？') + P.replyAfter('吃了三碗白米饭！')])
+  assert.deepEqual(s.map(x => x.ms), lines.map(([, t]) => P.bubbleMs(t)))
+  assert.equal(P.replyAfter('吃了吗？'), 4400)
+  assert.equal(P.replyAfter('字'.repeat(30)), 5400)
 })

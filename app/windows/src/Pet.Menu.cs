@@ -42,6 +42,7 @@ namespace CrossPet
             }
             menu.Items.Add(Item("摸摸头", () => Js("handleClick('pat')")));
             menu.Items.Add(Item("戳一下", () => Js("handleClick('poke')")));
+            menu.Items.Add(Item("我们的小本子", OpenOwnNotebook));
             var eggItem = Item("召唤彩蛋", () => Js("playEgg(true)"));
             eggItem.Enabled = eggAllowed;   // 有别的桌宠在场时不演彩蛋（页面发 eggAllowed:false）
             menu.Items.Add(eggItem);

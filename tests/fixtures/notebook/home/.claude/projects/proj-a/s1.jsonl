@@ -1,0 +1,12 @@
+{"type":"user","timestamp":"2026-11-01T10:00:00.000Z","message":{"role":"user","content":"假的提问一"}}
+{"type":"assistant","timestamp":"2026-11-01T10:00:05.500Z","message":{"model":"claude-opus-5-5","content":[{"type":"text","text":"假的回复"}]}}
+{"type":"user","timestamp":"2026-11-01T10:00:06.000Z","message":{"role":"user","content":[{"type":"tool_result","content":"x"}]}}
+{"type":"assistant","timestamp":"2026-11-01T10:00:09.000Z","message":{"model":"<synthetic>","content":[{"type":"text","text":"x"}]}}
+this line is broken {
+{"type":"user","timestamp":"2026-11-01T10:01:00Z","isMeta":true,"message":{"role":"user","content":"meta"}}
+{"type":"user","timestamp":"2026-11-01T10:01:30Z","message":{"role":"user","content":"<command-name>/clear</command-name>"}}
+{"type":"user","timestamp":"2026-11-01T10:02:00Z","message":{"role":"user","content":[{"type":"text","text":"假的提问二"},{"type":"image"}]}}
+{"type":"assistant","timestamp":"2026-11-01T10:02:30Z","isSidechain":true,"message":{"model":"claude-opus-5-5","content":[]}}
+{"type":"assistant","timestamp":"2026-11-01T10:03:00Z","message":{"model":"deepseek-chat","content":[]}}
+{"type":"assistant","message":{"model":"claude-opus-5-5","content":[]}}
+{"type":"attachment","timestamp":"2026-11-01T10:03:10Z"}

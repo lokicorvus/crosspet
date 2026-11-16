@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>我们的小本子</title>
+<link rel="stylesheet" href="notebook-themes.css">
+</head>
+<body class="shut">
+<div id="root"></div>
+<script src="notebook-themes.js"></script>
+<script src="notebook-friends.js"></script>
+<script>
+// 小本子面板（外壳开的无边框小窗）。数据由主桌宠页面算好（notebookFor），外壳交过来：
+//   外壳 → 页面：render(view)（合着的封面，量好尺寸发 {size}）、openBook()（窗口摆好、显示后调：翻开）、closeBook()（翻回去，翻完发 {closed}）
+//   页面 → 外壳：{ ready }（载入完）、{ size: { w, h } }、{ closed }（翻完了，外壳关窗口）
+// 点 × 或按 Esc 也是 closeBook()。notebook.html?demo=<角色> 用示例数据看样式（开发用，不进菜单）
+function toShell(msg) {
+  try { window.webkit?.messageHandlers?.notebook?.postMessage(msg) } catch {}
+  try { window.chrome?.webview?.postMessage(msg) } catch {}
+}
+const root = document.getElementById('root')
+const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+let closing = false, openTimer = null, closeTimer = null, flipTimer = null, flipping = false
+
+function sizeNow() {
+  const r = document.body.getBoundingClientRect()
+  toShell({ size: { w: Math.ceil(r.width), h: Math.ceil(r.height) } })
+}
+function render(view) {
+  clearTimeout(openTimer); clearTimeout(closeTimer); closing = false
+  const theme = NotebookThemes.themeFor(view && view.id)
+  root.innerHTML = NotebookThemes.panel(view, theme)
+  root.classList.remove('p2'); clearTimeout(flipTimer); flipping = false
+  for (const img of root.querySelectorAll('img[data-fallback]')) img.onerror = () => { img.onerror = null; img.src = img.dataset.fallback }
+  document.body.className = 'shut'
+  sizeNow()
+}
+// 翻开：封面、两页纸依次翻过去（CSS 里的 .opening），翻完换成 .open 把翻页那几层收掉
+function openBook() {
+  if (closing) return
+  document.body.className = ''
+  void document.body.offsetWidth   // 重新开始动画
+  document.body.className = 'opening'
+  clearTimeout(openTimer)
+  openTimer = setTimeout(() => { if (!closing) document.body.className = 'open' }, reduced() ? 200 : 1100)
+}
+function closeBook() {
+  if (closing) return
+  closing = true
+  clearTimeout(openTimer)
+  document.body.className = ''
+  void document.body.offsetWidth
+  document.body.className = 'closing'
+  closeTimer = setTimeout(() => toShell({ closed: true }), reduced() ? 170 : 780)
+}
+// 翻页：点书签或翻页角。翻到第二页：一张纸从右往左翻过去（纸盖住时就换好了页）；翻回来：纸翻回来盖住再换。
+// 第几页记在 #root 上（body 的类给翻开 / 合上用）；两页叠在同一个格子里，窗口大小不变
+function flipTo(n) {
+  const want = n === 2, now = root.classList.contains('p2')
+  if (want === now || flipping || closing || !document.body.classList.contains('open')) return
+  if (reduced()) { root.classList.toggle('p2', want); return }
+  flipping = true
+  const cls = want ? 'flipping' : 'flipping-back'
+  root.classList.add(cls)
+  if (want) root.classList.add('p2')
+  flipTimer = setTimeout(() => { if (!want) root.classList.remove('p2'); root.classList.remove(cls); flipping = false }, 540)
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-action="close"]')) { closeBook(); return }
+  const page = e.target.closest('[data-page]')
+  if (page) flipTo(Number(page.dataset.page))
+})
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBook() })
+document.addEventListener('contextmenu', e => e.preventDefault())
+
+// ---- 开发看样式：?demo=claude ----
+const demo = new URLSearchParams(location.search).get('demo')
+if (demo) {
+  document.documentElement.style.background = '#e7e2da'
+  const day = 86_400_000, now = Date.now()
+  const friendOf = { claude: 'deepseek', deepseek: 'claude', gpt: 'gemini', gemini: 'gpt', glm: 'qwen', grok: 'deepseek', qwen: 'glm' }
+  const names = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', glm: 'GLM', grok: 'Grok', qwen: '千问' }
+  const f = friendOf[demo] || 'claude'
+  const view = {
+    id: demo, name: names[demo] || demo, firstMet: now - 36 * day, daysKnown: 37, rounds: 312, workMs: 41 * 3_600_000, minutes: 96 * 60,
+    pats: 128, pokes: 23, angry: 4, busiest: { date: '2026-11-03', rounds: 46 }, longestMs: 133 * 60_000,
+    friend: { id: f, name: names[f], level: '挚友', hearts: 8.5, image: `../../characters/${f}/idle.webp` },
+    milestones: [{ id: 'round100', label: '第 300 轮活', date: '2026-11-07' }, { id: 'night', label: '凌晨 3 点还在陪你', date: '2026-10-28' }, { id: 'days30', label: '认识 30 天', date: '2026-11-01' }],
+    before: 86, backfilled: true, total: { days: 37, rounds: 1284 }, notes: null, sign: null,
+  }
+  // 第二页：三个朋友（挚友 / 好朋友 / 认识了），用真的文案挑
+  const others = Object.keys(names).filter(id => id !== demo && id !== f).slice(0, 2)
+  const today = new Date().toISOString().slice(0, 10)
+  const fr = [[f, 3, 9.2], [others[0], 2, 5.5], [others[1], 1, 2]].map(([id, level, hearts]) => ({ id, level, hearts, first: now - 36 * day, minutes: 96 * 60 }))
+  view.page2 = { now, ownerImage: `../../characters/${demo}/idle.webp`,
+    friends: fr.map(x => ({ id: x.id, name: names[x.id], image: `../../characters/${x.id}/idle.webp`, levelName: ['刚见面', '认识了', '好朋友', '挚友'][x.level], hearts: x.hearts,
+      block: NotebookFriends.block({ owner: demo, friend: x.id, level: x.level, day: today, facts: { first: x.first, minutes: x.minutes, days: 36, rounds: 312, pats: 128 } }) })),
+    cameo: (c => c && { ...c, name: names[c.who] })(NotebookFriends.cameo({ owner: demo, friends: fr, day: today }) || NotebookFriends.cameo({ owner: demo, friends: fr, day: new Date(now + day).toISOString().slice(0, 10) })),
+    chats: [{ t: now - 3_600_000, lines: [[f, '中午吃啥？'], [demo, '你定吧']] }, { t: now - 30 * 3_600_000, lines: [[others[0], '今天外面下雨了'], [demo, '记得带伞。'], [f, '下雨就睡觉！']] }]
+      .map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who], text })) })) }
+  if (new URLSearchParams(location.search).get('page') === '2') setTimeout(() => flipTo(2), 1600)
+  render(view)
+  setTimeout(openBook, 300)
+  // 收起后过一会儿再翻开一次，方便反复看动画
+  toShell = msg => { if (msg.closed) setTimeout(() => { render(view); setTimeout(openBook, 300) }, 500) }
+}
+toShell({ ready: true })
+</script>
+</body></html>

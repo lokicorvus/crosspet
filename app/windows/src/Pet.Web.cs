@@ -55,6 +55,7 @@ namespace CrossPet
             var skin = Store.Skins != null && Store.Skins.TryGetValue(id, out var w) ? w as string ?? "" : "";
             Ledger.Append(SwitchesFile, new Dictionary<string, object> { ["from"] = current ?? "", ["to"] = id, ["skin"] = skin, ["why"] = why, ["via"] = via });
             if (id != current) Store.Log($"换角色 {current} → {id}（{why}{(via == "" ? "" : " " + via)}）");
+            if (id != current && NotebookOwner == "main") CloseNotebook();   // 她换成别人了：她的小本子收起
             current = id;
             if (dock != null && !dockOut) After(800, ApplyDock);   // 换了角色，切口位置跟着变
             Store.Settings["character"] = id; Store.SaveSettings();
