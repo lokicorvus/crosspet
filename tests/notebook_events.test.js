@@ -71,3 +71,7 @@ test('pats_picks_by_kind', () => {
   const b = E.block({ ev: ev('pats', { n: 25, m: 'pokes' }), owner: 'claude', level: 1 })
   assert.ok(E.EVENT_MSG.pats.gemini.pokes.map(t => t.replace('{n}', 25)).includes(b.lines[0].text), b.lines[0].text)
 })
+
+test('skins_have_their_own：四套性格皮肤每种事都有自己的', () => {
+  for (const s of ['gpt-onesie', 'deepseek-hoodie', 'claude-saint', 'gemini-magician']) checkWriter(s, { allFests: false })
+})
