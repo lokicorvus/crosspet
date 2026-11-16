@@ -101,6 +101,33 @@ class HookClientTests(unittest.TestCase):
         self.assertNotIn('z1', self.read('glm-sessions.json'))
         self.assertIn('z1', self.read('deepseek-sessions.json'))
 
+    def test_kimi_code_events(self):
+        # Kimi Code：多模型宿主，模型名只在 SessionStart 里给（真机收到的格式：kimi-code/<模型别名>），默认演 Kimi
+        for c in ('kimi', 'claude'):
+            self.add_character(c)
+        base = {'session_id': 'k1', 'cwd': '/tmp', 'client_type': 'kimi_code_cli'}
+        self.fire('kimi', {**base, 'hook_event_name': 'SessionStart', 'source': 'startup', 'model': 'kimi-code/kimi-for-coding-highspeed', 'profile': 'agent'})
+        self.fire('kimi', {**base, 'hook_event_name': 'UserPromptSubmit', 'prompt': [{'type': 'text', 'text': 'hi'}], 'is_steer': False})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'listening')
+        self.fire('kimi', {**base, 'hook_event_name': 'PreToolUse', 'tool_name': 'Read', 'tool_input': {'path': 'a.txt'}, 'tool_call_id': 't1'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'reading')
+        self.assertEqual(self.read('kimi-sessions.json')['k1']['client'], 'kimi')
+        self.assertEqual(self.read('kimi-models.json')['k1'], 'kimi-code/kimi-for-coding-highspeed')   # 不和会话状态抢同一个文件
+        self.fire('kimi', {**base, 'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'asking')
+        self.fire('kimi', {**base, 'hook_event_name': 'PermissionResult', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'thinking')
+        self.fire('kimi', {**base, 'hook_event_name': 'PreCompact', 'trigger': 'auto', 'token_count': 1})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'compact')
+        self.fire('kimi', {**base, 'hook_event_name': 'StopFailure', 'error_type': 'APIStatusError', 'error_message': 'x'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'oops')
+        # 同一个 Kimi Code 里换成 Claude 的模型：新会话由 Claude 来演
+        self.fire('kimi', {**base, 'session_id': 'k2', 'hook_event_name': 'SessionStart', 'source': 'startup', 'model': 'my-anthropic/claude-sonnet-5'})
+        self.fire('kimi', {**base, 'session_id': 'k2', 'hook_event_name': 'PreToolUse', 'tool_name': 'Bash', 'tool_input': {'command': 'ls'}})
+        self.assertEqual(self.read('claude-state.json')['pose'], 'running')
+        self.assertEqual(self.read('claude-sessions.json')['k2']['client'], 'kimi')
+        self.assertIsNotNone((self.state / 'seen-kimi').exists() or None)
+
     def test_codex_client(self):
         self.fire('gpt', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'turn_id': 'T1', 'cwd': '/tmp',
                           'model': 'gpt-test', 'tool_name': 'exec_command', 'transcript_path': str(self.transcript)})

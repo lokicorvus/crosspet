@@ -556,13 +556,13 @@ try:
 except Exception:
     pass
 
-# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen")
-# ZCode 默认用智谱的 GLM；Qwen Code 默认用自家的千问。它们只在会话开始时告诉模型名，
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi")
+# ZCode 默认用智谱的 GLM；Qwen Code、Kimi Code 默认用自家的模型。它们只在会话开始时告诉模型名，
 # 之后的事件按会话 id 查当时记下的模型
-HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen"}
+HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen", "kimi": "kimi"}
 characters_dir = app_data / "characters"
 
 
@@ -655,7 +655,7 @@ def installed(c) -> bool:
 # 另外看环境变量里的模型名和接口地址
 SELF_HOSTS = ("claude", "gpt")
 # 宿主名同时也是角色名的：它们的 <名字>-sessions.json 被多会话状态占用，记模型要另开一个文件（见 remember_session_model）
-NAMED_HOSTS = SELF_HOSTS + ("qwen",)
+NAMED_HOSTS = SELF_HOSTS + ("qwen", "kimi")
 if character in SELF_HOSTS:
     host = character
     # 先看事件里的模型名（Claude Code 会话开始时给的、Codex 每条都给的，是实际要用的那个）；
@@ -807,7 +807,9 @@ if arg_event and name == "PostToolUse":
         pose = agy or ("searching" if tool.startswith("browser") else pose_for_tool(tool))
     name = "PreToolUse"  # 让桌宠当作「正在用这个工具」显示，而不是「工具结束、回去思考」
 elif name in ("PermissionRequest",):
-    pose = "asking"  # 等你授权（Codex）
+    pose = "asking"  # 等你授权（Codex、Kimi Code）
+elif name in ("PermissionResult",):
+    pose = "thinking"  # 你点了同意 / 拒绝（Kimi Code）：回去接着干
 elif name in ("Notification",):
     kind = str(event.get("notification_type", "")).lower()
     message = str(event.get("message", "")).lower()

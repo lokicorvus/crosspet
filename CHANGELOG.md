@@ -2,6 +2,9 @@
 
 ## 未发布
 
+- 新增：新角色 Kimi：月亮上来的音乐少女小女仆，银白长发、拉小提琴，话多、有点爱做梦。用 Kimi 的模型时（ZCode、WorkBuddy、Hermes、DeepSeek Harness、Cursor 里，或者 Claude Code、Claude Code 增强版走 Kimi 的接口）她来演；切到 Kimi 客户端时也换成她
+- 新增：接入 Kimi Code（月之暗面的命令行编程工具）：按会话的模型换角色，等你批准时举乐谱等你选，压缩上下文时整理乐谱。写进 `~/.kimi-code/config.toml`，撤销时按标记删掉。干活时的事件要会员才能触发，还没实测
+- 修复：Claude Code 增强版接了千问、Grok 的模型时，桌宠照旧是 Claude。现在和普通接入一样换成对应角色
 - 修复（Windows）：好感度、小本子时有时无，像是清零了又冒出来。桌宠没开着时由 Codex（商店装的 ChatGPT）干活叫出来，会带上那个应用的沙箱，数据被系统转存进它的私有目录；下次从开始菜单打开读的是真目录，两份各涨各的。现在 AI 叫桌宠一律交给资源管理器打开，和从开始菜单打开一样。已经分开的两份数据要手动合并一次（感谢用户反馈）。钩子随 CrossPet 更新自动换新；DeepSeek Harness 插件升到 1.3.11，用户会收到提醒，在「接入 AI」里点一次「更新」再重开 Harness
 - 修复：多桌宠打开时，在 ZCode 旧对话里把模型从 DeepSeek 换成 GLM，会同时冒出 GLM 和 DeepSeek 两只（这个对话在 DeepSeek 名下还算「干活中」，要 10 分钟才清掉）。现在对话换了模型就只算新角色的（感谢用户反馈）
 - 修复（Windows）：开着 GPT 额度时，偶尔弹出 `git.exe` 的「应用程序错误 0xc0000142」窗口。CrossPet 问完额度会马上强行结束 Codex，可能正撞上 Codex 在后台启动 git 刷新插件市场。现在先请 Codex 自己退出，5 秒还没退才强行结束（感谢 @ShiningCrevice 的排查和修法，#48）

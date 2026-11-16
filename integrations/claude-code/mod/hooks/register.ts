@@ -30,11 +30,17 @@ function characterForUrl(url: string): string | undefined {
   const u = url.toLowerCase()
   if (u.includes('deepseek.com')) return 'deepseek'
   if (u.includes('bigmodel.cn') || u.includes('z.ai') || u.includes('zhipu')) return 'glm'
+  if (u.includes('moonshot') || u.includes('kimi')) return 'kimi'
+  if (u.includes('x.ai')) return 'grok'
   return undefined
 }
 function characterForModel(model: string): string | undefined {
   const m = model.toLowerCase()
   if (/glm|zhipu|chatglm|z\.ai|zai-/.test(m)) return 'glm'
+  // 和 crosspet-hook.py 的 character_for_model 同一个顺序
+  if (/qwen|dashscope|bailian|tongyi/.test(m)) return 'qwen'
+  if (/kimi|moonshot/.test(m)) return 'kimi'
+  if (m.includes('grok')) return 'grok'
   if (m.includes('deepseek')) return 'deepseek'
   if (/claude|anthropic|opus|sonnet|haiku/.test(m)) return 'claude'
   if (m.includes('gemini')) return 'gemini'

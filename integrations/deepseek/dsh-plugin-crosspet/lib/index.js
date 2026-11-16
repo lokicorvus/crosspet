@@ -43,6 +43,7 @@ function characterFor(provider, model, custom = {}) {
     if (/deepseek/.test(s)) return "deepseek";
     if (/glm|zhipu|bigmodel|chatglm|z-ai|zai-/.test(s)) return "glm";
     if (/qwen|dashscope|bailian|tongyi/.test(s)) return "qwen";
+    if (/kimi|moonshot/.test(s)) return "kimi";
     if (/grok|x-ai|xai/.test(s)) return "grok";
     if (/claude|anthropic/.test(s)) return "claude";
     if (/gemini|google|vertex/.test(s)) return "gemini";

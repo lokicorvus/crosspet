@@ -16,7 +16,7 @@
   // 这些姿态不算干活；「等你回答」（asking）算
   const WORKING_EXCLUDED = new Set(['idle', 'sleeping', 'happy', 'proud', 'tired'])
   // 跑在终端里的客户端
-  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'grok', 'hermes'])
+  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'kimi', 'grok', 'hermes'])
   // 没有 client 的旧条目（key 是 角色@角色）：这些角色默认接入的是命令行客户端
   // （claude → Claude Code 命令行、gpt → codex，其余同名命令行）
   const LEGACY_CLI_CHARACTERS = new Set(['claude', 'gpt', 'deepseek', 'gemini', 'qwen', 'grok'])
