@@ -222,9 +222,9 @@ test('logChat：新的在前，最多留 30 段，只存角色和台词', () => 
 test('addMinute 顺带记每一对一起在桌面上的分钟和第一次', () => {
   let s = N.addMinute(N.empty(0), ['claude', 'gpt', 'grok'], 5000)
   s = N.addMinute(s, ['claude', 'gpt'], 65000)
-  assert.deepEqual(s.pairs['claude+gpt'], { first: 5000, minutes: 2 })
-  assert.deepEqual(s.pairs['gpt+grok'], { first: 5000, minutes: 1 })
-  assert.deepEqual(s.pairs['claude+grok'], { first: 5000, minutes: 1 })
+  assert.deepEqual(s.pairs['claude+gpt'], { first: 5000, minutes: 2, last: 65000 })
+  assert.deepEqual(s.pairs['gpt+grok'], { first: 5000, minutes: 1, last: 5000 })
+  assert.deepEqual(s.pairs['claude+grok'], { first: 5000, minutes: 1, last: 5000 })
   assert.equal(N.addMinute(N.empty(0), ['claude'], 1).pairs, undefined)
 })
 
@@ -267,4 +267,32 @@ test('chatsOf：只要她参与的，最近 5 段', () => {
   const got = N.chatsOf(s, 'claude')
   assert.equal(got.length, 5); assert.equal(got[0].t, 7)
   assert.equal(N.chatsOf(s, 'grok').length, 1)
+})
+
+test('addminute_sets_pair_last：记下这一对上次一起站着的时间', () => {
+  const t = new Date(2026, 10, 16, 12).getTime()
+  const s = N.addMinute(N.empty(t), ['claude', 'gpt'], t)
+  assert.equal(s.pairs['claude+gpt'].last, t)
+})
+
+test('bump_today_counter_rolls_over：今天的摸戳次数，过了零点重新数', () => {
+  const y = new Date(2026, 10, 15, 22).getTime(), t = new Date(2026, 10, 16, 9).getTime()
+  let s = N.empty(y)
+  for (let i = 0; i < 3; i++) s = N.bump(s, 'claude', 'pats', y)
+  s = N.bump(s, 'claude', 'pats', t)
+  s = N.bump(s, 'claude', 'angry', t)
+  assert.deepEqual(s.chars.claude.today, { day: '2026-11-16', pats: 1, pokes: 0 })
+})
+
+test('merge_keeps_pair_last_and_lv：合并时上次同框取晚的、关系取大的', () => {
+  const local = { ...N.empty(0), pairs: { 'claude+gpt': { first: 1, minutes: 5, last: 100, lv: 1 } } }
+  const saved = { ...N.empty(0), pairs: { 'claude+gpt': { first: 2, minutes: 9, last: 50, lv: 2 } } }
+  assert.deepEqual(N.merge(local, saved).pairs['claude+gpt'], { first: 1, minutes: 9, last: 100, lv: 2 })
+})
+
+test('merge_combines_events：两边的事合并去重', () => {
+  const e = { day: '2026-11-16', kind: 'chat', owner: 'claude', friend: 'gpt', q: 'x' }
+  const local = { ...N.empty(0), events: [e] }
+  const saved = { ...N.empty(0), events: [{ ...e }, { day: '2026-11-15', kind: 'anniv', owner: 'claude', friend: 'gpt', n: 30 }] }
+  assert.equal(N.merge(local, saved).events.length, 2)
 })

@@ -3,6 +3,7 @@
 // 设计：docs/superpowers/specs/2026-11-08-notebook-design.md
 ;(function (root) {
   const Friendship = root.Friendship || (typeof require === 'function' ? require('./friendship.js') : null)
+  const Diary = root.NotebookDiary || (typeof require === 'function' ? require('./notebook-diary.js') : null)
   const DAY = 86_400_000
   // 按天的轮数只留最近这么多天（算「最忙的一天」用；最忙那天另外记着，删了也不丢）
   const KEEP_DAYS = 60
@@ -75,7 +76,7 @@
     const pairs = { ...(out.pairs || {}) }
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const key = pairKey(list[i], list[j]), p = pairs[key] || { first: nowMs, minutes: 0 }
-      pairs[key] = { first: Math.min(p.first || nowMs, nowMs), minutes: (p.minutes || 0) + 1 }
+      pairs[key] = { ...p, first: Math.min(p.first || nowMs, nowMs), minutes: (p.minutes || 0) + 1, last: nowMs }
     }
     return { ...out, pairs }
   }
@@ -83,7 +84,10 @@
   function bump(store, ch, kind, nowMs) {
     if (!KINDS.includes(kind)) return store
     const rec = recOf(store, ch)
-    return put(store, ch, { ...rec, firstMet: meet(rec, nowMs), [kind]: rec[kind] + 1 })
+    // 今天的摸 / 戳次数（第二页「今天被摸了好多次」用）：换天从 0 数
+    const day = localDay(nowMs), t = rec.today && rec.today.day === day ? rec.today : { day, pats: 0, pokes: 0 }
+    const today = kind === 'angry' ? rec.today : { ...t, [kind]: t[kind] + 1 }
+    return put(store, ch, { ...rec, firstMet: meet(rec, nowMs), [kind]: rec[kind] + 1, ...(today ? { today } : {}) })
   }
 
   // 看有没有新达成的小成就；日期：认识 N 天按 firstMet 往后数，其余按 nowMs（这一轮结束 / 这次摸头的时刻）
@@ -184,7 +188,9 @@
     for (const src of [local.pairs, saved.pairs]) for (const [key, p] of Object.entries(isStore(src) ? src : {})) {
       if (!p || !Number.isFinite(p.minutes)) continue
       const q = pairs[key]
-      pairs[key] = q ? { first: Math.min(q.first || p.first, p.first || q.first), minutes: Math.max(q.minutes, p.minutes) } : { first: p.first || 0, minutes: p.minutes }
+      const last = Math.max(q?.last || 0, p.last || 0), lv = Math.max(q?.lv ?? -1, Number.isFinite(p.lv) ? p.lv : -1)
+      pairs[key] = { ...(q ? { first: Math.min(q.first || p.first, p.first || q.first), minutes: Math.max(q.minutes, p.minutes) } : { first: p.first || 0, minutes: p.minutes }),
+        ...(last ? { last } : {}), ...(lv >= 0 ? { lv } : {}) }
     }
     const seen = new Set(), chats = []
     for (const c of [...(Array.isArray(local.chats) ? local.chats : []), ...(Array.isArray(saved.chats) ? saved.chats : [])])
@@ -194,6 +200,8 @@
       backfilled: !!(local.backfilled || saved.backfilled), chars }
     if (Object.keys(pairs).length) out.pairs = pairs
     if (chats.length) out.chats = chats.slice(0, CHAT_KEEP)
+    const events = Diary ? Diary.mergeEvents(local.events, saved.events) : []
+    if (events.length) out.events = events
     return out
   }
 
