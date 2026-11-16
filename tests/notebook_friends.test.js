@@ -37,10 +37,10 @@ test('level_controls_amount：刚见面一句；好朋友有回复、贴纸；�
   }
 })
 
-test('msg_all_directed_pairs：七个角色两两、两个方向，好朋友和挚友每格至少 2 条', () => {
+test('msg_all_directed_pairs：七个角色两两、两个方向，好朋友和挚友每格至少 4 条', () => {
   for (const w of SEVEN) for (const o of SEVEN) if (w !== o) for (const level of [2, 3]) {
     const list = NF.MSG[w]?.[o]?.[level]
-    assert.ok(list && list.length >= 2, `${w}→${o} ${level}`)
+    assert.ok(list && list.length >= 4, `${w}→${o} ${level}`)
   }
 })
 

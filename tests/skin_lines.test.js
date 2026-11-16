@@ -41,10 +41,10 @@ test('第二页留言：写的人穿魔术师换她写的话，主人穿魔术�
   const day = '2026-11-03'
   assert.deepEqual(NF.block({ owner: 'claude', friend: 'deepseek', level: 3, facts, day, friendSkin: 'deepseek-knit' }),
     NF.block({ owner: 'claude', friend: 'deepseek', level: 3, facts, day }))
-  // 魔术师写给每个别的角色、每个别的角色写给魔术师，好朋友和挚友都至少 2 条
+  // 魔术师写给每个别的角色、每个别的角色写给魔术师，好朋友和挚友都至少 4 条
   for (const o of NF.SEVEN.filter(c => c !== 'gemini')) for (const lv of [2, 3]) {
-    assert.ok(NF.MSG[MG][o]?.[lv]?.length >= 2, `${MG}→${o} ${lv}`)
-    assert.ok(NF.MSG[o][MG]?.[lv]?.length >= 2, `${o}→${MG} ${lv}`)
+    assert.ok(NF.MSG[MG][o]?.[lv]?.length >= 4, `${MG}→${o} ${lv}`)
+    assert.ok(NF.MSG[o][MG]?.[lv]?.length >= 4, `${o}→${MG} ${lv}`)
   }
   assert.ok(NF.GREET[MG] && NF.DATA_MSG[MG] && NF.STICKER[MG] && NF.CAMEO[MG])
 })
@@ -74,8 +74,8 @@ test('四套性格皮肤（降智龙崽、Claude 卫衣、圣女、魔术师）�
     assert.ok(L.NOTES[skin] && L.SIGNS[skin], `${skin} 批注/落款`)
     assert.ok(NF.GREET[skin] && NF.DATA_MSG[skin] && NF.STICKER[skin] && NF.CAMEO[skin], `${skin} 留言表`)
     for (const o of NF.SEVEN.filter(c => c !== base)) for (const lv of [2, 3]) {
-      assert.ok(NF.MSG[skin][o]?.[lv]?.length >= 2, `${skin}→${o} ${lv}`)
-      assert.ok(NF.MSG[o][skin]?.[lv]?.length >= 2, `${o}→${skin} ${lv}`)
+      assert.ok(NF.MSG[skin][o]?.[lv]?.length >= 4, `${skin}→${o} ${lv}`)
+      assert.ok(NF.MSG[o][skin]?.[lv]?.length >= 4, `${o}→${skin} ${lv}`)
     }
     for (const kind of Object.keys(T.DATA)) assert.ok(T.DATA[kind][skin] && T.DATA_REPLY[kind][skin], `${skin} DATA ${kind}`)
     for (const t of T.TOPICS) for (const pos of ['open', 'follow', 'close']) assert.ok(t[pos][skin], `${skin} ${t.id}/${pos}`)
