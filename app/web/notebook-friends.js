@@ -336,6 +336,13 @@
     return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
   }
   const one = (list, rnd) => list[Math.floor(rnd() * list.length)]
+  // 轮流：按 seed 洗一次牌，第 i 天用第 i 条（取余），一轮用完才重复
+  function rotate(list, seed, i) {
+    const rnd = seeded(seed), order = list.map((_, k) => k)
+    for (let k = order.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [order[k], order[j]] = [order[j], order[k]] }
+    const n = Math.max(0, Math.floor(i) || 0)
+    return list[order[n % list.length]]
+  }
   const of = (table, id, skin) => table[skin] || table[id] || table['*']
   const dateOf = ms => { const x = new Date(ms); return `${x.getMonth() + 1} 月 ${x.getDate()} 日` }
 
@@ -356,18 +363,19 @@
     const fw = friendSkin || friend, ow = ownerSkin || owner
     const whoOf = w => (w === fw || w === friend ? friend : owner)
     const say = (who, text) => lines.push({ who: whoOf(who), text })
-    const greet = lvl => { for (const t of one(of(GREET, friend, friendSkin)[lvl], rnd).t) say(friend, t) }
-    const data = lvl => { const list = dataLines(friend, lvl, facts, friendSkin); if (list.length) say(friend, one(list, rnd)); return list.length > 0 }
+    const turn = facts.days || 0, seed = what => `${owner}|${friend}|${what}`
+    const greet = lvl => { for (const t of rotate(of(GREET, friend, friendSkin)[lvl], seed(`greet${lvl}`), turn).t) say(friend, t) }
+    const data = lvl => { const list = dataLines(friend, lvl, facts, friendSkin); if (list.length) say(friend, rotate(list, seed(`data${lvl}`), turn)); return list.length > 0 }
     const msg = (MSG[fw]?.[ow] || MSG[fw]?.[owner] || MSG[friend]?.[ow] || MSG[friend]?.[owner])?.[lv]
     if (lv === 0) greet(0)
     else if (lv === 1) { if (rnd() < 0.5 || !data(1)) greet(1) }
     else if (!msg) { greet(1); data(lv) }   // 自定义角色：没有写给她的，用认识了的那几句加数字
     else if (lv === 2) {
-      const m = one(msg, rnd)
+      const m = rotate(msg, seed('msg2'), turn)
       if (rnd() < 0.5) data(2)   // 数字那句先写，主人的回复接在留言后面
       for (const [who, t] of m.t) say(who, t)
       if (m.r) say(owner, m.r)
-    } else for (const [who, t] of one(msg, rnd).t) say(who, t)
+    } else for (const [who, t] of rotate(msg, seed('msg3'), turn).t) say(who, t)
     return {
       lines,
       sticker: lv >= 2 ? one(of(STICKER, friend, friendSkin), rnd) : null,
@@ -388,7 +396,7 @@
     return { who, ...one(of(CAMEO, who, wear(who)), rnd) }
   }
 
-  const api = { SEVEN, GREET, MSG, DATA_MSG, STICKER, CAMEO, HINT, block, cameo, dateOf }
+  const api = { SEVEN, GREET, MSG, DATA_MSG, STICKER, CAMEO, HINT, block, cameo, dateOf, rotate }
   root.NotebookFriends = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

@@ -16,7 +16,7 @@ test('same_day_same_block：同一天打开看到的一样', () => {
 
 test('next_day_may_change：30 天里至少出现 2 种', () => {
   for (const level of [0, 1, 2, 3]) {
-    const seen = new Set(days(30).map(day => sig(NF.block({ owner: 'claude', friend: 'deepseek', level, facts, day }).lines)))
+    const seen = new Set(days(30).map((day, i) => sig(NF.block({ owner: 'claude', friend: 'deepseek', level, facts: { ...facts, days: facts.days + i }, day }).lines)))
     assert.ok(seen.size >= 2, `level ${level} 只有 ${seen.size} 种`)
   }
 })
@@ -97,4 +97,20 @@ test('cameo_rules：至少两个朋友、有一个好朋友以上才有；隔天
     assert.ok(c.text || c.stamp)
   }
   assert.equal(sig(NF.cameo({ owner: 'claude', friends, day })), sig(NF.cameo({ owner: 'claude', friends, day })))
+})
+
+test('rotate_cycles_without_repeat：一轮里不重复，下一轮从头来', () => {
+  const list = ['a', 'b', 'c', 'd']
+  const got = [0, 1, 2, 3].map(i => NF.rotate(list, 'claude|gpt|msg', i))
+  assert.equal(new Set(got).size, 4)
+  assert.equal(NF.rotate(list, 'claude|gpt|msg', 4), got[0])
+})
+
+test('block_rotates_by_days：按认识的天数轮流，和哪天打开无关', () => {
+  const n = NF.MSG.gpt.claude[3].length
+  const text = (days, day) => NF.block({ owner: 'claude', friend: 'gpt', level: 3, day, facts: { days } }).lines.map(l => l.text).join()
+  const seen = new Set()
+  for (let d = 0; d < n; d++) seen.add(text(d, '2026-11-01'))
+  assert.equal(seen.size, n)
+  assert.equal(text(1, '2026-11-01'), text(1, '2026-12-25'))
 })
