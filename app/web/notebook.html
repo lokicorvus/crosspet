@@ -8,6 +8,7 @@
 <div id="root"></div>
 <script src="notebook-themes.js"></script>
 <script src="notebook-friends.js"></script>
+<script src="notebook-events.js"></script><!-- 同上，只给 ?demo= 造假事 -->
 <script src="notebook-lines.js"></script><!-- 只给 ?demo= 开发预览挑批注用；正式打开时批注由主桌宠页面挑好送来 -->
 <script>
 // 小本子面板（外壳开的无边框小窗）。数据由主桌宠页面算好（notebookFor），外壳交过来：
@@ -63,10 +64,24 @@ function flipTo(n) {
   const cls = want ? 'flipping' : 'flipping-back'
   root.classList.add(cls)
   if (want) root.classList.add('p2')
-  flipTimer = setTimeout(() => { if (!want) root.classList.remove('p2'); root.classList.remove(cls); flipping = false }, 540)
+  flipTimer = setTimeout(() => { if (!want) { root.classList.remove('p2'); root.querySelectorAll('.pg2 .sub').forEach((s, k) => s.classList.toggle('on', k === 0)) } root.classList.remove(cls); flipping = false }, 540)
+}
+// 第二页里翻：第 0 张今天，往回翻是更早有事的日子（.sub）。往回翻像翻回前一页，往今天翻像翻下一页，沿用整页的翻纸效果
+function flipSub(i) {
+  const subs = root.querySelectorAll('.pg2 .sub'), now = [...subs].findIndex(s => s.classList.contains('on'))
+  if (!subs[i] || i === now || flipping || closing || !root.classList.contains('p2')) return
+  const show = () => subs.forEach((s, k) => s.classList.toggle('on', k === i))
+  if (reduced()) { show(); return }
+  flipping = true
+  const cls = i > now ? 'flipping-back' : 'flipping'
+  root.classList.add(cls)
+  flipTimer = setTimeout(show, 260)
+  setTimeout(() => { root.classList.remove(cls); flipping = false }, 540)
 }
 document.addEventListener('click', e => {
   if (e.target.closest('[data-action="close"]')) { closeBook(); return }
+  const sub = e.target.closest('[data-sub]')
+  if (sub) { if (!sub.disabled) flipSub(Number(sub.dataset.sub)); return }
   const page = e.target.closest('[data-page]')
   if (page) flipTo(Number(page.dataset.page))
 })
@@ -99,6 +114,19 @@ if (demo) {
     cameo: (c => c && { ...c, name: names[c.who] })(NotebookFriends.cameo({ owner: demo, friends: fr, day: today }) || NotebookFriends.cameo({ owner: demo, friends: fr, day: new Date(now + day).toISOString().slice(0, 10) })),
     chats: [{ t: now - 3_600_000, lines: [[f, '中午吃啥？'], [demo, '你定吧']] }, { t: now - 30 * 3_600_000, lines: [[others[0], '今天外面下雨了'], [demo, '记得带伞。'], [f, '下雨就睡觉！']] }]
       .map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who], text })) })) }
+  // 假事：今天聊过 + 升级；往回翻几天（中秋那天事多，拆两页）
+  const ymd = ms => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  const lv = id => (fr.find(x => x.id === id) || { level: 1 }).level
+  const evItem = (dayMs, kind, friend, more) => { const x = fr.find(y => y.id === friend) || { level: 1, hearts: 2 }
+    return { id: friend, name: names[friend], image: `../../characters/${friend}/idle.webp`, levelName: ['刚见面', '认识了', '好朋友', '挚友'][x.level], hearts: x.hearts, kind,
+      block: NotebookEvents.block({ ev: { day: ymd(dayMs), kind, owner: demo, friend, ...more }, owner: demo, ownerSkin: skin, level: lv(friend) }) } }
+  const md = ms => { const d = new Date(ms); return `${d.getMonth() + 1} 月 ${d.getDate()} 日` }
+  view.page2.today = [evItem(now, 'chat', f, { q: '中午吃啥？' }), evItem(now, 'levelup', others[0], { n: 2 })]
+  view.page2.history = [
+    { day: ymd(now - 2 * day), label: md(now - 2 * day) + ' · 中秋节', items: ['fest', 'fest', 'fest', 'anniv', 'busy'].map((k, i) => evItem(now - 2 * day, k, [f, others[0], others[1], f, f][i], k === 'fest' ? { n: 'midautumn' } : k === 'anniv' ? { n: 30 } : { n: 41 })) },
+    { day: ymd(now - 5 * day), label: md(now - 5 * day), items: [evItem(now - 5 * day, 'reunion', others[1], { n: 9 }), evItem(now - 5 * day, 'pats', f, { n: 26, m: 'pats' })] },
+    { day: ymd(now - 9 * day), label: md(now - 9 * day), items: [evItem(now - 9 * day, 'chat', others[0], { q: '今天外面下雨了' })] },
+  ]
   if (new URLSearchParams(location.search).get('page') === '2') setTimeout(() => flipTo(2), 1600)
   render(view)
   setTimeout(openBook, 300)

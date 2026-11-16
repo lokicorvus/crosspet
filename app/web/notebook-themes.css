@@ -328,3 +328,16 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 .flipping .nb .flip .leaf { animation: nb-turn .52s cubic-bezier(.45,.05,.3,1) both; }
 .flipping-back .nb .flip .leaf { animation: nb-turn .52s cubic-bezier(.45,.05,.3,1) reverse both; }
 @media (prefers-reduced-motion: reduce) { .nb .flip { display: none !important; } }
+
+/* 第二页的分页：第 0 张今天，往回翻有事的那几天（.sub，notebook-themes.js 的 friendsPage） */
+.nb .pg2 .sub { display: none; }
+.nb .pg2 .sub.on { display: block; }
+.nb .sub-date { margin: 2px 0 12px; font-size: 15px; color: var(--ink); }
+.nb .msg .quote { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.nb .sub-nav { display: flex; justify-content: space-between; margin-top: 10px; }
+.nb .sub-nav button { width: 26px; height: 22px; border: 1.5px solid var(--line-strong, var(--line)); border-radius: 11px; background: var(--paper-solid, transparent); color: var(--muted); cursor: pointer; padding: 0; font: inherit; font-size: 13px; line-height: 1; }
+.nb .sub-nav .sub-prev::before { content: '‹'; }
+.nb .sub-nav .sub-next { margin-left: auto; }
+.nb .sub-nav .sub-next::before { content: '›'; }
+.nb .sub-nav button:hover:not(:disabled) { color: var(--ink); border-color: var(--ink); }
+.nb .sub-nav button:disabled { opacity: .35; cursor: default; }

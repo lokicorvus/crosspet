@@ -354,12 +354,35 @@
     const when = ms => sameDay(ms, p.now || Date.now()) ? `今天 ${hhmm(ms)}` : mdOf(ms)
     const chats = (p.chats || []).slice(0, CHATS_MAX)
     const chatList = chats.length ? `<div class="rule">${svg(t.icon)}最近她们聊了什么</div><ul class="chats">${chats.map(ch => `<li class="chat"><span class="when">${when(ch.t)}</span>${ch.lines.map(l => `<span class="${hand(l.who)}">${esc(l.name)}：${esc(l.text)}</span>`).join('')}</li>`).join('')}</ul>` : ''
+    // 一件事一块（notebook-events.js 挑好的话）：和留言块同一个样子，聊过的那件在她的话下面小字引当时那句
+    const evBlock = it => {
+      const b = it.block || { lines: [] }
+      const lines = b.lines.map(l => `<div class="ln ${hand(l.who)}${l.who === owner ? ' reply' : ''}">${esc(l.text)}</div>`).join('')
+      const quote = b.quote ? `<div class="quote ${hand(it.id)}">「${esc(b.quote)}」</div>` : ''
+      return `<div class="msg ev ev-${esc(it.kind)}">${avatarImg(it.image)}<div class="body"><div class="who"><b>${esc(it.name)}</b> · ${esc(it.levelName)}<span class="hearts">${hearts(it.hearts || 0)}</span></div>${lines}${quote}</div></div>`
+    }
+    const today = (p.today || []).length ? `<div class="rule">${svg(t.icon)}今天的事</div>${p.today.map(evBlock).join('')}` : ''
+    // 叶：第 0 张是今天，后面一天一张（一天超过 PER_LEAF 块拆开），新的在前
+    const PER_LEAF = 4
+    const back = []
+    for (const h of p.history || []) {
+      const n = Math.ceil(h.items.length / PER_LEAF)
+      for (let k = 0; k < n; k++) back.push({ title: n > 1 ? `${h.label} · ${k + 1}/${n}` : h.label, items: h.items.slice(k * PER_LEAF, (k + 1) * PER_LEAF) })
+    }
+    const total = back.length + 1
+    const nav = i => `<div class="sub-nav"><button class="sub-prev" data-sub="${i + 1}" title="往前翻"${i + 1 >= total ? ' disabled' : ''} aria-label="往前翻一页"></button>${i > 0 ? `<button class="sub-next" data-sub="${i - 1}" title="往后翻" aria-label="往后翻一页"></button>` : ''}</div>`
+    const first = `<div class="sub on" data-i="0">
+      ${cameo}
+      ${today}
+      ${friends.length ? friends.map(block).join('') : '<p class="empty">还没有一起站过的朋友，多叫她们出来玩吧</p>'}
+      ${chatList}
+      ${nav(0)}
+    </div>`
+    const rest = back.map((l, k) => `<div class="sub" data-i="${k + 1}"><div class="sub-date ${hand(owner)}">${esc(l.title)}</div>${l.items.map(evBlock).join('')}${nav(k + 1)}</div>`).join('')
     return `<div class="sheet pg pg2">
       <button class="close" title="收起" data-action="close">×</button>
       <div class="hd hd2"><div class="kicker">${svg(t.icon)}第 2 页</div><div class="title">朋友们的留言</div></div>
-      ${cameo}
-      ${friends.length ? friends.map(block).join('') : '<p class="empty">还没有一起站过的朋友，多叫她们出来玩吧</p>'}
-      ${chatList}
+      ${first}${rest}
       <div class="pn">— 2 —</div>
       <button class="corner" title="翻回我们这一页" data-page="1" aria-label="翻回上一页"></button>
     </div>`

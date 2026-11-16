@@ -150,3 +150,35 @@ test('chats_section_five_max：最近聊了什么最多 5 段，今天的写时�
   assert.ok(html.includes('11 月 8 日'))
   assert.ok(html.includes('class="w-gpt"'))
 })
+
+// ---- 第二页的叶：今天一张，往回翻有事的那几天 ----
+const evItem = (kind, more = {}) => ({ id: 'gpt', name: 'GPT', image: 'gpt/idle.webp', levelName: '好朋友', hearts: 5, kind,
+  block: { lines: [{ who: 'gpt', text: '记着。' }], quote: null }, ...more })
+const leafPage = (o = {}) => ({ now: Date.now(), ownerImage: '', friends: [], cameo: null, chats: [], today: [], history: [], ...o })
+const leaves = html => html.match(/class="sub( on)?"/g) || []
+
+test('page2_has_today_leaf_first：没有往回翻的页时只有今天一张', () => {
+  const html = T.panel(view({ page2: leafPage() }), T.themeFor('claude'))
+  assert.deepEqual(leaves(html), ['class="sub on"'])
+  assert.ok(!html.includes('sub-next'))
+})
+
+test('history_day_splits_after_four：一天超过 4 块拆成几张', () => {
+  const html = T.panel(view({ page2: leafPage({ history: [{ day: '2026-11-14', label: '11 月 14 日 · 中秋节', items: [1, 2, 3, 4, 5].map(() => evItem('fest')) }] }) }), T.themeFor('claude'))
+  assert.equal(leaves(html).length, 3)
+  assert.ok(html.includes('11 月 14 日 · 中秋节 · 1/2') && html.includes('11 月 14 日 · 中秋节 · 2/2'))
+})
+
+test('last_leaf_prev_disabled：最后一张的往前翻灰掉', () => {
+  const html = T.panel(view({ page2: leafPage({ history: [{ day: '2026-11-14', label: '11 月 14 日', items: [evItem('anniv')] }] }) }), T.themeFor('claude'))
+  const prev = html.match(/<button class="sub-prev"[^>]*>/g)
+  assert.equal(prev.length, 2)
+  assert.ok(!prev[0].includes('disabled') && prev[1].includes('disabled'), prev.join())
+  assert.ok(html.includes('data-sub="1"') && html.includes('class="sub-next" data-sub="0"'))
+})
+
+test('chat_quote_rendered：聊天那块引着当时那句（转义过）', () => {
+  const html = T.panel(view({ page2: leafPage({ today: [evItem('chat', { block: { lines: [{ who: 'gpt', text: '记着。' }], quote: '<嗯>' } })] }) }), T.themeFor('claude'))
+  assert.ok(html.includes('&lt;嗯&gt;') && !html.includes('<嗯>'))
+  assert.ok(html.includes('今天的事'))
+})
