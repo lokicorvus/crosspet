@@ -66,3 +66,21 @@ test('互动：看数字、群聊、接话都按穿的挑，说话的人还是�
   assert.ok(T.REACT_BACK.poke[MG].includes(back.lines[1][1]), back.lines[1][1])
   for (const kind of Object.keys(T.REACT)) assert.ok(T.REACT[kind][MG], kind)
 })
+
+test('四套性格皮肤（降智龙崽、Claude 卫衣、圣女、魔术师）每张表都有自己的', () => {
+  const PC = require('../app/web/pair-chat.js')
+  const SKINS = { 'gpt-onesie': 'gpt', 'deepseek-hoodie': 'deepseek', 'claude-saint': 'claude', [MG]: 'gemini' }
+  for (const [skin, base] of Object.entries(SKINS)) {
+    assert.ok(L.NOTES[skin] && L.SIGNS[skin], `${skin} 批注/落款`)
+    assert.ok(NF.GREET[skin] && NF.DATA_MSG[skin] && NF.STICKER[skin] && NF.CAMEO[skin], `${skin} 留言表`)
+    for (const o of NF.SEVEN.filter(c => c !== base)) for (const lv of [2, 3]) {
+      assert.ok(NF.MSG[skin][o]?.[lv]?.length >= 2, `${skin}→${o} ${lv}`)
+      assert.ok(NF.MSG[o][skin]?.[lv]?.length >= 2, `${o}→${skin} ${lv}`)
+    }
+    for (const kind of Object.keys(T.DATA)) assert.ok(T.DATA[kind][skin] && T.DATA_REPLY[kind][skin], `${skin} DATA ${kind}`)
+    for (const t of T.TOPICS) for (const pos of ['open', 'follow', 'close']) assert.ok(t[pos][skin], `${skin} ${t.id}/${pos}`)
+    for (const kind of Object.keys(T.REACT)) assert.ok(T.REACT[kind][skin], `${skin} REACT ${kind}`)
+    for (const kind of Object.keys(T.REACT_BACK)) assert.ok(T.REACT_BACK[kind][skin], `${skin} BACK ${kind}`)
+    assert.ok(PC.SKIN_PAIRS[skin], `${skin} 两只闲聊`)
+  }
+})
