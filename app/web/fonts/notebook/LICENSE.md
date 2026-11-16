@@ -12,5 +12,6 @@
 | ma-shan-zheng.woff2 | Ma Shan Zheng（马善政毛笔楷书） | Ma ShanZheng，<https://github.com/google/fonts/tree/main/ofl/mashanzheng> |
 | long-cang.woff2 | Long Cang（龙藏体） | Chen Xiaomin，<https://github.com/google/fonts/tree/main/ofl/longcang> |
 | zhi-mang-xing.woff2 | Zhi Mang Xing（钟齐志莽行书） | Zhong Qi，<https://github.com/google/fonts/tree/main/ofl/zhimangxing> |
+| xiaolai.woff2 | 小赖字体 Xiaolai（基于濑户字体） | LXGW、Nozomi Seto，<https://github.com/lxgw/kose-font> |
 
-子集是 OFL 允许的修改版本。霞鹜文楷声明了保留字体名（霞鹜、霞鶩、落霞孤鹜、落霞孤鶩、LXGW），所以它的子集改名 Notebook Kai；其余六款没有保留字体名，沿用原名。
+子集是 OFL 允许的修改版本。霞鹜文楷声明了保留字体名（霞鹜、霞鶩、落霞孤鹜、落霞孤鶩、LXGW），所以它的子集改名 Notebook Kai；其余七款没有保留字体名，沿用原名。

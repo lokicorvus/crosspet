@@ -2,7 +2,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const T = require('../app/web/notebook-themes.js')
 
-const IDS = ['claude', 'deepseek', 'gpt', 'gemini', 'glm', 'grok', 'qwen']
+const IDS = ['claude', 'deepseek', 'gpt', 'gemini', 'glm', 'grok', 'qwen', 'kimi']
 const view = (o = {}) => ({
   id: 'claude', name: 'Claude', firstMet: new Date(2026, 9, 2, 10).getTime(), daysKnown: 37, rounds: 312, workMs: 41.4 * 3_600_000,
   minutes: 96 * 60, pats: 128, pokes: 23, angry: 4, busiest: { date: '2026-11-03', rounds: 46 }, longestMs: (2 * 60 + 13) * 60_000,
@@ -11,7 +11,7 @@ const view = (o = {}) => ({
   before: 0, backfilled: false, total: { days: 37, rounds: 1284 }, notes: null, sign: null, ...o,
 })
 
-test('themeFor：七个角色各有主题；不认识的用 Claude 的手册', () => {
+test('themeFor：八个角色各有主题；不认识的用 Claude 的手册', () => {
   for (const id of IDS) {
     const t = T.themeFor(id)
     assert.equal(t.id, id)
@@ -20,7 +20,7 @@ test('themeFor：七个角色各有主题；不认识的用 Claude 的手册', (
     assert.ok('sign' in t)
     assert.equal(typeof t.cover, 'string')
   }
-  assert.equal(T.themeFor('kimi').id, 'claude')
+  assert.equal(T.themeFor('alice').id, 'claude')
   assert.equal(T.themeFor(undefined).id, 'claude')
 })
 
@@ -120,8 +120,8 @@ test('friends_page_writer_fonts：留言用写的人的字，回复用本子主�
   assert.ok(css.includes('.w-other {'))
 })
 
-test('custom_writer_font：写的人是自定义角色（kimi）→ w-other', () => {
-  const html = T.panel(view({ page2: page2({ friends: [{ id: 'kimi', name: 'Kimi', image: null, levelName: '认识了', hearts: 1, block: { lines: [{ who: 'kimi', text: '嗨' }], sticker: null, photo: null, hint: 'x' } }] }) }), T.themeFor('claude'))
+test('custom_writer_font：写的人是自定义角色（alice）→ w-other', () => {
+  const html = T.panel(view({ page2: page2({ friends: [{ id: 'alice', name: 'Alice', image: null, levelName: '认识了', hearts: 1, block: { lines: [{ who: 'alice', text: '嗨' }], sticker: null, photo: null, hint: 'x' } }] }) }), T.themeFor('claude'))
   assert.ok(html.includes('class="ln w-other"'))
 })
 

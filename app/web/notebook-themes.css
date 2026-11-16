@@ -7,6 +7,7 @@
 @font-face { font-family: "ZCOOL QingKe HuangYou"; src: local("ZCOOL QingKe HuangYou"), url("fonts/notebook/zcool-qingke-huangyou.woff2") format("woff2"); font-display: block; }
 @font-face { font-family: "Ma Shan Zheng"; src: local("Ma Shan Zheng"), url("fonts/notebook/ma-shan-zheng.woff2") format("woff2"); font-display: block; }
 @font-face { font-family: "Long Cang"; src: local("Long Cang"), url("fonts/notebook/long-cang.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "Xiaolai"; src: local("Xiaolai"), url("fonts/notebook/xiaolai.woff2") format("woff2"); font-display: block; }
 @font-face { font-family: "Zhi Mang Xing"; src: local("Zhi Mang Xing"), url("fonts/notebook/zhi-mang-xing.woff2") format("woff2"); font-display: block; }
 
 html, body { margin: 0; background: transparent; }
@@ -127,6 +128,16 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 .t-gemini .stat:after { content: ""; position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; background: #f4cb7f; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 .t-gemini .ms li.new .badge { color: #2a2358; }
 
+/* ======================= Kimi：月光琴谱（小赖字体） ======================= */
+.t-kimi { --title-font: "Xiaolai", "Kaiti SC", serif; --hand: "Xiaolai", "Kaiti SC", serif; --label-font: "Xiaolai", serif; --label-size: 13px; --title-size: 22px; --note: #6b5bb5; --note-size: 15px; --radius: 18px;
+  --paper: radial-gradient(70% 40% at 90% 0%, #dfe4fb, transparent 70%), linear-gradient(180deg, #f7f8fe, #eef0fb 60%, #e6e9f8); --paper-solid: #f7f8fe;
+  --ink: #2f3558; --muted: #8a90b0; --accent: #3a4a9c; --num: #34428f; --title: #2b3577;
+  --tile: #fbfcff; --line: #dde1f2; --line-strong: #c9cfea; --tint: #e6e9f7; --badge-bg: #e3e7f7; --avatar-ring: #9aa6dc;
+  --rule: linear-gradient(90deg, transparent, #9aa6dc 30%, #9aa6dc 70%, transparent); }
+.t-kimi .title { letter-spacing: .04em; }
+.t-kimi .stat { border-color: #d6dbf1; background: #fbfcff; box-shadow: 0 1px 0 #e3e7f7; }
+.t-kimi .ms li.new .badge { background: #3a4a9c; color: #fff; }
+
 /* ======================= GLM：狐狸掌柜的流水账 ======================= */
 .t-glm { --title-font: "Ma Shan Zheng", "Kaiti SC", serif; --hand: "Ma Shan Zheng", "Kaiti SC", serif; --label-font: "Ma Shan Zheng", serif; --label-size: 15px; --title-size: 23px; --hd-pad: 100px; --title-weight: 400; --note: #b8322a; --note-size: 17px;
   --radius: 6px; --paper: repeating-linear-gradient(180deg, transparent 0 25px, #f0d9cf 25px 26px), linear-gradient(180deg, #fdf8ec, #f8efdc); --paper-solid: #fdf8ec;
@@ -237,6 +248,8 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 .t-qwen .cv-vertical { box-shadow: inset 0 0 0 3px #f6ecd6, inset 0 0 0 4px #c9a24a, 0 1px 2px #0005; }
 .t-qwen .cv-vertical .cv-title { font-size: 23px; letter-spacing: .18em; }
 .cv-seal { position: absolute; right: 30px; bottom: 34px; padding: 5px 4px; writing-mode: vertical-rl; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 13px; font-weight: 700; color: #fff; background: #c23b2e; border-radius: 3px; transform: rotate(-6deg); letter-spacing: 2px; }
+.t-kimi { --cover-bg: radial-gradient(70% 45% at 70% 22%, #5f6fc0, transparent 60%), linear-gradient(170deg, #2f3d86, #222c66 65%, #1a2252); --cover-ink: #eef1ff; }
+.t-kimi .cv-label { top: 58%; }
 
 /* ================= 第二页「朋友们的留言」 =================
    两页叠在同一个格子里（高度取高的那页，翻页时窗口不跳）；#root.p2 显示第二页。翻页时一张纸从右往左翻过去（.flip，同打开时的纸） */
@@ -297,6 +310,7 @@ body { padding: 36px 22px 30px; font-family: -apple-system, "PingFang SC", "Micr
 .w-glm { --wf: "Ma Shan Zheng", "Kaiti SC", serif; --wc: #b8322a; --ws: 16.5px; }
 .w-grok { --wf: "Long Cang", "Kaiti SC", cursive; --wc: #d63c3c; --ws: 17.5px; }
 .w-qwen { --wf: "Zhi Mang Xing", "Kaiti SC", serif; --wc: #3e4c9c; --ws: 17px; }
+.w-kimi { --wf: "Xiaolai", "Kaiti SC", serif; --wc: #5a4fb0; --ws: 15px; }
 .w-other { --wf: "Kaiti SC", "STKaiti", "KaiTi", cursive; --wc: var(--ink); --ws: 15px; }
 .t-gemini [class*="w-"], .t-grok [class*="w-"] { --wc-dark: color-mix(in srgb, var(--wc) 45%, #fff); }
 .t-gemini .ln, .t-gemini .chat > span:not(.when), .t-gemini .cameo span, .t-gemini .stamp,

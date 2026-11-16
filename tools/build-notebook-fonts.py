@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小本子的七款角色字体：按面板上会用到的字做子集，出 app/web/fonts/notebook/*.woff2。
+"""小本子的八款角色字体：按面板上会用到的字做子集，出 app/web/fonts/notebook/*.woff2。
 
 只在开发机上跑（要 fontTools 和 brotli：pip install fonttools brotli）。源字体放 ~/.cache/crosspet-fonts/，
 没有就打印下载地址退出。用到的字 = notebook-themes.js、notebook.js、notebook-lines.js、notebook-friends.js、pair-chat.js、pet-talk.js 里的所有字 + 各角色 character.json 的
@@ -27,6 +27,7 @@ FONTS = [
     ("ma-shan-zheng", "MaShanZheng-Regular.ttf", "https://github.com/google/fonts/tree/main/ofl/mashanzheng"),
     ("long-cang", "LongCang-Regular.ttf", "https://github.com/google/fonts/tree/main/ofl/longcang"),
     ("zhi-mang-xing", "ZhiMangXing-Regular.ttf", "https://github.com/google/fonts/tree/main/ofl/zhimangxing"),
+    ("xiaolai", "Xiaolai-Regular.ttf", "https://github.com/lxgw/kose-font/releases (Xiaolai-Regular.ttf)"),
 ]
 
 

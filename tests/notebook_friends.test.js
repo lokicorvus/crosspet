@@ -3,7 +3,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const NF = require('../app/web/notebook-friends.js')
 
-const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen']
+const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen', 'kimi']
 const facts = { first: new Date(2026, 9, 28, 10).getTime(), minutes: 600, days: 12, rounds: 340, pats: 128 }
 const days = n => Array.from({ length: n }, (_, i) => { const d = new Date(2026, 10, 1 + i); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })
 const sig = b => JSON.stringify(b)

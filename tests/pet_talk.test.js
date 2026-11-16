@@ -3,7 +3,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const T = require('../app/web/pet-talk.js')
 
-const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen']
+const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen', 'kimi']
 const facts = (o = {}) => ({ today: {}, pats: {}, togetherMin: 0, knownDays: 0, ...o })
 const kinds = list => list.map(x => x.id.split('/')[1])
 

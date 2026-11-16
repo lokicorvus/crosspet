@@ -1,4 +1,4 @@
-// 小本子面板的七套角色主题（皮面手账、潮汐日志、冰晶匣、星夜、狐狸掌柜的流水账、毒舌批改本、扇底春风录）和面板 HTML。
+// 小本子面板的八套角色主题（皮面手账、潮汐日志、冰晶匣、星夜、狐狸掌柜的流水账、毒舌批改本、扇底春风录、月光琴谱）和面板 HTML。
 // 定稿原型 build/notebook-preview.html；样式在 notebook-themes.css，字体在 fonts/notebook/。
 // 浏览器里是 window.NotebookThemes；Node 测试里 require 进来（只拼字符串，不碰 DOM）。
 // 规则：只画几何类插画（纹样、器物、光效），动物、人物不手画；批注 / 落款默认值在这里，character.json 的 notebook 覆盖。
@@ -214,6 +214,26 @@
         </svg>`
       },
     },
+    kimi: {
+      icon: 'moon', notes: ['前奏开始啦～', null, null], sign: '♪ 月亮上的 Kimi',
+      bg: () => {
+        const staff = y0 => [0, 1, 2, 3, 4].map(i => `<path d="M0 ${y0 + i * 7}C90 ${y0 + i * 7 - 10} 270 ${y0 + i * 7 + 10} 364 ${y0 + i * 7}"/>`).join('')
+        return `<svg width="364" height="720" style="left:0;top:0">${starfield(26, 23).replace(/#fff/g, '#9aa6dc')}
+          <g fill="none" stroke="#c9d0ee" stroke-width=".8" opacity=".7">${staff(612)}</g></svg>`
+      },
+      head: () => {
+        const note = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="3.6" ry="2.6" transform="rotate(-22)" fill="#4a5fb0"/><path d="M3.2-1V-16c2 3 6 4 6 9" fill="none" stroke="#4a5fb0" stroke-width="1.3" stroke-linecap="round"/></g>`
+        return `<svg style="position:absolute;right:-6px;top:-10px;width:124px;height:96px" viewBox="0 0 124 96">
+          <defs><radialGradient id="kglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#dfe4ff" stop-opacity=".9"/><stop offset="1" stop-color="#dfe4ff" stop-opacity="0"/></radialGradient>
+            <linearGradient id="kmoon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9d1f3"/></linearGradient></defs>
+          <circle cx="92" cy="34" r="32" fill="url(#kglow)"/>
+          <path d="M98 12a22 22 0 1 0 10 34 18 18 0 0 1-10-34z" fill="url(#kmoon)" stroke="#aeb8e4" stroke-width="1"/>
+          <g fill="none" stroke="#9aa6dc" stroke-width=".9">${[0, 1, 2, 3, 4].map(i => `<path d="M2 ${62 + i * 5}C30 ${58 + i * 5} 60 ${68 + i * 5} 92 ${63 + i * 5}"/>`).join('')}</g>
+          ${note(20, 70)}${note(44, 76, .9)}${note(68, 72)}
+          ${sparkle4(60, 22, .5, '#9aa6dc', 'tw', .3)}${sparkle4(116, 72, .4, '#9aa6dc', 'tw', 1.1)}
+        </svg>`
+      },
+    },
   }
 
   let hid = 0
@@ -262,12 +282,20 @@
     qwen: () => `<svg class="cv-art" viewBox="0 0 364 600" preserveAspectRatio="none"><g stroke="#d8b25a" stroke-width="1.2" opacity=".8">${[70, 200, 330, 460].map(y => `<path d="M0 ${y}h20"/>`).join('')}</g>
         ${[70, 200, 330, 460].map(y => `<circle cx="10" cy="${y}" r="2.4" fill="#1d2552"/>`).join('')}</svg>
         <div class="cv-label cv-vertical"><span class="cv-title">扇底春风录</span></div><div class="cv-seal">千问</div>`,
+    kimi: () => `<svg class="cv-art" viewBox="0 0 364 600" preserveAspectRatio="xMidYMid slice">${starfield(46, 31, 364, 600)}
+        <defs><radialGradient id="cvkglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e6eaff" stop-opacity=".55"/><stop offset="1" stop-color="#e6eaff" stop-opacity="0"/></radialGradient></defs>
+        <circle cx="236" cy="150" r="80" fill="url(#cvkglow)"/>
+        <path d="M250 98a52 52 0 1 0 24 82 42 42 0 0 1-24-82z" fill="#eef1ff"/>
+        <g fill="none" stroke="#c9d1f3" stroke-width="1.1" opacity=".75">${[0, 1, 2, 3, 4].map(i => `<path d="M0 ${470 + i * 9}C110 ${450 + i * 9} 250 ${500 + i * 9} 364 ${470 + i * 9}"/>`).join('')}</g>
+        ${[[70, 476], [128, 470], [210, 486], [286, 488]].map(([x, y]) => `<g transform="translate(${x} ${y})" fill="#eef1ff"><ellipse rx="6" ry="4.4" transform="rotate(-22)"/><path d="M5.2-1.5V-26c3 5 10 6 10 15" fill="none" stroke="#eef1ff" stroke-width="2" stroke-linecap="round"/></g>`).join('')}
+        <rect x="14" y="14" width="336" height="572" rx="10" fill="none" stroke="#c9d1f3" stroke-width="1" opacity=".55"/></svg>
+        <div class="cv-label"><span class="cv-icon">${svg('moon')}</span><span class="cv-title">月光琴谱</span><span class="cv-sub">KIMI · ♪</span></div>`,
   }
 
   // 本子名；标题是「她的名字 + 的 + 本子名」，名字用用户在设置里改的（没改就是默认名），比如「白龙的冰晶匣」
   const BOOKS = {
     claude: '随身手册', deepseek: '潮汐日志', gpt: '冰晶匣', gemini: '星光小心愿',
-    glm: '掌柜流水账', grok: '毒舌批改本', qwen: '扇底春风录',
+    glm: '掌柜流水账', grok: '毒舌批改本', qwen: '扇底春风录', kimi: '月光琴谱',
   }
   // 名字以英文字母或数字结尾时空一格（「Claude 的随身手册」），中文名紧挨着（「白龙的冰晶匣」）
   const bookTitle = (name, book) => { const n = String(name || '').trim(); return n ? `${n}${/[A-Za-z0-9]$/.test(n) ? ' ' : ''}的${book}` : book }
@@ -306,7 +334,7 @@
 
   // ---- 第二页：朋友们的留言 ----
   // v.page2 = { now, ownerImage, friends: [{ id, name, image, levelName, hearts, block }], cameo, chats: [{ t, lines: [{ who, name, text }] }] }
-  // 每个人的字用 .w-<她>（七个角色各自本子的字体和批注色，别的角色 .w-other）
+  // 每个人的字用 .w-<她>（八个角色各自本子的字体和批注色，别的角色 .w-other）
   const WRITERS = new Set(Object.keys(BOOKS))
   const hand = id => `w-${WRITERS.has(id) ? id : 'other'}`
   const hhmm = ms => { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }

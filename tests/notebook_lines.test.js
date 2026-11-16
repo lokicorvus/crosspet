@@ -4,7 +4,7 @@ const assert = require('node:assert/strict')
 const L = require('../app/web/notebook-lines.js')
 const T = require('../app/web/notebook-themes.js')
 
-const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen']
+const SEVEN = ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'qwen', 'kimi']
 const H = 3_600_000, DAY = 86_400_000
 const at = (h, d = 15) => new Date(2026, 10, d, h, 0, 0).getTime()   // 本地时间 2026-11-d h 点
 
