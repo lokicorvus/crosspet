@@ -224,6 +224,38 @@ const cases = [
     const calls = e.msgs().filter(m => m.companionCall && m.companionCall.fn === 'chat')
     assert(calls.length === 2, `额外那两只各说一句：${JSON.stringify(calls)}`)
   }, ['grok']],
+  ['chat_becomes_today_event', async e => {
+    // 两只说过的一段：第二页「今天的事」里有一条 chat，写的人是对方，引着她当时说的那句
+    e.run(`noteChat([['claude', '你好'], ['gpt', '嗯。']])`)
+    const today = nb(e).page2.today
+    assert(Array.isArray(today) && today.length === 1, JSON.stringify(today))
+    assert(today[0].kind === 'chat' && today[0].id === 'gpt' && today[0].name === 'GPT' && today[0].block.quote === '嗯。', JSON.stringify(today[0]))
+    assert(today[0].block.lines[0].who === 'gpt', JSON.stringify(today[0].block))
+  }],
+  ['yesterday_events_show_in_history', async e => {
+    const y = e.run(`Notebook.localDay(Date.now() - 86400000)`)
+    e.run(`noteStoreWrite({ ...noteStore(), events: [{ day: '${y}', kind: 'levelup', owner: 'claude', friend: 'gpt', n: 2 }] })`)
+    const p = nb(e).page2
+    assert(p.today.length === 0, JSON.stringify(p.today))
+    assert(p.history.length === 1 && p.history[0].day === y && p.history[0].items[0].kind === 'levelup', JSON.stringify(p.history))
+    assert(/^\d+ 月 \d+ 日$/.test(p.history[0].label), p.history[0].label)
+  }],
+  ['history_label_names_festival', async e => {
+    const y = e.run(`Notebook.localDay(Date.now() - 86400000)`)
+    e.run(`noteStoreWrite({ ...noteStore(), events: [{ day: '${y}', kind: 'fest', owner: 'claude', friend: 'gpt', n: 'midautumn' }] })`)
+    const label = nb(e).page2.history[0].label
+    assert(label.endsWith(' · 中秋节'), label)
+  }],
+  ['tick_records_levelup', async e => {
+    // 每分钟的计时：第一次只记下关系，之后升了级才记一条
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 20 } })})`)
+    e.run(`pageHidden = false`)
+    await e.advance(61000)
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: 1e6 } })})`)
+    await e.advance(61000)
+    const ups = (e.run(`noteStore().events`) || []).filter(x => x.kind === 'levelup')
+    assert(ups.length === 2 && ups.every(x => x.n === 3), JSON.stringify(ups))
+  }],
 ]
 
 function assert(ok, msg) { if (!ok) throw Error(msg) }

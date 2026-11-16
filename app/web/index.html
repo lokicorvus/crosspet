@@ -239,9 +239,11 @@ addEventListener('error', e => {
 <script src="friendship.js"></script>
 <script src="pair-chat.js"></script>
 <script src="pet-talk.js"></script>
+<script src="notebook-diary.js"></script>
 <script src="notebook.js"></script>
 <script src="notebook-lines.js"></script>
 <script src="notebook-friends.js"></script>
+<script src="notebook-events.js"></script>
 <script src="notebook-backfill.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
@@ -2030,8 +2032,11 @@ function noteNotebookEvent(ch, s) {
 // 说完的一段对话记进小本子（只主桌宠记）
 function noteChat(lines) {
   if (role !== 'main') return
-  noteStoreWrite(Notebook.logChat(noteStore(), lines, Date.now()))
+  const nowMs = Date.now()
+  // 说过话的每两只，各在对方的本子上记一件「今天聊过」（第二页的事，notebook-diary.js）
+  noteStoreWrite(NotebookDiary.recordChat(Notebook.logChat(noteStore(), lines, nowMs), lines, nowMs, { installed: noteInstalled() }))
 }
+const noteInstalled = () => Object.keys(manifest.characters || {}).filter(id => !manifest.characters[id].egg)
 function noteBump(ch, kind) {
   if (role !== 'main' || !ch) return
   const nowMs = Date.now()
@@ -2044,7 +2049,9 @@ setInterval(() => {
   if (role !== 'main' || pageHidden || egg || !manifest.characters) return
   const nowMs = Date.now(), present = presentCharacters().filter(ch => manifest.characters[ch] && !manifest.characters[ch].egg)
   if (!present.length) return
-  let store = Notebook.addMinute(noteStore(), present, nowMs)
+  // 先记按日期、按数字的事（升级、纪念日、节日、昨天很忙、今天被摸得多、隔了好久又碰面）：要用上一次的 pairs.last，所以在 addMinute 之前
+  let store = NotebookDiary.tick(noteStore(), { nowMs, present, friendship: friendStoreRead(), fest: festivalOf(new Date(nowMs)), installed: noteInstalled() })
+  store = Notebook.addMinute(store, present, nowMs)
   // 「认识 N 天」这类按日子到的：顺手在这里看（不说话的那几个也在这里补上）
   for (const ch of present.slice(1)) store = Notebook.checkMilestones(store, ch, nowMs, { friendLevel: noteFriendLevel(ch) }).store
   noteCommit(store, present[0], nowMs)
@@ -2074,7 +2081,20 @@ function notebookPage2(ch, v, names, nowMs) {
   }))
   const c = NotebookFriends.cameo({ owner: ch, friends: list, day, wear: id => chars[id]?.skin || '' })
   const chats = Notebook.chatsOf(store, ch).map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who] || who, text })) }))
-  return { now: nowMs, ownerImage: idle(ch), friends, cameo: c && { ...c, name: names[c.who] || c.who }, chats }
+  // 有事的日子（notebook-diary.js 记的）：今天的放今天这页，之前的一天一页往回翻；写的人已经不在了的跳过
+  const fs = friendStoreRead(), skinOf = id => chars[id]?.skin || ''
+  const items = list => list.filter(ev => installed.includes(ev.friend)).map(ev => {
+    const pts = fs[Notebook.pairKey(ch, ev.friend)]?.points || 0, level = Friendship.level(pts)
+    return { id: ev.friend, name: names[ev.friend] || ev.friend, image: idle(ev.friend), levelName: Notebook.LEVEL_NAMES[level],
+      hearts: Friendship.hearts(pts) + Friendship.partial(pts), kind: ev.kind,
+      block: NotebookEvents.block({ ev, owner: ch, ownerSkin: skinOf(ch), friendSkin: skinOf(ev.friend), level }) }
+  })
+  const md = d => { const [, m, dd] = d.split('-').map(Number); return `${m} 月 ${dd} 日` }
+  const history = NotebookDiary.daysOf(store, ch).filter(d => d < day).map(d => {
+    const evs = NotebookDiary.eventsOn(store, ch, d), fest = evs.find(e => e.kind === 'fest')
+    return { day: d, label: md(d) + (fest && NotebookEvents.FEST_NAMES[fest.n] ? ` · ${NotebookEvents.FEST_NAMES[fest.n]}` : ''), items: items(evs) }
+  }).filter(h => h.items.length)
+  return { now: nowMs, ownerImage: idle(ch), friends, cameo: c && { ...c, name: names[c.who] || c.who }, chats, today: items(NotebookDiary.eventsOn(store, ch, day)), history }
 }
 
 // ---- 每对台词（台词和挑法在 pair-chat.js）----
