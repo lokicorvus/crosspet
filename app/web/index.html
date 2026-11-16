@@ -2057,9 +2057,9 @@ function notebookFor(ch) {
   // 好朋友的头像：她的待机图（面板先试同一个文件夹里的探头头像 avatar.webp，没有再用它）
   const friend = v.friend && { ...v.friend, image: chars[v.friend.id]?.poses?.idle?.[0] || null }
   // 批注每次打开随机挑一句（按数字的档），落款按深夜 / 忙 / 好久不见 / 纪念日换（notebook-lines.js）；character.json 写了的照旧优先
-  const nowMs = Date.now()
+  const nowMs = Date.now(), skin = chars[ch]?.skin || ''
   return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null,
-           notesPicked: NotebookLines.notesFor(ch, v), signPicked: NotebookLines.signFor(ch, v, nowMs), page2: notebookPage2(ch, v, names, nowMs) }
+           notesPicked: NotebookLines.notesFor(ch, v, undefined, skin), signPicked: NotebookLines.signFor(ch, v, nowMs, undefined, skin), page2: notebookPage2(ch, v, names, nowMs) }
 }
 // 第二页：和她一起站过的朋友（最多 4 个，心多的在前）各写的一块、路过插一嘴的、最近她参与的几段对话（notebook-friends.js 挑文案）
 function notebookPage2(ch, v, names, nowMs) {
@@ -2069,10 +2069,10 @@ function notebookPage2(ch, v, names, nowMs) {
   const idle = id => chars[id]?.poses?.idle?.[0] || null
   const friends = list.map(f => ({
     id: f.id, name: names[f.id] || f.id, image: idle(f.id), levelName: Notebook.LEVEL_NAMES[f.level], hearts: f.hearts,
-    block: NotebookFriends.block({ owner: ch, friend: f.id, level: f.level, day,
+    block: NotebookFriends.block({ owner: ch, friend: f.id, level: f.level, day, ownerSkin: chars[ch]?.skin || '', friendSkin: chars[f.id]?.skin || '',
       facts: { first: f.first, minutes: f.minutes, days: f.first ? Math.floor((nowMs - f.first) / 86_400_000) : 0, rounds: v.rounds, pats: v.pats } }),
   }))
-  const c = NotebookFriends.cameo({ owner: ch, friends: list, day })
+  const c = NotebookFriends.cameo({ owner: ch, friends: list, day, wear: id => chars[id]?.skin || '' })
   const chats = Notebook.chatsOf(store, ch).map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who] || who, text })) }))
   return { now: nowMs, ownerImage: idle(ch), friends, cameo: c && { ...c, name: names[c.who] || c.who }, chats }
 }
@@ -2101,9 +2101,9 @@ function tryPairChat() {
   }
   // 三只以上闲着：先试群聊（按话题每人一句）；没中再挑一对，候选里多几段「看数字说话」（填小本子里的数）
   const levelOf = key => Friendship.level(store[key]?.points || 0)
-  const got = PetTalk.groupPick({ present: presentCharacters(), busy, levelOf, nowMs, lastAt: pairChatAt, recent: pairChatRecent })
+  const got = PetTalk.groupPick({ present: presentCharacters(), busy, levelOf, nowMs, lastAt: pairChatAt, recent: pairChatRecent, wear })
     || PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
-                       hearts10: key => Friendship.hearts(store[key]?.points || 0), wear, extra: (a, b) => PetTalk.dataExchanges(a, b, noteFacts(a, b, nowMs)) })
+                       hearts10: key => Friendship.hearts(store[key]?.points || 0), wear, extra: (a, b) => PetTalk.dataExchanges(a, b, noteFacts(a, b, nowMs), wear) })
   if (!got) return
   pairChatAt = nowMs
   pairChatRecent.push(got.id)
@@ -2124,7 +2124,7 @@ function friendEvent(actor, kind, exclude = []) {
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
   const got = PetTalk.react({ kind, actor, present: presentCharacters(), busy, exclude, nowMs, last: reactLast,
-                              levelOf: key => Friendship.level(store[key]?.points || 0) })
+                              levelOf: key => Friendship.level(store[key]?.points || 0), wear: ch => manifest.characters?.[ch]?.skin || '' })
   if (!got) return
   for (const m of got.marks) reactLast[m] = nowMs
   speakingUntil = nowMs + REACT_DELAY + 1000

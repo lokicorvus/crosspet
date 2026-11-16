@@ -8,6 +8,7 @@
 <div id="root"></div>
 <script src="notebook-themes.js"></script>
 <script src="notebook-friends.js"></script>
+<script src="notebook-lines.js"></script><!-- 只给 ?demo= 开发预览挑批注用；正式打开时批注由主桌宠页面挑好送来 -->
 <script>
 // 小本子面板（外壳开的无边框小窗）。数据由主桌宠页面算好（notebookFor），外壳交过来：
 //   外壳 → 页面：render(view)（合着的封面，量好尺寸发 {size}）、openBook()（窗口摆好、显示后调：翻开）、closeBook()（翻回去，翻完发 {closed}）
@@ -72,14 +73,14 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBook() })
 document.addEventListener('contextmenu', e => e.preventDefault())
 
-// ---- 开发看样式：?demo=claude ----
+// ---- 开发看样式：?demo=claude（&skin=gemini-magician 看穿皮肤时的文字）----
 const demo = new URLSearchParams(location.search).get('demo')
 if (demo) {
   document.documentElement.style.background = '#e7e2da'
   const day = 86_400_000, now = Date.now()
   const friendOf = { claude: 'deepseek', deepseek: 'claude', gpt: 'gemini', gemini: 'gpt', glm: 'qwen', grok: 'deepseek', qwen: 'glm', kimi: 'deepseek' }
   const names = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', glm: 'GLM', grok: 'Grok', qwen: '千问', kimi: 'Kimi' }
-  const f = friendOf[demo] || 'claude'
+  const f = friendOf[demo] || 'claude', skin = new URLSearchParams(location.search).get('skin') || ''
   const view = {
     id: demo, name: names[demo] || demo, firstMet: now - 36 * day, daysKnown: 37, rounds: 312, workMs: 41 * 3_600_000, minutes: 96 * 60,
     pats: 128, pokes: 23, angry: 4, busiest: { date: '2026-11-03', rounds: 46 }, longestMs: 133 * 60_000,
@@ -87,13 +88,14 @@ if (demo) {
     milestones: [{ id: 'round100', label: '第 300 轮活', date: '2026-11-07' }, { id: 'night', label: '凌晨 3 点还在陪你', date: '2026-10-28' }, { id: 'days30', label: '认识 30 天', date: '2026-11-01' }],
     before: 86, backfilled: true, total: { days: 37, rounds: 1284 }, notes: null, sign: null,
   }
+  view.notesPicked = NotebookLines.notesFor(demo, view, undefined, skin); view.signPicked = NotebookLines.signFor(demo, view, now, undefined, skin)
   // 第二页：三个朋友（挚友 / 好朋友 / 认识了），用真的文案挑
   const others = Object.keys(names).filter(id => id !== demo && id !== f).slice(0, 2)
   const today = new Date().toISOString().slice(0, 10)
   const fr = [[f, 3, 9.2], [others[0], 2, 5.5], [others[1], 1, 2]].map(([id, level, hearts]) => ({ id, level, hearts, first: now - 36 * day, minutes: 96 * 60 }))
-  view.page2 = { now, ownerImage: `../../characters/${demo}/idle.webp`,
+  view.page2 = { now, ownerImage: `../../characters/${skin || demo}/idle.webp`,
     friends: fr.map(x => ({ id: x.id, name: names[x.id], image: `../../characters/${x.id}/idle.webp`, levelName: ['刚见面', '认识了', '好朋友', '挚友'][x.level], hearts: x.hearts,
-      block: NotebookFriends.block({ owner: demo, friend: x.id, level: x.level, day: today, facts: { first: x.first, minutes: x.minutes, days: 36, rounds: 312, pats: 128 } }) })),
+      block: NotebookFriends.block({ owner: demo, friend: x.id, level: x.level, day: today, ownerSkin: skin, facts: { first: x.first, minutes: x.minutes, days: 36, rounds: 312, pats: 128 } }) })),
     cameo: (c => c && { ...c, name: names[c.who] })(NotebookFriends.cameo({ owner: demo, friends: fr, day: today }) || NotebookFriends.cameo({ owner: demo, friends: fr, day: new Date(now + day).toISOString().slice(0, 10) })),
     chats: [{ t: now - 3_600_000, lines: [[f, '中午吃啥？'], [demo, '你定吧']] }, { t: now - 30 * 3_600_000, lines: [[others[0], '今天外面下雨了'], [demo, '记得带伞。'], [f, '下雨就睡觉！']] }]
       .map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who], text })) })) }

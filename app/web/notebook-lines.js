@@ -53,6 +53,12 @@
       work: S('拉了几小时～|休息一下手指|喝口茶再继续', '好久好久了|弓毛都磨亮了|陪你到月亮升起', '一百小时了！|月亮都圆了好几次|这么久，谢谢你'),
       pats: S('嘿嘿，再摸一下|头发要乱掉啦|被摸头了～', '你很喜欢摸头呀|摸着摸着想哼歌|乖乖给你摸', '摸了上百次了|头顶都暖暖的|最喜欢你摸了'),
     },
+    // 皮肤：魔术师
+    'gemini-magician': {
+      rounds: S('开场啦喵～|第一个戏法|帽子戴好了', '演了好多场|观众越来越多|掌声在哪里喵', '几百场了喵！|戏法都变熟了|袖子都磨亮了', '上千场！谢幕喵|传说级魔术师|帽子里装满了'),
+      work: S('演了几小时|中场休息喵|变杯茶给你', '好久的演出|披风都皱了|夜场也上了喵', '一百小时！|这是马戏团了吧|魔杖都磨短了'),
+      pats: S('帽子要歪啦|再摸一下喵|呼噜……', '摸头是魔法吗|帽子早摘了喵|摸着摸着困了', '摸了上百次|魔力全满了喵|你是我的观众'),
+    },
     '*': {
       rounds: S('刚开始|开工啦|慢慢来', '不少轮了|越来越熟|继续加油', '几百轮了|好厉害|一起好久了', '上千轮了|真了不起|快写满了'),
       work: S('辛苦了|几个小时|休息下', '好久了|别太累|记得喝水', '一百小时|很久了|谢谢陪伴'),
@@ -78,6 +84,8 @@
       miss: G('好久不见呀～|等你好久了呢'), anniv: G('纪念日快乐～|今天我请客哦') },
     kimi: { normal: G('今天也一起加油～ · Kimi|♪ 月亮上的 Kimi'), night: G('月亮好高了，快睡吧|给你拉首摇篮曲～'), busy: G('今天的曲子好长呀|拉了一整天，手酸酸'),
       miss: G('好久不见，谱子都落灰了|你回来啦！我拉一曲'), anniv: G('纪念日！开演奏会～|今天的月亮为你圆') },
+    'gemini-magician': { normal: G('✦ 魔术师 Gemini|谢谢观看喵～'), night: G('夜场只为你演喵|月亮下的魔术时间'), busy: G('今天演了一整天|帽子都变空了喵'),
+      miss: G('你终于回来看演出了|座位一直给你留着'), anniv: G('纪念日！变朵花给你|今天的戏法只给你') },
     '*': { normal: G('今天也加油|写到这里'), night: G('夜深了，晚安|早点睡吧'), busy: G('今天好忙|辛苦啦'),
       miss: G('好久不见|你回来啦'), anniv: G('纪念日快乐|又一个纪念日') },
   }
@@ -85,11 +93,12 @@
   const ANNIV = new Set([7, 30, 100, 365])
   const pickOf = (list, rnd) => list.length ? list[Math.floor(rnd() * list.length)] : null
 
-  // view：Notebook.view 给的（rounds、workMs、pats）→ 三条批注（没有的是 null）
-  function notesFor(id, view, rnd = Math.random) {
-    const book = NOTES[id] || NOTES['*']
+  // view：Notebook.view 给的（rounds、workMs、pats）→ 三条批注（没有的是 null）。
+  // skin：她穿着的皮肤 id；性格不一样的皮肤（魔术师等）有自己的批注就用，没写的那一项退回原角色
+  function notesFor(id, view, rnd = Math.random, skin = '') {
+    const own = NOTES[skin], book = NOTES[id] || NOTES['*']
     const value = { rounds: view.rounds || 0, work: (view.workMs || 0) / 3_600_000, pats: view.pats || 0 }
-    return STATS.map(stat => pickOf(book[stat][bandOf(stat, value[stat])] || [], rnd))
+    return STATS.map(stat => pickOf(((own && own[stat]) || book[stat])[bandOf(stat, value[stat])] || [], rnd))
   }
   // 哪一种落款：view.daysKnown 是「认识第几天」（第一天是 1），所以认识整 N 天是第 N+1 天
   function signKind(view, nowMs) {
@@ -101,8 +110,9 @@
     if (view.lastEnd && nowMs - view.lastEnd >= MISS_MS) return 'miss'
     return 'normal'
   }
-  function signFor(id, view, nowMs, rnd = Math.random) {
-    return pickOf((SIGNS[id] || SIGNS['*'])[signKind(view, nowMs)], rnd)
+  function signFor(id, view, nowMs, rnd = Math.random, skin = '') {
+    const kind = signKind(view, nowMs)
+    return pickOf(SIGNS[skin]?.[kind] || (SIGNS[id] || SIGNS['*'])[kind], rnd)
   }
 
   const api = { BANDS, NOTES, SIGNS, bandOf, notesFor, signFor, signKind }

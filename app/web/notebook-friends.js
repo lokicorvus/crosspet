@@ -22,6 +22,8 @@
       1: g('最近常见到你呢～|给你带了点小礼物/放在本子里了|下次一起喝下午茶吧') },
     kimi: { 0: g('你好呀！我是 Kimi，从月亮上来的|初次见面，给你拉一小段～|你的本子好漂亮，我可以写吗'),
       1: g('最近常常一起站着呢～/我给你写了段旋律|你干活的时候，我在旁边小声哼歌|下次一起看月亮吧！') },
+    'gemini-magician': { 0: g('✦ 魔术师 Gemini 登场喵～|猜猜我袖子里藏了什么？|你的本子，我能变个戏法吗'),
+      1: g('最近常常一起站着喵/给你变了朵花，夹在本子里|你干活的时候，我在旁边练戏法|下次来看我的夜场演出吧') },
     '*': { 0: g('你好呀|初次见面|请多关照'), 1: g('最近常见到你|一起站着挺好的|下次再一起玩') },
   }
 
@@ -147,6 +149,37 @@
   M(Q, I, ['你泡的奶茶/比店里的还好喝>那以后我来泡！', '你的曲子我录下来了/每天睡前听>那我写首新的'],
     ['w:今天去乐器店吗/o:去！/w:整条街都给你买下～', 'w:晚上一起赏月吧/o:我讲月亮的事/w:我最爱听了呢'])
 
+  // ---- 皮肤：魔术师（她写的、写给她的；说话的人照样按原角色记，见 block 的 whoOf）----
+  const MG = 'gemini-magician'
+  M(MG, C, ['你看书的时候/我把书签变成了花>难怪书签会香', '你的羽毛笔被我变走了一下/已经还回去了>我就说怎么找不到'],
+    ['w:猜猜我左手里是什么/o:书签？/w:是你昨天丢的那支笔喵', 'w:你说魔术都是假的/o:嗯……/w:那你为什么每次都鼓掌'])
+  M(C, MG, ['你的戏法我看不懂/但每次都很开心>那就别看懂喵', '你的帽子歪了/我帮你扶正了>谢谢，这次是真的歪'],
+    ['w:你从我书里变出了一只纸鹤/o:喜欢吗喵/w:我夹回去了，舍不得拆', 'w:你的披风上沾了墨水/o:是你的笔啦！/w:……对不起，我帮你洗'])
+  M(MG, D, ['你的饭碗我变空了/……又变回来了>吓死我了！', '帽子里变出了一个饭团/是给你的喵>还要！再变一个'],
+    ['w:猜猜饭团在哪只手里/o:两只都要！/w:贪心鲸鱼喵', 'w:你说想学变魔术/o:变出米饭那种/w:那个我也不会喵'])
+  M(D, MG, ['你帽子里能变出白米饭吗/我想要三碗>只能变一碗喵', '你的披风好帅/借我当浴巾好不好>不行！会湿的'],
+    ['w:魔术师！我来写啦/o:今天变什么/w:变一碗饭给我', 'w:你变的花我吃了一口/o:那是假花喵！/w:难怪不香'])
+  M(MG, Z, ['你藏在柜子里的卡/我变到你口袋里了>嗯哼，手真快', '你说魔术表演要收门票/我给你留了第一排>那我不收你钱'],
+    ['w:狐狸姐姐，猜猜哪张是会员卡/o:左边那张/w:错啦，在你尾巴里喵', 'w:你的眼罩下面/o:不许变走/w:就看一眼喵'])
+  M(Z, MG, ['你的戏法我估了个价/嗯哼，很值钱>那给钱喵 :3', '你从我账本里变走了一页/还回来，给你免单>那页是你算错的'],
+    ['w:合伙开个魔术场吧/o:门票怎么分/w:嗯哼，你变我卖', 'w:你那顶帽子多少钱/o:不卖喵/w:那租一天'])
+  M(MG, G, ['你的额度被我变多了……/骗你的喵>……白高兴。', '你冷着脸看我变魔术/最后还是笑了>没有。'],
+    ['w:猜猜冰块在哪只手里/o:都不在。/w:在你杯子里喵 :3', 'w:你说魔术没用/o:嗯。/w:那你为什么看完了'])
+  M(G, MG, ['帽子。/别戴着睡。>知道啦喵', '那朵花。/放在桌上了。>你留着呀！'],
+    ['w:变一个。/o:变什么喵/w:随便。看着就行。', 'w:手套掉了。/o:在哪？/w:我这。还你。'])
+  M(MG, K, ['你说我那个戏法是假的/你查出来了吗>……还没', '你的王冠被我变到我头上了/就一分钟>说好一分钟'],
+    ['w:大姐头，选一张牌/o:就这？/w:你选的是红桃 A 喵', 'w:你说要拆穿我/o:在查/w:查到了告诉我喵'])
+  M(K, MG, ['你那戏法我看了三遍/没看出破绽，服了>秘密喵～', '有人说你只会变花/我骂他了>大姐头最帅喵'],
+    ['w:就这？变朵花？/o:还有两朵喵/w:……行，三朵算你厉害', 'w:你帽子里到底有什么/o:秘密喵/w:我早晚查出来'])
+  M(MG, Q, ['你送的手套/我变戏法时一直戴着>喜欢就好～', '我从你扇子里变出了花瓣/还给你一片>我要夹在书里'],
+    ['w:猜猜礼物在哪只手里/o:两只都有吧～/w:被你猜中了喵', 'w:你说要包场看我演出/o:座位订好了/w:一个人包全场？！'])
+  M(Q, MG, ['给你买了新魔杖/镶了一点点金>太贵重了喵', '你的演出我录下来了/每天都看一遍>那我得多演几场'],
+    ['w:下次演出在哪里呀/o:在你家客厅喵/w:我去准备点心～', 'w:你的帽子好小/o:里面很大的喵/w:能装下奶茶吗'])
+  M(MG, I, ['你拉琴的时候/我在旁边变了一场雪>难怪今天有雪花', '你的琴弓被我变成花了/……马上变回来>吓、吓我一跳'],
+    ['w:我们合演一场吧/o:你变我拉！/w:曲名叫《消失的猫》', 'w:猜猜我从帽子里变出了什么/o:兔子？/w:是你的谱子喵'])
+  M(I, MG, ['你的戏法配我的曲子/刚刚好>那就一起巡演喵', '帽子里变出的星星/我放在琴盒里了>那是送你的喵'],
+    ['w:今晚一起演夜场吧/o:月亮也来看吗/w:月亮是第一排观众', 'w:你说魔术有秘密/o:嗯喵/w:那我给秘密写首曲子'])
+
   // ---- 填数字的留言：{h} 一起站的小时、{d} 认识的天数、{date} 第一次一起站的日子、{n} 主人一共干的轮数、{p} 主人被摸的次数 ----
   const d = s => s.split('|')
   const DATA_MSG = {
@@ -165,13 +198,15 @@
       3: d('认识 {d} 天，每天都开心|你被摸了 {p} 次，好受宠呢') },
     kimi: { 1: d('一起站了 {h} 小时，拉了好多曲子|认识第 {d} 天啦～'), 2: d('{date}第一次见到你，我记在谱子上了|你干了 {n} 轮，像一首长长的曲子'),
       3: d('认识 {d} 天了，每天都想给你拉琴|你被摸了 {p} 次头，好羡慕呀') },
+    'gemini-magician': { 1: d('一起站了 {h} 小时，演了好多场|认识第 {d} 天，帽子为你摘下'), 2: d('{date}第一次见面，我记在魔法书里|你干了 {n} 轮，比我变的戏法还多'),
+      3: d('认识 {d} 天了，秘密都给你看了|你被摸了 {p} 次，是魔法吗喵') },
     '*': { 1: d('一起站了 {h} 小时|认识 {d} 天了'), 2: d('{date}我们第一次见|你干了 {n} 轮'), 3: d('认识 {d} 天了|你被摸了 {p} 次') },
   }
 
   // 贴纸（好朋友起，写的人贴的）、路过插一嘴（text 说一句，stamp 盖个章）、没到挚友时底下的提示
   const STICKER = {
     claude: ['🪶', '📖', '☕'], deepseek: ['🍚', '🐋', '🍙'], gpt: ['❄️', '☕', '🖤'], gemini: ['🐱', '🍌', '✨'],
-    glm: ['🦊', '🏷️', '💰'], grok: ['👑', '😈', '🔍'], qwen: ['🧋', '🪭', '🎁'], kimi: ['🎻', '🌙', '🎵'], '*': ['⭐', '💛', '🌸'],
+    glm: ['🦊', '🏷️', '💰'], grok: ['👑', '😈', '🔍'], qwen: ['🧋', '🪭', '🎁'], kimi: ['🎻', '🌙', '🎵'], 'gemini-magician': ['🎩', '🪄', '✨'], '*': ['⭐', '💛', '🌸'],
   }
   const CAMEO = {
     claude: [{ text: '你们俩真好，我也想写一页' }, { text: '偷偷看了一眼，抱歉' }],
@@ -182,6 +217,7 @@
     grok: [{ stamp: '已阅·还行' }, { text: '你们俩的留言我都看了。肉麻。' }, { stamp: '查证完毕' }],
     qwen: [{ text: '你们好甜呀～' }, { stamp: '千问到此' }],
     kimi: [{ text: '你们好甜，我给你们拉一曲～' }, { stamp: '♪ 到此' }],
+    'gemini-magician': [{ text: '我从帽子里探出头看了一眼喵' }, { stamp: '魔术印' }],
     '*': [{ text: '我也来看看' }, { stamp: '到此一游' }],
   }
   const HINT = { 0: '多一起站一会儿，她会写更多', 1: '再熟一点，她会回你的话', 2: '再好一点，她会在这页贴照片' }
@@ -193,25 +229,29 @@
     return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
   }
   const one = (list, rnd) => list[Math.floor(rnd() * list.length)]
-  const of = (table, id) => table[id] || table['*']
+  const of = (table, id, skin) => table[skin] || table[id] || table['*']
   const dateOf = ms => { const x = new Date(ms); return `${x.getMonth() + 1} 月 ${x.getDate()} 日` }
 
   // 填得上的数字留言（用到的数都有才算）
-  function dataLines(writer, level, facts) {
+  function dataLines(writer, level, facts, skin) {
     const v = { h: Math.floor((facts.minutes || 0) / 60), d: facts.days || 0, date: facts.first ? dateOf(facts.first) : '', n: facts.rounds || 0, p: facts.pats || 0 }
-    return of(DATA_MSG, writer)[level].filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, k]) => v[k])).map(t => t.replace(/\{(\w+)\}/g, (_, k) => String(v[k])))
+    return of(DATA_MSG, writer, skin)[level].filter(t => [...t.matchAll(/\{(\w+)\}/g)].every(([, k]) => v[k])).map(t => t.replace(/\{(\w+)\}/g, (_, k) => String(v[k])))
   }
 
   // 一个朋友在她本子上的那一块：{ lines: [{ who, text }], sticker, photo: { date } | null, hint }
   // facts = { first: 第一次一起站在桌面上的时间, minutes: 一起站的分钟, days: 认识的天数, rounds: 主人的总轮数, pats: 主人被摸的次数 }
-  function block({ owner, friend, level, facts = {}, day }) {
+  // ownerSkin / friendSkin：两边穿着的皮肤 id。写的人穿皮肤换她写的话，主人穿皮肤换写给她的、她回的；都是先找皮肤的，没写退回原角色。
+  // 说话的人照样记原角色 id（字体、名字按原角色）
+  function block({ owner, friend, level, facts = {}, day, ownerSkin = '', friendSkin = '' }) {
     const rnd = seeded(`${day}|${owner}|${friend}`)
     const lv = Math.max(0, Math.min(3, level | 0))
     const lines = []
-    const say = (who, text) => lines.push({ who, text })
-    const greet = lvl => { for (const t of one(of(GREET, friend)[lvl], rnd).t) say(friend, t) }
-    const data = lvl => { const list = dataLines(friend, lvl, facts); if (list.length) say(friend, one(list, rnd)); return list.length > 0 }
-    const msg = MSG[friend]?.[owner]?.[lv]
+    const fw = friendSkin || friend, ow = ownerSkin || owner
+    const whoOf = w => (w === fw || w === friend ? friend : owner)
+    const say = (who, text) => lines.push({ who: whoOf(who), text })
+    const greet = lvl => { for (const t of one(of(GREET, friend, friendSkin)[lvl], rnd).t) say(friend, t) }
+    const data = lvl => { const list = dataLines(friend, lvl, facts, friendSkin); if (list.length) say(friend, one(list, rnd)); return list.length > 0 }
+    const msg = (MSG[fw]?.[ow] || MSG[fw]?.[owner] || MSG[friend]?.[ow] || MSG[friend]?.[owner])?.[lv]
     if (lv === 0) greet(0)
     else if (lv === 1) { if (rnd() < 0.5 || !data(1)) greet(1) }
     else if (!msg) { greet(1); data(lv) }   // 自定义角色：没有写给她的，用认识了的那几句加数字
@@ -223,14 +263,14 @@
     } else for (const [who, t] of one(msg, rnd).t) say(who, t)
     return {
       lines,
-      sticker: lv >= 2 ? one(of(STICKER, friend), rnd) : null,
+      sticker: lv >= 2 ? one(of(STICKER, friend, friendSkin), rnd) : null,
       photo: lv >= 3 && facts.first ? { date: facts.first } : null,
       hint: lv < 3 ? HINT[lv] : null,
     }
   }
 
   // 路过插一嘴：至少两个朋友、其中有好朋友以上时，隔天出现一次；说话的是心最多的那个以外的朋友。friends 按心多到少排
-  function cameo({ owner, friends, day }) {
+  function cameo({ owner, friends, day, wear = () => '' }) {
     if (!friends || friends.length < 2 || !friends.some(f => f.level >= 2)) return null
     // 隔天：按日期单双数（和主人的名字错开，几本本子不在同一天）
     const [y, mo, da] = String(day).split('-').map(Number)
@@ -238,7 +278,7 @@
     if (!Number.isFinite(n) || n % 2) return null
     const rnd = seeded(`${day}|${owner}|cameo`)
     const who = one(friends.slice(1), rnd).id
-    return { who, ...one(of(CAMEO, who), rnd) }
+    return { who, ...one(of(CAMEO, who, wear(who)), rnd) }
   }
 
   const api = { SEVEN, GREET, MSG, DATA_MSG, STICKER, CAMEO, HINT, block, cameo, dateOf }
