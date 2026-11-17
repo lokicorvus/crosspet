@@ -205,6 +205,10 @@ extension App {
             case "noSleep":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "noSleep"); js("setNeverSleep(\(on))")
+            case "sitRemind", "waterRemind":
+                defaults.set(value as? Bool ?? false, forKey: key); js(breakRemindersJS)
+            case "sitEvery", "waterEvery":
+                if let n = (value as? NSNumber)?.intValue, Self.breakChoices.contains(n) { defaults.set(n, forKey: key); js(breakRemindersJS) }
             case "quotaAggregate":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "quotaAggregate"); js("setQuotaAggregate(\(on))")

@@ -182,6 +182,7 @@ extension App {
             "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"), "gptQuotaNote": codexNote,
             "login": SMAppService.mainApp.status == .enabled,
             "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "codexResets": codexResets, "peakStyle": peakStyle, "quotaStyle": quotaStyle, "peakSkins": peakSkins, "powerSave": powerSave, "noSleep": noSleep,
+            "sitRemind": defaults.bool(forKey: "sitRemind"), "sitEvery": breakEvery("sitEvery", 45), "waterRemind": defaults.bool(forKey: "waterRemind"), "waterEvery": breakEvery("waterEvery", 60),
             "hideHotkey": hideHotkey, "hotkeyFailed": hotkeyFailed, "hotkeys": [["id": "off", "label": "不用快捷键"]] + Self.hotkeyChoices.map { ["id": $0.id, "label": $0.label] },
             "aiAutostart": aiAutostart,
             "multiPets": multiPetsOn, "petsRest": petsRest, "mainPet": mainPet, "friendship": friendshipRows,
