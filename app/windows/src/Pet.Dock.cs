@@ -35,6 +35,12 @@ namespace CrossPet
         static bool PowerSave => Store.Settings.TryGetValue("powerSave", out var v) && v is bool b && b;
         /// <summary>不睡觉（默认关）：闲太久、AI 会话结束都不睡，判断在网页（setNeverSleep）</summary>
         static bool NoSleep => Store.Settings.TryGetValue("noSleep", out var v) && v is bool b && b;
+        /// <summary>久坐、喝水提醒（默认关）：间隔只认设置页的几个选项，别的值退回默认；计时和判断在网页（break-reminders.js）</summary>
+        static readonly int[] BreakChoices = { 30, 45, 60, 90, 120 };
+        static int? BreakMinutes(object v) { try { var n = Convert.ToInt32(v); return Array.IndexOf(BreakChoices, n) >= 0 ? n : (int?)null; } catch { return null; } }
+        static int BreakEvery(string key, int fallback) => Store.Settings.TryGetValue(key, out var v) ? BreakMinutes(v) ?? fallback : fallback;
+        static string BreakRemindersJs =>
+            $"setBreakReminders({{ sit: {(Store.Flag("sitRemind") ? "true" : "false")}, sitEvery: {BreakEvery("sitEvery", 45)}, water: {(Store.Flag("waterRemind") ? "true" : "false")}, waterEvery: {BreakEvery("waterEvery", 60)} }})";
         /// <summary>额度合并显示（默认关）：小窗把各家 AI 的额度排成几行，而不是只显示当前角色的。怎么排在网页里（quota-aggregate.js）</summary>
         static bool QuotaAggregate => Store.Flag("quotaAggregate");
         static string QuotaStyle => Store.Settings.TryGetValue("quotaStyle", out var v) && v is string s && s == "bars" ? "bars" : "text";   // 额度怎么显示：text 文字（默认）/ bars 额度条（网页层 quota-bars.js）

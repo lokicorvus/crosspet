@@ -144,6 +144,7 @@ namespace CrossPet
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
                 ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
+                ["sitRemind"] = Store.Flag("sitRemind"), ["sitEvery"] = BreakEvery("sitEvery", 45), ["waterRemind"] = Store.Flag("waterRemind"), ["waterEvery"] = BreakEvery("waterEvery", 60),
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
                 // 多桌宠（设置页「角色」页）：开关、她们什么时候去休息、固定主桌宠、友谊（主桌宠页面最后一次发来的）
                 ["multiPets"] = MultiPetsOn, ["petsRest"] = PetsRest, ["mainPet"] = MainPet, ["friendship"] = friendshipRows ?? new object[0],
@@ -216,6 +217,10 @@ namespace CrossPet
                             break;
                         case "powerSave": Store.Settings["powerSave"] = on; Store.SaveSettings(); Js($"setPowerSave({(on ? "true" : "false")})"); break;
                         case "noSleep": Store.Settings["noSleep"] = on; Store.SaveSettings(); Js($"setNeverSleep({(on ? "true" : "false")})"); break;
+                        case "sitRemind": case "waterRemind": Store.Settings[key] = on; Store.SaveSettings(); Js(BreakRemindersJs); break;
+                        case "sitEvery": case "waterEvery":
+                            if (BreakMinutes(value) is int every) { Store.Settings[key] = every; Store.SaveSettings(); Js(BreakRemindersJs); }
+                            break;
                         case "eggs": Store.Settings["eggs"] = on; Store.SaveSettings(); Js($"setEggsEnabled({(on ? "true" : "false")})"); break;
                         case "aura":
                             if (value is string m && (m == "auto" || m == "on" || m == "off")) { Store.Settings["auraMode"] = m; Store.SaveSettings(); Js($"setAuraMode({Q(m)})"); }
