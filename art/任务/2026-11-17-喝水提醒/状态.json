@@ -1,0 +1,220 @@
+{
+ "about": "drink：drink · 喝水",
+ "items": [
+  {
+   "char": "claude",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [
+    "用户退回：嘴部与玻璃杯错位，接触和遮挡不自然；2026-11-17 用户确认修正方案后说“开工吧”，授权新一轮。以原始定妆重新组织嘴唇、杯口透视、双手及轻微倾角，不沿用旧错误成品；同时保留头顶余量和待机尺度。 Claude 的书完全收起，不夹在臂下或贴身。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3,
+   "pick": 3
+  },
+  {
+   "char": "claude-saint",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [
+    "用户退回：嘴部与玻璃杯错位，接触和遮挡不自然；2026-11-17 用户确认修正方案后说“开工吧”，授权新一轮。以原始定妆重新组织嘴唇、杯口透视、双手及轻微倾角，不沿用旧错误成品；同时保留头顶余量和待机尺度。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3,
+   "pick": 3
+  },
+  {
+   "char": "deepseek",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [
+    "用户退回：嘴部与玻璃杯错位，接触和遮挡不自然；2026-11-17 用户确认修正方案后说“开工吧”，授权新一轮。以原始定妆重新组织嘴唇、杯口透视、双手及轻微倾角，不沿用旧错误成品；同时保留头顶余量和待机尺度。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3,
+   "pick": 3
+  },
+  {
+   "char": "deepseek-hoodie",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [
+    "用户退回：嘴部与玻璃杯错位，接触和遮挡不自然；2026-11-17 用户确认修正方案后说“开工吧”，授权新一轮。以原始定妆重新组织嘴唇、杯口透视、双手及轻微倾角，不沿用旧错误成品；同时保留头顶余量和待机尺度。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 4,
+   "pick": 4
+  },
+  {
+   "char": "deepseek-knit",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1,
+   "pick": 1
+  },
+  {
+   "char": "deepseek-pajamas",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "deepseek-winter",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gemini",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1,
+   "pick": 1
+  },
+  {
+   "char": "gemini-magician",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "glm",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2,
+   "pick": 2
+  },
+  {
+   "char": "gpt",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "gpt-onesie",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [
+    "用户指出 gpt-onesie 喝水 v1 多了呆毛，明确要求重画。本张喝水图去掉兜帽顶伸出的白色卷呆毛，兜帽顶部平顺；保留两只奶油色布偶角及原长白发，保持嘴杯接触、袖爪握杯和其他服饰身份。该要求覆盖旧角色文字中“兜帽上伸出呆毛”的描述。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2,
+   "rejected": 1,
+   "pick": 2
+  },
+  {
+   "char": "grok",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "kimi",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "qwen",
+   "pose": "drink",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 2,
+   "pick": 2
+  }
+ ]
+}
