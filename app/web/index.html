@@ -233,6 +233,7 @@ addEventListener('error', e => {
 <script src="stand-in.js"></script>
 <script src="follow-policy.js"></script>
 <script src="codex-resets.js"></script>
+<script src="break-reminders.js"></script>
 <script src="whats-new.js"></script>
 <script src="peak-hours.js"></script>
 <script src="companions.js"></script>
@@ -282,13 +283,17 @@ const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
   peakStart: ['高峰到了，换身衣服干活～'], valleyStart: ['空闲时段，半价啦～换身轻松的'],   // 按时段换衣服（皮肤可以自己写）
+  // 久坐、喝水提醒（见「久坐、喝水提醒」；角色在 character.json 的 lines 里写了同名键就用角色的）
+  remindSit: ['坐好久啦，起来走走～', '站起来伸个懒腰吧！', '起来活动一下，我等你～', '腰酸了吧？起来动一动'],
+  remindWater: ['喝口水吧～', '该喝水啦，咕嘟咕嘟', '杯子空了没？去倒点水', '休息一下，喝口水再继续'],
 }
 Object.assign(LOCAL_LINES, CodexResets.LINES)   // 重置提醒的默认台词（角色自己写了同名键就用角色的）
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
   reset_check: 'thinking', reset_bell: 'reset', reset_hope: 'happy', reset_maybe: 'hum', reset_nope: 'sulk',   // Codex 重置提醒（见 codex-resets.js）
   busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
-  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy' }
+  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy',
+  drink: 'happy' }   // 喝水提醒（还没画喝水的立绘）
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
   annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000, roll_call: 6000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
@@ -509,6 +514,39 @@ function say(line) {
   b.textContent = line
   b.classList.remove('hide')
 }
+// ---- 久坐、喝水提醒（设置里默认关；计时规则在 break-reminders.js）----
+// 只按时间算；到点主桌宠伸个懒腰（久坐）或开心一下（喝水，以后画了 drink 就用上），说一句，半分钟后自己收起，不用点。
+// 她在忙就等着（最多 10 分钟），夜里不说；额外那只不提醒。设计见 docs/superpowers/specs/2026-11-17-break-reminders-design.md
+const BREAK_SHOW_MS = 30000
+let breakCfg = { sit: 0, water: 0 }, breaks = BreakReminders.fresh(Date.now()), hiddenSince = 0
+// 外壳调：{ sit: 开没开, sitEvery: 分钟, water, waterEvery }。开关或间隔变了的那项从现在重新算
+function setBreakReminders(o) {
+  if (role !== 'main') return
+  const minutes = (k, every) => (o?.[k] ? (BreakReminders.CHOICES.includes(Number(every)) ? Number(every) : BreakReminders.DEFAULTS[k]) : 0)
+  const cfg = { sit: minutes('sit', o?.sitEvery), water: minutes('water', o?.waterEvery) }
+  for (const k of ['sit', 'water']) if (cfg[k] !== breakCfg[k]) breaks = BreakReminders.restart(breaks, k, Date.now())
+  breakCfg = cfg
+}
+// 闲着才说：待机、累了、睡着（叫醒她说）都算闲；干活、多会话、彩蛋、更新、道别、换角色、贴边、开发者控制台都算忙；
+// 待机时气泡里正说着别的话也等一下
+function breakBusy() {
+  return !!(egg || multi || updatingNow || farewellLine !== null || tucked || characterTimer || devHeld() || devActive || aiActivity()
+    || !['idle', 'tired', 'sleeping'].includes(pose) || (pose === 'idle' && !$('bubble').classList.contains('hide')))
+}
+function remindBreak(kind) {
+  clearTimeout(pending); clearTimeout(revertTimer)
+  lastActive = Date.now(); shownAt = Date.now()
+  setPose(kind === 'sit' ? 'stretch' : 'drink', true)
+  say(pick(linesOf(kind === 'sit' ? 'remindSit' : 'remindWater') || ['']))
+  revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, BREAK_SHOW_MS)
+}
+setInterval(() => {
+  if (role !== 'main' || pageHidden || !charId || char()?.egg) return
+  const r = BreakReminders.tick(breaks, breakCfg, Date.now(), breakBusy())
+  breaks = r.state
+  if (r.say) remindBreak(r.say)
+}, 60000)
+
 // ---- Codex 重置提醒（设置里默认关；数据来自第三方网站 codex-resets.com，判断见 codex-resets.js）----
 // 只对 GPT 生效：官方提前宣布了重置，额度下方多一行；右键「会重置吗？」（外壳调 askReset）她按预测分档回答；
 // 出现新的强预测 / 新宣布，她闲着时主动说一次。连不上那个网站时安静失败（国内网络常见）
@@ -1280,7 +1318,13 @@ function setNeverSleep(on) {
   neverSleep = !!on
   if (neverSleep && pose === 'sleeping') setPose('sleeping')
 }
-function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
+function setPageHidden(h) {
+  h = !!h
+  if (h && !pageHidden) hiddenSince = Date.now()
+  // 藏了够久（屏幕睡着、被你藏起来）算起来过了：久坐重新计时
+  if (!h && pageHidden && hiddenSince) { breaks = BreakReminders.back(breaks, Date.now() - hiddenSince, Date.now()); hiddenSince = 0 }
+  pageHidden = h; applyFxRate()
+}
 applyFxRate()
 
 // ---- 多会话：同一个 AI 好几个对话同时在干活 ----
