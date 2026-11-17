@@ -369,6 +369,30 @@ const cases = [
     click(f)
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'followApps', value: false }), 'followApps 消息变了')
   }],
+  // 久坐、喝水提醒（「通用」页；设计见 docs/superpowers/specs/2026-11-17-break-reminders-design.md）
+  ['久坐、喝水提醒：两行在「通用」页，下拉选项 30–120 分钟，按 state 显示', p => {
+    for (const [sw, sel] of [['sitRemind', 'sitEvery'], ['waterRemind', 'waterEvery']]) {
+      const box = p.q(`input[data-key=${sw}]`); assert(box, '没有开关 ' + sw)
+      assert(box.closest('.card').dataset.tab === 'general', sw + ' 不在「通用」页')
+      assert(box.closest('.item') === p.$(sel)?.closest('.item'), sel + ' 下拉和开关不在同一行')
+      const opts = p.$(sel).children.map(o => o.value)
+      assert(JSON.stringify(opts) === JSON.stringify(['30', '45', '60', '90', '120']), sel + ' 选项不对：' + opts)
+    }
+    p.push({ sitRemind: false, sitEvery: 45, waterRemind: true, waterEvery: 90 })
+    assert(p.$('sitEvery').value === '45' && p.$('waterEvery').value === '90', '下拉没按 state 显示：' + p.$('sitEvery').value + ' ' + p.$('waterEvery').value)
+    assert(!p.q('input[data-key=sitRemind]').checked && p.q('input[data-key=waterRemind]').checked, '开关没按 state 显示')
+  }],
+  ['久坐、喝水提醒：换间隔发数字', p => {
+    p.push({ waterRemind: true, waterEvery: 60 })
+    p.$('waterEvery').value = '30'; p.$('waterEvery').onchange()
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'waterEvery', value: 30 }), '该发数字 30：' + JSON.stringify(p.posted.at(-1)))
+    p.$('sitEvery').value = '120'; p.$('sitEvery').onchange()
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'sitEvery', value: 120 }), '该发数字 120')
+  }],
+  ['久坐、喝水提醒：外壳没给间隔时显示默认 45 / 60', p => {
+    p.push({})
+    assert(p.$('sitEvery').value === '45' && p.$('waterEvery').value === '60', '默认值不对：' + p.$('sitEvery').value + ' ' + p.$('waterEvery').value)
+  }],
 ]
 
 let failed = 0

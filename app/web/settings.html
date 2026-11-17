@@ -210,6 +210,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="powerSave"><span></span></label></div></div>
   <div class="item"><div class="label">不睡觉<small>平时 10 分钟没动静、AI 会话结束时她会睡着；打开后一直醒着待机，偶尔哼歌、伸懒腰</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="noSleep"><span></span></label></div></div>
+  <div class="item"><div class="label">久坐提醒<small>坐久了她提醒你起来走走；夜里 11 点到早上 7 点不提醒</small></div>
+    <div class="ctl"><select id="sitEvery" aria-label="久坐提醒间隔"><option value="30">每 30 分钟</option><option value="45">每 45 分钟</option><option value="60">每 60 分钟</option><option value="90">每 90 分钟</option><option value="120">每 120 分钟</option></select><label class="switch"><input type="checkbox" data-key="sitRemind"><span></span></label></div></div>
+  <div class="item"><div class="label">喝水提醒<small>隔一阵提醒你喝口水；夜里 11 点到早上 7 点不提醒</small></div>
+    <div class="ctl"><select id="waterEvery" aria-label="喝水提醒间隔"><option value="30">每 30 分钟</option><option value="45">每 45 分钟</option><option value="60">每 60 分钟</option><option value="90">每 90 分钟</option><option value="120">每 120 分钟</option></select><label class="switch"><input type="checkbox" data-key="waterRemind"><span></span></label></div></div>
   <div class="item"><div class="label">检查更新</div>
     <div class="ctl"><button data-action="checkUpdate">检查</button></div></div>
   <div class="item"><div class="label">文件夹<small>换立绘、加角色看「自定义角色」文档</small></div>
@@ -258,6 +262,8 @@ function setState(s) {
   for (const el of document.querySelectorAll('[data-only]')) el.classList.toggle('hidden', s[el.dataset.only] === undefined || s[el.dataset.only] === null)
   for (const b of $('aura').children) b.classList.toggle('on', b.dataset.v === s.aura)
   for (const b of $('peakStyle').children) b.classList.toggle('on', b.dataset.v === s.peakStyle)
+  // 久坐、喝水提醒的间隔（外壳没给就是默认的 45 / 60 分钟）；正在选的时候不改
+  for (const [id, def] of [['sitEvery', 45], ['waterEvery', 60]]) if (document.activeElement !== $(id)) $(id).value = String(s[id] || def)
   for (const b of $('quotaStyle').children) b.classList.toggle('on', b.dataset.v === (s.quotaStyle || 'text'))
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   if (s.hotkeys) {
@@ -462,6 +468,7 @@ $('textLink').onclick = () => state?.textLinked === false
   : post({ cmd: 'set', key: 'textSize', value: +$('size').value })
 // 还原：人物、文字都回 100%，并锁上
 document.querySelector('[data-reset-size]').onclick = () => { post({ cmd: 'set', key: 'size', value: 1 }); post({ cmd: 'set', key: 'textLinked', value: true }) }
+for (const id of ['sitEvery', 'waterEvery']) $(id).onchange = () => post({ cmd: 'set', key: id, value: Number($(id).value) })
 $('hideHotkey').onchange = () => post({ cmd: 'set', key: 'hideHotkey', value: $('hideHotkey').value })
 // 主桌宠：点「固定为」用下拉里选着的角色；换下拉就直接固定为那个角色
 for (const r of document.querySelectorAll('input[name=mainPet]')) r.onchange = () => post({ cmd: 'set', key: 'mainPet', value: r.value === 'fixed' ? $('mainPetSelect').value : '' })
