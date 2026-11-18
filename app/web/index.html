@@ -33,6 +33,9 @@ html, body { margin: 0; background: transparent; overflow: hidden; -webkit-user-
 #stage.swap { transform: scale(.9) translateY(4%); opacity: 0; }
 /* 额外那只先在屏幕外备着（Windows 预开窗口，见 prepareThen）：整页不显示，登场时 arriveNow() 再噗一下出来 */
 body.parked { visibility: hidden; }
+/* 让开：鼠标在她身上时按一下 ⌥（Windows 是 Ctrl），她变透明、鼠标穿过她点到后面；鼠标离开她就回来（外壳判断，调 setYield） */
+body { transition: opacity .15s ease; }
+html.yield body { opacity: .25; }
 #aura { position: absolute; left: 50%; top: 50%; width: 240px; height: 240px; margin: -120px 0 0 -120px;
   border-radius: 50%; opacity: var(--aura-o);
   background: radial-gradient(circle closest-side, var(--aura) 0%, color-mix(in srgb, var(--aura) 45%, transparent) 45%, transparent 100%);
@@ -230,11 +233,19 @@ addEventListener('error', e => {
 <script src="stand-in.js"></script>
 <script src="follow-policy.js"></script>
 <script src="codex-resets.js"></script>
+<script src="break-reminders.js"></script>
 <script src="whats-new.js"></script>
 <script src="peak-hours.js"></script>
 <script src="companions.js"></script>
 <script src="friendship.js"></script>
 <script src="pair-chat.js"></script>
+<script src="pet-talk.js"></script>
+<script src="notebook-diary.js"></script>
+<script src="notebook.js"></script>
+<script src="notebook-lines.js"></script>
+<script src="notebook-friends.js"></script>
+<script src="notebook-events.js"></script>
+<script src="notebook-backfill.js"></script>
 <script>
 // CrossPet 画面：由 CrossPet.app（Swift 外壳）调用这几个函数
 //   init(manifest)          角色清单（characters/*/character.json + 立绘）
@@ -272,13 +283,17 @@ const LOCAL_LINES = {
   idle: ['……', '在呢'], pat: ['嘿嘿', '（蹭蹭）'], surprised: ['诶？！'], hum: ['♪～'], stretch: ['伸个懒腰～'],
   yawn: ['哈啊……'], sleeping: ['zZz'], tired: ['有点累了…'],
   peakStart: ['高峰到了，换身衣服干活～'], valleyStart: ['空闲时段，半价啦～换身轻松的'],   // 按时段换衣服（皮肤可以自己写）
+  // 久坐、喝水提醒（见「久坐、喝水提醒」；角色在 character.json 的 lines 里写了同名键就用角色的）
+  remindSit: ['坐好久啦，起来走走～', '站起来伸个懒腰吧！', '起来活动一下，我等你～', '腰酸了吧？起来动一动'],
+  remindWater: ['喝口水吧～', '该喝水啦，咕嘟咕嘟', '杯子空了没？去倒点水', '休息一下，喝口水再继续'],
 }
 Object.assign(LOCAL_LINES, CodexResets.LINES)   // 重置提醒的默认台词（角色自己写了同名键就用角色的）
 // 新加的姿态还没画立绘时，先用哪张顶上
 const POSE_FALLBACK = { compact: 'writing', reset: 'happy', feast: 'eat', sorry: 'listening', asking: 'listening', update: 'happy', bye: 'happy',
   reset_check: 'thinking', reset_bell: 'reset', reset_hope: 'happy', reset_maybe: 'hum', reset_nope: 'sulk',   // Codex 重置提醒（见 codex-resets.js）
   busy_left: 'thinking', busy_right: 'thinking', swamped_left: 'busy_left', swamped_right: 'busy_right', edge_left: 'idle', edge_right: 'idle', edge_left_peek: 'edge_left', edge_right_peek: 'edge_right',
-  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy' }
+  annoyed: 'pout', puffed: 'pout', redhot: 'pout', sulk: 'pout', pout: 'surprised', dizzy: 'oops', coaxed: 'pat', forgiven: 'happy', friend_up: 'happy',
+  drink: 'happy' }   // 喝水提醒（还没画喝水的立绘）
 const TRANSIENT = { happy: 5000, proud: 6000, oops: 4000, surprised: 3000, pat: 4000, hum: 4000, stretch: 3200, yawn: 3000,
   annoyed: 4500, puffed: 5000, dizzy: 3000, coaxed: 3500, forgiven: 5000, roll_call: 6000 }
 for (const p of Object.keys(MOTION)) if (p.startsWith('greet_')) TRANSIENT[p] = 5500; else if (p.startsWith('fest_')) TRANSIENT[p] = 6500
@@ -371,6 +386,7 @@ function setPose(p, instant) {
   if (tucked) p = `edge_${tucked}${tuckedPeek ? '_peek' : ''}`   // 缩在边上：一直扒着，别的动作等她出来再演
   if (p === pose) return
   pose = p; poseSince = Date.now()
+  if (p === 'sleeping') noteSlept()
   const frames = framesFor(p)
   showImage(instant ? frames[0] : pick(frames), instant)
   $('body').className = MOTION[p] || 'm-bob'
@@ -451,6 +467,8 @@ function setAuraMode(mode) {
 }
 // 能点到的区域（网页像素，[x, y, 宽, 高]）：桌宠本体、气泡、名牌、额度。窗口其余透明的地方让点击穿过去，
 // 点到后面的窗口（窗口比桌宠大，是给动作、气泡留的空间）
+// 外壳调：让开（变透明，外壳同时让鼠标穿过窗口）/ 回来
+function setYield(on) { document.documentElement.classList.toggle('yield', !!on) }
 function hitRects() {
   const out = []
   if (tucked) {   // 缩在边上：只有露出来的那截能点 / 能让她探出来
@@ -496,6 +514,39 @@ function say(line) {
   b.textContent = line
   b.classList.remove('hide')
 }
+// ---- 久坐、喝水提醒（设置里默认关；计时规则在 break-reminders.js）----
+// 只按时间算；到点主桌宠伸个懒腰（久坐）或开心一下（喝水，以后画了 drink 就用上），说一句，半分钟后自己收起，不用点。
+// 她在忙就等着（最多 10 分钟），夜里不说；额外那只不提醒。设计见 docs/superpowers/specs/2026-11-17-break-reminders-design.md
+const BREAK_SHOW_MS = 30000
+let breakCfg = { sit: 0, water: 0 }, breaks = BreakReminders.fresh(Date.now()), hiddenSince = 0
+// 外壳调：{ sit: 开没开, sitEvery: 分钟, water, waterEvery }。开关或间隔变了的那项从现在重新算
+function setBreakReminders(o) {
+  if (role !== 'main') return
+  const minutes = (k, every) => (o?.[k] ? (BreakReminders.CHOICES.includes(Number(every)) ? Number(every) : BreakReminders.DEFAULTS[k]) : 0)
+  const cfg = { sit: minutes('sit', o?.sitEvery), water: minutes('water', o?.waterEvery) }
+  for (const k of ['sit', 'water']) if (cfg[k] !== breakCfg[k]) breaks = BreakReminders.restart(breaks, k, Date.now())
+  breakCfg = cfg
+}
+// 闲着才说：待机、累了、睡着（叫醒她说）都算闲；干活、多会话、彩蛋、更新、道别、换角色、贴边、开发者控制台都算忙；
+// 待机时气泡里正说着别的话也等一下
+function breakBusy() {
+  return !!(egg || multi || updatingNow || farewellLine !== null || tucked || characterTimer || devHeld() || devActive || aiActivity()
+    || !['idle', 'tired', 'sleeping'].includes(pose) || (pose === 'idle' && !$('bubble').classList.contains('hide')))
+}
+function remindBreak(kind) {
+  clearTimeout(pending); clearTimeout(revertTimer)
+  lastActive = Date.now(); shownAt = Date.now()
+  setPose(kind === 'sit' ? 'stretch' : 'drink', true)
+  say(pick(linesOf(kind === 'sit' ? 'remindSit' : 'remindWater') || ['']))
+  revertTimer = characterTimeout(() => { setPose(restPose()); say('') }, BREAK_SHOW_MS)
+}
+setInterval(() => {
+  if (role !== 'main' || pageHidden || !charId || char()?.egg) return
+  const r = BreakReminders.tick(breaks, breakCfg, Date.now(), breakBusy())
+  breaks = r.state
+  if (r.say) remindBreak(r.say)
+}, 60000)
+
 // ---- Codex 重置提醒（设置里默认关；数据来自第三方网站 codex-resets.com，判断见 codex-resets.js）----
 // 只对 GPT 生效：官方提前宣布了重置，额度下方多一行；右键「会重置吗？」（外壳调 askReset）她按预测分档回答；
 // 出现新的强预测 / 新宣布，她闲着时主动说一次。连不上那个网站时安静失败（国内网络常见）
@@ -821,6 +872,7 @@ function init(m) {
     else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
   } else { $('caption').textContent = char().name }
   sendStoredFriendship()
+  askNotebookBackfill()
   restoreGathered()
 }
 // 主桌宠页面第一次 init 完：存着友谊就交一次给外壳（不管开关开没开），重启后开关关着设置页也能显示灰的列表。额外那只不发
@@ -927,8 +979,17 @@ function setCharacter(id, quiet) {
     const pend = pendingCelebration[id]
     if (pend && Date.now() - pend.at < 10 * 60 * 1000) characterTimeout(() => celebrate(id, pend.ev), 1200)
     // 新立绘加载好再淡入，避免先看到空白
+    // 没加载完的 <img> 换了地址后浏览器先接着显示上一张：只等 0.16 秒的话，Windows（立绘由外壳异步读文件交给网页，常常更慢）
+    // 会先露出换之前的衣服，再突然变成新的。所以等新图解码好再淡入，最多等 1.5 秒
     const reveal = () => stage.classList.remove('swap')
-    if (active.complete && spare.complete) characterTimeout(reveal, 60); else characterTimeout(reveal, 160)
+    const loading = [active, spare, $('blink')].filter(i => i.src && !i.complete)
+    if (!loading.length) characterTimeout(reveal, 60)
+    else {
+      let done = false
+      const go = () => { if (done) return; done = true; if (charId === id && generation === characterGeneration) reveal() }
+      Promise.all(loading.map(i => i.decode().catch(() => {}))).then(go)
+      setTimeout(go, 1500)
+    }
   }, 330)
 }
 
@@ -1187,10 +1248,10 @@ function setName(id, name) {
   if (id === charId) $('caption').textContent = name
 }
 
-// 兜底：干活的样子（思考、读写、跑命令……）停了这么久没有任何新事件，就当这一轮已经停了，回去待机。
+// 兜底：干活的样子（思考、读写、跑命令……）停了 3 分钟没有任何新事件，就当这一轮已经停了，回去待机。
 // 有的 AI 被你中途打断时不发「结束」（Claude Code 标准钩子、Gemini CLI……），不然她会一直停在思考。
-// 「等你回答」不算：那是在等你，本来就可能很久
-const STUCK_AFTER = 3 * 60 * 1000
+// 「等你回答」不算：那是在等你，本来就可能很久。正在调用模型的思考（Antigravity 一次能想 6 分钟以上，中间不发事件）
+// 放宽到 10 分钟，见 companions.js 的 stuckAfter
 const NOT_WORKING = new Set(['idle', 'sleeping', 'asking', 'tired', 'hungry', 'happy', 'proud', 'oops', 'surprised'])
 let stuckTimer = null
 function watchStuck() {
@@ -1200,7 +1261,7 @@ function watchStuck() {
     clearTimeout(thinkTimer)
     show('idle', true)
     say('')
-  }, STUCK_AFTER)
+  }, Companions.stuckAfter(charState[charId]))
 }
 
 // ---- 特效省电 ----
@@ -1266,7 +1327,13 @@ function setNeverSleep(on) {
   neverSleep = !!on
   if (neverSleep && pose === 'sleeping') setPose('sleeping')
 }
-function setPageHidden(h) { pageHidden = !!h; applyFxRate() }
+function setPageHidden(h) {
+  h = !!h
+  if (h && !pageHidden) hiddenSince = Date.now()
+  // 藏了够久（屏幕睡着、被你藏起来）算起来过了：久坐重新计时
+  if (!h && pageHidden && hiddenSince) { breaks = BreakReminders.back(breaks, Date.now() - hiddenSince, Date.now()); hiddenSince = 0 }
+  pageHidden = h; applyFxRate()
+}
 applyFxRate()
 
 // ---- 多会话：同一个 AI 好几个对话同时在干活 ----
@@ -1291,7 +1358,7 @@ function sessionKind(e, now) {
   if (e.pose === 'happy' || e.pose === 'proud') return age < SESSION_DONE_SHOW ? 'done' : null
   if ((e.pose === 'oops' || e.pose === 'surprised') && e.event === 'Stop') return age < SESSION_DONE_SHOW ? 'error' : null
   if (e.pose === 'idle' || e.pose === 'sleeping') return null
-  return age < STUCK_AFTER / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
+  return age < Companions.stuckAfter(e) / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
 }
 // 当前角色要演的会话：她自己的，加上她响应的各家 AI 的，再加上 current 的（会话 id 各家不重复，直接合在一起）。
 // current 的整个归主桌宠，不按她占着的客户端筛
@@ -1452,6 +1519,7 @@ function diagnosePets(windows) {
   }
 }
 function applyCharState(id, s) {
+  noteNotebookEvent(id === 'current' ? charId : id, s)
   // 多模型宿主里没有对应角色的模型（WorkBuddy 的混元、Kimi……）：由主桌宠（当前角色）来演。
   // 要先于 playsByClient 判断：外壳不转发 current@* 文件，换成角色名再判会被当成「改由按客户端那份演」吞掉（设计第一节：未知模型算主桌宠占着的客户端）
   if (id === 'current') { playCharState(charId, s); return }
@@ -1745,8 +1813,12 @@ function sendHome(k) {
 // 额外那只被摸了头（外壳转来；主桌宠自己被摸也记）：记下时间。5 分钟内摸了两个不同的角色就 +2（记过的那几下清掉，不重复算）
 function notePat(character) {
   if (role !== 'main' || !character) return
+  noteBump(character, 'pats')
   const nowMs = Date.now()
   patAt[character] = nowMs
+  // 吃醋：5 分钟内没被摸过的朋友说一句（被摸过的不说）
+  patSeen[character] = nowMs
+  friendEvent(character, 'jealous', Object.keys(patSeen).filter(o => nowMs - patSeen[o] <= Friendship.PATS_MS))
   if (!friendshipOn()) return
   const partners = Object.keys(patAt).filter(o => o !== character && nowMs - patAt[o] <= Friendship.PATS_MS)
   if (!partners.length) return
@@ -1916,14 +1988,176 @@ setInterval(() => {
   else if (sentFriendship === null) sendFriendship()
 }, FRIEND_TICK)
 
+// ---- 她的小本子（相处记录）----
+// 只记数字和日期：一轮活（开始干活 → Stop）、在桌面上的分钟、摸头 / 戳 / 惹她生气、小成就。按角色记，不按客户端。
+// 只由主桌宠页面记（额外那只被摸 / 戳 / 惹生气，外壳转来 notePat / notePoke / noteAngry），存 localStorage['crosspet-notebook']，
+// 每次写都交给外壳存一份 notebook.json（restoreNotebook 并回来，规则同友谊）。纯函数在 notebook.js，补算拼轮在 notebook-backfill.js。
+// 设计：docs/superpowers/specs/2026-11-08-notebook-design.md
+const NOTE_KEY = 'crosspet-notebook', NOTE_TICK = 60_000
+const NOTE_END = new Set(['Stop', 'AfterAgent'])
+const NOTE_START = new Set(['UserPromptSubmit', 'BeforeAgent'])
+const NOTE_RESTING = new Set(['idle', 'sleeping', 'happy', 'proud', 'bye', 'tired'])
+const noteOpenAt = {}            // 角色 → 这一轮开始的时间（毫秒）；页面重载就丢，重载前那轮不记
+let noteBackfillAsked = false
+function noteStoreRead() {
+  try { const v = JSON.parse(localStorage.getItem(NOTE_KEY)); if (v && typeof v === 'object' && !Array.isArray(v) && v.chars) return v } catch {}
+  return null
+}
+// 读不到就从现在开始记（liveSince = 现在）。只有主桌宠存
+function noteStore() {
+  const v = noteStoreRead()
+  if (v) return v
+  const s = Notebook.empty(Date.now())
+  if (role === 'main') noteStoreWrite(s)
+  return s
+}
+function noteStoreWrite(store) {
+  if (role !== 'main') return
+  try { localStorage.setItem(NOTE_KEY, JSON.stringify(store)) } catch {}
+  toShell({ notebookStore: store })
+}
+// 外壳载入完、init 之前调：saved 是 notebook.json（没有就是 null）。每个角色留多的那份；网页这边多的回写给外壳
+function restoreNotebook(saved) {
+  if (role !== 'main') return
+  const local = noteStoreRead(), merged = Notebook.merge(local, saved)
+  if (!merged) return
+  const json = JSON.stringify(merged)
+  if (json !== JSON.stringify(local)) { try { localStorage.setItem(NOTE_KEY, json) } catch {} }
+  if (json !== JSON.stringify(saved)) toShell({ notebookStore: merged })
+}
+// init 完：还没补算过就请外壳扫一次 AI 程序的记录（只要一次；外壳扫完调 applyNotebookBackfill）
+function askNotebookBackfill() {
+  if (role !== 'main' || noteBackfillAsked) return
+  noteBackfillAsked = true
+  if (!noteStore().backfilled) toShell({ notebookBackfill: true })
+}
+function applyNotebookBackfill(payload) {
+  if (role !== 'main') return
+  const before = noteStore()
+  const installed = Object.keys(manifest.characters || {}).filter(id => !manifest.characters[id].egg)
+  const after = NotebookBackfill.apply(before, payload, installed)
+  if (after !== before) noteStoreWrite(after)   // 补算里达成的小成就不说（是以前的事）
+}
+// 她和谁关系最好（友谊记录里的最高一档），算「第一次有了好朋友」用
+function noteFriendLevel(ch) {
+  const store = friendStoreRead()
+  let best = 0
+  for (const [key, r] of Object.entries(store)) if (key.split('+').includes(ch) && r) best = Math.max(best, Friendship.level(r.points || 0))
+  return best
+}
+// 写进去，顺手看小成就；新达成的她说一句（台词：character.json 的 milestones 优先，没有用通用的）
+function noteCommit(store, ch, nowMs) {
+  const r = Notebook.checkMilestones(store, ch, nowMs, { friendLevel: noteFriendLevel(ch) })
+  noteStoreWrite(r.store)
+  for (const id of r.reached) {
+    const rec = r.store.chars[ch]
+    const line = String(manifest.characters?.[ch]?.milestones?.[id] ?? Notebook.MILESTONES[id].line).replace('{h}', rec.nightHour ?? '')
+    if (ch === mainCharacter()) { if (!egg) say(line) }
+    else {
+      const p = companionsState?.pets.find(x => x.character === ch)
+      if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, null] } })
+    }
+  }
+}
+// applyCharState 每条状态都先过这里：开始干活（你发了一句，或者第一条干活的事件）开一轮，Stop 收一轮。
+// 同一条 Stop 送来两次（页面重载、外壳重发状态文件）只算一次：每个角色记着最后算过的 ts
+const BIG_ROUND_MS = 2 * 60_000, FRESH_MS = 60_000
+function noteNotebookEvent(ch, s) {
+  if (role !== 'main' || !ch || !s || !Number.isFinite(s.ts) || !manifest.characters?.[ch] || manifest.characters[ch].egg) return
+  const ms = s.ts * 1000, ev = s.event || ''
+  if (NOTE_END.has(ev)) {
+    const start = noteOpenAt[ch]
+    delete noteOpenAt[ch]
+    if (start == null || ms < start) return
+    const store = noteStore(), rec = store.chars[ch]
+    if (rec && s.ts <= (rec.lastTs || 0)) return
+    let next = Notebook.recordRound(store, ch, start, ms)
+    next = { ...next, chars: { ...next.chars, [ch]: { ...next.chars[ch], lastTs: s.ts } } }
+    noteCommit(next, ch, ms)
+    // 刚干完一轮大活（≥ 2 分钟；重放的旧状态不算）：朋友夸一句
+    if (ms - start >= BIG_ROUND_MS && Date.now() - ms < FRESH_MS) friendEvent(ch, 'done')
+    return
+  }
+  if (s.pose === 'oops' && Date.now() - ms < FRESH_MS) friendEvent(ch, 'oops')
+  if (noteOpenAt[ch] != null) return
+  if (NOTE_START.has(ev) || (s.pose && !NOTE_RESTING.has(s.pose) && ev !== 'SessionEnd' && ev !== 'SessionStart')) noteOpenAt[ch] = ms
+}
+// 说完的一段对话记进小本子（只主桌宠记）
+function noteChat(lines) {
+  if (role !== 'main') return
+  const nowMs = Date.now()
+  // 说过话的每两只，各在对方的本子上记一件「今天聊过」（第二页的事，notebook-diary.js）
+  noteStoreWrite(NotebookDiary.recordChat(Notebook.logChat(noteStore(), lines, nowMs), lines, nowMs, { installed: noteInstalled() }))
+}
+const noteInstalled = () => Object.keys(manifest.characters || {}).filter(id => !manifest.characters[id].egg)
+function noteBump(ch, kind) {
+  if (role !== 'main' || !ch) return
+  const nowMs = Date.now()
+  noteCommit(Notebook.bump(noteStore(), ch, kind, nowMs), ch, nowMs)
+}
+function notePoke(character) { noteBump(character, 'pokes'); friendEvent(character, 'poke') }
+function noteAngry(character) { noteBump(character, 'angry'); friendEvent(character, 'redhot') }
+// 在桌面上：主桌宠和站着的额外那几只，页面没藏起来（外壳藏起来 / 屏幕睡了会 setPageHidden）每分钟记一分钟
+setInterval(() => {
+  if (role !== 'main' || pageHidden || egg || !manifest.characters) return
+  const nowMs = Date.now(), present = presentCharacters().filter(ch => manifest.characters[ch] && !manifest.characters[ch].egg)
+  if (!present.length) return
+  // 先记按日期、按数字的事（升级、纪念日、节日、昨天很忙、今天被摸得多、隔了好久又碰面）：要用上一次的 pairs.last，所以在 addMinute 之前
+  let store = NotebookDiary.tick(noteStore(), { nowMs, present, friendship: friendStoreRead(), fest: festivalOf(new Date(nowMs)), installed: noteInstalled() })
+  store = Notebook.addMinute(store, present, nowMs)
+  // 「认识 N 天」这类按日子到的：顺手在这里看（不说话的那几个也在这里补上）
+  for (const ch of present.slice(1)) store = Notebook.checkMilestones(store, ch, nowMs, { friendLevel: noteFriendLevel(ch) }).store
+  noteCommit(store, present[0], nowMs)
+}, NOTE_TICK)
+// 外壳打开小本子时取：面板要的数据 + 她的批注 / 落款（character.json 的 notebook，没写就是 null，用主题里的）
+function notebookFor(ch) {
+  const chars = manifest.characters || {}
+  const names = Object.fromEntries(Object.entries(chars).map(([id, c]) => [id, c.name]))
+  const v = Notebook.view(noteStore(), ch, { names, friendship: friendStoreRead(), nowMs: Date.now() })
+  // 好朋友的头像：她的待机图（面板先试同一个文件夹里的探头头像 avatar.webp，没有再用它）
+  const friend = v.friend && { ...v.friend, image: chars[v.friend.id]?.poses?.idle?.[0] || null }
+  // 批注每次打开随机挑一句（按数字的档），落款按深夜 / 忙 / 好久不见 / 纪念日换（notebook-lines.js）；character.json 写了的照旧优先
+  const nowMs = Date.now(), skin = chars[ch]?.skin || ''
+  return { ...v, friend, notes: chars[ch]?.notebook?.notes ?? null, sign: chars[ch]?.notebook?.sign ?? null,
+           notesPicked: NotebookLines.notesFor(ch, v, undefined, skin), signPicked: NotebookLines.signFor(ch, v, nowMs, undefined, skin), page2: notebookPage2(ch, v, names, nowMs) }
+}
+// 第二页：和她一起站过的朋友（最多 4 个，心多的在前）各写的一块、路过插一嘴的、最近她参与的几段对话（notebook-friends.js 挑文案）
+function notebookPage2(ch, v, names, nowMs) {
+  const chars = manifest.characters || {}, store = noteStore(), day = Notebook.localDay(nowMs)
+  const installed = Object.keys(chars).filter(id => !chars[id].egg)
+  const list = Notebook.friendsOf(store, ch, { friendship: friendStoreRead(), installed })
+  const idle = id => chars[id]?.poses?.idle?.[0] || null
+  const friends = list.map(f => ({
+    id: f.id, name: names[f.id] || f.id, image: idle(f.id), levelName: Notebook.LEVEL_NAMES[f.level], hearts: f.hearts,
+    block: NotebookFriends.block({ owner: ch, friend: f.id, level: f.level, day, ownerSkin: chars[ch]?.skin || '', friendSkin: chars[f.id]?.skin || '',
+      facts: { first: f.first, minutes: f.minutes, days: f.first ? Math.floor((nowMs - f.first) / 86_400_000) : 0, rounds: v.rounds, pats: v.pats } }),
+  }))
+  const c = NotebookFriends.cameo({ owner: ch, friends: list, day, wear: id => chars[id]?.skin || '' })
+  const chats = Notebook.chatsOf(store, ch).map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who] || who, text })) }))
+  // 有事的日子（notebook-diary.js 记的）：今天的放今天这页，之前的一天一页往回翻；写的人已经不在了的跳过
+  const fs = friendStoreRead(), skinOf = id => chars[id]?.skin || ''
+  const items = list => list.filter(ev => installed.includes(ev.friend)).map(ev => {
+    const pts = fs[Notebook.pairKey(ch, ev.friend)]?.points || 0, level = Friendship.level(pts)
+    return { id: ev.friend, name: names[ev.friend] || ev.friend, image: idle(ev.friend), levelName: Notebook.LEVEL_NAMES[level],
+      hearts: Friendship.hearts(pts) + Friendship.partial(pts), kind: ev.kind,
+      block: NotebookEvents.block({ ev, owner: ch, ownerSkin: skinOf(ch), friendSkin: skinOf(ev.friend), level }) }
+  })
+  const md = d => { const [, m, dd] = d.split('-').map(Number); return `${m} 月 ${dd} 日` }
+  const history = NotebookDiary.daysOf(store, ch).filter(d => d < day).map(d => {
+    const evs = NotebookDiary.eventsOn(store, ch, d), fest = evs.find(e => e.kind === 'fest')
+    return { day: d, label: md(d) + (fest && NotebookEvents.FEST_NAMES[fest.n] ? ` · ${NotebookEvents.FEST_NAMES[fest.n]}` : ''), items: items(evs) }
+  }).filter(h => h.items.length)
+  return { now: nowMs, ownerImage: idle(ch), friends, cameo: c && { ...c, name: names[c.who] || c.who }, chats, today: items(NotebookDiary.eventsOn(store, ch, day)), history }
+}
+
 // ---- 每对台词（台词和挑法在 pair-chat.js）----
-// 多桌宠在跑、两只都在场又都闲着时，隔一阵子（至少 12 分钟、每分钟掷一次）挑一对一问一答；按这一对的心数分档说不同的话。
+// 多桌宠在跑、两只都在场又都闲着时，隔一阵子（至少 8 分钟、每分钟掷一次）挑一对说几句（三只以上有时是群聊，pet-talk.js）；按这一对的心数分档说不同的话。
 // 主桌宠自己说走 chat()，额外那只说交给外壳转（companionCall，fn = chat）。只由主桌宠页面挑，额外那只只管说
 let pairChatAt = 0
 const LEVEL_UP_GAP = 30_000
 const pairChatRecent = []
 function tryPairChat() {
-  if (role !== 'main' || !friendshipOn() || pageHidden || egg) return
+  if (role !== 'main' || !friendshipOn() || pageHidden || egg || Date.now() < speakingUntil) return
   const store = friendStoreRead(), nowMs = Date.now()
   const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
   if (aiActivity()) busy.push(mainCharacter())
@@ -1934,30 +2168,77 @@ function tryPairChat() {
     if (up) {
       pairChatAt = nowMs
       friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
-      up.lines.forEach(([who, line, pose, fx], i) => setTimeout(() => chatAs(who, line, pose, fx), i * PairChat.REPLY_MS))
+      speak(up.lines)
       return
     }
   }
-  const got = PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
-                             hearts10: key => Friendship.hearts(store[key]?.points || 0), wear })
+  // 三只以上闲着：先试群聊（按话题每人一句）；没中再挑一对，候选里多几段「看数字说话」（填小本子里的数）
+  const levelOf = key => Friendship.level(store[key]?.points || 0)
+  const got = PetTalk.groupPick({ present: presentCharacters(), busy, levelOf, nowMs, lastAt: pairChatAt, recent: pairChatRecent, wear })
+    || PairChat.pick({ present: presentCharacters(), busy, nowMs, lastAt: pairChatAt, recent: pairChatRecent,
+                       hearts10: key => Friendship.hearts(store[key]?.points || 0), wear, extra: (a, b) => PetTalk.dataExchanges(a, b, noteFacts(a, b, nowMs), wear) })
   if (!got) return
   pairChatAt = nowMs
   pairChatRecent.push(got.id)
   if (pairChatRecent.length > 12) pairChatRecent.shift()
-  got.lines.forEach(([who, line, pose], i) => setTimeout(() => chatAs(who, line, pose), i * PairChat.REPLY_MS))
+  speak(got.lines)
 }
-function chatAs(character, line, pose, fx) {
+// ---- 对彼此的事有反应（台词和挑法在 pet-talk.js）----
+// 事主（actor）身上发生了 kind（done 干完大活 / redhot 红温 / jealous 吃醋 / sleep 睡着 / poke 被戳 / oops 出错）：旁边闲着的朋友说一句、她回一句。
+// 演彩蛋、页面藏着、正在说一段时不说，也不记冷却；忙着的（主桌宠在干活也算）不当说话的那只；冷却（每种事每对 10 分钟、全部 2 分钟）记在 reactLast
+const reactLast = {}, patSeen = {}
+const REACT_DELAY = 1500
+function friendEvent(actor, kind, exclude = []) {
+  if (role !== 'main' || !actor || !friendshipOn() || pageHidden || egg) return
+  const nowMs = Date.now()
+  if (nowMs < speakingUntil) return
+  const store = friendStoreRead()
+  // 忙着的不当说话的那只（主桌宠在干活也一样）；事主自己忙不要紧（她刚干完、刚出错，正是朋友接话的时候）
+  const busy = Object.keys(friendWorking).filter(ch => friendWorking[ch])
+  if (aiActivity()) busy.push(mainCharacter())
+  const got = PetTalk.react({ kind, actor, present: presentCharacters(), busy, exclude, nowMs, last: reactLast,
+                              levelOf: key => Friendship.level(store[key]?.points || 0), wear: ch => manifest.characters?.[ch]?.skin || '' })
+  if (!got) return
+  for (const m of got.marks) reactLast[m] = nowMs
+  speakingUntil = nowMs + REACT_DELAY + 1000
+  setTimeout(() => speak(got.lines), REACT_DELAY)
+}
+// 她睡着了：主桌宠自己直接算；额外那只告诉外壳，外壳转给主桌宠页面 friendEvent(她, 'sleep')
+function noteSlept() {
+  if (role === 'main') friendEvent(mainCharacter(), 'sleep')
+  else toShell({ slept: true })
+}
+// 「看数字说话」要的数：两只今天的轮数、摸头次数，这一对一起在桌面上的分钟和认识的天数（小本子记录里的）
+function noteFacts(a, b, nowMs) {
+  const store = noteStore(), day = Notebook.localDay(nowMs), pair = store.pairs?.[Notebook.pairKey(a, b)]
+  const today = {}, pats = {}
+  for (const ch of [a, b]) { const rec = store.chars?.[ch]; today[ch] = rec?.days?.[day] || 0; pats[ch] = rec?.pats || 0 }
+  const knownDays = pair?.first ? Math.floor((nowMs - pair.first) / 86_400_000) : 0
+  return { today, pats, togetherMin: pair?.minutes || 0, knownDays }
+}
+// 放一段对话：按 PairChat.schedule 一句句说（气泡按字数停 12–20 秒，后一句等前一句显示一阵再接），整段记进小本子「最近她们聊了什么」
+// lines：[[谁, 说什么, 立绘或 null, 特效?]]。speakingUntil：这段说完的时间（反应、群聊看它，别插嘴）
+let speakingUntil = 0
+function speak(lines) {
+  if (!lines || !lines.length) return
+  const plan = PairChat.schedule(lines)
+  for (const x of plan) setTimeout(() => chatAs(x.who, x.text, x.pose, x.fx, x.ms), x.at)
+  const last = plan[plan.length - 1]
+  speakingUntil = Date.now() + last.at + last.ms
+  noteChat(lines)
+}
+function chatAs(character, line, pose, fx, ms) {
   if (!friendshipOn()) return
-  if (character === mainCharacter()) { chat(line, pose, fx); return }
+  if (character === mainCharacter()) { chat(line, pose, fx, ms); return }
   const p = companionsState?.pets.find(x => x.character === character)
-  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: fx ? [line, pose || null, fx] : [line, pose || null] } })
+  if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null, fx || null, ms || PairChat.bubbleMs(line)] } })
 }
-// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；6 秒后收起（气泡已经换成别的话就不管）。
-// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），6 秒后回到常态；缩在边上时不换。
+// 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；ms 后收起（没给按字数，PairChat.bubbleMs；气泡已经换成别的话就不管）。
+// look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），收起时回到常态；缩在边上时不换。
 // fx：换上 look 时改用这个特效（关系升级：飘心）；没给就不要特效——这些图平时配的是干活的特效（清单、奖杯、对话卡片），聊天时看着像在偷偷干活
-const CHAT_MS = 6000
 let chatTimer = null
-function chat(line, look, fx) {
+function chat(line, look, fx, ms) {
+  const CHAT_MS = Number.isFinite(ms) && ms > 0 ? ms : PairChat.bubbleMs(line)
   if (egg || farewellLine !== null || updatingNow || aiActivity() || typeof line !== 'string') return
   if (typeof look === 'string' && MOTION[look] && !tucked) {
     clearTimeout(pending); clearTimeout(revertTimer)
@@ -2065,6 +2346,8 @@ function handleClick(kind, x, y) {
   lastActive = Date.now()
   // 摸头记给友谊：主桌宠自己记；额外那只告诉外壳，外壳转给主桌宠页面 notePat(角色)
   if (kind === 'pat') { if (role === 'main') notePat(mainCharacter()); else toShell({ patted: true }) }
+  // 戳一下记进小本子：同摸头，额外那只交给外壳转给主桌宠（notePoke）
+  if (kind === 'poke') { if (role === 'main') notePoke(mainCharacter()); else toShell({ poked: true }) }
   if (kind === 'pat' && Math.random() < EGG_CLICK_CHANCE && playEgg(true)) return
   if (pose === 'sleeping') { show('yawn', true); say('唔…你回来啦'); return }
   if (kind === 'pat' && (sulking || angerNow() >= 20)) { coaxHer(); return }   // 生着气的时候摸她 = 哄她
@@ -2098,6 +2381,7 @@ function react(afterWork) {
   const said = () => { if (afterWork) { const l = linesOf('work' + lv[0].toUpperCase() + lv.slice(1)); if (l) say(pick(l)) } }
   if (lv !== 'redhot') { show(lv, true); said(); return }
   sulking = true; coax = 0
+  if (role === 'main') noteAngry(mainCharacter()); else toShell({ angered: true })   // 惹她生气记进小本子（同戳一下）
   show('redhot', true)
   said()
   clearTimeout(sulkTimer)
@@ -2154,7 +2438,7 @@ function setPluginUpdates(list) {
 }
 function aiActivity() {
   const s = charState[charId]
-  if (!s?.pose || Date.now() / 1000 - (s.ts || 0) > STUCK_AFTER / 1000) return null
+  if (!s?.pose || Date.now() / 1000 - (s.ts || 0) >= Companions.stuckAfter(s) / 1000) return null   // 满了就算停：兜底计时器正好到点时不能再判成在干活
   if (pose === 'idle' || pose === 'sleeping' || pose === 'tired') return null   // 卡住的状态被兜底送回待机了
   if (s.pose === 'asking') return 'asking'
   return NOT_WORKING.has(s.pose) ? null : 'work'

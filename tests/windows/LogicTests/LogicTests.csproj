@@ -19,5 +19,9 @@
     <Compile Include="../../../app/windows/src/CardImages.cs" />
     <Compile Include="../../../app/windows/src/CompanionPlace.cs" />
     <Compile Include="../../../app/windows/src/RunningClient.cs" />
+    <Compile Include="../../../app/windows/src/YieldRule.cs" />
+    <Compile Include="../../../app/windows/src/ProcessStop.cs" />
+    <Compile Include="../../../app/windows/src/NotebookScan.cs" />
+    <Compile Include="../../../app/windows/src/NotebookPlace.cs" />
   </ItemGroup>
 </Project>

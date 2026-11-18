@@ -54,3 +54,16 @@ test('ENTRYPOINT 是 cli 或没有：都算 claude-cli', async () => {
   assert.equal(sessions['s-none'].client, 'claude-cli')
   assert.equal(json('claude@claude-cli-state.json').client, 'claude-cli')
 })
+
+test('turn.step 按模型换角色：kimi / moonshot 认成 kimi，没装 kimi 时退回 claude', async () => {
+  const step = async (sid, model) => {
+    const gen = handlers['turn.step'](engine(sid, 'cli'), { model }, async function* () { return {} })
+    for (let r = await gen.next(); !r.done; r = await gen.next());
+    return json('claude-host.json').character
+  }
+  assert.equal(await step('s-k0', 'kimi-k2.6'), 'claude')   // 角色文件夹里还没有 kimi
+  const dir = join(root, 'Library', 'Application Support', 'CrossPet', 'characters', 'kimi')
+  await mkdir(dir, { recursive: true }); await writeFile(join(dir, 'character.json'), '{}')
+  assert.equal(await step('s-k1', 'kimi-k2.6'), 'kimi')
+  assert.equal(await step('s-k2', 'moonshot-v1-128k'), 'kimi')
+})

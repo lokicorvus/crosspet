@@ -133,6 +133,97 @@ class IntegrationTests(unittest.TestCase):
         for event in integrate.load_json(integrate.REPO / 'integrations/qwen/hooks.json')['hooks']:
             self.assertIn(f'"{event}"', hook, event)
 
+    # Kimi Code：钩子写在 ~/.kimi-code/config.toml 的 [[hooks]] 表里，CrossPet 的条目整段夹在两行标记之间
+    KIMI_TOML = 'default_model = "kimi-code/k3"\n\n[[hooks]]\nevent = "Notification"\ncommand = "terminal-notifier -message done"\n\n[thinking]\nenabled = true\n'
+    def run_kimi(self, tmp, install, text=None):
+        home = Path(tmp) / '.kimi-code'; home.mkdir(exist_ok=True)
+        (home / 'device_id').write_text('x')   # Kimi Code 自己的文件：只有 config.toml 不算装过
+        cfg = home / 'config.toml'
+        if text is not None:
+            cfg.write_text(text, encoding='utf-8')
+        with mock.patch.object(integrate, 'KIMI_HOME', home), mock.patch.object(integrate, 'KIMI_CONFIG', cfg), \
+             contextlib.redirect_stdout(io.StringIO()):
+            integrate.kimi(install)
+        return cfg.read_text(encoding='utf-8') if cfg.exists() else None
+    def test_kimi_install_is_idempotent_and_reversible(self):
+        import tomllib
+        with tempfile.TemporaryDirectory() as tmp:
+            first = self.run_kimi(tmp, True, self.KIMI_TOML)
+            self.assertEqual(self.run_kimi(tmp, True), first)                      # 重复接入不叠加
+            data = tomllib.loads(first)                                            # 还是合法的 TOML
+            ours = [h for h in data['hooks'] if 'crosspet-hook.py' in h['command']]
+            self.assertEqual({h['event'] for h in ours}, set(integrate.KIMI_EVENTS))
+            for h in data['hooks']:
+                self.assertLessEqual(set(h), {'event', 'matcher', 'command', 'timeout'})   # 多一个字段整个配置读不进去
+            self.assertTrue(all(h['command'].endswith(' kimi') for h in ours))
+            self.assertIn({'event': 'Notification', 'command': 'terminal-notifier -message done'}, data['hooks'])   # 别人的不动
+            self.assertEqual(data['thinking'], {'enabled': True})
+            self.assertEqual(self.run_kimi(tmp, False).strip(), self.KIMI_TOML.strip())   # 撤销后和原来一样
+    def test_kimi_uninstall_removes_entries_without_markers(self):
+        # 标记被人删了、只剩条目：按 [[hooks]] 表认出命令里有 crosspet-hook.py 的
+        loose = self.KIMI_TOML + '\n[[hooks]]\nevent = "Stop"\ncommand = \'python3 "x/crosspet-hook.py" kimi\'\n'
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self.run_kimi(tmp, False, loose).strip(), self.KIMI_TOML.strip())
+    def test_kimi_uninstall_leaves_untouched_config_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(self.run_kimi(tmp, False, self.KIMI_TOML), self.KIMI_TOML)
+            self.assertEqual(list((Path(tmp) / '.kimi-code').glob('*.bak-crosspet-*')), [])   # 没改就不备份
+    def test_kimi_skips_when_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / '.kimi-code'
+            with mock.patch.object(integrate, 'KIMI_HOME', home), mock.patch.object(integrate, 'KIMI_CONFIG', home / 'config.toml'), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                integrate.kimi(True)
+            self.assertFalse(home.exists())
+    def test_kimi_registered_and_events_known_to_hook(self):
+        self.assertIn('kimi', integrate.TARGETS)
+        self.assertEqual(integrate.SEEN_KEY['kimi'], 'kimi')
+        hook = (integrate.REPO / 'integrations/crosspet-hook.py').read_text(encoding='utf-8')
+        for event in integrate.KIMI_EVENTS:
+            self.assertIn(f'"{event}"', hook, event)
+    def test_toml_str_quotes(self):
+        import tomllib
+        for value in ['python3 "$HOME/a b/crosspet-hook.py" kimi', "C:/it's/py.exe x kimi", 'C:\\x\\y "z"']:
+            self.assertEqual(tomllib.loads('v = ' + integrate.toml_str(value))['v'], value)
+
+
+class WindowsClaudeExecFormTests(unittest.TestCase):
+    # #45：Windows 上 Claude Code 的钩子写成 exec 形式（command 是随包 Python、args 是参数），不经过命令行壳；
+    # 在 macOS 上假装成 Windows 跑一遍 load_template（os 换成只把 name 改成 nt 的代理，SUPPORT 指到临时目录）
+    class _Os:
+        name = 'nt'
+        def __getattr__(self, k): return getattr(os, k)
+    def _template(self, tmp):
+        with mock.patch.object(integrate, 'os', self._Os()), mock.patch.object(integrate, 'SUPPORT', Path(tmp)):
+            return integrate.load_template(integrate.REPO / 'integrations/claude-code/hooks.json')
+    def test_claude_hooks_are_exec_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            hooks = [h for groups in self._template(tmp)['hooks'].values() for g in groups for h in g['hooks']]
+            self.assertTrue(hooks)
+            for h in hooks:
+                self.assertEqual(h['command'], str(Path(sys.executable)))
+                self.assertEqual(h['args'], ['-I', str(Path(tmp) / integrate.MARK), 'claude'])
+                self.assertNotIn('onFailure', h)   # 不写：默认就不拦，旧版 Claude Code 也不认这个字段
+                self.assertEqual(h['timeout'], 5)
+    def test_exec_form_entries_are_ours_and_user_hooks_kept(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ours = self._template(tmp)['hooks']['PreToolUse'][0]
+            mine = {'matcher': 'Bash', 'hooks': [{'type': 'command', 'command': 'node', 'args': ['check.js']}]}
+            mixed = {'matcher': '*', 'hooks': [ours['hooks'][0], {'type': 'command', 'command': 'echo hi'}]}
+            kept = integrate.without_ours([mine, ours, mixed])
+            self.assertEqual(kept, [mine, {'matcher': '*', 'hooks': [{'type': 'command', 'command': 'echo hi'}]}])
+
+
+class SeenTests(unittest.TestCase):
+    # #44：增强版 mod 的心跳写成了带引号的字符串（"1793979559"），诊断读不出、一直「没有记录」；旧 mod 写的文件也要认
+    def test_seen_reads_plain_and_quoted(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(integrate, 'STATE_DIR', Path(tmp)):
+            now = int(integrate.time.time()) if hasattr(integrate, 'time') else int(__import__('time').time())
+            (Path(tmp) / 'seen-claude-mod').write_text(f'"{now}"')
+            self.assertNotEqual(integrate.seen('claude-mod'), '没有记录')
+            (Path(tmp) / 'seen-claude-mod').write_text(str(now))
+            self.assertNotEqual(integrate.seen('claude-mod'), '没有记录')
+
 
 class CursorIntegrationTests(unittest.TestCase):
     def setUp(self):

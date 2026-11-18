@@ -1,0 +1,77 @@
+{
+ "about": "pop：pop · 彩蛋·登场；pretend：pretend · 彩蛋·装模作样；caught：caught · 彩蛋·被识破；bye：bye · 彩蛋·道别；escape：escape · 彩蛋·溜走",
+ "items": [
+  {
+   "char": "egg-deepseek-hat",
+   "pose": "pop",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
+    }
+   ],
+   "version": 3
+  },
+  {
+   "char": "egg-deepseek-hat",
+   "pose": "pretend",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-hat",
+   "pose": "caught",
+   "state": "已导入",
+   "notes": [
+    "2026-11-17 用户要求重新画被识破；未指定额外修改原因。本轮只重画caught、保存新版本，不修改pick或其他动作。用户既有单纯留白例外继续有效。",
+    "2026-11-17 用户指出尾巴偏差必须修正且画风改变；修订为从原始idle编辑，锁定原画风，尾端按原图光滑尖鳍，不加毛边。",
+    "2026-11-17 用户退回v5再次要求重画。新一轮从v6开始，保留原定妆眼睛和脸型、紧凑比例，以小幅心虚惊讶替代巨大眼白和大嘴。",
+    "2026-11-17用户认可v6脸与画风，要求被识破时饭撒出来。固定v6为底图，只改礼帽倾斜、饭从帽沿撒到身前/围裙及必要手部角度；不改pick。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 7
+  },
+  {
+   "char": "egg-deepseek-hat",
+   "pose": "bye",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-hat",
+   "pose": "escape",
+   "state": "已导入",
+   "notes": [
+    "2026-11-17用户明确要求重画escape：v1/v2头顶和腿上各一顶帽子。本轮移除头顶多余礼帽，恢复原女仆头饰，只保留腿上装饭帽；其余尽量保持v2，不改pick。"
+   ],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 3
+  }
+ ]
+}

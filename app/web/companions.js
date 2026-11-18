@@ -9,11 +9,14 @@
   const CLI_RECENT = 600_000
   // 主桌宠占着的客户端停下后，还粘住这么久不换
   const CLAIM_STICK = 60_000
+  // 主桌宠的角色最近这么久内有过动静的会话才算占着客户端；更早的（比如前天留下的）不算，
+  // 不然一条旧会话就让「谁先来谁当」一直成立，切到别的 AI 也不换（11-09 Windows 反馈）
+  const CLAIM_FRESH = 30 * 60_000
 
   // 这些姿态不算干活；「等你回答」（asking）算
   const WORKING_EXCLUDED = new Set(['idle', 'sleeping', 'happy', 'proud', 'tired'])
   // 跑在终端里的客户端
-  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'grok', 'hermes'])
+  const CLI_CLIENTS = new Set(['claude-cli', 'codex', 'deepseek', 'gemini', 'qwen', 'kimi', 'grok', 'hermes'])
   // 没有 client 的旧条目（key 是 角色@角色）：这些角色默认接入的是命令行客户端
   // （claude → Claude Code 命令行、gpt → codex，其余同名命令行）
   const LEGACY_CLI_CHARACTERS = new Set(['claude', 'gpt', 'deepseek', 'gemini', 'qwen', 'grok'])
@@ -21,10 +24,18 @@
   // 一轮结束（Stop / SessionEnd）不管什么姿态都不算干活：被打断、出错收尾时钩子会写 oops / surprised + Stop。
   // 一轮中途的 oops（比如 PostToolUseFailure）还算干活。
   // 「等你回答」不受 3 分钟卡住兜底（同 index.html），但最多算 CLI_RECENT：终端关掉不发 SessionEnd 时不至于一直站着。
+  // 正在调用模型（Antigravity 的 PreInvocation、Gemini CLI 的 BeforeModel 之后的思考）：一次调用里不发任何事件，
+  // Gemini 深度思考一次能想 6 分钟以上（11-18 实测 367 秒），按 3 分钟兜底会当成停了、多桌宠那只先走了。
+  // 这种思考和「等你回答」一样最多算 CLI_RECENT；代价是中途被你打断、客户端又不发结束时，她多想一会儿
+  const MODEL_CALL = new Set(['PreInvocation', 'BeforeModel'])
+  function stuckAfter(s) {
+    return s && (s.pose === 'asking' || (s.pose === 'thinking' && MODEL_CALL.has(s.event))) ? CLI_RECENT : STUCK_AFTER
+  }
+
   function isWorking(s, ageMs) {
     if (!s.pose || WORKING_EXCLUDED.has(s.pose)) return false
     if (s.event === 'Stop' || s.event === 'SessionEnd') return false
-    return ageMs < (s.pose === 'asking' ? CLI_RECENT : STUCK_AFTER)
+    return ageMs < stuckAfter(s)
   }
 
   // 命令行客户端；没有 client 的旧条目（客户端就是角色名，比如 claude@claude、gpt@gpt）按角色默认接入的那个算
@@ -63,7 +74,7 @@
 
   // 主桌宠占着她当前角色的哪个客户端。
   // 占着的客户端还在干活、或停下不到 CLAIM_STICK，就粘住不换（免得同一角色两个客户端都在干活时来回对调）；
-  // 换了角色、或占着的客户端已经没有会话了，立刻重新选。
+  // 换了角色、或占着的客户端已经没有会话了，立刻重新选。只在 CLAIM_FRESH 内有过动静的会话里选，都没有就是 null（没占着）。
   // 重新选：前台对得上的客户端（Claude 桌面 → claude-desktop；终端 → 最近有事件的命令行客户端），
   // 对不上就取最近有事件的那个。
   // last / 返回值：{ key, since }，since 是开始占着这个客户端的时间（毫秒）
@@ -72,11 +83,12 @@
     const held = last && last.key && mine.find(c => c.key === last.key)
     if (held && (held.working || nowMs - held.lastTs * 1000 < CLAIM_STICK)) return last
 
+    const fresh = mine.filter(c => c.working || nowMs - c.lastTs * 1000 < CLAIM_FRESH)
     const fg = foreground || {}
     let pick = null
-    if (fg.kind === 'ai' && fg.client) pick = mine.find(c => c.client === fg.client) || null
-    else if (fg.kind === 'terminal') pick = latest(mine.filter(isCli))
-    if (!pick) pick = latest(mine)
+    if (fg.kind === 'ai' && fg.client) pick = fresh.find(c => c.client === fg.client) || null
+    else if (fg.kind === 'terminal') pick = latest(fresh.filter(isCli))
+    if (!pick) pick = latest(fresh)
 
     const key = pick ? pick.key : null
     if (last && last.key === key) return last
@@ -123,7 +135,7 @@
 
   // 主桌宠从 from 换成 to，而 to 已经有一只额外的站着：两个对调——那只就地换成 from（窗口、位置、id 不变，外壳就地换角色），
   // 不然会两只 to 同时在、那只再说 bye 走，from 也凭空没了。
-  // 集合来的那只换成集合来的 from；干活那只换成主桌宠原来占着的客户端（fromClaim，<from>@<客户端>），没占着就当集合来的。
+  // 集合来的那只换成集合来的 from；干活那只换成主桌宠原来占着的客户端（fromClaim，<from>@<客户端>），没占着就不对调（那只让给主桌宠、说 bye 走）。
   // 返回 { state, gathered }：gathered 是新的集合名单（集合来的才变：去掉 to、加上 from）；不用对调时原样返回
   function swapMain(state, { from, to, fromClaim, gathered }) {
     const g = gathered || []
@@ -133,6 +145,9 @@
     if (i < 0 || pets.some(x => x.character === from)) return { state, gathered: g }
     const pet = pets[i]
     const work = pet.via !== 'gather' && typeof fromClaim === 'string' && fromClaim.startsWith(from + '@')
+    // 干活冒出来的那只、主桌宠原来又没占着客户端（她的角色没有最近的会话）：不对调。
+    // 主桌宠接着占走这个客户端，那只说 bye 走；原来的角色没在用，不留一只「集合来的」在桌面上
+    if (pet.via !== 'gather' && !work) return { state, gathered: g }
     const swapped = work
       ? { ...pet, character: from, key: fromClaim, client: fromClaim.slice(from.length + 1), via: 'work', quota: false }
       : { ...pet, character: from, key: gatherKey(from), client: null, via: 'gather', quota: false }
@@ -294,9 +309,9 @@
   }
 
   const api = {
-    STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK,
+    STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK, CLAIM_FRESH,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome, swapMain, clientCharacter, rememberClients,
+    isCli, stuckAfter, clientsOf, mainClaim, inAISoftware, decide, sendHome, swapMain, clientCharacter, rememberClients,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api

@@ -40,6 +40,7 @@ namespace CrossPet
         bool HandlePointer(Dictionary<string, object> m)
         {
             if (!(m.TryGetValue("pointer", out var pv) && pv is string pointer)) return false;
+            CloseNotebook();   // 在她身上按下（拖、点、右键）：小本子先收起（同 macOS 点面板外面）
             // 拖窗口要进系统的移动循环（松手才返回）、菜单要等弹出：都排到网页控件的回调返回之后
             if (pointer == "drag") ui.BeginInvoke(new Action(Drag));
             // 点的位置是网页坐标（CSS 像素）：网页要知道是不是点在「新功能」卡片的按钮上

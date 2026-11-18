@@ -210,6 +210,7 @@ namespace CrossPet
         {
             if (m.TryGetValue("pointer", out var pv) && pv is string pointer)
             {
+                pet.CloseNotebook();   // 在她身上按下：小本子先收起
                 // 拖窗口要进系统的移动循环（松手才返回）：排到网页控件的回调返回之后
                 if (pointer == "drag") ui.BeginInvoke(new Action(Drag));
                 else if (pointer == "click")
@@ -218,6 +219,10 @@ namespace CrossPet
                 return;
             }
             if (m.TryGetValue("patted", out var p) && p is bool pb && pb) pet.Js($"notePat({Pet.Q(Character)})");
+            // 戳一下、惹她生气：记进小本子（同摸头，只在主桌宠页面记）
+            if (m.TryGetValue("poked", out var pk) && pk is bool pkb && pkb) pet.Js($"notePoke({Pet.Q(Character)})");
+            if (m.TryGetValue("angered", out var an) && an is bool anb && anb) pet.Js($"noteAngry({Pet.Q(Character)})");
+            if (m.TryGetValue("slept", out var sl) && sl is bool slb && slb) pet.Js($"friendEvent({Pet.Q(Character)}, 'sleep')");   // 她睡着了：旁边的朋友小声说一句
             // 不能在这个网页控件自己的消息回调里同步 Dispose 它：排到回调返回之后再关（和 ProcessFailed 一样）
             if (m.TryGetValue("gone", out var g) && g is bool gb && gb) ui.BeginInvoke(new Action(Close));
         }
@@ -271,6 +276,7 @@ namespace CrossPet
             timers.Clear();
             slideTimer?.Stop();
             openMenu?.Close();
+            if (pet.NotebookOwner == Id) pet.CloseNotebook();   // 她的小本子跟着收起
             pet.CompanionClosed(this);
             // 关窗口可能是从网页控件的回调里来的（她自己的 gone、主桌宠页面的 companions 消息 / 加载完、初始化失败）：
             // 在回调里同步 Dispose 网页控件不安全，状态先改好（上面），真正的 Dispose 和关窗口排到回调返回之后
@@ -358,6 +364,7 @@ namespace CrossPet
             }
             Add("摸摸头", () => Js("handleClick('pat')"));
             Add("戳一下", () => Js("handleClick('poke')"));
+            Add("我们的小本子", () => pet.OpenNotebook(Character, Host.Bounds, Host.DpiScale, Id));   // 这只的角色的
             // 让她先回去：交给主桌宠页面判（她这个客户端开始新的一轮活之前不再出现），页面再发 companionLeave 让她走
             Add("让她先回去", () => pet.Js($"sendHome({Pet.Q(Id)})"));
             // 换衣服：这个角色有别的衣服（皮肤）时列出来，原版排第一。衣服按角色记，同一个角色的几只一起换（Pet.Wear）

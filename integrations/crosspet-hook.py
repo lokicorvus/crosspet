@@ -59,16 +59,24 @@ def detect_client(host: str) -> str:
     return integration_name([sys.argv[0], host, *sys.argv[2:]])
 
 
-def _lock(f) -> None:
-    try:
-        if os.name == "nt":
-            import msvcrt
-            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(f, fcntl.LOCK_EX)
-    except Exception:
-        pass
+def _lock(f, timeout: float = .15) -> None:
+    """排队写共享文件。等不到就抛 TimeoutError，调用的地方跳过这次记录：观察者不能拖住 AI。
+    Windows 上以前用 LK_LOCK，每次重试隔 1 秒、最多 10 秒，超过 Claude 给钩子的 5 秒（#45 @Ink-Stained-Clouds）"""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            f.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("observer lock busy")
+            time.sleep(.005)
 
 
 def ledger(result: str, detail: str) -> None:
@@ -220,17 +228,15 @@ def ensure_pet() -> str:
         exe = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "Programs/CrossPet/CrossPet.exe"
         if not exe.exists():
             return f"不打开：没找到 {exe}"
-        # 独立进程：不挂在 AI 进程下面，AI 退出时桌宠不会被一起关掉
+        # 一律交给已经在跑的资源管理器去打开（和从开始菜单打开一样），不由钩子直接启动：
+        # - 商店装的 AI（Windows 版 ChatGPT / Codex 是打包应用）直接启动的子程序会带着它的沙箱身份，
+        #   桌宠往 %LOCALAPPDATA%\CrossPet 写的好感度、小本子等被系统悄悄转进那个应用的私有目录；
+        #   下次从开始菜单打开读的是真目录，看着像清零了，两份还各涨各的（用户反馈，1.3.10）
+        # - 有的 AI（WorkBuddy）把钩子放进不许脱离的作业对象，一轮结束就把里面的进程全关掉，直接打开的桌宠会跟着闪退
         detached = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-        try:
-            subprocess.Popen([str(exe)], cwd=str(exe.parent), creationflags=detached | 0x01000000, **quiet)  # + CREATE_BREAKAWAY_FROM_JOB
-        except OSError:
-            # 有的 AI（WorkBuddy）把钩子放进不许脱离的作业对象，一轮结束就把里面的进程全关掉，直接打开的桌宠会跟着闪退。
-            # 交给已经在跑的资源管理器去打开（和从开始菜单打开一样），桌宠就不在这个作业对象里了
-            explorer = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "explorer.exe"
-            subprocess.Popen([str(explorer), str(exe)], creationflags=detached, **quiet)
-            return fresh_note + "已打开（由资源管理器打开）"
-        return fresh_note + "已打开"
+        explorer = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "explorer.exe"
+        subprocess.Popen([str(explorer), str(exe)], creationflags=detached, **quiet)
+        return fresh_note + "已打开（由资源管理器打开）"
     else:
         try:
             os.kill(int((state_dir / "pet.pid").read_text().strip()), 0)
@@ -550,13 +556,13 @@ try:
 except Exception:
     pass
 
-# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen")
-# ZCode 默认用智谱的 GLM；Qwen Code 默认用自家的千问。它们只在会话开始时告诉模型名，
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi")
+# ZCode 默认用智谱的 GLM；Qwen Code、Kimi Code 默认用自家的模型。它们只在会话开始时告诉模型名，
 # 之后的事件按会话 id 查当时记下的模型
-HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen"}
+HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen", "kimi": "kimi"}
 characters_dir = app_data / "characters"
 
 
@@ -595,12 +601,7 @@ def remember_session_model(host: str, fallback: str = "") -> str:
             # 同一宿主的几个会话会同时启动：锁住「读旧表 → 加新项 → 替换」整段。
             # 临时文件也按目标文件命名，不能与 update_sessions 的 .qwen-sessions.json 抢同一路径。
             with open(state_dir / f".{host}-models.lock", "a+b") as lock:
-                if os.name == "nt":
-                    import msvcrt
-                    msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-                else:
-                    import fcntl
-                    fcntl.flock(lock, fcntl.LOCK_EX)
+                _lock(lock)
                 try:
                     try:
                         known = json.loads(path.read_text())
@@ -654,7 +655,7 @@ def installed(c) -> bool:
 # 另外看环境变量里的模型名和接口地址
 SELF_HOSTS = ("claude", "gpt")
 # 宿主名同时也是角色名的：它们的 <名字>-sessions.json 被多会话状态占用，记模型要另开一个文件（见 remember_session_model）
-NAMED_HOSTS = SELF_HOSTS + ("qwen",)
+NAMED_HOSTS = SELF_HOSTS + ("qwen", "kimi")
 if character in SELF_HOSTS:
     host = character
     # 先看事件里的模型名（Claude Code 会话开始时给的、Codex 每条都给的，是实际要用的那个）；
@@ -806,7 +807,9 @@ if arg_event and name == "PostToolUse":
         pose = agy or ("searching" if tool.startswith("browser") else pose_for_tool(tool))
     name = "PreToolUse"  # 让桌宠当作「正在用这个工具」显示，而不是「工具结束、回去思考」
 elif name in ("PermissionRequest",):
-    pose = "asking"  # 等你授权（Codex）
+    pose = "asking"  # 等你授权（Codex、Kimi Code）
+elif name in ("PermissionResult",):
+    pose = "thinking"  # 你点了同意 / 拒绝（Kimi Code）：回去接着干
 elif name in ("Notification",):
     kind = str(event.get("notification_type", "")).lower()
     message = str(event.get("message", "")).lower()
@@ -916,19 +919,11 @@ if pose:
 SESSION_KEEP = 10 * 60   # 多久没动静的会话不再记
 
 
-def update_sessions(sid: str, entry) -> None:
-    path = state_dir / f"{character}-sessions.json"
-    with open(state_dir / f".{character}-sessions.lock", "a+") as lock:
-        try:
-            if os.name == "nt":
-                import msvcrt
-                lock.seek(0)
-                msvcrt.locking(lock.fileno(), msvcrt.LK_LOCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(lock, fcntl.LOCK_EX)
-        except Exception:
-            raise  # 没拿到共享会话锁时不能继续读改写，避免覆盖 Cursor 的卡片。
+def update_sessions(sid: str, entry, who: str = "") -> None:
+    who = who or character
+    path = state_dir / f"{who}-sessions.json"
+    with open(state_dir / f".{who}-sessions.lock", "a+") as lock:
+        _lock(lock)  # 拿不到锁就跳过这次会话卡片（外面 except 兜着）：不能拖住 AI，也不能不加锁就改，会覆盖 Cursor 的卡片
         try:
             known = json.loads(path.read_text())
         except Exception:
@@ -942,13 +937,33 @@ def update_sessions(sid: str, entry) -> None:
         else:
             known[sid] = entry
         known = {k: v for k, v in known.items() if now - float(v.get("ts", 0)) < SESSION_KEEP}
-        tmp = state_dir / f".{character}-sessions.json"
+        tmp = state_dir / f".{who}-sessions.json"
         tmp.write_text(json.dumps(known))
         tmp.replace(path)
         if os.name == "nt":
             try:
                 lock.seek(0)
                 msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            except Exception:
+                pass
+
+
+def retire_session_elsewhere(sid: str) -> None:
+    """同一个会话中途换了模型（ZCode 旧对话里 DeepSeek → GLM、Claude Code 换接口……）就换了角色：
+    把它从别的角色名下删掉。不然旧角色那份还停在「干活中」，最多留 SESSION_KEEP，多桌宠会同时冒出新旧两只。
+    只删同一个客户端记的条目；宿主自己记模型的表（<宿主>-sessions.json，值是模型名字符串）不是会话卡片，不碰"""
+    for path in state_dir.glob("*-sessions.json"):
+        who = path.name[:-len("-sessions.json")]
+        if who == character or who.startswith("."):
+            continue
+        try:
+            known = json.loads(path.read_text())
+        except Exception:
+            continue
+        old = known.get(sid) if isinstance(known, dict) else None
+        if isinstance(old, dict) and old.get("client") == client:
+            try:
+                update_sessions(sid, None, who)
             except Exception:
                 pass
 
@@ -961,6 +976,8 @@ if session_id and (pose or name == "SessionEnd"):
                          "client": client})
     except Exception:
         pass
+    if name != "SessionEnd":
+        retire_session_elsewhere(session_id)
 
 ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "unknown-event")
 

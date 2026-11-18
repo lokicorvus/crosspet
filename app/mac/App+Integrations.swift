@@ -18,6 +18,7 @@ extension App {
         ("hermes", "Hermes Agent", "按当前模型换角色；新开的会话生效"),
         ("cursor", "Cursor", "按当前模型换角色；认不出的模型由当前角色来演"),
         ("qwen", "Qwen Code（阿里）", "按当前模型换角色；新开的会话生效"),
+        ("kimi", "Kimi Code（月之暗面）", "按会话的模型换角色；新开的会话生效。Kimi 客户端没有接口，切到它时换成 Kimi"),
         ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
     ]
     var integrateScript: URL? {
@@ -63,7 +64,7 @@ extension App {
     // 钩子 / 插件每收到一条事件就在状态目录写 seen-<名字>（时间戳）。状态目录 /tmp 重启会清空，所以桌宠把读到的最新时间存进设置。
     // 设置里据此标出「接上了但从没收到过消息」，反馈里也带着
     static let seenKeys = ["claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "cursor": "cursor", "grok": "grok"]
+                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok"]
     var lastSeen: [String: Double] {
         get { (defaults.dictionary(forKey: "seen") as? [String: Double]) ?? [:] }
         set { defaults.set(newValue, forKey: "seen") }
@@ -72,7 +73,7 @@ extension App {
         var seen = lastSeen, changed = false
         for key in Set(Self.seenKeys.values) {
             guard let text = try? String(contentsOf: stateDir.appendingPathComponent("seen-\(key)"), encoding: .utf8),
-                  let ts = Double(text.trimmingCharacters(in: .whitespacesAndNewlines)), ts > (seen[key] ?? 0) else { continue }
+                  let ts = Double(text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"")))), ts > (seen[key] ?? 0) else { continue }   // 旧增强版 mod 写成了带引号的字符串（#44）
             seen[key] = ts; changed = true
         }
         if changed { lastSeen = seen; if settingsWeb != nil { pushSettings() } }
@@ -204,6 +205,10 @@ extension App {
             case "noSleep":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "noSleep"); js("setNeverSleep(\(on))")
+            case "sitRemind", "waterRemind":
+                defaults.set(value as? Bool ?? false, forKey: key); js(breakRemindersJS)
+            case "sitEvery", "waterEvery":
+                if let n = (value as? NSNumber)?.intValue, Self.breakChoices.contains(n) { defaults.set(n, forKey: key); js(breakRemindersJS) }
             case "quotaAggregate":
                 let on = value as? Bool ?? false
                 defaults.set(on, forKey: "quotaAggregate"); js("setQuotaAggregate(\(on))")

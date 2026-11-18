@@ -36,6 +36,12 @@ extension App {
     var powerSave: Bool { defaults.bool(forKey: "powerSave") }
     /// 不睡觉（默认关）：闲太久、AI 会话结束都不睡，判断在网页（setNeverSleep）
     var noSleep: Bool { defaults.bool(forKey: "noSleep") }
+    /// 久坐、喝水提醒（默认关）：间隔只认设置页的几个选项，别的值退回默认；计时和判断在网页（break-reminders.js）
+    static let breakChoices = [30, 45, 60, 90, 120]
+    func breakEvery(_ key: String, _ fallback: Int) -> Int { let v = defaults.integer(forKey: key); return Self.breakChoices.contains(v) ? v : fallback }
+    var breakRemindersJS: String {
+        "setBreakReminders({ sit: \(defaults.bool(forKey: "sitRemind")), sitEvery: \(breakEvery("sitEvery", 45)), water: \(defaults.bool(forKey: "waterRemind")), waterEvery: \(breakEvery("waterEvery", 60)) })"
+    }
     // 看不见的时候（窗口被完全挡住、锁屏、屏幕休眠）让网页把动画全停了
     func updatePageHidden() {
         guard ready else { return }

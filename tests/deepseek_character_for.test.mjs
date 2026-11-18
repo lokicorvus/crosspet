@@ -36,6 +36,11 @@ test('Grok：模型名或服务商名（xai / x-ai）认出来换成 grok', asyn
     assert.equal(await hostCharacterFor(provider, model), 'grok', `${provider}/${model}`)
   }
 })
+test('Kimi：模型名或服务商名（moonshot）认出来换成 kimi', async () => {
+  for (const [provider, model] of [['', 'kimi-k2.6'], ['moonshot', 'moonshot-v1-128k'], ['openrouter', 'moonshotai/kimi-k2']]) {
+    assert.equal(await hostCharacterFor(provider, model), 'kimi', `${provider}/${model}`)
+  }
+})
 test('认不出的还是由 DeepSeek 自己来演', async () => {
   assert.equal(await hostCharacterFor('some-gateway', 'mystery-model-1'), 'deepseek')
 })

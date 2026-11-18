@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>我们的小本子</title>
+<link rel="stylesheet" href="notebook-themes.css">
+</head>
+<body class="shut">
+<div id="root"></div>
+<script src="notebook-themes.js"></script>
+<script src="notebook-friends.js"></script>
+<script src="notebook-events.js"></script><!-- 同上，只给 ?demo= 造假事 -->
+<script src="notebook-lines.js"></script><!-- 只给 ?demo= 开发预览挑批注用；正式打开时批注由主桌宠页面挑好送来 -->
+<script>
+// 小本子面板（外壳开的无边框小窗）。数据由主桌宠页面算好（notebookFor），外壳交过来：
+//   外壳 → 页面：render(view)（合着的封面，量好尺寸发 {size}）、openBook()（窗口摆好、显示后调：翻开）、closeBook()（翻回去，翻完发 {closed}）
+//   页面 → 外壳：{ ready }（载入完）、{ size: { w, h } }、{ closed }（翻完了，外壳关窗口）
+// 点 × 或按 Esc 也是 closeBook()。notebook.html?demo=<角色> 用示例数据看样式（开发用，不进菜单）
+function toShell(msg) {
+  try { window.webkit?.messageHandlers?.notebook?.postMessage(msg) } catch {}
+  try { window.chrome?.webview?.postMessage(msg) } catch {}
+}
+const root = document.getElementById('root')
+const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+let closing = false, openTimer = null, closeTimer = null, flipTimer = null, flipping = false
+
+// 窗口要多大：本子（.wrap 定宽）加页边距，再乘缩放。不量 body 的宽：body 跟着窗口宽，量它会越放越大
+const PAD_X = 44, PAD_Y = 66
+const baseW = () => (root.querySelector('.wrap')?.offsetWidth || 364) + PAD_X
+const baseH = () => root.offsetHeight + PAD_Y
+function sizeNow() {
+  toShell({ size: { w: Math.ceil(baseW() * zoom), h: Math.ceil(baseH() * zoom) } })
+}
+// ---- 拖边缩放（11-18 反馈：Windows 100% / 125% 缩放下本子偏小、字发虚）----
+// 拖右边、下边或右下角：整本按比例放大缩小（transform，排版和分页不变），80%–180%，不超过屏幕；大小记在本机，下次打开照旧
+const ZOOM_MIN = 0.8, ZOOM_MAX = 1.8
+let zoom = 1
+try { zoom = Number(localStorage.getItem('notebookZoom')) || 1 } catch {}
+const zoomMax = () => Math.max(1, Math.min(ZOOM_MAX, (screen.availHeight - 16) / baseH(), (screen.availWidth - 16) / baseW()))
+function setZoom(z, send = true) {
+  zoom = Math.round(Math.min(zoomMax(), Math.max(ZOOM_MIN, z)) * 100) / 100
+  const st = document.documentElement.style
+  st.setProperty('--z', zoom)
+  if (zoom === 1) st.removeProperty('--zt'); else st.setProperty('--zt', `scale(${zoom})`)
+  if (send) sizeNow()
+}
+document.body.insertAdjacentHTML('beforeend', '<div class="rz rz-r" data-rz="x"></div><div class="rz rz-b" data-rz="y"></div><div class="rz rz-c" data-rz="xy"></div>')
+let drag = null, sizeFrame = 0
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest?.('.rz')
+  if (!g || e.button !== 0) return
+  e.preventDefault()
+  try { g.setPointerCapture(e.pointerId) } catch {}
+  g.classList.add('on')
+  drag = { g, axis: g.dataset.rz, x: e.screenX, y: e.screenY, z: zoom, w: baseW(), h: baseH() }
+})
+document.addEventListener('pointermove', e => {
+  if (!drag) return
+  const rx = (drag.w * drag.z + e.screenX - drag.x) / drag.w, ry = (drag.h * drag.z + e.screenY - drag.y) / drag.h
+  setZoom(drag.axis === 'x' ? rx : drag.axis === 'y' ? ry : (rx + ry) / 2, false)
+  if (!sizeFrame) sizeFrame = requestAnimationFrame(() => { sizeFrame = 0; sizeNow() })
+})
+const endDrag = () => {
+  if (!drag) return
+  drag.g.classList.remove('on'); drag = null
+  sizeNow()
+  try { localStorage.setItem('notebookZoom', String(zoom)) } catch {}
+}
+document.addEventListener('pointerup', endDrag)
+document.addEventListener('pointercancel', endDrag)
+// 第二页按高度分张：两页叠在同一个格子里，窗口按高的那页定，第二页内容一多整本就被撑长（11-18 反馈：Claude 的本子突然很长）。
+// 量第一页多高，第二页每张超过它就把后面的块挪到新的一张（接在后面，「接上页」），一张至少留一块、不以小标题结尾；
+// 最后重新编号、重画每张底下的翻页。第一页太短时按 PAGE_MIN 算，免得第二页拆得太碎
+const PAGE_MIN = 560
+function paginate() {
+  const pg1 = root.querySelector('.pg1'), pg2 = root.querySelector('.pg2')
+  if (!pg1 || !pg2) return
+  const shown = root.classList.contains('p2')
+  pg1.style.alignSelf = pg2.style.alignSelf = 'start'   // 量各自本来多高，不被格子拉齐
+  const limit = Math.max(pg1.offsetHeight, PAGE_MIN)
+  const subsOf = () => [...pg2.querySelectorAll(':scope > .sub')]
+  const only = sub => subsOf().forEach(x => x.classList.toggle('on', x === sub))
+  const fits = sub => { only(sub); return pg2.offsetHeight <= limit }
+  const isItem = c => !c.classList.contains('sub-nav') && !c.classList.contains('sub-date')
+  for (let k = 0; k < subsOf().length && k < 30; k++) {
+    const sub = subsOf()[k]
+    if (fits(sub)) continue
+    const items = () => [...sub.children].filter(isItem)
+    if (items().length < 2) continue
+    const next = document.createElement('div')
+    next.className = 'sub'
+    const title = (sub.querySelector('.sub-date')?.textContent || '').trim().replace(/（接上页）$/, '') || '今天'
+    next.innerHTML = '<div class="sub-date cont"></div><div class="sub-nav"></div>'
+    next.firstChild.textContent = title + '（接上页）'
+    sub.after(next)
+    // 从末尾一块块往新的一张挪，每块插在上一块前面，顺序不变
+    let at = next.querySelector('.sub-nav')
+    const move = () => { const it = items().at(-1); next.insertBefore(it, at); at = it }
+    while (items().length > 1 && !fits(sub)) move()
+    while (items().length > 1 && items().at(-1).classList.contains('rule')) move()
+    if (!next.querySelector('.sub-date ~ :not(.sub-nav)')) next.remove()
+  }
+  const subs = subsOf()
+  subs.forEach((x, i) => { x.dataset.i = i; x.querySelector(':scope > .sub-nav').outerHTML = NotebookThemes.subNav(i, subs.length) })
+  only(subs[0])
+  pg1.style.alignSelf = pg2.style.alignSelf = ''
+  if (shown) root.classList.add('p2')
+}
+let current = null
+function draw(view) {
+  root.innerHTML = NotebookThemes.panel(view, NotebookThemes.themeFor(view && view.id))
+  for (const img of root.querySelectorAll('img[data-fallback]')) img.onerror = () => {
+    const rest = img.dataset.fallback.split('|'), next = rest.shift()
+    img.dataset.fallback = rest.join('|')
+    if (!rest.length) { img.onerror = null; img.parentNode.classList.add('full') }   // 退到全身待机图
+    img.src = next
+  }
+  paginate()
+  setZoom(zoom)   // 记下的大小；屏幕变小了就按屏幕收
+}
+function render(view) {
+  clearTimeout(openTimer); clearTimeout(closeTimer); closing = false
+  current = view
+  root.classList.remove('p2'); clearTimeout(flipTimer); flipping = false
+  document.body.className = 'shut'
+  draw(view)
+  // 本子的字体载入前量的高度不准：载完还没翻开就重排一次（翻开以后不动，免得正看着时跳）
+  document.fonts?.ready.then(() => { if (current === view && document.body.className === 'shut') draw(view) })
+}
+// 翻开：封面、两页纸依次翻过去（CSS 里的 .opening），翻完换成 .open 把翻页那几层收掉
+function openBook() {
+  if (closing) return
+  document.body.className = ''
+  void document.body.offsetWidth   // 重新开始动画
+  document.body.className = 'opening'
+  clearTimeout(openTimer)
+  openTimer = setTimeout(() => { if (!closing) document.body.className = 'open' }, reduced() ? 200 : 1100)
+}
+function closeBook() {
+  if (closing) return
+  closing = true
+  clearTimeout(openTimer)
+  document.body.className = ''
+  void document.body.offsetWidth
+  document.body.className = 'closing'
+  closeTimer = setTimeout(() => toShell({ closed: true }), reduced() ? 170 : 780)
+}
+// 翻页：点书签或翻页角。翻到第二页：一张纸从右往左翻过去（纸盖住时就换好了页）；翻回来：纸翻回来盖住再换。
+// 第几页记在 #root 上（body 的类给翻开 / 合上用）；两页叠在同一个格子里，窗口大小不变
+function flipTo(n) {
+  const want = n === 2, now = root.classList.contains('p2')
+  if (want === now || flipping || closing || !document.body.classList.contains('open')) return
+  if (reduced()) { root.classList.toggle('p2', want); return }
+  flipping = true
+  const cls = want ? 'flipping' : 'flipping-back'
+  root.classList.add(cls)
+  if (want) root.classList.add('p2')
+  flipTimer = setTimeout(() => { if (!want) { root.classList.remove('p2'); root.querySelectorAll('.pg2 .sub').forEach((s, k) => s.classList.toggle('on', k === 0)) } root.classList.remove(cls); flipping = false }, 540)
+}
+// 第二页里翻：第 0 张今天，往回翻是更早有事的日子（.sub）。往回翻像翻回前一页，往今天翻像翻下一页，沿用整页的翻纸效果
+function flipSub(i) {
+  const subs = root.querySelectorAll('.pg2 .sub'), now = [...subs].findIndex(s => s.classList.contains('on'))
+  if (!subs[i] || i === now || flipping || closing || !root.classList.contains('p2')) return
+  const show = () => subs.forEach((s, k) => s.classList.toggle('on', k === i))
+  if (reduced()) { show(); return }
+  flipping = true
+  const cls = i > now ? 'flipping-back' : 'flipping'
+  root.classList.add(cls)
+  flipTimer = setTimeout(show, 260)
+  setTimeout(() => { root.classList.remove(cls); flipping = false }, 540)
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-action="close"]')) { closeBook(); return }
+  const sub = e.target.closest('[data-sub]')
+  if (sub) { if (!sub.disabled) flipSub(Number(sub.dataset.sub)); return }
+  const page = e.target.closest('[data-page]')
+  if (page) flipTo(Number(page.dataset.page))
+})
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBook() })
+document.addEventListener('contextmenu', e => e.preventDefault())
+
+// ---- 开发看样式：?demo=claude（&skin=gemini-magician 看穿皮肤时的文字）----
+const demo = new URLSearchParams(location.search).get('demo')
+if (demo) {
+  document.documentElement.style.background = '#e7e2da'
+  const day = 86_400_000, now = Date.now()
+  const friendOf = { claude: 'deepseek', deepseek: 'claude', gpt: 'gemini', gemini: 'gpt', glm: 'qwen', grok: 'deepseek', qwen: 'glm', kimi: 'deepseek' }
+  const names = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', glm: 'GLM', grok: 'Grok', qwen: '千问', kimi: 'Kimi' }
+  const f = friendOf[demo] || 'claude', skin = new URLSearchParams(location.search).get('skin') || ''
+  const view = {
+    id: demo, name: names[demo] || demo, firstMet: now - 36 * day, daysKnown: 37, rounds: 312, workMs: 41 * 3_600_000, minutes: 96 * 60,
+    pats: 128, pokes: 23, angry: 4, busiest: { date: '2026-11-03', rounds: 46 }, longestMs: 133 * 60_000,
+    friend: { id: f, name: names[f], level: '挚友', hearts: 8.5, image: `../../characters/${f}/idle.webp` },
+    milestones: [{ id: 'round100', label: '第 300 轮活', date: '2026-11-07' }, { id: 'night', label: '凌晨 3 点还在陪你', date: '2026-10-28' }, { id: 'days30', label: '认识 30 天', date: '2026-11-01' }],
+    before: 86, backfilled: true, total: { days: 37, rounds: 1284 }, notes: null, sign: null,
+  }
+  view.notesPicked = NotebookLines.notesFor(demo, view, undefined, skin); view.signPicked = NotebookLines.signFor(demo, view, now, undefined, skin)
+  // 第二页：三个朋友（挚友 / 好朋友 / 认识了），用真的文案挑
+  const others = Object.keys(names).filter(id => id !== demo && id !== f).slice(0, 2)
+  const today = new Date().toISOString().slice(0, 10)
+  const fr = [[f, 3, 9.2], [others[0], 2, 5.5], [others[1], 1, 2]].map(([id, level, hearts]) => ({ id, level, hearts, first: now - 36 * day, minutes: 96 * 60 }))
+  view.page2 = { now, ownerImage: `../../characters/${skin || demo}/idle.webp`,
+    friends: fr.map(x => ({ id: x.id, name: names[x.id], image: `../../characters/${x.id}/idle.webp`, levelName: ['刚见面', '认识了', '好朋友', '挚友'][x.level], hearts: x.hearts,
+      block: NotebookFriends.block({ owner: demo, friend: x.id, level: x.level, day: today, ownerSkin: skin, facts: { first: x.first, minutes: x.minutes, days: 36, rounds: 312, pats: 128 } }) })),
+    cameo: (c => c && { ...c, name: names[c.who] })(NotebookFriends.cameo({ owner: demo, friends: fr, day: today }) || NotebookFriends.cameo({ owner: demo, friends: fr, day: new Date(now + day).toISOString().slice(0, 10) })),
+    chats: [{ t: now - 3_600_000, lines: [[f, '中午吃啥？'], [demo, '你定吧']] }, { t: now - 30 * 3_600_000, lines: [[others[0], '今天外面下雨了'], [demo, '记得带伞。'], [f, '下雨就睡觉！']] }]
+      .map(x => ({ t: x.t, lines: x.lines.map(([who, text]) => ({ who, name: names[who], text })) })) }
+  // 假事：今天聊过 + 升级；往回翻几天（中秋那天事多，拆两页）
+  const ymd = ms => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+  const lv = id => (fr.find(x => x.id === id) || { level: 1 }).level
+  const evItem = (dayMs, kind, friend, more) => { const x = fr.find(y => y.id === friend) || { level: 1, hearts: 2 }
+    return { id: friend, name: names[friend], image: `../../characters/${friend}/idle.webp`, levelName: ['刚见面', '认识了', '好朋友', '挚友'][x.level], hearts: x.hearts, kind,
+      block: NotebookEvents.block({ ev: { day: ymd(dayMs), kind, owner: demo, friend, ...more }, owner: demo, ownerSkin: skin, level: lv(friend) }) } }
+  const md = ms => { const d = new Date(ms); return `${d.getMonth() + 1} 月 ${d.getDate()} 日` }
+  view.page2.today = [evItem(now, 'chat', f, { q: '中午吃啥？' }), evItem(now, 'levelup', others[0], { n: 2 })]
+  // &many=1：今天事很多（看第二页按高度分张）
+  if (new URLSearchParams(location.search).get('many')) view.page2.today.push(evItem(now, 'levelup', f, { n: 1 }), evItem(now, 'chat', others[1], { q: '一起演了1小时喵' }), evItem(now, 'pats', f, { n: 31, m: 'pokes' }), evItem(now, 'busy', others[0], { n: 52 }), evItem(now, 'chat', others[0], { q: '你刚才很专注' }))
+  view.page2.history = [
+    { day: ymd(now - 2 * day), label: md(now - 2 * day) + ' · 中秋节', items: ['fest', 'fest', 'fest', 'anniv', 'busy'].map((k, i) => evItem(now - 2 * day, k, [f, others[0], others[1], f, f][i], k === 'fest' ? { n: 'midautumn' } : k === 'anniv' ? { n: 30 } : { n: 41 })) },
+    { day: ymd(now - 5 * day), label: md(now - 5 * day), items: [evItem(now - 5 * day, 'reunion', others[1], { n: 9 }), evItem(now - 5 * day, 'pats', f, { n: 26, m: 'pats' })] },
+    { day: ymd(now - 9 * day), label: md(now - 9 * day), items: [evItem(now - 9 * day, 'chat', others[0], { q: '今天外面下雨了' })] },
+  ]
+  if (new URLSearchParams(location.search).get('page') === '2') setTimeout(() => flipTo(2), 1600)
+  render(view)
+  setTimeout(openBook, 300)
+  // 收起后过一会儿再翻开一次，方便反复看动画
+  toShell = msg => { if (msg.closed) setTimeout(() => { render(view); setTimeout(openBook, 300) }, 500) }
+}
+toShell({ ready: true })
+</script>
+</body></html>

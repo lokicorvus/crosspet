@@ -8,7 +8,7 @@
 import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { homedir } from "node:os";
 import { lowThresholds, summarize } from "./balance.js";
 
@@ -17,7 +17,7 @@ export const inject = ["credentials"];
 
 const ID = "deepseek";
 const CLIENT = "deepseek";   // 多桌宠按「角色 + 客户端」各站一只：Harness 本身就是一个客户端（同 crosspet-hook.py 的 detect_client 用接入名）
-const PLUGIN_VERSION = "1.3.10";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
+const PLUGIN_VERSION = "1.3.11";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 60 * 1000;   // 定时查余额：充了值、没再对话，最多等 1 分钟（以前 10 分钟，用户充值后半天没变）。只是要一次账户余额，不耗 token
 
@@ -43,6 +43,7 @@ function characterFor(provider, model, custom = {}) {
     if (/deepseek/.test(s)) return "deepseek";
     if (/glm|zhipu|bigmodel|chatglm|z-ai|zai-/.test(s)) return "glm";
     if (/qwen|dashscope|bailian|tongyi/.test(s)) return "qwen";
+    if (/kimi|moonshot/.test(s)) return "kimi";
     if (/grok|x-ai|xai/.test(s)) return "grok";
     if (/claude|anthropic/.test(s)) return "claude";
     if (/gemini|google|vertex/.test(s)) return "gemini";
@@ -166,7 +167,9 @@ export function apply(ctx, config = {}) {
       if (process.platform === "win32") {
         const exe = join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "Programs", "CrossPet", "CrossPet.exe");
         if (!existsSync(exe)) return noteAutostart(source, `不打开：没找到 ${exe}`);
-        child = spawn(exe, [], { detached: true, stdio: "ignore", cwd: dirname(exe) });
+        // 交给资源管理器打开（和从开始菜单打开一样），不带上 Harness 的进程环境；理由同 crosspet-hook.py 的 ensure_pet
+        const explorer = join(process.env.SystemRoot || "C:\\Windows", "explorer.exe");
+        child = spawn(explorer, [exe], { detached: true, stdio: "ignore" });
       } else if (process.platform === "darwin") {
         child = spawn("/usr/bin/open", ["-g", "-b", "io.github.crosspet"], { detached: true, stdio: "ignore" });
       } else return;

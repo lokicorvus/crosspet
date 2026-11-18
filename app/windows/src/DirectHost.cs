@@ -114,9 +114,20 @@ namespace CrossPet
             var over = !ForcePassThrough && hitRects.Any(r => r.Contains(local));
             MouseOverHit = over;
             if (!ForcePassThrough && (Forms.Control.MouseButtons & Forms.MouseButtons.Left) != 0) return;
+            SetYield(YieldRule.Next(yielding, over, YieldRule.OnlyCtrl(vk => (GetAsyncKeyState(vk) & 0x8000) != 0)));
+            if (yielding) over = false;   // 让开着：鼠标穿过她
             var ex = Native.GetWindowLong(Handle, Native.GWL_EXSTYLE);
             var want = over ? ex & ~WS_EX_TRANSPARENT : ex | WS_EX_TRANSPARENT;
             if (want != ex) Native.SetWindowLong(Handle, Native.GWL_EXSTYLE, want);
+        }
+
+        /// <summary>让开着（见 YieldRule）：网页变透明（setYield），窗口让鼠标穿过</summary>
+        bool yielding;
+        void SetYield(bool on)
+        {
+            if (on == yielding) return;
+            yielding = on;
+            try { Web?.CoreWebView2?.ExecuteScriptAsync($"setYield({(on ? "true" : "false")})"); } catch { }
         }
 
         /// <summary>开始拖窗口（网页报了 pointer: 'drag'）：交给系统的移动循环，松手才返回。拖动中 LocationChanged 照常来</summary>
@@ -146,6 +157,7 @@ namespace CrossPet
         const uint LWA_ALPHA = 2;
         [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
         [DllImport("user32.dll")] static extern bool GetCursorPos(out Point p);
+        [DllImport("user32.dll")] static extern short GetAsyncKeyState(int vKey);
         [DllImport("user32.dll")] static extern bool ReleaseCapture();
         [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr h);

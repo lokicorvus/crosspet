@@ -1,0 +1,46 @@
+{
+  "actions": {
+    "searching": "Searching inside her own bottomless magician's hat. Remove the magnifying glass completely. She has taken off her SINGLE small navy top hat and holds it open at upper-waist height in the glove on viewer's right; no hat remains on her head, ahoge and both cat ears stay intact. The glove on viewer's left reaches into the hat and pinches the end of a long physical silk streamer striped in violet and white with narrow gold edging, pulling it out in a continuous curved strip. One end visibly emerges from inside the hat. Head inclined toward the opening, both pupils look DOWN into it beneath naturally curved upper lids; one eyebrow arched, tiny curious 'oh?' mouth. Tail curled, body compact. No second hat, magnifier, rabbit, sparkles or floating icons.",
+    "asking": "A stage magician inviting the viewer to choose a card. One gloved hand presents a compact fan of FIVE overlapping physical playing cards toward the viewer at chest height, navy backs with gold border and a small four-pointed star. The other hand is open beside the fan in an inviting showman's gesture. The cards have no letters, numbers or conventional suit icons. Her small hat stays on her head. Preserve a lively tilted head, coherent eye contact with the viewer, one eyebrow raised and an expectant small open cat smile. Cards do not cover her face; wand put away. No floating card symbols or particles.",
+    "happy": "Successful flower-production trick. Preserve the happy closed crescent eyes, lifted pink cheeks and bright small open cat smile. Instead of two empty celebratory fists, one glove holds her short BLACK wand with WHITE tips upright at chest height, with THREE small white stage flowers on real leafy violet stems visibly emerging from the wand's upper tip. The other glove opens beneath the little bouquet in a graceful 'ta-da' presentation. Flowers have pale gold centers, not strong new colors, and remain below chin height. Tiny top hat stays worn, tail curls happily, cape opens softly. Flowers and wand form one connected prop, no floating sparkles, no text, no human audience.",
+    "compact": "Bottomless-hat packing trick, conveying compressing and putting things away. Remove the suitcase entirely. Her SINGLE small navy magician top hat is off her head and held at waist height with its open brim facing upward in one glove; no duplicate hat on the head. The other glove tries to tuck an absurdly long physical violet-and-white silk streamer with narrow gold edging INTO the small hat. The continuous silk piles and loops around the opening and drapes down in front of the skirt, never crossing the face or extending outside the canvas. The tail helps hold one loose silk loop. Both pupils look DOWN at the hat, upper lids lowered, eyebrows knitted, cheeks lightly puffed and a tiny strained cat-mouth curve, as if this tiny hat somehow swallows everything. Keep the original face, head size, short body, two feet and safe framing; only adjust the arms and lean as needed. No suitcase, no floor, no second hat, no sparkles.",
+    "busy_left": "A composed cat magician performing several sleight-of-hand tasks toward viewer's LEFT. Remove the laptop, cable and all electronics completely. At chest height on viewer's LEFT, one glove holds THREE thin smooth gold stage-linking rings, clearly interlocked like a classic linking-ring trick; the other glove holds the short black wand with white tips and guides its white end through one ring. On viewer's RIGHT her fluffy tail curls around the end of a short physical violet-and-white silk ribbon as a third helper. All props are held or connected, not floating icons. Head bowed slightly and turned LEFT, both pupils looking DOWN and LEFT at the linking rings, one eyebrow lightly arched and a focused clever cat smile. Small top hat remains worn. Preserve the approved face, costume and compact body, same two-legged stance and safe margins. No motion arcs, beams, particles, letters or sparkles.",
+    "swamped_left": "An overwhelmed stage magician whose simultaneous tricks are slipping. Remove the laptop, electronics, cable and tail-pencil completely. Leaning toward viewer's LEFT in the existing off-balance short-legged stance: glove on viewer's LEFT catches a cascade of FIVE overlapping physical navy-and-gold cards, blank backs with one little star design, NO letters, numerals or suit glyphs; the other glove on viewer's RIGHT clutches THREE thin interlocked gold stage rings against her waistcoat. Her tail on viewer's RIGHT has become loosely tangled in a continuous violet-and-white silk scarf which drapes between tail and rings, with the tail still clearly fluffy and visible. All cards overlap or touch the glove, all props stay inside the canvas. Head and both pupils turn toward the slipping cards on viewer's LEFT, eyes worried and open, brows raised unevenly, mouth a tiny wobbly cat shape and one sweat bead ON her cheek. Little hat remains on head, ears low, cape flares. Exactly two arms and one tail. No floating motion arcs, symbols, magic beams or sparkles.",
+    "busy_right": "Opposite-facing companion to the new magic linking-rings busy_left: turn toward viewer's RIGHT, linking rings and wand manipulation on viewer's RIGHT, fluffy tail holding the violet-and-white silk on viewer's LEFT. Use the new LEFT sprite for the exact trick props and their sizes, and the previous RIGHT sprite for its already-correct right-facing face and compact pose, ignoring all old laptop props. No laptop or cable. Both pupils look DOWN and RIGHT toward the rings, one eyebrow slightly arched, a focused clever small cat smile. Redraw the opposite direction; do not mirror the face or its ornaments. CRITICAL: the large star hairclip remains on the VIEWER'S RIGHT above the AMBER eye, not above the pink eye on viewer's left. Pink iris stays viewer's left, amber stays viewer's right. Preserve exact outfit, same small hat worn and safe framing; no motion marks, floating symbols, beams or sparkle particles.",
+    "swamped_right": "Opposite-facing companion to the new magic-trick swamped_left. Lean toward viewer's RIGHT: FIVE overlapping navy-and-gold cards slipping into the glove on viewer's RIGHT, THREE interlinked thin gold stage rings clutched in the other glove against her chest on viewer's LEFT, and the fluffy tail on viewer's LEFT loosely tangled with the connected violet-and-white silk scarf. No laptop, electronics, cable or pencil. Use the new left sprite to match the physical magician props and the previous right sprite to preserve its expressive right-facing worried face and compact stance. Head and both pupils follow cards toward viewer's RIGHT, brows worried and uneven, tiny wobbly mouth, one cheek sweat bead, low cat ears. CRITICAL: keep the large star hairclip on the VIEWER'S RIGHT immediately above the AMBER eye; pink iris remains viewer's left, gold viewer's right. Never mirror the face ornaments. Same top hat stays worn. All five cards touch/overlap the glove or each other, scarf physically drapes and touches props or tail. All silhouette edges inside safe margins; no motion marks, floating symbols, beams or sparkle particles."
+  },
+  "entries": [
+    {
+      "pose": "searching",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__searching__v1.png"
+    },
+    {
+      "pose": "asking",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__asking__v1.png"
+    },
+    {
+      "pose": "happy",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__happy__v1.png"
+    },
+    {
+      "pose": "compact",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__compact__v1.png"
+    },
+    {
+      "pose": "busy_left",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v2.png"
+    },
+    {
+      "pose": "swamped_left",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v2.png"
+    },
+    {
+      "pose": "busy_right",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_right__v2.png"
+    },
+    {
+      "pose": "swamped_right",
+      "old": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_right__v3.png"
+    }
+  ]
+}

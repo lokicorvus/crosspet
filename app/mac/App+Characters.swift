@@ -114,6 +114,7 @@ extension App {
         let skins = defaults.dictionary(forKey: "skins") as? [String: String] ?? [:]
         Ledger.append(switchesURL, ["from": currentId ?? "", "to": id, "skin": skins[id] ?? "", "why": why, "via": via])
         if id != currentId { appLog("换角色 \(currentId ?? "-") → \(id)（\(why)\(via.isEmpty ? "" : " " + via)）") }
+        if id != currentId, notebookOwner == "main" { closeNotebook() }   // 换了角色：她的小本子收起
         currentId = id
         defaults.set(id, forKey: "character")   // 重启后恢复（didFinish 里）；Windows 的 SwitchTo 也是这么记的
         if dock != nil, !dockOut { DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in self?.applyDock() } }   // 换了角色，切口位置跟着变
@@ -175,7 +176,7 @@ extension App {
         guard id != currentId, characterIds.contains(id) else { return }
         let work = DispatchWorkItem { [weak self] in
             guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle else { return }
-            // 开关开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、她已经有一只站着：不换）；关着时照旧直接换
+            // 开关开着时先问 FollowPolicy.foregroundTarget（固定了主桌宠、主桌宠的角色最近有会话：不换）；关着时照旧直接换
             self?.followForeground(id, why: "front", via: bundle) { NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundle }
         }
         pendingSwitch = work

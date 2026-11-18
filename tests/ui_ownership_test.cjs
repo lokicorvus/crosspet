@@ -29,7 +29,7 @@ function clock() {
 function makeEnv(html) {
   const t = clock()
   class FakeDate extends Date { constructor(...a) { super(...(a.length ? a : [t.now()])) } static now() { return t.now() } }
-  const context = vm.createContext({ Date: FakeDate, setTimeout: t.set, clearTimeout: t.clear,
+  const context = vm.createContext({ Companions: require('../app/web/companions.js'), Date: FakeDate, setTimeout: t.set, clearTimeout: t.clear,
     setInterval: t.set, clearInterval: t.clear, console })
   const setup = `
     let charId = 'gpt', pose = 'idle', poseSince = Date.now(), currentUrl = '', swappedAt = 0
@@ -67,7 +67,7 @@ function makeEnv(html) {
     function currentSessions(){const out={...(sessions[charId]||{})};for(const [host,map]of Object.entries(sessions))if(standsIn(host))Object.assign(out,map);return out}
     function capture(){return {charId,pose,bubble:$('bubble').textContent,fx:$('fx').innerHTML,fxHidden:$('fx').classList.contains('hide'),charState:JSON.parse(JSON.stringify(charState)),history:[...history],effectHistory:[...effectHistory],generation:characterGeneration}}
     function hook(id,p,event,extra={}){applyCharState(id,{pose:p,event,ts:Date.now()/1000,...extra})}
-    function playsByClient(){return false}function updateCompanions(){}
+    function playsByClient(){return false}function updateCompanions(){}function noteNotebookEvent(){}
   `
   const funcs = ['setBlinkSrc','characterTimeout','clearCharacterTimers','setFx','restPose','show','arrivalGreeting','setCharacter','watchStuck','applyCharState','playCharState','aiActivity','setSessions','noteVerdict'].map(n => fn(html,n,n==='setBlinkSrc'||n==='characterTimeout'||n==='clearCharacterTimers')).join('\n')
   vm.runInContext(setup + '\n' + funcs, context)
@@ -171,6 +171,15 @@ const cases=[
   e.advance(181000)
   assert(e.state().pose==='idle','cached work had no own 180s fallback after switching')
  }],
+ ['model_call_thinking_waits_10_minutes',e=>{
+  // Antigravity / Gemini CLI 一次模型调用里不发事件，深度思考能想 6 分钟以上：3 分钟兜底不能把她送回待机
+  e.run(`hook('gpt','thinking','BeforeModel')`);e.advance(500)
+  assert(e.state().pose==='thinking','model-call thinking was not shown')
+  e.advance(367000)
+  assert(e.state().pose==='thinking','long model-call thinking fell back to idle after 3 minutes')
+  e.advance(240000)
+  assert(e.state().pose==='idle','model-call thinking had no 10-minute fallback')
+ }],
  ['old_stuck_timeout_cannot_cancel_new_character_work',e=>{
   e.run(`hook('gpt','thinking','BeforeModel')`);e.advance(179000);e.run(`setCharacter('grok',true)`);e.advance(500)
   e.run(`hook('grok','writing','PreToolUse')`);e.advance(600)
@@ -186,7 +195,7 @@ function runSuite(file) {
 function newsCardShown(html, role) {
   const t = clock()
   class FakeDate extends Date { constructor(...a) { super(...(a.length ? a : [t.now()])) } static now() { return t.now() } }
-  const context = vm.createContext({ Date: FakeDate, setTimeout: t.set, clearTimeout: t.clear, setInterval: t.set, clearInterval: t.clear, console })
+  const context = vm.createContext({ Companions: require('../app/web/companions.js'), Date: FakeDate, setTimeout: t.set, clearTimeout: t.clear, setInterval: t.set, clearInterval: t.clear, console })
   const setup = `
     let role = ${JSON.stringify(role)}, pose = 'idle', egg = null, farewellLine = null, updatingNow = false, tucked = null
     let newsTimer = null, newsShown = 0
@@ -215,6 +224,31 @@ const current = runSuite(page)
   check('main_shows_news_card', newsCardShown(html, 'main'), 'control: main page did not show the news card')
   check('companion_has_no_news_card', !newsCardShown(html, 'companion'), 'companion page showed the news card')
 }
-const failed = current.results.filter(item => !item.passed)
-console.log(JSON.stringify({file: page, passed: current.passed, failed: current.failed, failures: failed}, null, 2))
-if (current.failed) process.exitCode = 1
+// 换衣服 / 换角色后，新立绘还没加载完时不能先淡入（Windows 上立绘由外壳异步读文件，慢于 0.16 秒，会先露出旧衣服）
+async function revealWaitsForImage(html) {
+  const e = makeEnv(html)
+  const flush = () => new Promise(r => setImmediate(r))
+  e.run(`var decodeDone; active.complete = false; active.src = 'new.webp'; active.decode = () => new Promise(r => { decodeDone = () => { active.complete = true; r() } })`)
+  e.run(`setCharacter('grok', true)`); e.advance(330 + 200); await flush()
+  const hiddenWhileLoading = e.run(`$('stage').classList.contains('swap')`)
+  e.run(`if (decodeDone) decodeDone()`); await flush()
+  const shownAfterLoad = !e.run(`$('stage').classList.contains('swap')`)
+  // 一直加载不完：最多等 1.5 秒也要露出来
+  const e2 = makeEnv(html)
+  e2.run(`active.complete = false; active.src = 'stuck.webp'; active.decode = () => new Promise(() => {})`)
+  e2.run(`setCharacter('grok', true)`); e2.advance(330 + 1400); await flush()
+  const stillHidden = e2.run(`$('stage').classList.contains('swap')`)
+  e2.advance(200); await flush()
+  const shownByCap = !e2.run(`$('stage').classList.contains('swap')`)
+  return { hiddenWhileLoading, shownAfterLoad, stillHidden, shownByCap }
+}
+;(async () => {
+  const html = fs.readFileSync(page, 'utf8').replace(/\r\n/g, '\n')
+  const r = await revealWaitsForImage(html)
+  const check = (name, ok, error) => { current.results.push(ok ? { name, passed: true } : { name, passed: false, error }); if (ok) current.passed++; else current.failed++ }
+  check('reveal_waits_for_new_image', r.hiddenWhileLoading && r.shownAfterLoad, `stage revealed before the new image loaded: ${JSON.stringify(r)}`)
+  check('reveal_gives_up_after_1500ms', r.stillHidden && r.shownByCap, `stage reveal cap wrong: ${JSON.stringify(r)}`)
+  const failed = current.results.filter(item => !item.passed)
+  console.log(JSON.stringify({file: page, passed: current.passed, failed: current.failed, failures: failed}, null, 2))
+  if (current.failed) process.exitCode = 1
+})()

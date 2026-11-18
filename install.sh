@@ -36,6 +36,7 @@ ask "接入 WorkBuddy（腾讯，写入 ~/.workbuddy-ai 或 ~/.workbuddy 的 set
 ask "接入 ZCode（智谱，写入 ~/.zcode/cli/config.json）？" && python3 tools/integrate.py install zcode
 ask "接入 Hermes Agent（Nous Research，装插件到 ~/.hermes/plugins/crosspet，按当前模型换角色）？" && python3 tools/integrate.py install hermes
 ask "接入 Qwen Code（阿里，写入 ~/.qwen/settings.json，按当前模型换角色）？" && python3 tools/integrate.py install qwen
+ask "接入 Kimi Code（月之暗面，写入 ~/.kimi-code/config.toml，按当前模型换角色）？" && python3 tools/integrate.py install kimi
 ask "接入 Grok Build（xAI，写入 ~/.grok/hooks/crosspet.json）？" && python3 tools/integrate.py install grok
 ask "接入 Cursor（写入 ~/.cursor/hooks.json，按当前模型换角色）？" && python3 tools/integrate.py install cursor
 

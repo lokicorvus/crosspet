@@ -100,10 +100,11 @@ namespace CrossPet
             };
             Process p;
             try { p = Process.Start(psi); } catch (Exception e) { return (null, "起不来 Codex：" + e.Message, (int)sw.ElapsedMilliseconds); }
+            StreamWriter stdin = null;
             try
             {
                 p.ErrorDataReceived += (_, __) => { }; p.BeginErrorReadLine();   // 不读 stderr 会把管道塞满
-                var stdin = new StreamWriter(p.StandardInput.BaseStream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
+                stdin = new StreamWriter(p.StandardInput.BaseStream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
                 stdin.WriteLine("{\"id\":1,\"method\":\"initialize\",\"params\":{\"clientInfo\":{\"name\":\"crosspet\",\"version\":\"1\"}}}");
                 stdin.WriteLine("{\"method\":\"initialized\"}");
                 stdin.WriteLine("{\"id\":2,\"method\":\"account/rateLimits/read\"}");
@@ -131,7 +132,17 @@ namespace CrossPet
                 return (rl2, err, (int)sw.ElapsedMilliseconds);
             }
             catch (Exception e) { return (null, "问 Codex 出错：" + e.Message, (int)sw.ElapsedMilliseconds); }
-            finally { KillTree(p); p.Dispose(); }
+            finally
+            {
+                // 先关输入请它自己退出，5 秒还没退再强杀整棵树（为什么不直接强杀见 ProcessStop，#48）。
+                // 等它退出放到后台，额度先交给网页，不多等这几秒
+                var w = stdin;
+                _ = Task.Run(() =>
+                {
+                    ProcessStop.Stop(p, () => { if (w != null) w.Dispose(); else p.StandardInput.Close(); }, 5000, KillTree);
+                    p.Dispose();
+                });
+            }
         }
 
         /// 给网页的 payload（rateLimits 原样，不含账号标识——accountId 在 result 里，不在 rateLimits 里）

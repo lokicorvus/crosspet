@@ -49,6 +49,7 @@ namespace CrossPet
         void SetUserHidden(bool hidden)
         {
             userHidden = hidden;
+            if (hidden) CloseNotebook();
             if (!hidden) { fullscreenOverride = true; hiddenForFullscreen = false; }
             SetConcealed(hidden);
             if (!hidden) RefreshCodexQuota(CodexWhy.Tick);   // 藏着时没查：叫回来补一次（自带间隔，不会多问）

@@ -22,6 +22,7 @@ extension App {
         }
         add(menu, "摸摸头", #selector(pat))
         add(menu, "戳一下", #selector(poke))
+        add(menu, "我们的小本子", #selector(openOwnNotebook))
         let eggItem = add(menu, "召唤彩蛋", #selector(egg))
         if !eggAllowed { eggItem.action = nil }   // 有别的桌宠在场时不演彩蛋（页面发 eggAllowed:false）：没有动作的菜单项自动变灰
         // 集合不受开关限制，一直在；正集合着（包括叫了一只出来）时多一项「解散」，「集合！」把还没来的都叫来

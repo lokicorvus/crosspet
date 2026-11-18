@@ -1,0 +1,211 @@
+{
+  "reference": "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png",
+  "scope": "重做表演相关动作，保留自然日常动作；用户已明确选择",
+  "common": "Create a single static desktop-pet portrait of the approved Gemini magician. The attached approved idle sprite is the model for identity, outfit, linework, color and short round proportions. This design communicates a CHARACTER'S STATE through her face and a settled graceful posture. It does not need to show a magic trick in progress.\n\nCHARACTER AND ART: the same petite chibi cat girl with voluminous wavy blue-violet hair fading to pink-magenta, curled ahoge, two side buns, cat ears with pink interiors and white fluff, ONE fluffy blue-violet tail; pink-magenta iris on viewer's LEFT and amber-gold iris on viewer's RIGHT. The single large iridescent gold-rimmed four-pointed star clip and its dangling stars stay on viewer's RIGHT, above the amber eye. Dark pupils, small crisp highlights, natural upper eyelid curves and the approved fine dark-violet drawing with gently varied line weights, colored cel shadows and glossy irregular hair highlights.\nPreserve her entire approved outfit: SMALL tilted navy top hat, gold band and little star, both ears visible, hat below ahoge; short navy cape with gold edge and star-speckled violet lining; navy soft collar bow and star clasp, white frilled blouse with short puff sleeves, gold-edged fitted navy waistcoat with three gold buttons, short WHITE gloves and gold cuffs, gold-trimmed navy pleated skirt with small stars and white frilly petticoat, white leg warmers and navy-violet buckled platform shoes. TWO short arms, TWO softly drawn normal human gloved hands. The one existing hat STAYS WORN on all these poses.\n\nDESIGN: convey a bright, clever, slightly mischievous young stage magician through her hat, cape, a restrained graceful hand gesture and a responsive charming expression. A quiet BEFORE or AFTER moment. The silhouette should read immediately at small desktop size. Settle the feet and cape into a balanced still pose, short softly bent elbows, a tiny weight shift and natural little head angle; cape and tail are restrained. Keep head-to-body proportions compact, never lengthen torso or limbs. Face, bow, waistcoat and skirt stay clear.\n\nFACE: the mood is specifically described in POSE below. Eyes focus coherently toward one named target; when looking down, lower both pupils and relax the upper lids. Use subtle eyebrow asymmetry, lifted or softened cheeks and a TINY mouth shape. Retain the approved cheek/chin contour and eye-to-face scale. No warped mouth, stretched zigzag, huge bulging eyes, angry slashing eyebrows, cross-eyed stare or oversized grin. Match the way the approved face is drawn, while changing its expression as needed. The small catlike smile is warm and clever.\n\nPROP RESTRAINT: use ONLY the ordinary prop explicitly named in POSE. A short BLACK wand with WHITE tips is an optional character accessory when specified. A notebook and pen may serve a work pose. The only playing card in this set is the ONE small face-down card in asking. No flowers, silk, linking rings, levitating props, card fans, floating effects or magic demonstrations. Tail is expressive, free of tools or cloth. No extra people or animals.\n\nFORMAT / SAFE FRAMING: one full-body character, centered, square at least 1024x1024, genuine transparent background. On a 1254px square put the highest ahoge around y=65, soles around y=1190: leave the entire top 50 rows empty and transparent and at least 40px at the ordinary sides. Preserve proportions while reframing; do NOT copy the source's edge-to-edge pixel placement. All hat, hair, gloves, props, tail and shoes inside the image. No floor, cast shadow, glow, border, caption, text, letters, numerals, floating symbols, motion strokes, sparkles or beam. Stars sewn on the approved outfit stay.\nSHORT ARM ANATOMY: hands stay at temple level or lower. No glove reaches the high top hat. Exactly two complete connected arms and two gloved hands; no stray fingers emerging from hair or hat.",
+  "order": [
+    "running",
+    "searching",
+    "asking",
+    "happy",
+    "proud",
+    "compact",
+    "busy_left",
+    "swamped_left",
+    "busy_right",
+    "swamped_right"
+  ],
+  "actions": {
+    "running": "READY, quietly confident before starting work. Body facing the viewer, both feet planted, shoulders relaxed. Glove on viewer's LEFT brings ONE fingertip lightly to her temple beside the eye, a small clever 'I have a plan' gesture; the other glove holds her short black wand with white tips loosely beside her thigh pointing down. Head inclined a few degrees, chin gently lifted. Both pupils look DIRECTLY at the viewer beneath naturally curved, comfortably open lids. One fine eyebrow raised a little, the other softly relaxed; cheeks slightly lifted and a tiny closed asymmetric cat smile: she already has a plan. Cape hangs neatly behind her, tail forms a small relaxed hook. No aiming the wand, trick props, powerful effects or aggressive stance. The raised glove is beside her temple, NOT touching the hat. No hand or loose fingers beside the hat. Exactly two hands: the temple hand and the lowered wand hand.",
+    "searching": "SEARCHING, a thoughtful look into the distance. Slight shallow turn of shoulders toward viewer's LEFT, original compact feet stable. Glove on viewer's LEFT rests lightly just above her eyebrow beneath the hat brim, a gentle eye-shading gesture, without covering the eyes, ears or clip. Other glove holds the short black wand with white tips down near her thigh. Head tilts a little toward viewer's left; BOTH irises sit toward the viewer's-LEFT corners, clearly scanning to that side rather than looking at us. One eyebrow softly lifted in interest, tiny slightly parted curious mouth. Ears perk, tail curves freely on viewer's right. Hat remains worn. No magnifier, removed hat, scarf or magic trick.",
+    "asking": "WAITING for the viewer's choice. Face and body toward viewer with a tiny inquisitive head tilt. Glove on viewer's LEFT holds ONE small face-down navy card with thin gold edge and a single little four-pointed star, near upper-waist height, angled gently toward the viewer. The card is about one glove-length and well below the chin. Other glove rests lightly at her waist against the cape edge. Both pupils focus directly on the viewer, eyelids naturally curved, one eyebrow gently raised and the other softly curved. A tiny expectant closed cat smile, faint blush: patiently teasing, giving the viewer time to answer. Feet settled, cape hanging calmly, tail tip hooked. Hat stays worn. Only ONE card, no fan, flower, rings, wand or trick in progress.",
+    "happy": "HAPPY, a relaxed little 'all done' presentation after work. Body front-facing with a tiny courteous inclination of head and shoulders, both feet on the same baseline. One glove opens palm-up beside her waist in a modest welcoming gesture; the other holds the short black wand with white tips down beside her thigh. Eyes closed into two soft happy curves, cheeks lifted, a SMALL gently open cat smile, not a broad laughing mouth. Ears perk and tail makes a soft happy hook; cape falls behind her with one small open fold. Hat remains worn. The satisfaction and friendly posture are the whole subject: no flower, revealed object or trick props.",
+    "proud": "PROUD, a still portrait at the END of a show, a courteous little curtain-call bow. Body mostly toward viewer, shoulders and head incline forward only a little while eyes glance up toward the viewer. Glove on viewer's RIGHT rests flat against her upper chest just below the collar bow; glove on viewer's LEFT gently pinches the near gold cape edge at her hip, lifting it by one glove-width. Both elbows SHORT and softly bent. Upper lids comfortably relaxed, both pupils look up toward the VIEWER from beneath them, one brow slightly higher, tiny closed confident cat smile, light blush: pleased but sweet. Both feet together, tail curled behind her. Hat stays on head. No wand, crown, cards, flowers or demonstration.",
+    "compact": "COMPACTING, a satisfied quiet moment of tidying up memories. Both gloves hold ONE small CLOSED navy notebook with thin gold corner trim and a plain cover at upper-waist level: lower glove supports its spine, upper glove rests gently over the newly closed top edge. Book width smaller than half her face. Head bowed slightly toward it, pupils low in both eyes, upper lids relaxed, soft uneven eyebrow arches and a tiny content closed cat smile. Shoulders relax, feet settled together, tail curled naturally. The single closed notebook suggests everything has been put in order. Hat stays worn. No suitcase, cards, silk, removed hat, magic trick, wand or strain.",
+    "busy_left": "BUSY working, shallow three-quarter turn toward viewer's LEFT. Both feet planted compactly, a tiny weight shift. Glove on viewer's left supports a SMALL open navy notebook just below the collar, other glove writes in it with one slim pale quill, tip touching the page. Notebook and pen form ONE ordinary work group narrower than half her face. Head bowed gently toward notebook; upper eyelids relax a little and both pupils look DOWN and LEFT at the writing tip. One eyebrow gently lifted, other slightly drawn in concentration; tiny quietly confident closed cat smile, no angry frown. Ears attentive, cape hanging still, tail free on viewer's right. Hat stays worn. No laptop, cable, rings, cards, wand, scarf or tools in the tail.",
+    "swamped_left": "OVERWHELMED, trying to regain composure after too much work. Slight shallow turn and gentle lean toward viewer's LEFT; keep BOTH feet planted, shoulders raised just a little. One glove hugs a small CLOSED navy notebook against her chest; the other rests its fingertips gently at her temple, just outside the eye, as if collecting her thoughts. Short arms, clear two-hand anatomy. Head inclined toward viewer's left. Both eyes open only a little wider than normal with original-sized irises, both pupils glancing toward the viewer's LEFT; eyebrows softly raised toward the middle and uneven, mouth a TINY uncertain slightly open sigh. Pink cheeks, ears tilted sideways and tail a little fluffed, not enlarged. A sweet recognizably flustered expression, not a distorted grimace. Cape droops calmly. No slipping objects, cards, rings, silk, pencil, floating sweat icons or magic demonstration.",
+    "busy_right": "RIGHT-facing companion of image 1's quiet working pose. Image 1 defines notebook, quill, proportions and posture; image 2 is the approved identity and outfit. Shallow three-quarter turn toward viewer's RIGHT, small open navy notebook and writing quill on viewer's RIGHT, both pupils looking DOWN and RIGHT at the writing tip. Same relaxed focused eyelids, subtly asymmetric brows and tiny confident cat smile. Both compact feet planted, cape still, tail free on viewer's LEFT. The small notebook and pen are the only work group. Hat stays worn. Do not mirror the face: pink eye stays viewer's LEFT, amber eye viewer's RIGHT, and large star clip stays on viewer's RIGHT above the amber eye. No rings, cloth, cards, wand, laptop or cable.",
+    "swamped_right": "RIGHT-facing companion of image 1's overwhelmed but composed standing portrait. Image 1 defines the small closed notebook hugged to chest and the other glove resting its fingertips gently at her temple beside the eye, collecting her thoughts; image 2 is the approved face identity and asymmetries. Shallow turn and tiny lean toward viewer's RIGHT, both feet still planted, shoulders slightly raised and short elbows natural. Head inclined toward viewer's right, both pupils glancing toward that side in normally proportioned gently open eyes. Soft worried uneven eyebrows, tiny slightly open sigh mouth and pink cheeks, ears sideways, tail only slightly fluffed on viewer's LEFT. Keep the face sweet and natural, no stretched mouth or bulging eyes. Notebook is the only extra prop, no objects falling or tricks. Pink iris viewer's LEFT, gold viewer's RIGHT, star clip remains viewer's RIGHT above amber eye. Redraw opposite body direction rather than mirroring accessories."
+  },
+  "results": [
+    {
+      "done": false,
+      "pose": "running",
+      "version": 2,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__running__v2.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__running__v2.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ],
+      "visual_note": "帽子旁多出一组手指，本轮 v3 已修正；保留此版作历史对照。"
+    },
+    {
+      "done": false,
+      "pose": "running",
+      "version": 3,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__running__v2.png",
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__running__v3.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__running__v3.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "searching",
+      "version": 4,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__searching__v4.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__searching__v4.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "asking",
+      "version": 4,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__asking__v4.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__asking__v4.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "happy",
+      "version": 5,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__happy__v5.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__happy__v5.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "proud",
+      "version": 2,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__proud__v2.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__proud__v2.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "compact",
+      "version": 4,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__compact__v4.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__compact__v4.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "busy_left",
+      "version": 5,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v5.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__busy_left__v5.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "swamped_left",
+      "version": 5,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v5.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__swamped_left__v5.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "busy_right",
+      "version": 5,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_left__v5.png",
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__busy_right__v5.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__busy_right__v5.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    },
+    {
+      "done": false,
+      "pose": "swamped_right",
+      "version": 6,
+      "refs": [
+        "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_left__v5.png",
+        "/Users/loki/Projects/crosspet/art/原图/gemini-magician/idle/v3.png"
+      ],
+      "destination": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/成品/gemini-magician__swamped_right__v6.png",
+      "prompt_path": "/Users/loki/Projects/crosspet/art/任务/2026-11-皮肤-魔术师Gemini/提示词/静态气质重设计/gemini-magician__swamped_right__v6.md",
+      "checks": [
+        {
+          "level": "ok",
+          "msg": "机检通过"
+        }
+      ]
+    }
+  ]
+}

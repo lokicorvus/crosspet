@@ -114,6 +114,7 @@ namespace CrossPet
             if (m.TryGetValue("eggAllowed", out var ea) && ea is bool ok) eggAllowed = ok;
             if (m.TryGetValue("friendship", out var fr) && fr is object[] rows) { friendshipRows = rows; PushSettings(); }
             if (m.TryGetValue("friendshipStore", out var fs) && fs is Dictionary<string, object> store) SaveFriendshipFile(store);
+            HandleNotebookMessage(m);   // 小本子：notebookStore、notebookBackfill（Pet.Notebook.cs）
         }
 
         // ---- 友谊的备份（数据目录里的 friendship.json）----
@@ -500,7 +501,7 @@ namespace CrossPet
             var generation = followEventGeneration;
             var standing = companions.Values.Select(c => c.Character).Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray();
             var input = Store.Json.Serialize(new Dictionary<string, object> { ["foregroundId"] = id, ["current"] = current, ["mainPet"] = MainPet, ["standing"] = standing });
-            var answer = await Eval($"FollowPolicy.foregroundTarget(Object.assign({input}, {{ mainClaimed: mainClaimed() }}))");   // 主桌宠的角色有会话就不换（谁先来谁当）
+            var answer = await Eval($"FollowPolicy.foregroundTarget(Object.assign({input}, {{ mainClaimed: mainClaimed() }}))");   // 主桌宠的角色最近有会话就不换（谁先来谁当）
             string target;
             try { target = Store.Json.Deserialize<string>(answer); } catch { target = null; }
             if (target != id || id == current || generation != followEventGeneration || !ready || Paused || Native.ForegroundExe() != exe) return;

@@ -30,11 +30,17 @@ function characterForUrl(url: string): string | undefined {
   const u = url.toLowerCase()
   if (u.includes('deepseek.com')) return 'deepseek'
   if (u.includes('bigmodel.cn') || u.includes('z.ai') || u.includes('zhipu')) return 'glm'
+  if (u.includes('moonshot') || u.includes('kimi')) return 'kimi'
+  if (u.includes('x.ai')) return 'grok'
   return undefined
 }
 function characterForModel(model: string): string | undefined {
   const m = model.toLowerCase()
   if (/glm|zhipu|chatglm|z\.ai|zai-/.test(m)) return 'glm'
+  // 和 crosspet-hook.py 的 character_for_model 同一个顺序
+  if (/qwen|dashscope|bailian|tongyi/.test(m)) return 'qwen'
+  if (/kimi|moonshot/.test(m)) return 'kimi'
+  if (m.includes('grok')) return 'grok'
   if (m.includes('deepseek')) return 'deepseek'
   if (/claude|anthropic|opus|sonnet|haiku/.test(m)) return 'claude'
   if (m.includes('gemini')) return 'gemini'
@@ -106,7 +112,7 @@ async function clientOf($: EngineInterface): Promise<string> {
 // 同时开着好几个会话在干活时，桌宠演「手忙脚乱」，每个会话一张小卡片
 type State = { pose: string; event: string; tool: string; ts: number }
 async function setState($: EngineInterface, state: State): Promise<void> {
-  await write($, 'seen-claude-mod', String(Math.floor(Date.now() / 1000))).catch(() => {})   // 心跳：最近一次收到消息
+  await write($, 'seen-claude-mod', Math.floor(Date.now() / 1000)).catch(() => {})   // 心跳：最近一次收到消息。写数字：write 会 JSON.stringify，传字符串会多一层引号（#44）
   let sid = ''
   try { sid = await $.session.id() } catch {}
   const who = actors.get(sid) ?? ID

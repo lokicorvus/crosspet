@@ -75,6 +75,59 @@ class HookClientTests(unittest.TestCase):
         self.assertEqual(self.read('claude@claude-cli-state.json')['pose'], 'reading')
         self.assertEqual(self.ledger('claude-hooks')[-1]['client'], 'claude-cli')
 
+    def add_character(self, cid):
+        d = self.data / 'characters' / cid
+        d.mkdir(parents=True, exist_ok=True)
+        (d / 'character.json').write_text('{"name": "X"}', encoding='utf-8')
+        (d / 'idle.webp').write_bytes(b'x')
+
+    def test_session_moves_to_new_character_when_model_changes(self):
+        # ZCode 旧对话里把模型从 DeepSeek 换成 GLM：这个会话只能算 GLM 的，不能在 DeepSeek 名下还算「干活中」，
+        # 不然多桌宠同时冒出 GLM 和 DeepSeek 两只（用户反馈，1.3.10）
+        for c in ('deepseek', 'glm'):
+            self.add_character(c)
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'deepseek-v3', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('deepseek-sessions.json')['z1']['client'], 'zcode')
+        # 别的会话、别的客户端的同一角色不受影响
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z2', 'model': 'deepseek-v3', 'tool_name': 'Read'})
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'glm-4.6', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('glm-sessions.json')['z1']['client'], 'zcode')
+        self.assertNotIn('z1', self.read('deepseek-sessions.json'))
+        self.assertIn('z2', self.read('deepseek-sessions.json'))
+        # 宿主自己记模型的表（zcode-sessions.json，值是模型名）原样留着
+        self.assertEqual(self.read('zcode-sessions.json')['z1'], 'glm-4.6')
+        # 换回来也一样
+        self.fire('zcode', {'hook_event_name': 'PreToolUse', 'session_id': 'z1', 'model': 'deepseek-v3', 'tool_name': 'Bash'})
+        self.assertNotIn('z1', self.read('glm-sessions.json'))
+        self.assertIn('z1', self.read('deepseek-sessions.json'))
+
+    def test_kimi_code_events(self):
+        # Kimi Code：多模型宿主，模型名只在 SessionStart 里给（真机收到的格式：kimi-code/<模型别名>），默认演 Kimi
+        for c in ('kimi', 'claude'):
+            self.add_character(c)
+        base = {'session_id': 'k1', 'cwd': '/tmp', 'client_type': 'kimi_code_cli'}
+        self.fire('kimi', {**base, 'hook_event_name': 'SessionStart', 'source': 'startup', 'model': 'kimi-code/kimi-for-coding-highspeed', 'profile': 'agent'})
+        self.fire('kimi', {**base, 'hook_event_name': 'UserPromptSubmit', 'prompt': [{'type': 'text', 'text': 'hi'}], 'is_steer': False})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'listening')
+        self.fire('kimi', {**base, 'hook_event_name': 'PreToolUse', 'tool_name': 'Read', 'tool_input': {'path': 'a.txt'}, 'tool_call_id': 't1'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'reading')
+        self.assertEqual(self.read('kimi-sessions.json')['k1']['client'], 'kimi')
+        self.assertEqual(self.read('kimi-models.json')['k1'], 'kimi-code/kimi-for-coding-highspeed')   # 不和会话状态抢同一个文件
+        self.fire('kimi', {**base, 'hook_event_name': 'PermissionRequest', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'asking')
+        self.fire('kimi', {**base, 'hook_event_name': 'PermissionResult', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'thinking')
+        self.fire('kimi', {**base, 'hook_event_name': 'PreCompact', 'trigger': 'auto', 'token_count': 1})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'compact')
+        self.fire('kimi', {**base, 'hook_event_name': 'StopFailure', 'error_type': 'APIStatusError', 'error_message': 'x'})
+        self.assertEqual(self.read('kimi-state.json')['pose'], 'oops')
+        # 同一个 Kimi Code 里换成 Claude 的模型：新会话由 Claude 来演
+        self.fire('kimi', {**base, 'session_id': 'k2', 'hook_event_name': 'SessionStart', 'source': 'startup', 'model': 'my-anthropic/claude-sonnet-5'})
+        self.fire('kimi', {**base, 'session_id': 'k2', 'hook_event_name': 'PreToolUse', 'tool_name': 'Bash', 'tool_input': {'command': 'ls'}})
+        self.assertEqual(self.read('claude-state.json')['pose'], 'running')
+        self.assertEqual(self.read('claude-sessions.json')['k2']['client'], 'kimi')
+        self.assertIsNotNone((self.state / 'seen-kimi').exists() or None)
+
     def test_codex_client(self):
         self.fire('gpt', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'turn_id': 'T1', 'cwd': '/tmp',
                           'model': 'gpt-test', 'tool_name': 'exec_command', 'transcript_path': str(self.transcript)})

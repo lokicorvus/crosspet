@@ -170,6 +170,8 @@ extension App {
         if let ok = d["eggAllowed"] as? Bool { eggAllowed = ok }
         if let rows = d["friendship"] as? [Any] { friendshipRows = rows; pushSettings() }
         if let store = d["friendshipStore"] as? [String: Any] { saveFriendshipFile(store) }
+        if let store = d["notebookStore"] as? [String: Any] { saveNotebookFile(store) }   // 小本子的备份（App+Notebook.swift）
+        if d["notebookBackfill"] as? Bool == true { runNotebookBackfill() }
     }
 
     // MARK: 友谊的备份（数据目录里的 friendship.json）
