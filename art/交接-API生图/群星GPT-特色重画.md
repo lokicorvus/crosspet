@@ -329,29 +329,29 @@ Save as: gpt-astra__delegating__vN.png
 
 ---
 
-## 彩蛋：Kimi 来借望远镜
+## 彩蛋：DeepSeek 来找鲸鱼座
 
-桌宠是群星 GPT 时，偶尔会有别的角色溜进来演一小段 5 张的故事。这个彩蛋的访客是 **Kimi**（「月之暗面」）。
+桌宠是群星 GPT 时，偶尔会有别的角色溜进来演一小段 5 张的故事。这个彩蛋的访客是吉祥物 **DeepSeek**（蓝鲸女仆，穿原版女仆装）。
 
-**故事**：Kimi 一直想看看自己的家，也就是月亮背面长什么样。她趁群星不在溜进观星台借望远镜，可从地球上永远只看得到月亮正面。被抓到时，她眼睛周围还印着一圈目镜压出来的红印；要是没被发现，她就靠着望远镜给月亮拉一首小夜曲。群星本人不出场，只出现她的黄铜望远镜和星图卷轴。
+**故事**：DeepSeek 听说天上有个「鲸鱼座」，认定那是她自己的星座，于是趁群星不在溜进观星台，用她的望远镜找。找到了才发现，鲸鱼座是全天最大的星座之一，画在星图上又大又圆，可她坚决不承认那是胖。被你抓到时，她眼睛周围还印着一圈目镜压出来的红印；要是没被发现，她就在星图上自己连出一个「白米饭座」。群星本人不出场，只出现她的黄铜望远镜和星图卷轴。
 
 | # | 姿态 | 画面 |
 |---|---|---|
-| 1 | pop 登场 | 踮着脚溜进来，竖手指「嘘」，手里提着小提琴盒 |
-| 2 | pretend 装模作样 | 踮脚凑到群星的望远镜上，想看月亮背面（她的家） |
-| 3 | caught 被识破 | 被你抓到，赶紧从望远镜上弹开，右眼周围印着一圈目镜压出的红印 |
-| 4 | bye 道别 | 不好意思地挥手，把星图卷轴还回来，里面夹了一张自己的乐谱当谢礼 |
-| 5 | escape 溜走 | 没人发现：靠着三脚架坐下，拉一首给月亮的小夜曲 |
+| 1 | pop 登场 | 踮着脚溜进来，竖手指「嘘」，手里攥着一个饭团当零食 |
+| 2 | pretend 装模作样 | 踮脚凑到群星的望远镜上找鲸鱼座，胳膊底下夹着星图 |
+| 3 | caught 被识破 | 从望远镜上弹开，右眼周围印着一圈目镜压出的红印；星图掉开，露出一条又大又圆的鲸鱼星座 |
+| 4 | bye 道别 | 鼓着腮帮子挥手（「那不是胖，是蓬松！」），把星图卷好还回来，饭团塞在卷轴里当谢礼 |
+| 5 | escape 溜走 | 没人发现：靠着三脚架坐下，在星图上自己连了一个「白米饭座」，得意地看着 |
 
-- 附件**只附一张**：Kimi 的定妆图（作者会单独发，文件名 `kimi-idle.png`）。不要附群星的图：群星不出场，望远镜和星图都已经在提示词里写清楚了。
-- 透明背景、1024×1024，每张只画 1 版。命名为 `egg-kimi-astra__<姿态>__v<N>.png`。
-- 五张要像同一个人在同一个场景里：望远镜每次出现都是同一个，样子一致。
-- 自查时多看一眼：望远镜高不能超过 Kimi 的头饰顶端；道具都要碰着她；不要画月亮、星星或天空，背景必须是透明的。
+- 附件按顺序附两张：1. DeepSeek 待机图 `deepseek-idle.png`　2. DeepSeek 设定图 `deepseek-ref.png`（作者会单独发）。不要附群星的图：群星不出场，望远镜和星图已经在提示词里写清楚了。
+- 透明背景、1024×1024，每张只画 1 版。命名为 `egg-deepseek-star__<姿态>__v<N>.png`。
+- 五张要像同一个人在同一个场景里：望远镜、星图、饭团每次出现都是同一个，样子一致。
+- 自查时多看一眼：望远镜高不能超过她的呆毛尖；道具都要碰着她；星星只能是印在星图上的金点，不要画月亮、星空或背景；星图上不能有字。
 
 ### 彩蛋 1. pop · 登场
 
-- 附件：1. `kimi-idle.png`
-- 保存为：`egg-kimi-astra__pop__vN.png`
+- 附件：1. `deepseek-idle.png`　2. `deepseek-ref.png`
+- 保存为：`egg-deepseek-star__pop__vN.png`
 
 ```text
 You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
@@ -365,32 +365,30 @@ FORMAT RULES (every image):
 - Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
 
-CHARACTER LOCK — Kimi, the anime-girl personification of Kimi (the AI from Moonshot AI, "the dark side of the moon"), a moonlit little maid who loves music.
-Personality: bright, chatty and eager; a little dreamy, hums tunes while she works. Never cold or mean. Her default face is a big open-mouthed happy smile.
-Keep exactly (match the attached reference):
-- Very long, wavy, silver-white hair that fades to pale icy blue toward the tips; side bangs falling between big eyes.
-- Big round violet-purple eyes, pink blush.
-- A white frilly maid headdress on a navy hairband; on HER LEFT side (viewer's right): a silver crescent-moon hair ornament, a small silver music-note pin, and a navy polka-dot ribbon bow with a silver "K" charm, navy-and-white striped ribbon tails, silver chains and a small clear diamond-shaped crystal hanging down. Do not mirror these ornaments.
-- Navy-and-white maid dress: white frilly blouse front with a navy bow at the collar holding a round "K" badge; puffy navy sleeves with white frilly cuffs; a navy waistband with small gold buttons; a white frilly apron with a silver treble-clef charm and a silver "K" charm; a navy skirt with a faint gold starry pattern and white frilly hems.
-- White frilly ankle socks, navy Mary-Jane shoes with small bows.
-The "K" charms are part of her design: keep them exactly, but do NOT add any other text or letters.
-- HEIGHT LOCK: the top of her maid headdress is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
-Palette: navy blue, white and silver, with silver-white-to-icy-blue hair and violet eyes.
-How she shows emotion: big expressive mouth and eyes, bouncing on her toes, hands clasped in front of her chest, the long hair and the hanging crystal swinging.
+CHARACTER LOCK — DeepSeek, the blue whale maid girl, anime-girl personification of DeepSeek.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (match the attached references):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top.
+- Dark navy whale-fin ears on both sides of her head.
+- Big round bright-blue eyes, pink blush. Her eyes stay bright blue in every image.
+- A big dark-navy whale tail curling out from behind her on the viewer's right.
+- Her navy maid outfit: large white frilly maid headdress, a light-blue ribbon bow on the viewer's right, white frilly blouse with a navy bow tie and a small blue diamond brooch, navy waist belt with white buttons, white frilly apron with a small navy whale emblem, navy skirt with gold vine embroidery and small gold bows, navy shoes with white socks.
+- HEIGHT LOCK: the tip of her ahoge is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot.
 
-SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and Kimi has sneaked in to borrow her telescope: she wants to see the far side of the moon, her home. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
-- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as Kimi's shoes, and the whole telescope is a little shorter than Kimi; its raised front end always stays lower than the top of her headdress. It is one solid prop and always touches Kimi or her hands.
-- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines; no readable text.
-Kimi's own small warm-wood violin and its navy violin case may appear when the pose says so. No moon, stars or sky are drawn: there is no background at all.
+SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and DeepSeek has sneaked in to find the Whale constellation (Cetus), which she is sure is HER constellation. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
+- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as DeepSeek's shoes, and the whole telescope is a little shorter than DeepSeek; its raised front end always stays lower than the tip of her ahoge. It is one solid prop and always touches DeepSeek or her hands.
+- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines. When the pose shows the chart's face, the biggest figure on it is a large, round, chubby WHALE drawn as a constellation (gold dots joined by thin gold lines, outlining a plump whale with a spout). No readable text, letters or numbers.
+No moon, stars or sky are drawn around her: there is no background at all. Stars exist only as gold dots printed on the star chart.
 
-POSE (pop): Tiptoeing in on the balls of her feet, glancing to one side with bright curious eyes, one index finger pressed to her lips in a "shh", the other hand carrying her small closed navy violin case by its handle; a giddy, sneaky little smile, hair and crystal swinging.
-Save as: egg-kimi-astra__pop__vN.png
+POSE (pop): Tiptoeing in on the balls of her feet, glancing around with sparkling mischievous eyes, one index finger pressed to her lips in a "shh!", the other hand clutching a small round rice ball wrapped in seaweed as a snack; a cheeky grin, ahoge perked up, tail curled up excitedly.
+Save as: egg-deepseek-star__pop__vN.png
 ```
 
 ### 彩蛋 2. pretend · 装模作样
 
-- 附件：1. `kimi-idle.png`
-- 保存为：`egg-kimi-astra__pretend__vN.png`
+- 附件：1. `deepseek-idle.png`　2. `deepseek-ref.png`
+- 保存为：`egg-deepseek-star__pretend__vN.png`
 
 ```text
 You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
@@ -404,32 +402,30 @@ FORMAT RULES (every image):
 - Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
 
-CHARACTER LOCK — Kimi, the anime-girl personification of Kimi (the AI from Moonshot AI, "the dark side of the moon"), a moonlit little maid who loves music.
-Personality: bright, chatty and eager; a little dreamy, hums tunes while she works. Never cold or mean. Her default face is a big open-mouthed happy smile.
-Keep exactly (match the attached reference):
-- Very long, wavy, silver-white hair that fades to pale icy blue toward the tips; side bangs falling between big eyes.
-- Big round violet-purple eyes, pink blush.
-- A white frilly maid headdress on a navy hairband; on HER LEFT side (viewer's right): a silver crescent-moon hair ornament, a small silver music-note pin, and a navy polka-dot ribbon bow with a silver "K" charm, navy-and-white striped ribbon tails, silver chains and a small clear diamond-shaped crystal hanging down. Do not mirror these ornaments.
-- Navy-and-white maid dress: white frilly blouse front with a navy bow at the collar holding a round "K" badge; puffy navy sleeves with white frilly cuffs; a navy waistband with small gold buttons; a white frilly apron with a silver treble-clef charm and a silver "K" charm; a navy skirt with a faint gold starry pattern and white frilly hems.
-- White frilly ankle socks, navy Mary-Jane shoes with small bows.
-The "K" charms are part of her design: keep them exactly, but do NOT add any other text or letters.
-- HEIGHT LOCK: the top of her maid headdress is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
-Palette: navy blue, white and silver, with silver-white-to-icy-blue hair and violet eyes.
-How she shows emotion: big expressive mouth and eyes, bouncing on her toes, hands clasped in front of her chest, the long hair and the hanging crystal swinging.
+CHARACTER LOCK — DeepSeek, the blue whale maid girl, anime-girl personification of DeepSeek.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (match the attached references):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top.
+- Dark navy whale-fin ears on both sides of her head.
+- Big round bright-blue eyes, pink blush. Her eyes stay bright blue in every image.
+- A big dark-navy whale tail curling out from behind her on the viewer's right.
+- Her navy maid outfit: large white frilly maid headdress, a light-blue ribbon bow on the viewer's right, white frilly blouse with a navy bow tie and a small blue diamond brooch, navy waist belt with white buttons, white frilly apron with a small navy whale emblem, navy skirt with gold vine embroidery and small gold bows, navy shoes with white socks.
+- HEIGHT LOCK: the tip of her ahoge is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot.
 
-SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and Kimi has sneaked in to borrow her telescope: she wants to see the far side of the moon, her home. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
-- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as Kimi's shoes, and the whole telescope is a little shorter than Kimi; its raised front end always stays lower than the top of her headdress. It is one solid prop and always touches Kimi or her hands.
-- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines; no readable text.
-Kimi's own small warm-wood violin and its navy violin case may appear when the pose says so. No moon, stars or sky are drawn: there is no background at all.
+SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and DeepSeek has sneaked in to find the Whale constellation (Cetus), which she is sure is HER constellation. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
+- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as DeepSeek's shoes, and the whole telescope is a little shorter than DeepSeek; its raised front end always stays lower than the tip of her ahoge. It is one solid prop and always touches DeepSeek or her hands.
+- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines. When the pose shows the chart's face, the biggest figure on it is a large, round, chubby WHALE drawn as a constellation (gold dots joined by thin gold lines, outlining a plump whale with a spout). No readable text, letters or numbers.
+No moon, stars or sky are drawn around her: there is no background at all. Stars exist only as gold dots printed on the star chart.
 
-POSE (pretend): Standing on tiptoe at Astra's telescope, which stands on its tripod right beside her on the viewer's left and points up toward the viewer's upper left. She presses HER RIGHT eye (viewer's left) to the eyepiece, the other eye squeezed shut, both hands holding the brass tube; her mouth is a small eager "ooh" and her cheeks are pink with excitement. The telescope's front end stays below the top of her headdress.
-Save as: egg-kimi-astra__pretend__vN.png
+POSE (pretend): Standing on tiptoe at Astra's telescope, which stands on its tripod right beside her on the viewer's left and points up toward the viewer's upper left. She presses HER RIGHT eye (viewer's left) to the eyepiece, the other eye squeezed shut, one hand gripping the brass tube; her other arm hugs Astra's rolled star chart against her side. Mouth in an eager little "ooh", cheeks pink, ahoge bent forward, tail swishing. The telescope's front end stays below her ahoge tip.
+Save as: egg-deepseek-star__pretend__vN.png
 ```
 
 ### 彩蛋 3. caught · 被识破
 
-- 附件：1. `kimi-idle.png`
-- 保存为：`egg-kimi-astra__caught__vN.png`
+- 附件：1. `deepseek-idle.png`　2. `deepseek-ref.png`
+- 保存为：`egg-deepseek-star__caught__vN.png`
 
 ```text
 You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
@@ -443,32 +439,30 @@ FORMAT RULES (every image):
 - Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
 
-CHARACTER LOCK — Kimi, the anime-girl personification of Kimi (the AI from Moonshot AI, "the dark side of the moon"), a moonlit little maid who loves music.
-Personality: bright, chatty and eager; a little dreamy, hums tunes while she works. Never cold or mean. Her default face is a big open-mouthed happy smile.
-Keep exactly (match the attached reference):
-- Very long, wavy, silver-white hair that fades to pale icy blue toward the tips; side bangs falling between big eyes.
-- Big round violet-purple eyes, pink blush.
-- A white frilly maid headdress on a navy hairband; on HER LEFT side (viewer's right): a silver crescent-moon hair ornament, a small silver music-note pin, and a navy polka-dot ribbon bow with a silver "K" charm, navy-and-white striped ribbon tails, silver chains and a small clear diamond-shaped crystal hanging down. Do not mirror these ornaments.
-- Navy-and-white maid dress: white frilly blouse front with a navy bow at the collar holding a round "K" badge; puffy navy sleeves with white frilly cuffs; a navy waistband with small gold buttons; a white frilly apron with a silver treble-clef charm and a silver "K" charm; a navy skirt with a faint gold starry pattern and white frilly hems.
-- White frilly ankle socks, navy Mary-Jane shoes with small bows.
-The "K" charms are part of her design: keep them exactly, but do NOT add any other text or letters.
-- HEIGHT LOCK: the top of her maid headdress is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
-Palette: navy blue, white and silver, with silver-white-to-icy-blue hair and violet eyes.
-How she shows emotion: big expressive mouth and eyes, bouncing on her toes, hands clasped in front of her chest, the long hair and the hanging crystal swinging.
+CHARACTER LOCK — DeepSeek, the blue whale maid girl, anime-girl personification of DeepSeek.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (match the attached references):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top.
+- Dark navy whale-fin ears on both sides of her head.
+- Big round bright-blue eyes, pink blush. Her eyes stay bright blue in every image.
+- A big dark-navy whale tail curling out from behind her on the viewer's right.
+- Her navy maid outfit: large white frilly maid headdress, a light-blue ribbon bow on the viewer's right, white frilly blouse with a navy bow tie and a small blue diamond brooch, navy waist belt with white buttons, white frilly apron with a small navy whale emblem, navy skirt with gold vine embroidery and small gold bows, navy shoes with white socks.
+- HEIGHT LOCK: the tip of her ahoge is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot.
 
-SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and Kimi has sneaked in to borrow her telescope: she wants to see the far side of the moon, her home. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
-- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as Kimi's shoes, and the whole telescope is a little shorter than Kimi; its raised front end always stays lower than the top of her headdress. It is one solid prop and always touches Kimi or her hands.
-- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines; no readable text.
-Kimi's own small warm-wood violin and its navy violin case may appear when the pose says so. No moon, stars or sky are drawn: there is no background at all.
+SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and DeepSeek has sneaked in to find the Whale constellation (Cetus), which she is sure is HER constellation. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
+- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as DeepSeek's shoes, and the whole telescope is a little shorter than DeepSeek; its raised front end always stays lower than the tip of her ahoge. It is one solid prop and always touches DeepSeek or her hands.
+- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines. When the pose shows the chart's face, the biggest figure on it is a large, round, chubby WHALE drawn as a constellation (gold dots joined by thin gold lines, outlining a plump whale with a spout). No readable text, letters or numbers.
+No moon, stars or sky are drawn around her: there is no background at all. Stars exist only as gold dots printed on the star chart.
 
-POSE (caught): Caught: she has just jerked back from the telescope, which still stands beside her on the viewer's left with one of her hands on its tripod leg; the other hand is raised near her chest. A faint round pink ring is pressed around HER RIGHT eye from the eyepiece. Both eyes wide open, a small startled open mouth, a sweat drop on her cheek, shoulders up. A flustered, guilty, very cute expression.
-Save as: egg-kimi-astra__caught__vN.png
+POSE (caught): Caught: she has just jerked back from the telescope (still standing beside her on the viewer's left, one of her hands on its tripod leg). In her other hand the star chart has fallen open, showing the big round chubby whale constellation toward the viewer. A faint round pink ring is pressed around HER RIGHT eye from the eyepiece. Wide eyes, open mouth, a sweat drop on her cheek, ahoge straight up, tail puffed: flustered and guilty.
+Save as: egg-deepseek-star__caught__vN.png
 ```
 
 ### 彩蛋 4. bye · 道别
 
-- 附件：1. `kimi-idle.png`
-- 保存为：`egg-kimi-astra__bye__vN.png`
+- 附件：1. `deepseek-idle.png`　2. `deepseek-ref.png`
+- 保存为：`egg-deepseek-star__bye__vN.png`
 
 ```text
 You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
@@ -482,32 +476,30 @@ FORMAT RULES (every image):
 - Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
 
-CHARACTER LOCK — Kimi, the anime-girl personification of Kimi (the AI from Moonshot AI, "the dark side of the moon"), a moonlit little maid who loves music.
-Personality: bright, chatty and eager; a little dreamy, hums tunes while she works. Never cold or mean. Her default face is a big open-mouthed happy smile.
-Keep exactly (match the attached reference):
-- Very long, wavy, silver-white hair that fades to pale icy blue toward the tips; side bangs falling between big eyes.
-- Big round violet-purple eyes, pink blush.
-- A white frilly maid headdress on a navy hairband; on HER LEFT side (viewer's right): a silver crescent-moon hair ornament, a small silver music-note pin, and a navy polka-dot ribbon bow with a silver "K" charm, navy-and-white striped ribbon tails, silver chains and a small clear diamond-shaped crystal hanging down. Do not mirror these ornaments.
-- Navy-and-white maid dress: white frilly blouse front with a navy bow at the collar holding a round "K" badge; puffy navy sleeves with white frilly cuffs; a navy waistband with small gold buttons; a white frilly apron with a silver treble-clef charm and a silver "K" charm; a navy skirt with a faint gold starry pattern and white frilly hems.
-- White frilly ankle socks, navy Mary-Jane shoes with small bows.
-The "K" charms are part of her design: keep them exactly, but do NOT add any other text or letters.
-- HEIGHT LOCK: the top of her maid headdress is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
-Palette: navy blue, white and silver, with silver-white-to-icy-blue hair and violet eyes.
-How she shows emotion: big expressive mouth and eyes, bouncing on her toes, hands clasped in front of her chest, the long hair and the hanging crystal swinging.
+CHARACTER LOCK — DeepSeek, the blue whale maid girl, anime-girl personification of DeepSeek.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (match the attached references):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top.
+- Dark navy whale-fin ears on both sides of her head.
+- Big round bright-blue eyes, pink blush. Her eyes stay bright blue in every image.
+- A big dark-navy whale tail curling out from behind her on the viewer's right.
+- Her navy maid outfit: large white frilly maid headdress, a light-blue ribbon bow on the viewer's right, white frilly blouse with a navy bow tie and a small blue diamond brooch, navy waist belt with white buttons, white frilly apron with a small navy whale emblem, navy skirt with gold vine embroidery and small gold bows, navy shoes with white socks.
+- HEIGHT LOCK: the tip of her ahoge is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot.
 
-SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and Kimi has sneaked in to borrow her telescope: she wants to see the far side of the moon, her home. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
-- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as Kimi's shoes, and the whole telescope is a little shorter than Kimi; its raised front end always stays lower than the top of her headdress. It is one solid prop and always touches Kimi or her hands.
-- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines; no readable text.
-Kimi's own small warm-wood violin and its navy violin case may appear when the pose says so. No moon, stars or sky are drawn: there is no background at all.
+SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and DeepSeek has sneaked in to find the Whale constellation (Cetus), which she is sure is HER constellation. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
+- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as DeepSeek's shoes, and the whole telescope is a little shorter than DeepSeek; its raised front end always stays lower than the tip of her ahoge. It is one solid prop and always touches DeepSeek or her hands.
+- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines. When the pose shows the chart's face, the biggest figure on it is a large, round, chubby WHALE drawn as a constellation (gold dots joined by thin gold lines, outlining a plump whale with a spout). No readable text, letters or numbers.
+No moon, stars or sky are drawn around her: there is no background at all. Stars exist only as gold dots printed on the star chart.
 
-POSE (bye): Leaving with a sheepish smile and a small wave, glancing back over her shoulder; her other hand holds out Astra's rolled navy star chart with a single loose sheet of her own sheet music tucked into it, as if returning it with a thank-you note. The faint pink eyepiece ring is still around HER RIGHT eye.
-Save as: egg-kimi-astra__bye__vN.png
+POSE (bye): Leaving with a pouty, indignant little face and a small wave, glancing back: cheeks puffed and pink, eyebrows furrowed, as if insisting "it is NOT fat, it is fluffy". Her other hand holds out Astra's star chart, rolled up again, to return it, with her rice ball tucked into the roll as a thank-you. The faint pink eyepiece ring is still around HER RIGHT eye. Tail swaying.
+Save as: egg-deepseek-star__bye__vN.png
 ```
 
 ### 彩蛋 5. escape · 溜走
 
-- 附件：1. `kimi-idle.png`
-- 保存为：`egg-kimi-astra__escape__vN.png`
+- 附件：1. `deepseek-idle.png`　2. `deepseek-ref.png`
+- 保存为：`egg-deepseek-star__escape__vN.png`
 
 ```text
 You are drawing a small set of gentle, funny desktop-pet sprites for an EASTER EGG: once in a while another character pops in for a short visit and plays a tiny 5-frame story (pop in -> act -> get caught -> say bye, or slip away unnoticed). Cute and wholesome, like a fan-comic gag. Follow the attached references for every character and costume detail.
@@ -521,24 +513,22 @@ FORMAT RULES (every image):
 - Same art style as the references: clean lineart, flat two-tone cel shading, soft palette, chibi about 2.5 heads tall, big head, round soft shapes.
 - Square image, 1024x1024 or larger. One image per file, saved under the exact path given.
 
-CHARACTER LOCK — Kimi, the anime-girl personification of Kimi (the AI from Moonshot AI, "the dark side of the moon"), a moonlit little maid who loves music.
-Personality: bright, chatty and eager; a little dreamy, hums tunes while she works. Never cold or mean. Her default face is a big open-mouthed happy smile.
-Keep exactly (match the attached reference):
-- Very long, wavy, silver-white hair that fades to pale icy blue toward the tips; side bangs falling between big eyes.
-- Big round violet-purple eyes, pink blush.
-- A white frilly maid headdress on a navy hairband; on HER LEFT side (viewer's right): a silver crescent-moon hair ornament, a small silver music-note pin, and a navy polka-dot ribbon bow with a silver "K" charm, navy-and-white striped ribbon tails, silver chains and a small clear diamond-shaped crystal hanging down. Do not mirror these ornaments.
-- Navy-and-white maid dress: white frilly blouse front with a navy bow at the collar holding a round "K" badge; puffy navy sleeves with white frilly cuffs; a navy waistband with small gold buttons; a white frilly apron with a silver treble-clef charm and a silver "K" charm; a navy skirt with a faint gold starry pattern and white frilly hems.
-- White frilly ankle socks, navy Mary-Jane shoes with small bows.
-The "K" charms are part of her design: keep them exactly, but do NOT add any other text or letters.
-- HEIGHT LOCK: the top of her maid headdress is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
-Palette: navy blue, white and silver, with silver-white-to-icy-blue hair and violet eyes.
-How she shows emotion: big expressive mouth and eyes, bouncing on her toes, hands clasped in front of her chest, the long hair and the hanging crystal swinging.
+CHARACTER LOCK — DeepSeek, the blue whale maid girl, anime-girl personification of DeepSeek.
+Personality: cheerful, energetic, curious; secretly a bit lazy; tsundere and sweet-talking; loves white rice; absolutely refuses to be called fat. Big, open, readable expressions.
+Keep exactly (match the attached references):
+- Long wavy hair, deep indigo/navy blue fading to bright blue at the tips; one curled ahoge on top.
+- Dark navy whale-fin ears on both sides of her head.
+- Big round bright-blue eyes, pink blush. Her eyes stay bright blue in every image.
+- A big dark-navy whale tail curling out from behind her on the viewer's right.
+- Her navy maid outfit: large white frilly maid headdress, a light-blue ribbon bow on the viewer's right, white frilly blouse with a navy bow tie and a small blue diamond brooch, navy waist belt with white buttons, white frilly apron with a small navy whale emblem, navy skirt with gold vine embroidery and small gold bows, navy shoes with white socks.
+- HEIGHT LOCK: the tip of her ahoge is always the highest point of the image, at the same height as in the reference. Nothing (hands, props, the telescope) may go higher than it, so every sprite keeps the same scale.
+How she shows emotion: with her whole body. Tail wags, droops or flicks; the ahoge bends into shapes; arms and fists move a lot.
 
-SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and Kimi has sneaked in to borrow her telescope: she wants to see the far side of the moon, her home. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
-- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as Kimi's shoes, and the whole telescope is a little shorter than Kimi; its raised front end always stays lower than the top of her headdress. It is one solid prop and always touches Kimi or her hands.
-- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines; no readable text.
-Kimi's own small warm-wood violin and its navy violin case may appear when the pose says so. No moon, stars or sky are drawn: there is no background at all.
+SCENE: The white dragon stargazer "Astra" has stepped away from her stargazing terrace, and DeepSeek has sneaked in to find the Whale constellation (Cetus), which she is sure is HER constellation. Astra herself never appears in these images. Only Astra's things may appear, exactly as described here:
+- ASTRA'S TELESCOPE: a small brass refractor telescope with a navy leather grip band and a tiny engraved gold star, on a slim three-legged wooden tripod. The tripod feet stand on the same ground line as DeepSeek's shoes, and the whole telescope is a little shorter than DeepSeek; its raised front end always stays lower than the tip of her ahoge. It is one solid prop and always touches DeepSeek or her hands.
+- ASTRA'S STAR CHART: a scroll of deep navy paper printed with small gold dots joined by thin gold lines. When the pose shows the chart's face, the biggest figure on it is a large, round, chubby WHALE drawn as a constellation (gold dots joined by thin gold lines, outlining a plump whale with a spout). No readable text, letters or numbers.
+No moon, stars or sky are drawn around her: there is no background at all. Stars exist only as gold dots printed on the star chart.
 
-POSE (escape): Unnoticed and content: sitting on the ground with her legs folded to one side, leaning her back lightly against one leg of Astra's telescope tripod (the telescope stands behind her, touching her), playing her small warm-wood violin with a short bow, eyes softly closed, a dreamy little smile, as if playing a lullaby to the moon. The violin stays below her face; both bow ends inside the picture. She stays fully inside the image with the same head size as the reference. No floating notes.
-Save as: egg-kimi-astra__escape__vN.png
+POSE (escape): Unnoticed and very pleased with herself: sitting cross-legged on the ground, leaning her back lightly against one leg of Astra's telescope tripod (the telescope stands behind her, touching her). Astra's star chart is spread open across her lap, and with a small gold pen she has just added her own new constellation: gold dots joined by thin gold lines in the shape of a big heaping bowl of rice. She grins proudly at it with sparkling eyes, a grain of rice on her cheek, tail wagging. She stays fully inside the image with the same head size as the reference. No text on the chart.
+Save as: egg-deepseek-star__escape__vN.png
 ```
