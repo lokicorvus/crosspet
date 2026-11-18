@@ -268,12 +268,18 @@ def check_image(path, cid, pose_name, batch=None, st=None):
     edge = "贴边" in pose["rules"] or "探头" in pose["rules"]
     if edge:
         side = pose["side"]
-        # 切口不一定正好压在边框上：差几十像素的透明缝导入时会裁掉（prepare.py 裁到人物外框），只要切口是一条直的、离边框不远
-        solid = np.where(m[t:b + 1].mean(0) > 0.15)[0]   # 身体盖住一成半以上高度的列：切口就是最靠边的那一列
-        gap = W if not len(solid) else (solid[0] if side == "left" else W - 1 - solid[-1])
+        # 切口不用正好压在边框上：导入时 prepare.py 会找到那条直切口、裁到边框（透明缝、伸出去的碎发、切口上的描边都去掉）。
+        # 这里只查有没有一条直切口、在不在靠这一边的地方
+        from PIL import Image
+        from prepare import find_cut
+        cut, share = find_cut(np.array(Image.open(path).convert("RGBA")), side)
+        gap = W if cut is None else (cut if side == "left" else W - 1 - cut)
         far = (r >= W - 2) if side == "left" else (l <= 1)
-        if gap > W * 0.06:
-            out.append({"level": "fail", "msg": f"{'左' if side == 'left' else '右'}边框没从她身上切过去（贴边图要贴着{'左' if side == 'left' else '右'}边）"})
+        name = "左" if side == "left" else "右"
+        if cut is None or share < 0.25 or gap > W * 0.3:
+            out.append({"level": "fail", "msg": f"{name}边没有一条从她身上直直切下去的切口（贴边图要被{name}边框切掉一部分）"})
+        elif gap > W * 0.02:
+            out.append({"level": "ok", "msg": f"切口离{name}边框 {gap} 像素：导入时自动裁到边框"})
         if far:
             out.append({"level": "fail", "msg": f"另一边（{'右' if side == 'left' else '左'}边）也贴着边框了：方向可能画反了"})
     else:
