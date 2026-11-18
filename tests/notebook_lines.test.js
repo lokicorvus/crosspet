@@ -64,7 +64,14 @@ test('old_override_wins：character.json 写了 notes / sign 就用她的；没�
   const picked = { notesPicked: ['挑的一', '挑的二', null], signPicked: '挑的落款' }
   assert.equal(T.noteFor(t, { notes: [null, '自己写的', null], ...picked }, 1), '自己写的')
   assert.equal(T.noteFor(t, { notes: null, ...picked }, 1), '挑的二')
-  assert.equal(T.noteFor(t, { notes: null, ...picked }, 2), t.notes[2])
+  assert.equal(T.noteFor(t, { notes: null, ...picked }, 2), null)
+  assert.equal(T.noteFor(t, { notes: null }, 1), t.notes[1])
+  // 0 档挑出来是 null：不写批注，不能退回主题里的示例（Grok 0 次摸头写「摸够没」）
+  const g = T.themeFor('grok'), zero = { notes: null, notesPicked: [null, null, null] }
+  assert.deepEqual([0, 1, 2].map(i => T.noteFor(g, zero, i)), [null, null, null])
+  const page = v => T.panel({ name: 'Grok', rounds: 0, workMs: 0, pats: v, milestones: [], ...zero, notesPicked: [null, null, v ? '摸够没' : null] }, g).split('pg pg2')[0]
+  assert.ok(!page(0).includes('class="ring"'), '0 次不画红圈')
+  assert.ok(page(5).includes('class="ring"'), '有批注才圈')
   assert.equal(T.signFor(t, { sign: '落款', ...picked }), '落款')
   assert.equal(T.signFor(t, { sign: null, ...picked }), '挑的落款')
   assert.equal(T.signFor(t, { sign: null }), t.sign)

@@ -979,8 +979,17 @@ function setCharacter(id, quiet) {
     const pend = pendingCelebration[id]
     if (pend && Date.now() - pend.at < 10 * 60 * 1000) characterTimeout(() => celebrate(id, pend.ev), 1200)
     // 新立绘加载好再淡入，避免先看到空白
+    // 没加载完的 <img> 换了地址后浏览器先接着显示上一张：只等 0.16 秒的话，Windows（立绘由外壳异步读文件交给网页，常常更慢）
+    // 会先露出换之前的衣服，再突然变成新的。所以等新图解码好再淡入，最多等 1.5 秒
     const reveal = () => stage.classList.remove('swap')
-    if (active.complete && spare.complete) characterTimeout(reveal, 60); else characterTimeout(reveal, 160)
+    const loading = [active, spare, $('blink')].filter(i => i.src && !i.complete)
+    if (!loading.length) characterTimeout(reveal, 60)
+    else {
+      let done = false
+      const go = () => { if (done) return; done = true; if (charId === id && generation === characterGeneration) reveal() }
+      Promise.all(loading.map(i => i.decode().catch(() => {}))).then(go)
+      setTimeout(go, 1500)
+    }
   }, 330)
 }
 
@@ -1239,10 +1248,10 @@ function setName(id, name) {
   if (id === charId) $('caption').textContent = name
 }
 
-// 兜底：干活的样子（思考、读写、跑命令……）停了这么久没有任何新事件，就当这一轮已经停了，回去待机。
+// 兜底：干活的样子（思考、读写、跑命令……）停了 3 分钟没有任何新事件，就当这一轮已经停了，回去待机。
 // 有的 AI 被你中途打断时不发「结束」（Claude Code 标准钩子、Gemini CLI……），不然她会一直停在思考。
-// 「等你回答」不算：那是在等你，本来就可能很久
-const STUCK_AFTER = 3 * 60 * 1000
+// 「等你回答」不算：那是在等你，本来就可能很久。正在调用模型的思考（Antigravity 一次能想 6 分钟以上，中间不发事件）
+// 放宽到 10 分钟，见 companions.js 的 stuckAfter
 const NOT_WORKING = new Set(['idle', 'sleeping', 'asking', 'tired', 'hungry', 'happy', 'proud', 'oops', 'surprised'])
 let stuckTimer = null
 function watchStuck() {
@@ -1252,7 +1261,7 @@ function watchStuck() {
     clearTimeout(thinkTimer)
     show('idle', true)
     say('')
-  }, STUCK_AFTER)
+  }, Companions.stuckAfter(charState[charId]))
 }
 
 // ---- 特效省电 ----
@@ -1349,7 +1358,7 @@ function sessionKind(e, now) {
   if (e.pose === 'happy' || e.pose === 'proud') return age < SESSION_DONE_SHOW ? 'done' : null
   if ((e.pose === 'oops' || e.pose === 'surprised') && e.event === 'Stop') return age < SESSION_DONE_SHOW ? 'error' : null
   if (e.pose === 'idle' || e.pose === 'sleeping') return null
-  return age < STUCK_AFTER / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
+  return age < Companions.stuckAfter(e) / 1000 ? 'work' : null   // 一轮中途某个工具出错：还在干活，只是卡片变红
 }
 // 当前角色要演的会话：她自己的，加上她响应的各家 AI 的，再加上 current 的（会话 id 各家不重复，直接合在一起）。
 // current 的整个归主桌宠，不按她占着的客户端筛
@@ -2429,7 +2438,7 @@ function setPluginUpdates(list) {
 }
 function aiActivity() {
   const s = charState[charId]
-  if (!s?.pose || Date.now() / 1000 - (s.ts || 0) > STUCK_AFTER / 1000) return null
+  if (!s?.pose || Date.now() / 1000 - (s.ts || 0) >= Companions.stuckAfter(s) / 1000) return null   // 满了就算停：兜底计时器正好到点时不能再判成在干活
   if (pose === 'idle' || pose === 'sleeping' || pose === 'tired') return null   // 卡住的状态被兜底送回待机了
   if (s.pose === 'asking') return 'asking'
   return NOT_WORKING.has(s.pose) ? null : 'work'

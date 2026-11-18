@@ -182,3 +182,21 @@ test('chat_quote_rendered：聊天那块引着当时那句（转义过）', () =
   assert.ok(html.includes('&lt;嗯&gt;') && !html.includes('<嗯>'))
   assert.ok(html.includes('今天的事'))
 })
+
+// 11-18：第二页按高度拆张后由 notebook.html 用 subNav 重画翻页；按钮带字、标第几张，只有一张时不显示
+test('sub_nav_labels_and_position：带字的按钮、第几张，只有一张时空', () => {
+  assert.equal(T.subNav(0, 1), '<div class="sub-nav"></div>')
+  const first = T.subNav(0, 3), mid = T.subNav(1, 3), last = T.subNav(2, 3)
+  assert.ok(first.includes('>往前翻<') && first.includes('1 / 3') && !first.includes('sub-next'), first)
+  assert.ok(mid.includes('data-sub="2"') && mid.includes('class="sub-next" data-sub="0"') && mid.includes('2 / 3'), mid)
+  assert.ok(/<button class="sub-prev"[^>]*disabled/.test(last) && last.includes('3 / 3'), last)
+})
+
+test('avatar_always_base_character', () => {
+  // 穿着皮肤也用原角色的头像；没有头像退回待机图
+  const skin = T.avatarImg('https://crosspet.data/characters/gpt-onesie/idle.webp', 'gpt')
+  assert.match(skin, /src="https:\/\/crosspet\.data\/characters\/gpt\/avatar\.webp" data-fallback="https:\/\/crosspet\.data\/characters\/gpt-onesie\/idle\.webp"/)
+  const own = T.avatarImg('../characters/gpt/idle.webp', 'gpt')
+  assert.match(own, /src="\.\.\/characters\/gpt\/avatar\.webp" data-fallback="\.\.\/characters\/gpt\/idle\.webp"/)
+  assert.equal(T.avatarImg(null, 'gpt'), '<span class="av"></span>')
+})

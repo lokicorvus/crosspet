@@ -23,18 +23,108 @@ const root = document.getElementById('root')
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 let closing = false, openTimer = null, closeTimer = null, flipTimer = null, flipping = false
 
+// 窗口要多大：本子（.wrap 定宽）加页边距，再乘缩放。不量 body 的宽：body 跟着窗口宽，量它会越放越大
+const PAD_X = 44, PAD_Y = 66
+const baseW = () => (root.querySelector('.wrap')?.offsetWidth || 364) + PAD_X
+const baseH = () => root.offsetHeight + PAD_Y
 function sizeNow() {
-  const r = document.body.getBoundingClientRect()
-  toShell({ size: { w: Math.ceil(r.width), h: Math.ceil(r.height) } })
+  toShell({ size: { w: Math.ceil(baseW() * zoom), h: Math.ceil(baseH() * zoom) } })
+}
+// ---- 拖边缩放（11-18 反馈：Windows 100% / 125% 缩放下本子偏小、字发虚）----
+// 拖右边、下边或右下角：整本按比例放大缩小（transform，排版和分页不变），80%–180%，不超过屏幕；大小记在本机，下次打开照旧
+const ZOOM_MIN = 0.8, ZOOM_MAX = 1.8
+let zoom = 1
+try { zoom = Number(localStorage.getItem('notebookZoom')) || 1 } catch {}
+const zoomMax = () => Math.max(1, Math.min(ZOOM_MAX, (screen.availHeight - 16) / baseH(), (screen.availWidth - 16) / baseW()))
+function setZoom(z, send = true) {
+  zoom = Math.round(Math.min(zoomMax(), Math.max(ZOOM_MIN, z)) * 100) / 100
+  const st = document.documentElement.style
+  st.setProperty('--z', zoom)
+  if (zoom === 1) st.removeProperty('--zt'); else st.setProperty('--zt', `scale(${zoom})`)
+  if (send) sizeNow()
+}
+document.body.insertAdjacentHTML('beforeend', '<div class="rz rz-r" data-rz="x"></div><div class="rz rz-b" data-rz="y"></div><div class="rz rz-c" data-rz="xy"></div>')
+let drag = null, sizeFrame = 0
+document.addEventListener('pointerdown', e => {
+  const g = e.target.closest?.('.rz')
+  if (!g || e.button !== 0) return
+  e.preventDefault()
+  try { g.setPointerCapture(e.pointerId) } catch {}
+  g.classList.add('on')
+  drag = { g, axis: g.dataset.rz, x: e.screenX, y: e.screenY, z: zoom, w: baseW(), h: baseH() }
+})
+document.addEventListener('pointermove', e => {
+  if (!drag) return
+  const rx = (drag.w * drag.z + e.screenX - drag.x) / drag.w, ry = (drag.h * drag.z + e.screenY - drag.y) / drag.h
+  setZoom(drag.axis === 'x' ? rx : drag.axis === 'y' ? ry : (rx + ry) / 2, false)
+  if (!sizeFrame) sizeFrame = requestAnimationFrame(() => { sizeFrame = 0; sizeNow() })
+})
+const endDrag = () => {
+  if (!drag) return
+  drag.g.classList.remove('on'); drag = null
+  sizeNow()
+  try { localStorage.setItem('notebookZoom', String(zoom)) } catch {}
+}
+document.addEventListener('pointerup', endDrag)
+document.addEventListener('pointercancel', endDrag)
+// 第二页按高度分张：两页叠在同一个格子里，窗口按高的那页定，第二页内容一多整本就被撑长（11-18 反馈：Claude 的本子突然很长）。
+// 量第一页多高，第二页每张超过它就把后面的块挪到新的一张（接在后面，「接上页」），一张至少留一块、不以小标题结尾；
+// 最后重新编号、重画每张底下的翻页。第一页太短时按 PAGE_MIN 算，免得第二页拆得太碎
+const PAGE_MIN = 560
+function paginate() {
+  const pg1 = root.querySelector('.pg1'), pg2 = root.querySelector('.pg2')
+  if (!pg1 || !pg2) return
+  const shown = root.classList.contains('p2')
+  pg1.style.alignSelf = pg2.style.alignSelf = 'start'   // 量各自本来多高，不被格子拉齐
+  const limit = Math.max(pg1.offsetHeight, PAGE_MIN)
+  const subsOf = () => [...pg2.querySelectorAll(':scope > .sub')]
+  const only = sub => subsOf().forEach(x => x.classList.toggle('on', x === sub))
+  const fits = sub => { only(sub); return pg2.offsetHeight <= limit }
+  const isItem = c => !c.classList.contains('sub-nav') && !c.classList.contains('sub-date')
+  for (let k = 0; k < subsOf().length && k < 30; k++) {
+    const sub = subsOf()[k]
+    if (fits(sub)) continue
+    const items = () => [...sub.children].filter(isItem)
+    if (items().length < 2) continue
+    const next = document.createElement('div')
+    next.className = 'sub'
+    const title = (sub.querySelector('.sub-date')?.textContent || '').trim().replace(/（接上页）$/, '') || '今天'
+    next.innerHTML = '<div class="sub-date cont"></div><div class="sub-nav"></div>'
+    next.firstChild.textContent = title + '（接上页）'
+    sub.after(next)
+    // 从末尾一块块往新的一张挪，每块插在上一块前面，顺序不变
+    let at = next.querySelector('.sub-nav')
+    const move = () => { const it = items().at(-1); next.insertBefore(it, at); at = it }
+    while (items().length > 1 && !fits(sub)) move()
+    while (items().length > 1 && items().at(-1).classList.contains('rule')) move()
+    if (!next.querySelector('.sub-date ~ :not(.sub-nav)')) next.remove()
+  }
+  const subs = subsOf()
+  subs.forEach((x, i) => { x.dataset.i = i; x.querySelector(':scope > .sub-nav').outerHTML = NotebookThemes.subNav(i, subs.length) })
+  only(subs[0])
+  pg1.style.alignSelf = pg2.style.alignSelf = ''
+  if (shown) root.classList.add('p2')
+}
+let current = null
+function draw(view) {
+  root.innerHTML = NotebookThemes.panel(view, NotebookThemes.themeFor(view && view.id))
+  for (const img of root.querySelectorAll('img[data-fallback]')) img.onerror = () => {
+    const rest = img.dataset.fallback.split('|'), next = rest.shift()
+    img.dataset.fallback = rest.join('|')
+    if (!rest.length) { img.onerror = null; img.parentNode.classList.add('full') }   // 退到全身待机图
+    img.src = next
+  }
+  paginate()
+  setZoom(zoom)   // 记下的大小；屏幕变小了就按屏幕收
 }
 function render(view) {
   clearTimeout(openTimer); clearTimeout(closeTimer); closing = false
-  const theme = NotebookThemes.themeFor(view && view.id)
-  root.innerHTML = NotebookThemes.panel(view, theme)
+  current = view
   root.classList.remove('p2'); clearTimeout(flipTimer); flipping = false
-  for (const img of root.querySelectorAll('img[data-fallback]')) img.onerror = () => { img.onerror = null; img.src = img.dataset.fallback }
   document.body.className = 'shut'
-  sizeNow()
+  draw(view)
+  // 本子的字体载入前量的高度不准：载完还没翻开就重排一次（翻开以后不动，免得正看着时跳）
+  document.fonts?.ready.then(() => { if (current === view && document.body.className === 'shut') draw(view) })
 }
 // 翻开：封面、两页纸依次翻过去（CSS 里的 .opening），翻完换成 .open 把翻页那几层收掉
 function openBook() {
@@ -122,6 +212,8 @@ if (demo) {
       block: NotebookEvents.block({ ev: { day: ymd(dayMs), kind, owner: demo, friend, ...more }, owner: demo, ownerSkin: skin, level: lv(friend) }) } }
   const md = ms => { const d = new Date(ms); return `${d.getMonth() + 1} 月 ${d.getDate()} 日` }
   view.page2.today = [evItem(now, 'chat', f, { q: '中午吃啥？' }), evItem(now, 'levelup', others[0], { n: 2 })]
+  // &many=1：今天事很多（看第二页按高度分张）
+  if (new URLSearchParams(location.search).get('many')) view.page2.today.push(evItem(now, 'levelup', f, { n: 1 }), evItem(now, 'chat', others[1], { q: '一起演了1小时喵' }), evItem(now, 'pats', f, { n: 31, m: 'pokes' }), evItem(now, 'busy', others[0], { n: 52 }), evItem(now, 'chat', others[0], { q: '你刚才很专注' }))
   view.page2.history = [
     { day: ymd(now - 2 * day), label: md(now - 2 * day) + ' · 中秋节', items: ['fest', 'fest', 'fest', 'anniv', 'busy'].map((k, i) => evItem(now - 2 * day, k, [f, others[0], others[1], f, f][i], k === 'fest' ? { n: 'midautumn' } : k === 'anniv' ? { n: 30 } : { n: 41 })) },
     { day: ymd(now - 5 * day), label: md(now - 5 * day), items: [evItem(now - 5 * day, 'reunion', others[1], { n: 9 }), evItem(now - 5 * day, 'pats', f, { n: 26, m: 'pats' })] },

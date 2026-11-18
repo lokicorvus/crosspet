@@ -26,10 +26,13 @@ test('every_kind_has_generic_and_base_writers', () => {
   assert.deepEqual(Object.keys(E.FEST_NAMES).sort(), [...FESTS].sort())
 })
 
-test('lengths_fit：写的人 ≤ 24 字，回复 ≤ 14 字', () => {
+// 2026-11-18：便条要短。Gemini 第一版把「事」写到平均 17 字、三成 20 字以上，读着像散文，收紧到 18 / 12
+test('lengths_fit：写的人 ≤ 18 字，回复 ≤ 12 字', () => {
   const walk = (x, out) => { if (typeof x === 'string') out.push(x); else if (x && typeof x === 'object') for (const v of Object.values(x)) walk(v, out); return out }
-  for (const s of walk(E.EVENT_MSG, [])) assert.ok(len(fill(s)) <= 24, `太长：${s}`)
-  for (const s of walk(E.EVENT_REPLY, [])) assert.ok(len(fill(s)) <= 14, `太长：${s}`)
+  for (const s of walk(E.EVENT_MSG, [])) assert.ok(len(fill(s)) <= 18, `太长：${s}`)
+  for (const s of walk(E.EVENT_REPLY, [])) assert.ok(len(s) <= 12, `太长：${s}`)
+  // 回复不填数字（block 只给朋友那句填 {n}），写了空会原样显示成「{n}」
+  for (const s of walk(E.EVENT_REPLY, [])) assert.ok(!/[{}]/.test(s), `回复里不能有空：${s}`)
   for (const s of walk(E.EVENT_MSG, [])) assert.ok(!/\{(?!n\}|fest\})/.test(s), `不认识的空：${s}`)
 })
 
@@ -65,6 +68,14 @@ test('fest_uses_named_festival_then_generic', () => {
 test('chat_block_quotes', () => {
   assert.equal(E.block({ ev: ev('chat', { q: '你好呀' }), owner: 'claude', level: 0 }).quote, '你好呀')
   assert.equal(E.block({ ev: ev('busy', { n: 30 }), owner: 'claude', level: 1 }).quote, null)
+})
+
+// 「聊过」下面引的是她当时随口说的一句，常常不是问句（「下雨就睡觉！」）：开头写「问你的」就接不上
+test('chat_intro_fits_any_quote：开头以冒号结尾，不说「问」', () => {
+  for (const [id, list] of Object.entries(E.EVENT_MSG.chat)) for (const t of list) {
+    assert.ok(/[：:]$/.test(t), `${id} 要以冒号结尾：${t}`)
+    assert.ok(!t.includes('问'), `${id} 下面引的不一定是问句：${t}`)
+  }
 })
 
 test('pats_picks_by_kind', () => {

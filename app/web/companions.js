@@ -24,10 +24,18 @@
   // 一轮结束（Stop / SessionEnd）不管什么姿态都不算干活：被打断、出错收尾时钩子会写 oops / surprised + Stop。
   // 一轮中途的 oops（比如 PostToolUseFailure）还算干活。
   // 「等你回答」不受 3 分钟卡住兜底（同 index.html），但最多算 CLI_RECENT：终端关掉不发 SessionEnd 时不至于一直站着。
+  // 正在调用模型（Antigravity 的 PreInvocation、Gemini CLI 的 BeforeModel 之后的思考）：一次调用里不发任何事件，
+  // Gemini 深度思考一次能想 6 分钟以上（11-18 实测 367 秒），按 3 分钟兜底会当成停了、多桌宠那只先走了。
+  // 这种思考和「等你回答」一样最多算 CLI_RECENT；代价是中途被你打断、客户端又不发结束时，她多想一会儿
+  const MODEL_CALL = new Set(['PreInvocation', 'BeforeModel'])
+  function stuckAfter(s) {
+    return s && (s.pose === 'asking' || (s.pose === 'thinking' && MODEL_CALL.has(s.event))) ? CLI_RECENT : STUCK_AFTER
+  }
+
   function isWorking(s, ageMs) {
     if (!s.pose || WORKING_EXCLUDED.has(s.pose)) return false
     if (s.event === 'Stop' || s.event === 'SessionEnd') return false
-    return ageMs < (s.pose === 'asking' ? CLI_RECENT : STUCK_AFTER)
+    return ageMs < stuckAfter(s)
   }
 
   // 命令行客户端；没有 client 的旧条目（客户端就是角色名，比如 claude@claude、gpt@gpt）按角色默认接入的那个算
@@ -303,7 +311,7 @@
   const api = {
     STUCK_AFTER, LEAVE_AFTER, CLI_RECENT, CLAIM_STICK, CLAIM_FRESH,
     WORKING_EXCLUDED, CLI_CLIENTS,
-    isCli, clientsOf, mainClaim, inAISoftware, decide, sendHome, swapMain, clientCharacter, rememberClients,
+    isCli, stuckAfter, clientsOf, mainClaim, inAISoftware, decide, sendHome, swapMain, clientCharacter, rememberClients,
   }
   root.Companions = api
   if (typeof module !== 'undefined') module.exports = api

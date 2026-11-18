@@ -69,7 +69,7 @@
         for (let i = 0; i < 27; i++) { const x = i * 14 + 7; sc += `<circle cx="${x}" cy="9" r="7.5"/>`; holes += `<circle cx="${x}" cy="10" r="1.8"/>` }
         return `<svg width="364" height="24" style="left:0;top:0"><g fill="#fff" stroke="#b9dcef" stroke-width=".8">${sc}</g><rect width="364" height="8" fill="#fff"/>
           <path d="M0 8.5H364" stroke="#b9dcef" stroke-width=".8"/><g fill="#d9eef8">${holes}</g>
-          <g fill="#2c4fa6"><path d="M174 2l-12-4v14z"/><path d="M190 2l12-4v14z"/><circle cx="182" cy="5" r="4"/></g></svg>`
+          <g fill="#2c4fa6" transform="translate(0 3)"><path d="M174 2l-12-4v14z"/><path d="M190 2l12-4v14z"/><circle cx="182" cy="5" r="4"/></g></svg>`
       },
       bg: () => {
         const R = rng(7); let b = ''
@@ -305,7 +305,8 @@
     return { id: key, book: BOOKS[key], icon: a.icon, notes: a.notes || [null, null, null], sign: a.sign ?? null, cover: key, art: a }
   }
   // character.json 的 notebook 写了就用她的；没写用打开时按数字挑好的（notebook-lines.js）；都没有用主题自带的
-  const noteFor = (theme, view, i) => (view && Array.isArray(view.notes) && view.notes[i]) || (view && Array.isArray(view.notesPicked) && view.notesPicked[i]) || theme.notes[i] || null
+  // 挑好的批注（notesPicked）里 null 是「这一档不写」，不再退回主题里的示例；没挑过（老页面、预览）才用主题的
+  const noteFor = (theme, view, i) => (view && Array.isArray(view.notes) && view.notes[i]) || (view && Array.isArray(view.notesPicked) ? view.notesPicked[i] || null : theme.notes[i] || null)
   const signFor = (theme, view) => (view && view.sign) || (view && view.signPicked) || theme.sign || null
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -326,10 +327,14 @@
     busy50: 'sparkle', night: 'moon', pats100: 'hearts', friend: 'star' }
 
   // 头像：探头头像 avatar.webp 优先（和 idle 同一个文件夹），没有就用待机图
-  function avatarImg(image) {
-    if (!image) return '<img alt="">'
-    const avatar = String(image).replace(/[^/]+$/, 'avatar.webp')
-    return `<img src="${esc(avatar)}" data-fallback="${esc(image)}" alt="">`
+  // 探头头像（avatar.webp）留白多、脸在下半：套一个圆框放大到脸上，Windows 100% / 125% 缩放下脸才不会只有十来个像素。
+  // 统一用原角色的头像（穿着皮肤也是，loki 定）：待机图那个文件夹换成原角色的；没有头像（自定义角色）退回待机图本身，
+  // 这时 notebook.html 给框加 .full，整张图从头顶显示
+  function avatarImg(image, id) {
+    if (!image) return '<span class="av"></span>'
+    const dir = String(image).replace(/[^/]+$/, '')
+    const avatar = (id ? dir.replace(/[^/]+\/$/, encodeURIComponent(id) + '/') : dir) + 'avatar.webp'
+    return `<span class="av"><img src="${esc(avatar)}" data-fallback="${esc(image)}" alt=""></span>`
   }
 
   // ---- 第二页：朋友们的留言 ----
@@ -340,6 +345,15 @@
   const hhmm = ms => { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }
   const sameDay = (a, b) => { const x = new Date(a), y = new Date(b); return x.getFullYear() === y.getFullYear() && x.getMonth() === y.getMonth() && x.getDate() === y.getDate() }
   const CHATS_MAX = 5
+  // 第二页每张底下的翻页：第 i 张（0 是今天），一共 total 张。往前翻 = 更早（i + 1），往后翻 = 更新（i - 1）。
+  // 只有一张时不显示；notebook.html 按高度再拆张后用它重画
+  function subNav(i, total) {
+    if (total <= 1) return '<div class="sub-nav"></div>'
+    return `<div class="sub-nav"><button class="sub-prev" data-sub="${i + 1}" title="往前翻"${i + 1 >= total ? ' disabled' : ''} aria-label="往前翻一页">往前翻</button>`
+      + `<span class="sub-pos">${i + 1} / ${total}</span>`
+      + `${i > 0 ? `<button class="sub-next" data-sub="${i - 1}" title="往后翻" aria-label="往后翻一页">往后翻</button>` : '<span class="sub-gap"></span>'}</div>`
+  }
+
   function friendsPage(v, t) {
     const p = v.page2 || {}, owner = v.id, friends = p.friends || []
     const block = (f, i) => {
@@ -347,7 +361,7 @@
       const lines = b.lines.map(l => `<div class="ln ${hand(l.who)}${l.who === owner ? ' reply' : ''}">${esc(l.text)}</div>`).join('')
       // 合照只贴第一个（心最多的）挚友那块，本子别太长
       const photo = b.photo && i === 0 ? `<div class="photo"><div class="pics">${p.ownerImage ? `<img src="${esc(p.ownerImage)}" alt="">` : ''}${f.image ? `<img src="${esc(f.image)}" alt="">` : ''}</div><div class="cap ${hand(f.id)}" title="第一次一起站在桌面上">${mdOf(b.photo.date)} · 第一次同框</div></div>` : ''
-      return `<div class="msg">${avatarImg(f.image)}<div class="body"><div class="who"><b>${esc(f.name)}</b> · ${esc(f.levelName)}<span class="hearts">${hearts(f.hearts || 0)}</span></div>${photo}${lines}${b.hint ? `<div class="locked">${esc(b.hint)}</div>` : ''}</div>${b.sticker ? `<span class="sticker">${esc(b.sticker)}</span>` : ''}</div>`
+      return `<div class="msg">${avatarImg(f.image, f.id)}<div class="body"><div class="who"><b>${esc(f.name)}</b> · ${esc(f.levelName)}<span class="hearts">${hearts(f.hearts || 0)}</span></div>${photo}${lines}${b.hint ? `<div class="locked">${esc(b.hint)}</div>` : ''}</div>${b.sticker ? `<span class="sticker">${esc(b.sticker)}</span>` : ''}</div>`
     }
     const c = p.cameo
     const cameo = !c ? '' : c.stamp ? `<span class="stamp ${hand(c.who)}">${esc(c.stamp)}</span>` : `<div class="cameo"><span class="${hand(c.who)}">${esc(c.name || c.who)}：${esc(c.text)}</span></div>`
@@ -359,7 +373,7 @@
       const b = it.block || { lines: [] }
       const lines = b.lines.map(l => `<div class="ln ${hand(l.who)}${l.who === owner ? ' reply' : ''}">${esc(l.text)}</div>`).join('')
       const quote = b.quote ? `<div class="quote ${hand(it.id)}">「${esc(b.quote)}」</div>` : ''
-      return `<div class="msg ev ev-${esc(it.kind)}">${avatarImg(it.image)}<div class="body"><div class="who"><b>${esc(it.name)}</b> · ${esc(it.levelName)}<span class="hearts">${hearts(it.hearts || 0)}</span></div>${lines}${quote}</div></div>`
+      return `<div class="msg ev ev-${esc(it.kind)}">${avatarImg(it.image, it.id)}<div class="body"><div class="who"><b>${esc(it.name)}</b> · ${esc(it.levelName)}<span class="hearts">${hearts(it.hearts || 0)}</span></div>${lines}${quote}</div></div>`
     }
     const today = (p.today || []).length ? `<div class="rule">${svg(t.icon)}今天的事</div>${p.today.map(evBlock).join('')}` : ''
     // 叶：第 0 张是今天，后面一天一张（一天超过 PER_LEAF 块拆开），新的在前
@@ -370,7 +384,7 @@
       for (let k = 0; k < n; k++) back.push({ title: n > 1 ? `${h.label} · ${k + 1}/${n}` : h.label, items: h.items.slice(k * PER_LEAF, (k + 1) * PER_LEAF) })
     }
     const total = back.length + 1
-    const nav = i => `<div class="sub-nav"><button class="sub-prev" data-sub="${i + 1}" title="往前翻"${i + 1 >= total ? ' disabled' : ''} aria-label="往前翻一页"></button>${i > 0 ? `<button class="sub-next" data-sub="${i - 1}" title="往后翻" aria-label="往后翻一页"></button>` : ''}</div>`
+    const nav = i => subNav(i, total)
     const first = `<div class="sub on" data-i="0">
       ${cameo}
       ${today}
@@ -391,7 +405,8 @@
   function panel(v, t) {
     const a = t.art
     const ring = `<svg class="ring" viewBox="0 0 100 44" preserveAspectRatio="none"><path d="M14 24C10 10 40 3 66 6s26 18 12 26-58 8-66-2c-4-6 2-12 14-16" fill="none" stroke="#ef4a4a" stroke-width="1.6" stroke-linecap="round" opacity=".9"/></svg>`
-    const stat = (i, n, u, l) => { const note = noteFor(t, v, i); return `<div class="stat">${a.ring === i ? ring : ''}<div class="n">${n}<small>${u}</small></div><div class="l">${l}</div>${note ? `<span class="note">${esc(note)}</span>` : ''}</div>` }
+    // 圈（Grok 的红圈）跟着批注：0 档没批注就不圈
+    const stat = (i, n, u, l) => { const note = noteFor(t, v, i); return `<div class="stat">${a.ring === i && note ? ring : ''}<div class="n">${n}<small>${u}</small></div><div class="l">${l}</div>${note ? `<span class="note">${esc(note)}</span>` : ''}</div>` }
     const meta = v.firstMet ? `认识第 <b>${num(v.daysKnown)}</b> 天 · ${mdOf(v.firstMet)}初见` : '还没一起干过活呢'
     const headText = `<div class="kicker">${svg(a.icon)}我们的小本子</div><div class="title">${esc(bookTitle(v.name, t.book))}</div><div class="meta">${meta}</div>`
     const head = t.id === 'qwen'
@@ -400,7 +415,7 @@
     const work = hoursOrMinutes(v.workMs).split(' ')
     const f = v.friend
     const friend = f ? `<div class="rule">${svg(a.icon)}最好的朋友</div>
-      <div class="friend">${avatarImg(f.image)}<div><div class="who">${esc(f.name)}</div><div class="rel">${esc(f.level)} · ${+(+f.hearts).toFixed(2)}</div></div><div class="hearts">${hearts(f.hearts)}</div></div>` : ''
+      <div class="friend">${avatarImg(f.image, f.id)}<div><div class="who">${esc(f.name)}</div><div class="rel">${esc(f.level)} · ${+(+f.hearts).toFixed(2)}</div></div><div class="hearts">${hearts(f.hearts)}</div></div>` : ''
     const list = (v.milestones || []).slice(0, 4)
     const ms = list.length
       ? `<ul class="ms">${list.map((m, i) => `<li${i === 0 ? ' class="new"' : ''}><span class="badge">${svg(MS_ICON[m.id] || 'sparkle')}</span><span class="t">${esc(m.label)}</span><span class="date">${md(m.date)}</span></li>`).join('')}</ul>`
@@ -435,7 +450,7 @@
   </section></div>`
   }
 
-  const api = { themeFor, noteFor, signFor, panel, bookTitle, hoursOrMinutes, duration, IDS: Object.keys(BOOKS) }
+  const api = { avatarImg, themeFor, noteFor, signFor, panel, subNav, bookTitle, hoursOrMinutes, duration, IDS: Object.keys(BOOKS) }
   root.NotebookThemes = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

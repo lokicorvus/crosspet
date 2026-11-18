@@ -54,9 +54,9 @@ test('lengths：写的人每句不超过 24 字，回复不超过 14 字，数�
     assert.ok(by[level].length >= 3, `GREET ${w} ${level}`)
     for (const m of by[level]) for (const t of m.t) said(w, t, 24)
   }
-  for (const [w, by] of Object.entries(NF.DATA_MSG)) for (const level of [1, 2, 3]) {
-    assert.ok(by[level].length >= 2, `DATA_MSG ${w} ${level}`)
-    for (const t of by[level]) said(w, t.replace(/\{date\}/g, '12 月 31 日').replace(/\{[hdnp]\}/g, '99999'), 24)
+  for (const [w, list] of Object.entries(NF.DATA_MSG)) {   // 只有「认识了」这档用
+    assert.ok(list.length >= 2, `DATA_MSG ${w}`)
+    for (const t of list) { assert.ok(!/\{(?!h\}|d\})/.test(t), `只能用 {h} {d}：${t}`); said(w, t.replace(/\{[hd]\}/g, '99999'), 24) }
   }
   for (const w of [...SEVEN, '*']) {
     assert.ok(NF.GREET[w] && NF.DATA_MSG[w] && NF.STICKER[w]?.length && NF.CAMEO[w]?.length, w)
@@ -73,6 +73,17 @@ test('数字留言填的是真数字；用不上的数（没一起站满一小�
     seen.add(l.text)
   }
   assert.ok([...seen].some(t => /12|340|128|10 月 28 日/.test(t)), [...seen].join(' / '))
+})
+
+// 2026-11-18：好朋友、挚友只写具体小事，不用数字句（以前好朋友有一半概率把「10 月 13 日第一次见到你」硬拼在留言前面，两件事挤一条）
+test('close_friends_no_numbers：好朋友、挚友的留言里没有数字句（自定义角色也一样）', () => {
+  const odd = { first: new Date(2026, 6, 23).getTime(), minutes: 4321 * 60, days: 777, rounds: 6543, pats: 9876 }
+  const marks = /4321|777|6543|9876|7 月 23 日/
+  for (const day of days(40)) for (const level of [2, 3]) {
+    for (const w of [...SEVEN, 'alice']) for (const o of SEVEN) if (w !== o) {
+      for (const l of NF.block({ owner: o, friend: w, level, facts: odd, day }).lines) assert.ok(!marks.test(l.text), `${w}→${o} ${level}: ${l.text}`)
+    }
+  }
 })
 
 test('generic_owner_and_friend：自定义角色（kimi）用通用的，不空', () => {

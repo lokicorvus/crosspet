@@ -51,6 +51,17 @@ test('asking 不受 3 分钟兜底，但最多算 10 分钟：9 分钟前算干�
   assert.equal(at(11 * 60), false)
 })
 
+test('模型调用中（Antigravity 的 PreInvocation、Gemini CLI 的 BeforeModel）思考很久也算干活，最多 10 分钟；别的思考照旧 3 分钟', () => {
+  // Antigravity 一次思考可以 6 分钟以上（用户实测 367 秒），中间一个事件都不发
+  const at = (event, sec) => C.clientsOf({ gemini: { s: { pose: 'thinking', event, ts: ago(sec), client: 'antigravity' } } }, NOW)[0].working
+  assert.equal(at('PreInvocation', 6 * 60), true)
+  assert.equal(at('BeforeModel', 6 * 60), true)
+  assert.equal(at('PreInvocation', 11 * 60), false)
+  assert.equal(at('PostToolUse', 4 * 60), false)
+  assert.equal(C.stuckAfter({ pose: 'thinking', event: 'PreInvocation' }), 600_000)
+  assert.equal(C.stuckAfter({ pose: 'running', event: 'PreToolUse' }), 180_000)
+})
+
 test('一轮结束（Stop / SessionEnd）不管什么姿态都不算干活；中途出错的 oops 还算', () => {
   const w = s => C.clientsOf({ claude: { s: { ts: ago(5), client: 'claude-cli', ...s } } }, NOW)[0].working
   assert.equal(w({ pose: 'surprised', event: 'Stop' }), false)

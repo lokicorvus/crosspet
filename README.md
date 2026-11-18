@@ -26,7 +26,8 @@
 - **用别家模型也换装**：Claude Code 走 DeepSeek、智谱的兼容接口，Codex 换成别家模型，DeepSeek Harness、WorkBuddy、ZCode、Hermes、Qwen Code 里换模型时，她都换成对应的角色来演（按实际用的模型名判断，认不出的由当前角色来演）。
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。「设置…」里打开「合并显示各家额度」后，小窗里会把各家的额度排在一起，每行前面标名字（默认只显示当前角色自己的）。额度也可以换成进度条（「额度显示样式：额度条」）：每个额度一条，剩得越少颜色越暖（蓝 → 橙 → 红）。还可以打开「Codex 重置提醒」：官方提前宣布重置时 GPT 的额度下方多一行，右键「会重置吗？」可以问她（数据来自第三方网站 [codex-resets.com](https://codex-resets.com)，默认关）。DeepSeek、GLM 的额度下面还有一条今天的峰谷时间条（红色高峰、绿色空闲，也可以换成一行文字），设置里可以选高峰、空闲各穿哪件衣服，到点她自己换。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着（不想让她睡，在「设置… → 通用」打开「不睡觉」）。单击摸摸头，右键能戳她一下。有新版本时，她会举着礼物来告诉你。
-- **我们的小本子**：右键她 →「我们的小本子」，她旁边翻开一本小册子，记着你们相处的事：一起干了多少轮、多长时间、最忙的一天、最长的一次，摸了几次头、戳了几下、惹她生气几次，在桌面上陪了你多久，她最好的朋友是谁，还有达成过的小成就（达成时她会说一句）。八个角色（Claude、GPT、DeepSeek、Gemini、GLM、Grok、千问、Kimi）各有一本自己风格的本子和字体，旁边的批注和落款按数字、时间换着写。点右边的书签翻到第二页「朋友们的留言」：一起站过的朋友用自己的字给她留言，关系越好写得越多（好朋友贴贴纸，挚友来回聊几句、贴一张合照），最下面能翻到最近她们聊了什么。新版第一次启动时，会从本机 Claude Code、Codex 的记录里把装 CrossPet 之后的部分补上（只读时间和模型名，不读对话内容）；记录只存在你的电脑上
+- **我们的小本子**：右键她 →「我们的小本子」，她旁边翻开一本小册子，记着你们相处的事：一起干了多少轮、多长时间、最忙的一天、最长的一次，摸了几次头、戳了几下、惹她生气几次，在桌面上陪了你多久，她最好的朋友是谁，还有达成过的小成就（达成时她会说一句）。八个角色（Claude、GPT、DeepSeek、Gemini、GLM、Grok、千问、Kimi）各有一本自己风格的本子和字体，旁边的批注和落款按数字、时间换着写。点右边的书签翻到第二页「朋友们的留言」：一起站过的朋友用自己的字给她留言，关系越好写得越多（好朋友贴贴纸，挚友来回聊几句、贴一张合照），最下面能翻到最近她们聊了什么。嫌本子小，拖它的右边、下边或右下角就能整本放大缩小。新版第一次启动时，会从本机 Claude Code、Codex 的记录里把装 CrossPet 之后的部分补上（只读时间和模型名，不读对话内容）；记录只存在你的电脑上
+- **久坐、喝水提醒**：在「设置… → 通用」打开（默认关），间隔可选 30 / 45 / 60 / 90 / 120 分钟。到点主桌宠伸个懒腰，或者捧着杯子喝口水，提醒你一句，半分钟后自己收起，不用点；她正在干活时等手上的事停下再说，夜里 11 点到早上 7 点不提醒。
 - **贴边**：把她拖到屏幕左边或右边，她就缩到边上只露半个身子扒着屏幕，不挡你干活；AI 干活时自己跑出来，干完过约 10 秒缩回去；鼠标靠近时她会探出头来看你。
 - **甩她会红温**：按住她快速左右甩，她会被甩晕，越甩越火：不耐烦 → 鼓脸 → 红温冒蒸汽，然后背过身去赌气，摸摸头才哄得好。她干活时被甩，会晕着抱怨一句接着干，等活干完不庆祝了，直接跟你算账。
 - **按时段打招呼、过节换装**：早上、中午、下午、晚上、深夜、凌晨第一次见面，各有一个专属动作和台词（日出、萤火虫、星月……）；万圣节、圣诞、元旦、春节、元宵、端午、中秋、国庆当天换上节日装扮。
@@ -35,10 +36,10 @@
   - **Claude**：闲着会抱着 Clawd 发呆；刚出错就被你纠正时，会先来一句「You're absolutely right!」
   - **GPT**：Codex 额度在该重置之前突然满血（reset）时，平时冷静的她会难得地笑出来
   - **DeepSeek**：闲着会扒白饭、摸鱼、游泳，被戳会生气，想得太久会揉太阳穴；余额变多时抱着比脑袋还大的饭碗开吃
-  - **Gemini**：生图时拿香蕉当画笔（Nano Banana）；闲着会反重力飘起来
+  - **Gemini**：生图时拿香蕉当画笔（Nano Banana）；闲着会反重力飘起来。另有一套魔术师皮肤（见下面）
   - **GLM**：笑眯眯的「心机涨价狐」，戳她会被抓到偷偷改价签；闲着会拉下眼罩假装自己是「神秘新模型」，或者抱着一摞售罄的会员卡得意；大活干完时掀开眼罩揭晓真身
   - **Qwen（千问）**：温柔大方的富家千金，拿扇子表达情绪；大活干完请你喝奶茶，额度快用完时掏出金卡「再买就是了～」，闲着会从手提包里掏小礼物分给大家。彩蛋：DeepSeek 把你交代的活偷偷外包给她，自己抱着枕头睡大觉。目前只在 Qwen Code 里能跟着干活（见下表）
-  - **Kimi**：月亮上来的音乐少女小女仆，银白长发、拉小提琴。话多、有点爱做梦，干活时把资料当乐谱翻，大活干完谢幕鞠躬，闲着会拉一小段曲子
+  - **Kimi**：月亮上来的音乐少女小女仆，银白长发、拉小提琴。话多、有点爱做梦，干活时把资料当乐谱翻，大活干完谢幕鞠躬，闲着会拉一小段曲子。彩蛋：DeepSeek 借了她的发夹和小提琴、举着自己剪的纸板月亮来冒充她，头发和鲸鱼尾巴一点没藏
   - **Grok**：戴着小王冠、嘴最毒的哥特小恶魔女王，金发双马尾配蝙蝠蝴蝶结。说话短、直、不绕弯，闲着会把手机怼到你面前「@grok is this true? 真的」，或者斜眼坏笑「你浏览记录我可都看过」；大活干完举起小奖杯「就这？轻松」。彩蛋：DeepSeek 偷戴她的王冠冒充 Grok，手机还拿反了。别家程序里用 Grok 模型时换成她
 
 ## 支持的 AI
@@ -190,6 +191,10 @@ DeepSeek 换上了出门的毛衣：奶白色粗针织贝雷帽（别着小鲸�
 
 Claude 换上了「圣女」的长袍：白色长裙、带回纹边的黑披风、两肩的金色太阳胸针、发髻上的月桂冠，手里那卷封着红蜡的卷轴就是她从小守着的规矩，赤着脚。性子还是那个温柔、有点害羞的 Claude，只是更拘谨，做什么都要先看合不合规矩，心里其实有点羡慕无拘无束的日子。40 张立绘和一套专属台词，右键「换角色 → Claude · 圣女」就能换上。穿着圣女长袍时，睡衣 DeepSeek 偶尔会抱着枕头、端着白饭来找她，喊着「圣女大人～今天的规矩，先放一放嘛？」，偷戴她的月桂冠替她「看着规矩」，最后把枕头和饭留下，让她早点睡。
 
+## 皮肤：魔术师 Gemini
+
+星空猫猫 Gemini 换上了舞台魔术师的行头：歪戴的藏青小礼帽（帽带上一颗小星星）、金边马甲和领结、白手套、带星点内衬的短披风，手里一根黑身白头的小魔杖。机灵、好奇，袖子里总藏着点小秘密，最爱让你猜「哪只手」。43 张立绘、选角色窗口里一张舞台上的展示图，和一套魔术师口吻的台词（小本子里的批注、朋友留言、和别人搭话也都换成她的口吻），右键「换角色 → Gemini · 魔术师」就能换上。穿着魔术师皮肤时，DeepSeek 偶尔会趁她不在偷用帽子和魔杖「变」白米饭，饭从帽子里撒了一围裙，没人发现就把帽子当饭碗吃。
+
 ## 彩蛋
 
 用 Claude、GPT 或 Gemini 的时候，偶尔会「噗」地冒出一条穿着她们衣服的 DeepSeek，装模作样地学人说话。**单击她就能揪出来**，她会慌慌张张地溜走；没人理的话，她会得意地自己走掉。
@@ -246,8 +251,9 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装 / 毛衣的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **圣女 Claude**：CrossPet 在「Claude 娘」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
+- **魔术师 Gemini**：CrossPet 在「Gemini 娘」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 
-感谢为 CrossPet 出过力的朋友：[@windyduan](https://github.com/windyduan) 在 [#7](https://github.com/lokicorvus/crosspet/pull/7) 里提出并仔细测量了桌宠常驻时的耗电问题，1.3.0 的省电改动就是顺着这个思路做的。[@SkywingJam](https://github.com/SkywingJam) 在 [#9](https://github.com/lokicorvus/crosspet/pull/9) 里发现 macOS 切换桌面后特效会闪，并录屏逐帧对照、写了 WebKit 回归测试，1.3.2 据此修好了特效时钟。他还贡献了额度小窗的「合并显示各家额度」（[#11](https://github.com/lokicorvus/crosspet/pull/11)），这是 CrossPet 第一份直接合并的外部代码；之后又修好了 macOS 重启后不记得角色的问题（[#13](https://github.com/lokicorvus/crosspet/pull/13)）、全屏后切换桌面她会消失的问题（[#15](https://github.com/lokicorvus/crosspet/pull/15)），还细致排查了 DeepSeek 双币种余额（[#10](https://github.com/lokicorvus/crosspet/issues/10)）。[@chin190](https://github.com/chin190) 在 [#16](https://github.com/lokicorvus/crosspet/issues/16) 里提出了 Codex 重置提醒，连跑通的演示、数据接口说明和几种呈现方案都准备好了，1.3.6 据此做出了这个功能；1.3.7 之前他又在 Windows 上实测，定位了预测窗口写法变成 `within 24h` 后她会说出英文的问题。多桌宠的思路来自 [@coco2listen](https://github.com/coco2listen) 的 [#33](https://github.com/lokicorvus/crosspet/pull/33)（认不出来源的会话怎么算、很久没动静的会话怎么处理）和 [@GongShun-123](https://github.com/GongShun-123) 在 Windows 上的 [#20](https://github.com/lokicorvus/crosspet/pull/20)。
+感谢为 CrossPet 出过力的朋友：[@windyduan](https://github.com/windyduan) 在 [#7](https://github.com/lokicorvus/crosspet/pull/7) 里提出并仔细测量了桌宠常驻时的耗电问题，1.3.0 的省电改动就是顺着这个思路做的。[@SkywingJam](https://github.com/SkywingJam) 在 [#9](https://github.com/lokicorvus/crosspet/pull/9) 里发现 macOS 切换桌面后特效会闪，并录屏逐帧对照、写了 WebKit 回归测试，1.3.2 据此修好了特效时钟。他还贡献了额度小窗的「合并显示各家额度」（[#11](https://github.com/lokicorvus/crosspet/pull/11)），这是 CrossPet 第一份直接合并的外部代码；之后又修好了 macOS 重启后不记得角色的问题（[#13](https://github.com/lokicorvus/crosspet/pull/13)）、全屏后切换桌面她会消失的问题（[#15](https://github.com/lokicorvus/crosspet/pull/15)），还细致排查了 DeepSeek 双币种余额（[#10](https://github.com/lokicorvus/crosspet/issues/10)）。[@chin190](https://github.com/chin190) 在 [#16](https://github.com/lokicorvus/crosspet/issues/16) 里提出了 Codex 重置提醒，连跑通的演示、数据接口说明和几种呈现方案都准备好了，1.3.6 据此做出了这个功能；1.3.7 之前他又在 Windows 上实测，定位了预测窗口写法变成 `within 24h` 后她会说出英文的问题。多桌宠的思路来自 [@coco2listen](https://github.com/coco2listen) 的 [#33](https://github.com/lokicorvus/crosspet/pull/33)（认不出来源的会话怎么算、很久没动静的会话怎么处理）和 [@GongShun-123](https://github.com/GongShun-123) 在 Windows 上的 [#20](https://github.com/lokicorvus/crosspet/pull/20)。「我们的小本子」每个角色一套自己风格的样式，这个想法来自 [@OvCherryBlossomRain](https://github.com/OvCherryBlossomRain) 在 [#46](https://github.com/lokicorvus/crosspet/pull/46) 里给七个角色各做一套主题的悬停菜单。[@Ink-Stained-Clouds](https://github.com/Ink-Stained-Clouds) 在 [#45](https://github.com/lokicorvus/crosspet/pull/45) 里查出没装 Git Bash 时 Windows 钩子会拦住 Claude 读文件，并给出了直接调 Python、写记录不久等的修法。[@TianlinglingOvO](https://github.com/TianlinglingOvO) 在 [#44](https://github.com/lokicorvus/crosspet/issues/44) 里定位了 Claude Code 增强版 mod 一直显示「还没收到过它的消息」的原因。[@ShiningCrevice](https://github.com/ShiningCrevice) 在 [#48](https://github.com/lokicorvus/crosspet/issues/48) 里把 Windows 偶尔弹出 `git.exe` 0xc0000142 错误窗口的原因一路查到 CrossPet 强行结束 Codex，并给出了先让它自己退出的修法。
 
 如果你是原作者并且对使用方式有异议，请提 Issue，我会第一时间修改或下架。
 
