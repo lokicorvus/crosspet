@@ -108,3 +108,12 @@ test('levelup_two_adds_gift_line：好朋友那句后面多一句送小帮手，
     for (const t of E.GIFT_LINE[id]) assert.ok(len(t) <= 22, t)
   }
 })
+
+test('gift_line_follows_gift_flag：有 gift 字段按它，旧记录按 n===2', () => {
+  const ev = { kind: 'levelup', friend: 'deepseek', day: '2026-11-20' }
+  const lv = (e, level) => E.block({ ev: { ...ev, ...e }, owner: 'claude', level }).lines
+  assert.equal(lv({ n: 3, gift: true }, 3).length, 3)   // 1 直接跳到 3
+  assert.equal(lv({ n: 3, gift: false }, 3).length, 2)  // 2 升 3
+  assert.equal(lv({ n: 2 }, 2).length, 3)               // 旧记录没 gift 字段
+  assert.equal(lv({ n: 3 }, 3).length, 2)
+})
