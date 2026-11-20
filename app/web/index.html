@@ -403,7 +403,8 @@ let miniHelper = null
 function syncMini() {
   if (!window.MiniHelper) return
   miniHelper = miniHelper || MiniHelper.attach($('stage'))
-  miniHelper.setSheet(char()?.poses?.mini?.[0])
+  const sheet = char()?.poses?.mini?.[0]
+  miniHelper.setCrew(sheet ? [{ id: charId, sheet, move: MiniHelper.moveOf(charId) }] : [])
   miniHelper.setMood(MiniHelper.moodOf(pose))
 }
 // 名牌上的名字：设置里可以关掉（额度照常显示）

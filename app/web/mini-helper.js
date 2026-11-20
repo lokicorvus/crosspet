@@ -1,9 +1,9 @@
-// 迷你小帮手：陪在桌宠脚边的小人（好感度礼物，送礼的逻辑还没做；现在角色目录里有 mini.webp 就出来）。
+// 迷你小帮手：陪在桌宠脚边的一组小人（她自己的 + 好朋友送的，最多 6 个，见 crew）。
 // 素材是一张横条 characters/<角色>/mini.webp（tools/mini_sheet.py 拼的），FRAMES 是格子顺序；
 // 外壳把它当「姿态 mini」扫进清单，网页从 char().poses.mini 拿地址。
 // 动作全交给代码：主桌宠换姿态时 moodOf(姿态) 决定小帮手在干嘛；绕圈跑、换帧、上下浮动都是 CSS 动画，
 // 她干活一干几个小时时也不用 JS 每帧算位置。
-// moodOf 是纯函数，网页和测试（tests/mini_helper.test.js）共用；attach 只在网页里用。
+// moodOf、crew、spotsFor、busyRoles 是纯函数，网页和测试（tests/mini_helper.test.js）共用；attach 只在网页里用。
 ;(function (root) {
   const FRAMES = ['idle', 'happy', 'sleep', 'run-a', 'run-b', 'run-c', 'wave', 'read', 'worried',
     'think-a', 'think-b', 'notes', 'carry-a', 'carry-b', 'carry-c', 'point', 'gift',
@@ -33,45 +33,80 @@
     return MOOD[pose] || 'idle'
   }
 
-  // 帧序列（帧名, 每帧毫秒）→ background-position 的关键帧
+  // 待机站位（画布坐标：x 离中线、y 正 = 靠前），按顺序填：右、左、脚前偏右、偏左、身后两侧（往后、高一点，从前面那个头上探出来）。
+  // 第一个是她自己的，位置不随人数变；|x| ≤ 104 才不出画布（画布半宽 125，小人半宽约 21）
+  const SPOTS = [[88, 2], [-88, 2], [42, 11], [-42, 11], [104, -12], [-104, -12]]
+  const spotsFor = n => SPOTS.slice(0, Math.max(0, Math.min(n, SPOTS.length))).map(([x, y]) => ({ x, y }))
+
+  // 她干活时谁干什么：最多 3 个绕圈（约一半），其余在原位看书 / 记笔记 / 思考；种子定了结果就定了
+  function busyRoles(n, seed) {
+    const rnd = seeded(String(seed))
+    const laps = n > 0 ? Math.min(3, Math.ceil(n / 2)) : 0
+    const r = []
+    for (let i = 0; i < n; i++) r.push(i < laps ? 'lap' : ['read', 'notes', 'think'][Math.floor(rnd() * 3)])
+    for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [r[i], r[j]] = [r[j], r[i]] }
+    return r
+  }
+
+  // 帧序列 → background-position 的关键帧（配 steps(1) 用）
   const pos = name => `${(FRAMES.indexOf(name) / (FRAMES.length - 1) * 100).toFixed(4)}% 0`
   function cycle(id, names) {
     const step = 100 / names.length
     return `@keyframes ${id} {` + names.map((n, i) => `${(i * step).toFixed(2)}% { background-position: ${pos(n)} }`).join(' ') +
       ` 100% { background-position: ${pos(names[0])} } }`
   }
+  const HOP = LAP / 6   // 扑跳：一圈 6 跳
+  // 绕圈的前后起伏，lift = 离地多高（飞 25、游 10）
+  const lapY = (id, lift) => `@keyframes ${id} { 0% { transform: translateY(${-lift}px); animation-timing-function: ease-out }
+  25% { transform: translateY(${RY - lift}px) scale(1.05); animation-timing-function: ease-in }
+  50% { transform: translateY(${-lift}px); animation-timing-function: ease-out }
+  75% { transform: translateY(${-RY - lift}px) scale(.9); animation-timing-function: ease-in } 100% { transform: translateY(${-lift}px) } }`
   function css() {
-    const f = n => `#mini .spr.f-${n} { background-position: ${pos(n)} }`
+    const f = n => `.mini .spr.f-${n} { background-position: ${pos(n)} }`
     return `
-#mini { position: absolute; left: 50%; bottom: ${BASE}px; width: 0; height: 0; z-index: 1; pointer-events: none; transition: opacity .3s; }
-#mini.off { opacity: 0; }
-#mini .mx, #mini .my, #mini .mf { position: absolute; left: 0; bottom: 0; }
-#mini .mx { transform: translateX(${RX}px); }
-#mini .spr { position: absolute; left: ${-W / 2}px; bottom: 0; width: ${W}px; height: ${H}px; background-repeat: no-repeat;
+.mini { position: absolute; left: 50%; bottom: ${BASE}px; width: 0; height: 0; z-index: 1; pointer-events: none; transition: opacity .3s; }
+.mini.off { opacity: 0; }
+.mini .mx, .mini .my, .mini .mh, .mini .mf { position: absolute; left: 0; bottom: 0; }
+.mini .spr { position: absolute; left: ${-W / 2}px; bottom: 0; width: ${W}px; height: ${H}px; background-repeat: no-repeat;
   background-size: ${FRAMES.length * 100}% 100%; transform-origin: 50% 100%; }
 ${FRAMES.map(f).join('\n')}
-/* 绕圈：从她右边出发，前半圈从她前面往左跑（大一点、翻过来），后半圈绕到她身后往右跑（小一点、被她挡住） */
-#mini.lap { animation: mini-z ${LAP}s infinite; }
-#mini.lap .mx { animation: mini-x ${LAP}s infinite; }
-#mini.lap .my { animation: mini-y ${LAP}s infinite; }
-#mini.lap .mf { animation: mini-f ${LAP}s infinite; }
-#mini.once, #mini.once .mx, #mini.once .my, #mini.once .mf { animation-iteration-count: 1; }
+/* 绕圈：从她右边出发，前半圈从她前面往左跑（大一点、翻过来），后半圈绕到她身后往右跑（小一点、被她挡住）。
+   错开、从自己的位置起跑都靠行内的 animation-delay / animation-iteration-count */
+.mini.lap { animation: mini-z ${LAP}s infinite; }
+.mini.lap .mx { animation: mini-x ${LAP}s infinite; }
+.mini.lap .my { animation: mini-y ${LAP}s infinite; }
+.mini.lap .mf { animation: mini-f ${LAP}s infinite; }
+/* 飞：离地高一截、一路上下起伏；游：离地一点、起伏更大更慢；扑：一跳一跳，落地停一拍 */
+.mini.lap.m-fly .my { animation-name: mini-y-fly; }
+.mini.lap.m-swim .my { animation-name: mini-y-swim; }
+.mini.lap.m-fly .mh { animation: mini-hover 1.3s ease-in-out infinite; }
+.mini.lap.m-swim .mh { animation: mini-paddle 2.2s ease-in-out infinite; }
+.mini.lap.m-pounce .mh { animation: mini-leap ${HOP.toFixed(3)}s infinite; }
 @keyframes mini-z { 0%, 49.9% { z-index: 1 } 50%, 100% { z-index: -1 } }
 @keyframes mini-x { 0% { transform: translateX(${RX}px); animation-timing-function: ease-in-out } 50% { transform: translateX(${-RX}px); animation-timing-function: ease-in-out } 100% { transform: translateX(${RX}px) } }
-@keyframes mini-y { 0% { transform: none; animation-timing-function: ease-out } 25% { transform: translateY(${RY}px) scale(1.05); animation-timing-function: ease-in }
-  50% { transform: none; animation-timing-function: ease-out } 75% { transform: translateY(${-RY}px) scale(.9); animation-timing-function: ease-in } 100% { transform: none } }
+${lapY('mini-y', 0)}
+${lapY('mini-y-fly', 25)}
+${lapY('mini-y-swim', 10)}
 @keyframes mini-f { 0%, 49.9% { transform: scaleX(-1) } 50%, 100% { transform: none } }
+@keyframes mini-hover { 50% { transform: translateY(-6px) } }
+@keyframes mini-paddle { 50% { transform: translateY(-8px) } }
+@keyframes mini-leap { 0% { transform: none; animation-timing-function: ease-out } 35% { transform: translateY(-14px); animation-timing-function: ease-in } 70%, 100% { transform: none } }
 ${cycle('mini-run', ['run-a', 'run-b', 'run-c', 'run-b'])}
 ${cycle('mini-carry', ['carry-a', 'carry-b', 'carry-c', 'carry-b'])}
-#mini .spr.run { animation: mini-run .44s steps(1) infinite; }
-#mini .spr.carry { animation: mini-carry .44s steps(1) infinite; }
-#mini .spr.bob { animation: mini-bob 2.4s ease-in-out infinite; }
-#mini .spr.hop { animation: mini-hop 1.1s ease-out infinite; }
-#mini .spr.breathe { animation: mini-breathe 3s ease-in-out infinite; }
-#mini .spr.wave { animation: mini-rock .6s ease-in-out 3; }
-#mini .spr.shake { animation: mini-shake .5s ease-in-out infinite; }
-#mini .spr.call { animation: mini-call 1.6s ease-out infinite; }
-#mini .spr.bow { animation: mini-bow 1.6s ease-in-out 1; }
+${cycle('mini-move', ['move-a', 'move-b', 'move-c', 'move-b'])}
+@keyframes mini-pf { 0% { background-position: ${pos('move-a')} } 12% { background-position: ${pos('move-b')} } 70%, 100% { background-position: ${pos('move-c')} } }
+.mini .spr.run { animation: mini-run .44s steps(1) infinite; }
+.mini .spr.carry { animation: mini-carry .44s steps(1) infinite; }
+.mini .spr.fly { animation: mini-move .36s steps(1) infinite; }
+.mini .spr.swim { animation: mini-move .6s steps(1) infinite; }
+.mini .spr.pounce { animation: mini-pf ${HOP.toFixed(3)}s steps(1) infinite; }
+.mini .spr.bob { animation: mini-bob 2.4s ease-in-out infinite; }
+.mini .spr.hop { animation: mini-hop 1.1s ease-out infinite; }
+.mini .spr.breathe { animation: mini-breathe 3s ease-in-out infinite; }
+.mini .spr.wave { animation: mini-rock .6s ease-in-out 3; }
+.mini .spr.shake { animation: mini-shake .5s ease-in-out infinite; }
+.mini .spr.call { animation: mini-call 1.6s ease-out infinite; }
+.mini .spr.bow { animation: mini-bow 1.6s ease-in-out 1; }
 @keyframes mini-bob { 50% { transform: translateY(-1px) } }
 @keyframes mini-hop { 35% { transform: translateY(-8px) } 60%, 100% { transform: none } }
 @keyframes mini-breathe { 50% { transform: scale(1.03, .97) } }
@@ -79,64 +114,142 @@ ${cycle('mini-carry', ['carry-a', 'carry-b', 'carry-c', 'carry-b'])}
 @keyframes mini-shake { 25% { transform: translateX(-1px) } 75% { transform: translateX(1px) } }
 @keyframes mini-call { 0%, 40%, 100% { transform: none } 15% { transform: translateY(-4px) } 28% { transform: none } 34% { transform: translateY(-2px) } }
 @keyframes mini-bow { 0% { transform: translateY(-16px); opacity: 0 } 25% { transform: none; opacity: 1 } 55% { transform: rotate(8deg) } 75% { transform: none } }
-html.tucked #mini { visibility: hidden; }`
+html.tucked .mini { visibility: hidden; }`
   }
 
-  // stage：#stage；返回 { setSheet(url | null), setMood(mood) , gift() }
+  // 站位 → 绕圈上最近的那一点（0–1）：靠前的在前半圈（右往左），靠后的在后半圈（左往右）。
+  // 待机跑一圈从这里起跑、跑回这里，不会先瞬移到她右边
+  function phaseOf({ x, y }) {
+    const c = v => Math.max(-1, Math.min(1, v))
+    return y >= 0 ? Math.acos(c(x / RX)) / Math.PI / 2 : .5 + Math.acos(c(-x / RX)) / Math.PI / 2
+  }
+
+  // stage：#stage；返回 { setCrew([{ id, sheet, move }]), setMood(mood), setOn(on), gift(id), size() }
+  // 每个成员一个 .mini（外层定位 + z 层 → .mx 左右 → .my 前后 → .mh 飞 / 游 / 扑的起伏 → .mf 翻转 → .spr 精灵图）
   function attach(stage) {
-    const style = document.createElement('style'); style.textContent = css(); document.head.appendChild(style)
+    const style = document.createElement('style'); style.textContent = css(); (document.head || document.documentElement).appendChild(style)
     stage.style.isolation = 'isolate'   // 后半圈的 z-index: -1 只沉到她身后，不沉到整页后面
-    const el = document.createElement('div'); el.id = 'mini'; el.className = 'off'
-    el.innerHTML = '<div class="mx"><div class="my"><div class="mf"><div class="spr"></div></div></div></div>'
-    stage.appendChild(el)
-    const spr = el.querySelector('.spr')
-    let sheet = null, mood = 'idle', timer = null, trick = 0
-    const frame = (name, anim) => { spr.className = 'spr' + (name ? ' f-' + name : '') + (anim ? ' ' + anim : ''); void spr.offsetWidth }
-    const lap = (on, once) => { el.classList.toggle('lap', on); el.classList.toggle('once', !!once) }
-    function stop() { clearTimeout(timer); timer = null; el.onanimationend = null }
-    function idle() {   // 站在她右脚边轻轻晃，隔一会儿自己找点事：跑一圈 → 挥手 → 坐下看会儿书
-      stop(); lap(false); frame('idle', 'bob')
-      timer = setTimeout(() => {
-        const t = trick++ % 3
-        if (t === 0) {
-          lap(false); void el.offsetWidth; lap(true, true); frame(null, 'run')
-          el.onanimationend = e => { if (e.target === el) idle() }
-        } else if (t === 1) { frame('wave', 'wave'); timer = setTimeout(idle, 1800) }
-        else { frame('read', 'breathe'); timer = setTimeout(idle, 5000) }
-      }, 9000 + Math.random() * 6000)
+    const members = new Map()   // id → 成员，按 crew 顺序
+    let order = [], mood = 'idle', on = true, roles = [], regroup = null
+    let lapper = null           // 待机时正在绕圈的那个：同一时刻最多一个
+    const visible = () => on && mood !== 'hidden'
+
+    function make(c) {
+      const div = cls => { const d = document.createElement('div'); d.className = cls; return d }
+      const m = { id: c.id, sheet: '', move: c.move || 'run', timer: null, i: 0, spot: { x: RX, y: 0 } }
+      m.el = div('mini off m-' + m.move); m.mx = div('mx'); m.my = div('my'); m.mh = div('mh'); m.mf = div('mf'); m.spr = div('spr')
+      m.el.appendChild(m.mx); m.mx.appendChild(m.my); m.my.appendChild(m.mh); m.mh.appendChild(m.mf); m.mf.appendChild(m.spr)
+      stage.appendChild(m.el)
+      return m
     }
-    function think(n) {   // 两帧来回换（歪头），换几次低头记一笔
-      if (n % 5 === 4) { frame('notes', 'breathe'); timer = setTimeout(() => think(n + 1), 2600); return }
-      frame(n % 2 ? 'think-b' : 'think-a', 'bob'); timer = setTimeout(() => think(n + 1), 1500)
+    const frame = (m, name, anim) => { m.spr.className = 'spr' + (name ? ' f-' + name : '') + (anim ? ' ' + anim : ''); void m.spr.offsetWidth }
+    const runAnim = (m, busy) => m.move === 'run' ? (busy ? 'carry' : 'run') : m.move   // 飞 / 游 / 扑的干活时也用自己的移动帧
+    function lap(m, yes, delay, count) {
+      const parts = [m.el, m.mx, m.my, m.mf]
+      if (yes) { m.el.classList.remove('lap'); void m.el.offsetWidth }   // 重新起跑
+      m.el.classList.toggle('lap', yes)
+      for (const p of parts) { p.style.animationDelay = yes ? delay + 's' : ''; p.style.animationIterationCount = yes ? count : '' }
+    }
+    function place(m) {   // 站到自己的位置：靠前的大一点、盖住靠后的；身后的沉到她后面
+      const { x, y } = m.spot
+      m.mx.style.transform = `translateX(${x}px)`
+      m.my.style.transform = `translateY(${y}px) scale(${(1 + y / 100).toFixed(3)})`
+      m.el.style.zIndex = y < 0 ? '-1' : String(1 + Math.round(y / 4))
+    }
+    function stop(m) {
+      clearTimeout(m.timer); m.timer = null; m.el.onanimationend = null
+      if (lapper === m) lapper = null
+      m.el.classList.remove('f-gift')
+    }
+    function idle(m) {   // 站在自己的位置轻轻晃，隔 9–20 秒自己找点事：跑一圈 / 挥手 / 坐下看书（她自己的偶尔记笔记）
+      stop(m); lap(m, false); frame(m, 'idle', 'bob')
+      m.timer = setTimeout(() => {
+        const tricks = m.i === 0 ? ['lap', 'wave', 'read', 'notes'] : ['lap', 'wave', 'read']
+        let t = tricks[Math.floor(Math.random() * tricks.length)]
+        if (t === 'lap' && lapper) t = 'wave'   // 有人在跑就改成挥手
+        if (t === 'lap') {
+          lapper = m
+          const p = phaseOf(m.spot)
+          lap(m, true, (-p * LAP).toFixed(3), (1 + p).toFixed(3)); frame(m, null, runAnim(m, false))
+          m.el.onanimationend = e => { if (e.target === m.el) idle(m) }
+        } else if (t === 'wave') { frame(m, 'wave', 'wave'); m.timer = setTimeout(() => idle(m), 1800) }
+        else { frame(m, t, 'breathe'); m.timer = setTimeout(() => idle(m), 5000) }
+      }, 9000 + Math.random() * 11000)
+    }
+    function think(m, n, notes) {   // 两帧来回换（歪头）；notes：换几次低头记一笔
+      if (notes && n % 5 === 4) { frame(m, 'notes', 'breathe'); m.timer = setTimeout(() => think(m, n + 1, notes), 2600); return }
+      frame(m, n % 2 ? 'think-b' : 'think-a', 'bob'); m.timer = setTimeout(() => think(m, n + 1, notes), 1500)
+    }
+    function busy(m) {   // 绕圈的在圈上均匀错开；其余在原位做忙的样子
+      const role = roles[m.i] || 'read'
+      if (role === 'lap') {
+        const laps = roles.filter(r => r === 'lap').length, j = roles.slice(0, m.i).filter(r => r === 'lap').length
+        lap(m, true, (-LAP * j / laps).toFixed(3), 'infinite'); frame(m, null, runAnim(m, true)); return
+      }
+      lap(m, false)
+      if (role === 'think') return think(m, 0, false)
+      frame(m, role, 'breathe')
+    }
+    function act(m) {   // 按现在的 mood 做事（不含错开的等待）
+      stop(m); place(m)
+      if (mood === 'busy') return busy(m)
+      lap(m, false)
+      if (mood === 'think') return think(m, 0, true)
+      if (mood === 'read') return frame(m, 'read', 'breathe')
+      if (mood === 'asking') return frame(m, 'point', 'call')
+      if (mood === 'sleep') return frame(m, 'sleep', 'breathe')
+      if (mood === 'happy') return frame(m, 'happy', 'hop')
+      if (mood === 'wave') return frame(m, 'wave', 'wave')
+      if (mood === 'worried') return frame(m, 'worried', 'shake')
+      idle(m)
+    }
+    const seed = () => Math.floor(Date.now() / 120000)   // 每 2 分钟换一次谁跑谁坐
+    function regroupLater() {
+      clearTimeout(regroup)
+      regroup = setTimeout(() => {
+        const next = busyRoles(order.length, seed())
+        if (next.join() !== roles.join()) { roles = next; order.forEach(m => act(m)) }
+        regroupLater()
+      }, 120000 - Date.now() % 120000 + 50)
     }
     function render() {
-      stop()
-      el.classList.toggle('off', !sheet || mood === 'hidden')
-      if (!sheet || mood === 'hidden') { lap(false); return }
-      if (mood === 'busy') { lap(true); frame(null, 'carry'); return }
-      lap(false)
-      if (mood === 'think') return think(0)
-      if (mood === 'read') return frame('read', 'breathe')
-      if (mood === 'asking') return frame('point', 'call')
-      if (mood === 'sleep') return frame('sleep', 'breathe')
-      if (mood === 'happy') return frame('happy', 'hop')
-      if (mood === 'wave') return frame('wave', 'wave')
-      if (mood === 'worried') return frame('worried', 'shake')
-      idle()
+      clearTimeout(regroup); regroup = null
+      const show = visible()
+      if (show && mood === 'busy') { roles = busyRoles(order.length, seed()); regroupLater() }
+      order.forEach((m, i) => {
+        stop(m); m.i = i
+        m.el.classList.toggle('off', !show)
+        if (!show) { lap(m, false); frame(m, 'idle'); return }
+        if (mood === 'busy' || mood === 'idle') return act(m)   // 干活、待机本来就各干各的
+        lap(m, false); place(m)
+        if (i === 0) return act(m)
+        m.timer = setTimeout(() => act(m), i * 250)   // 其他 mood：一个接一个换，不齐刷刷
+      })
     }
     return {
-      setSheet(url) {
-        const next = url || null
-        if (next === sheet) return
-        sheet = next
-        spr.style.backgroundImage = sheet ? `url("${sheet.replace(/"/g, '%22')}")` : ''
-        render()
+      setCrew(list) {
+        const next = (list || []).filter(c => c && c.id && c.sheet).slice(0, MAX_CREW)
+        const same = next.length === order.length && next.every((c, i) => order[i].id === c.id)
+        const keep = new Set(next.map(c => c.id))
+        for (const [id, m] of members) if (!keep.has(id)) { stop(m); m.el.remove(); members.delete(id) }
+        order = next.map(c => members.get(c.id) || members.set(c.id, make(c)).get(c.id))
+        const spots = spotsFor(order.length)
+        next.forEach((c, i) => {   // 换衣服只换图，不重建、不打断动画
+          const m = order[i]
+          if (m.sheet !== c.sheet) { m.sheet = c.sheet; m.spr.style.backgroundImage = `url("${c.sheet.replace(/"/g, '%22')}")` }
+          m.spot = spots[i]
+        })
+        if (!same) render()
       },
       setMood(m) { if (m === mood) return; mood = m; render() },
-      gift() {   // 刚收到时演一次：从上面落下来、捧着礼物鞠个躬
-        if (!sheet || mood === 'hidden') return
-        stop(); lap(false); frame('gift', 'bow'); timer = setTimeout(render, 3200)
+      setOn(v) { if (!!v === on) return; on = !!v; render() },
+      gift(id) {   // 刚收到时演一次：从上面落下来、捧着礼物鞠个躬，3.2 秒后回到现在的 mood
+        const m = members.get(id)
+        if (!m || !visible()) return
+        stop(m); lap(m, false); place(m); m.el.classList.add('f-gift'); frame(m, 'gift', 'bow')
+        m.timer = setTimeout(() => act(m), 3200)
       },
+      size() { return visible() ? order.length : 0 },
     }
   }
 
@@ -192,7 +305,7 @@ html.tucked #mini { visibility: hidden; }`
     return mine.concat(pick.map(f => f.e))
   }
 
-  const api = { FRAMES, moodOf, moveOf, crew, MAX_CREW }
+  const api = { FRAMES, moodOf, moveOf, crew, MAX_CREW, spotsFor, busyRoles }
   root.MiniHelper = Object.assign({ attach }, api)
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

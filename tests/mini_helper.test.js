@@ -70,3 +70,24 @@ test('move_of', () => {
   assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'swim')
   assert.equal(M.moveOf('gemini'), 'pounce'); assert.equal(M.moveOf('glm'), 'pounce'); assert.equal(M.moveOf('kimi'), 'run')
 })
+
+// ---- 一组：站位、干活分工 ----
+test('spots_stay_inside_canvas_and_apart', () => {
+  for (let n = 1; n <= 6; n++) {
+    const s = M.spotsFor(n)
+    assert.equal(s.length, n)
+    for (const p of s) assert.ok(Math.abs(p.x) <= 104, `n=${n} x=${p.x}`)
+    assert.deepEqual(s[0], M.spotsFor(1)[0])   // 第一个（她自己）的位置不随人数变
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++)   // 不叠成一团：左右至少差 16，或者前后至少差 10
+      assert.ok(Math.abs(s[i].x - s[j].x) >= 16 || Math.abs(s[i].y - s[j].y) >= 10, `n=${n} ${i}/${j}`)
+  }
+})
+test('busy_roles_at_most_three_laps_and_everyone_busy', () => {
+  for (let n = 1; n <= 6; n++) for (let seed = 0; seed < 20; seed++) {
+    const r = M.busyRoles(n, seed)
+    assert.equal(r.length, n)
+    assert.ok(r.filter(x => x === 'lap').length <= 3)
+    assert.ok(r.filter(x => x === 'lap').length >= Math.min(n, 1))
+    for (const x of r) assert.ok(['lap', 'read', 'notes', 'think'].includes(x))
+  }
+})
