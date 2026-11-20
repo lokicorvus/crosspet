@@ -120,6 +120,18 @@ test('merge：每对取分数高的；同分留网页的；坏记录和坏 key �
   assert.equal(F.merge(local, [1]), local)
 })
 
+test('merge_keeps_giftShown_from_either_side', () => {
+  const local = { 'claude+gpt': { points: 160, giftShown: true } }
+  const saved = { 'claude+gpt': { points: 170 } }
+  assert.deepEqual(F.merge(local, saved)['claude+gpt'], { points: 170, giftShown: true })
+  assert.equal(F.merge({ 'claude+gpt': { points: 180 } }, { 'claude+gpt': { points: 150, giftShown: true } })['claude+gpt'].giftShown, true)
+})
+
+test('localDay 导出：本地日期 YYYY-MM-DD', () => {
+  assert.equal(typeof F.localDay, 'function')
+  assert.equal(F.localDay(new Date(2026, 10, 1, 0, 5).getTime()), '2026-11-01')
+})
+
 test('间隔常量', () => {
   assert.equal(F.TOGETHER_MS, 600_000)
   assert.equal(F.COFINISH_MS, 300_000)
