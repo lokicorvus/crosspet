@@ -6,7 +6,8 @@
 // moodOf 是纯函数，网页和测试（tests/mini_helper.test.js）共用；attach 只在网页里用。
 ;(function (root) {
   const FRAMES = ['idle', 'happy', 'sleep', 'run-a', 'run-b', 'run-c', 'wave', 'read', 'worried',
-    'think-a', 'think-b', 'notes', 'carry-a', 'carry-b', 'carry-c', 'point', 'gift']
+    'think-a', 'think-b', 'notes', 'carry-a', 'carry-b', 'carry-c', 'point', 'gift',
+    'move-a', 'move-b', 'move-c']
   const CELL_W = 136, CELL_H = 148          // 和 tools/mini_sheet.py 一样
   // 画布（#stage 250×241）里的尺寸：站着的小人 43 高（桌宠画布 580×560 里 100 高，人物 420 高）
   const K = 43 / 140

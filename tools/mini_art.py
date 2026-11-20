@@ -8,6 +8,9 @@
     python3 tools/mini_art.py new <批次> mini mini_more mini_work mini_carry --chars deepseek,gemini,…,deepseek-hoodie
     python3 tools/mini_art.py redo <批次> <角色:姿态> "原因"
 
+    python3 tools/mini_art.py new <批次> mini_move --chars gpt,… --base-batch <批次>
+--base-batch：本批没有底图（原版的 mini_more）时去那个批次找（loki 选的那版优先，没选用版本号最大的）。
+
 出题 / 退回重写提示词的 mini 批次请用这个，不要直接用 art.py（art.py 会按普通姿态重写，皮肤就没了底图）。
 check、review、status 两个都一样。
 """
@@ -19,6 +22,19 @@ import art  # noqa: E402
 
 _read_pose = art.read_pose
 _write_prompt = art.write_prompt
+_base_source = art.base_source
+BASE_BATCH = None
+
+
+def base_source(batch, st, cid, base_pose):
+    src, in_batch = _base_source(batch, st, cid, base_pose)
+    if in_batch or not BASE_BATCH:
+        return src, in_batch
+    other = art.load(BASE_BATCH)
+    if any(i["char"] == cid and i["pose"] == base_pose for i in other["items"]):
+        found = art.done_path(BASE_BATCH, other, cid, base_pose) or art.done_pattern(BASE_BATCH, cid, base_pose)
+        return found, False
+    return src, in_batch
 
 
 def read_pose(pose, cid=""):
@@ -79,6 +95,11 @@ def write_prompt(batch, st, item):
 
 art.read_pose = read_pose
 art.write_prompt = write_prompt
+art.base_source = base_source
 
 if __name__ == "__main__":
+    if "--base-batch" in sys.argv:
+        i = sys.argv.index("--base-batch")
+        BASE_BATCH = sys.argv[i + 1]
+        del sys.argv[i:i + 2]
     art.main()

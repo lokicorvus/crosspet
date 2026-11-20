@@ -11,7 +11,8 @@ from pathlib import Path
 from PIL import Image
 
 FRAMES = ["idle", "happy", "sleep", "run-a", "run-b", "run-c", "wave", "read", "worried",
-          "think-a", "think-b", "notes", "carry-a", "carry-b", "carry-c", "point", "gift"]
+          "think-a", "think-b", "notes", "carry-a", "carry-b", "carry-c", "point", "gift",
+          "move-a", "move-b", "move-c"]
 CELL_W, CELL_H = 136, 148
 ROOT = Path(__file__).resolve().parent.parent
 

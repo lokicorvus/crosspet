@@ -1,8 +1,9 @@
 """迷你小帮手：把一个角色画好的 4 张格子图切成单帧、拼成 characters/<角色>/mini.webp（桌宠网页 app/web/mini-helper.js 用）。
 
-    python3 tools/mini_cut.py <批次> <角色>[,<角色>…] [--use mini_carry=1] [--frames <目录>]
+    python3 tools/mini_cut.py <批次> <角色>[,<角色>…] [--use mini_carry=1] [--move-batch <批次>] [--frames <目录>]
 
 用哪版：验收页选了哪版用哪版（状态.json 的 pick），没选用版本号最大的；--use 姿态=版本号 可以临时指定。
+--move-batch：mini_move（飞 / 游 / 蹿的 3 帧）去那个批次找，不写就在本批找；找不到就不报错，move-a/b/c 用 run-a/b/c 顶上。
 --frames：单帧另存一份到 <目录>/<角色>/（看切得对不对用），不写就只出 mini.webp。
 
 四张图（规格见 art/规则/迷你*.txt）：
@@ -10,6 +11,7 @@
   mini_more  横图 3×2：跑步 3 帧；挥手、看书、着急
   mini_work  横图 3×2：思考 2 帧、记笔记；抱书（单帧，不用）、指你、递礼物
   mini_carry 横图 3×1：抱书跑 3 帧
+  mini_move  横图 3×1：移动 3 帧（可选；飞 / 游的身体是横的，按头宽对齐大小，脚对齐左右）
 缩放：每张按站着的小人缩到 STAND 高（mini 用待机、mini_more 用挥手、mini_work 用指你），抱书跑按 mini_work 里那个抱书的对齐大小，
 四张图之间大小一致。连着播的几帧（跑步、抱书跑按头对齐，思考按脚对齐）共用一个框，放进格子后不会左右抖、腾空那帧还是离地的。
 """
@@ -59,6 +61,13 @@ def center_x(cell, part):
     return (m[0] + m[2]) / 2
 
 
+def head_width(cell):
+    """外框最上面 25% 的不透明宽度（飞 / 游的身体是横的，用头宽比身高稳）"""
+    b = bbox(cell)
+    m = mask(cell).crop((0, b[1], cell.width, b[1] + max(1, (b[3] - b[1]) // 4))).getbbox()
+    return m[2] - m[0]
+
+
 def group(cs, part):
     """连着播的几帧：按头 / 脚对齐左右，共用一个框（上下不动，腾空的还是离地）"""
     ref = center_x(cs[0], part)
@@ -79,13 +88,21 @@ def sheet_path(batch, st, cid, pose, use):
     return art.done_path(batch, st, cid, pose)
 
 
-def cut(batch, cid, use):
+def move_frames(cs, k_more, wave):
+    """mini_move 3 格：按头宽缩到和 mini_more 里挥手那个一样大，脚对齐"""
+    k = k_more * head_width(wave) / head_width(cs[0])
+    return {name: scaled(c, k) for name, c in zip(("move-a", "move-b", "move-c"), group(cs, "feet"))}
+
+
+def cut(batch, cid, use, move_batch=None):
     st = art.load(batch)
     src = {p: sheet_path(batch, st, cid, p, use) for p in ("mini", "mini_more", "mini_work", "mini_carry")}
     missing = [p for p, f in src.items() if not f]
     if missing:
         raise SystemExit(f"{cid}：还没画 {', '.join(missing)}")
     print(f"{cid}：" + "、".join(f"{p} {Path(f).stem.rsplit('__', 1)[1]}" for p, f in src.items()))
+    mv = sheet_path(move_batch or batch, art.load(move_batch) if move_batch else st, cid, "mini_move", use)
+    print(f"  mini_move：{Path(mv).stem.rsplit('__', 1)[1] if mv else '没有，用跑步顶'}")
     im = {p: Image.open(f).convert("RGBA") for p, f in src.items()}
     out = {}
 
@@ -98,6 +115,7 @@ def cut(batch, cid, use):
     k = STAND / (bbox(m[3])[3] - bbox(m[3])[1])
     for name, c in zip(("run-a", "run-b", "run-c"), group(m[:3], "head")):
         out[name] = scaled(c, k)
+    k_more = k
     for name, c in zip(("wave", "read", "worried"), m[3:]):
         out[name] = scaled(c.crop(bbox(c)), k)
 
@@ -113,6 +131,12 @@ def cut(batch, cid, use):
     k = k_work * carry_h / (bbox(cc[0])[3] - bbox(cc[0])[1])
     for name, c in zip(("carry-a", "carry-b", "carry-c"), group(cc, "head")):
         out[name] = scaled(c, k)
+
+    if mv:
+        out.update(move_frames(cells(Image.open(mv).convert("RGBA"), 3, 1), k_more, m[3]))
+    else:
+        for a, b in (("move-a", "run-a"), ("move-b", "run-b"), ("move-c", "run-c")):
+            out[a] = out[b]
     return out
 
 
@@ -139,6 +163,11 @@ def main():
         pose, v = args[i + 1].split("=")
         use[pose] = int(v)
         del args[i:i + 2]
+    move_batch = None
+    if "--move-batch" in args:
+        i = args.index("--move-batch")
+        move_batch = args[i + 1]
+        del args[i:i + 2]
     if "--frames" in args:
         i = args.index("--frames")
         frames_dir = Path(args[i + 1])
@@ -147,7 +176,7 @@ def main():
         raise SystemExit(__doc__)
     batch, chars = args[0], args[1].split(",")
     for cid in chars:
-        frames = cut(batch, cid, use)
+        frames = cut(batch, cid, use, move_batch)
         if frames_dir:
             d = frames_dir / cid
             d.mkdir(parents=True, exist_ok=True)
