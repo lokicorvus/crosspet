@@ -22,3 +22,51 @@ test('frames：和 tools/mini_sheet.py 的格子顺序一样', () => {
   const list = JSON.parse(py.match(/FRAMES = (\[[\s\S]*?\])/)[1].replace(/'/g, '"'))
   assert.deepEqual(list, M.FRAMES)
 })
+
+// ---- crew：该显示哪几个 ----
+const manifest = { characters: {
+  claude: { poses: { idle: ['file:///x/characters/claude/idle.webp'], mini: ['file:///x/characters/claude/mini.webp'] } },
+  deepseek: { poses: { idle: ['file:///x/characters/deepseek-pajamas/idle.webp'], mini: ['file:///x/characters/deepseek-pajamas/mini.webp'] }, skin: 'deepseek-pajamas' },
+  gpt: { skin: 'gpt-onesie', poses: { idle: ['https://crosspet.data/characters/gpt-onesie/idle.webp'] } },
+  gemini: { poses: { idle: ['…/gemini/idle.webp'], mini: ['…/gemini/mini.webp'] } },
+  'egg-claude': { egg: true, poses: { mini: ['…'] } },
+} }
+const lv = p => (p >= 150 ? 2 : p >= 15 ? 1 : 0)
+const S = (pts) => ({ points: pts })
+
+test('crew_self_first_then_good_friends_by_points', () => {
+  const store = { 'claude+deepseek': S(200), 'claude+gemini': S(400), 'claude+gpt': S(20) }
+  const c = M.crew('claude', { store, manifest, today: '2026-11-20', levelOf: lv })
+  assert.deepEqual(c.map(x => x.id), ['claude', 'gemini', 'deepseek'])   // gpt 只「认识了」不算
+  assert.equal(c[2].sheet, 'file:///x/characters/deepseek-pajamas/mini.webp')   // 穿着睡衣就是睡衣那套
+  assert.deepEqual(c.map(x => x.move), ['run', 'pounce', 'swim'])
+})
+test('crew_falls_back_to_base_sheet_when_skin_has_none', () => {
+  const c = M.crew('claude', { store: { 'claude+gpt': S(200) }, manifest, today: '2026-11-20', levelOf: lv })
+  assert.equal(c[1].sheet, 'https://crosspet.data/characters/gpt/mini.webp')
+  assert.equal(c[1].move, 'fly')
+})
+test('crew_skips_unknown_and_egg_characters', () => {
+  const store = { 'claude+my-own': S(500), 'claude+egg-claude': S(500) }
+  assert.deepEqual(M.crew('claude', { store, manifest, today: '2026-11-20', levelOf: lv }).map(x => x.id), ['claude'])
+})
+test('crew_without_own_sheet_still_shows_friends', () => {
+  const m = { characters: { ...manifest.characters, kimi: { poses: { idle: ['…/kimi/idle.webp'] } } } }
+  // kimi 没有 mini 也没有皮肤：自己那格没有，好友照常
+  assert.deepEqual(M.crew('kimi', { store: { 'gemini+kimi': S(200) }, manifest: m, today: '2026-11-20', levelOf: lv }).map(x => x.id), ['gemini'])
+})
+test('crew_caps_at_six_and_rotates_daily', () => {
+  const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']
+  const m = { characters: { claude: manifest.characters.claude } }
+  for (const id of ids) m.characters[id] = { poses: { mini: [`…/${id}/mini.webp`] } }
+  const store = Object.fromEntries(ids.map((id, i) => [`${id}+claude`, S(200 + i)]))   // pairKey 按字母序
+  const day1 = M.crew('claude', { store, manifest: m, today: '2026-11-20', levelOf: lv })
+  assert.equal(day1.length, 6); assert.equal(day1[0].id, 'claude')
+  assert.deepEqual(M.crew('claude', { store, manifest: m, today: '2026-11-20', levelOf: lv }), day1)   // 同一天不变
+  const week = new Set(['21', '22', '23', '24', '25', '26', '27', '28', '29', '30'].flatMap(d => M.crew('claude', { store, manifest: m, today: `2026-11-${d}`, levelOf: lv }).map(x => x.id)))
+  assert.equal(week.size, 8)   // 十天下来 7 个好友都轮到过（种子固定，结果是确定的）
+})
+test('move_of', () => {
+  assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'swim')
+  assert.equal(M.moveOf('gemini'), 'pounce'); assert.equal(M.moveOf('glm'), 'pounce'); assert.equal(M.moveOf('kimi'), 'run')
+})

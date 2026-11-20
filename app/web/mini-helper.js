@@ -139,7 +139,59 @@ html.tucked #mini { visibility: hidden; }`
     }
   }
 
-  const api = { FRAMES, moodOf }
+  // 移动方式按原版：gpt 飞，deepseek 游，gemini、glm 扑，其他跑
+  const MOVE = { gpt: 'fly', deepseek: 'swim', gemini: 'pounce', glm: 'pounce' }
+  const moveOf = id => MOVE[id] || 'run'
+
+  // 小帮手的图：先看姿态 mini；没有且穿着皮肤，就把皮肤目录的 idle 路径换成原角色的 mini.webp；都没有就是没有
+  function sheetOf(id, c) {
+    const own = c && c.poses && c.poses.mini && c.poses.mini[0]
+    if (own) return own
+    const idle = c && c.skin && c.poses && c.poses.idle && c.poses.idle[0]
+    const from = c && c.skin ? `/characters/${c.skin}/` : ''
+    if (!idle || !idle.includes(from)) return ''
+    return idle.replace(from, `/characters/${id}/`).replace(/[^/]*$/, 'mini.webp')
+  }
+
+  // 种子洗牌：FNV 取种子 + mulberry（和 notebook-events.js 同一套写法，抄进来不跨文件依赖）
+  function seeded(text) {
+    let h = 2166136261
+    for (const c of text) { h ^= c.codePointAt(0); h = Math.imul(h, 16777619) >>> 0 }
+    return () => { h = (h + 0x6D2B79F5) >>> 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+  }
+
+  // 该显示哪几个：她自己（有图的话）排第一，后面是好感度到 2 级的好友，按分数从高到低；
+  // 好友多了按「今天 + 她的 id」每天轮换，同一天不变
+  const MAX_CREW = 6
+  function crew(receiver, { store = {}, manifest = {}, today = '', levelOf = () => 0 } = {}) {
+    const chars = (manifest && manifest.characters) || {}
+    const entry = id => ({ id, sheet: sheetOf(id, chars[id]), move: moveOf(id) })
+    const self = chars[receiver] && !chars[receiver].egg ? entry(receiver) : null
+    const mine = self && self.sheet ? [self] : []
+    const friends = []
+    for (const key of Object.keys(store || {})) {
+      const pair = key.split('+')
+      if (pair.length !== 2 || !pair.includes(receiver)) continue
+      const id = pair[0] === receiver ? pair[1] : pair[0]
+      const points = Number(store[key] && store[key].points) || 0
+      if (id === receiver || levelOf(points) < 2) continue
+      if (!chars[id] || chars[id].egg) continue
+      const e = entry(id)
+      if (e.sheet) friends.push({ e, points })
+    }
+    friends.sort((a, b) => b.points - a.points)
+    const room = MAX_CREW - mine.length
+    let pick = friends
+    if (friends.length > room) {
+      const rnd = seeded(`${today}|${receiver}`)
+      const bag = friends.slice()
+      for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]] }
+      pick = bag.slice(0, room).sort((a, b) => b.points - a.points)   // 洗完再按分数排回去，顺序稳定
+    }
+    return mine.concat(pick.map(f => f.e))
+  }
+
+  const api = { FRAMES, moodOf, moveOf, crew, MAX_CREW }
   root.MiniHelper = Object.assign({ attach }, api)
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
