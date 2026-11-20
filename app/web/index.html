@@ -412,6 +412,8 @@ function syncMini() {
   miniHelper.setMood(MiniHelper.moodOf(pose))
 }
 setInterval(syncMini, 60_000)
+// 主桌宠这边小帮手看得见：看不见时不记送礼、不演，等看得见了补演（不然那一次就白丢了）
+const minisVisible = () => showMinis && !tucked && !egg
 // 外壳调：设置里的「迷你小帮手」开关
 function setShowMinis(on) { showMinis = !!on; syncMini() }
 // 送礼那一幕：她身边 from 送的那个小帮手落下来鞠个躬。主桌宠自己调，额外那只由主桌宠交过来（companionCall）。
@@ -2191,15 +2193,15 @@ function tryPairChat() {
     const up = PairChat.levelUp({ present: presentCharacters(), busy, wear, levelOf: key => Friendship.level(store[key]?.points || 0), shownOf: key => store[key]?.shown || 0 })
     if (up) {
       pairChatAt = nowMs
-      // 升到好朋友：送礼记号和 shown 一起写，对话说完半秒后两边演送礼
-      const gift = up.level >= 2 && store[up.key]?.giftShown !== true
+      // 升到好朋友：送礼记号和 shown 一起写，对话说完半秒后两边演送礼；小帮手这会儿看不见就先不记，等补演
+      const gift = up.level >= 2 && store[up.key]?.giftShown !== true && minisVisible()
       friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level, ...(gift ? { giftShown: true } : {}) } })
       speak(up.lines)
       if (gift) setTimeout(() => playGift(up.key), Math.max(0, speakingUntil - nowMs) + 500)
       return
     }
     // 老早就是好朋友、还没演过送礼的一对（更新前升的）：两只都在、都闲着时补演一次，不说话；先写记号，只演一次
-    const owed = pairsOf(presentCharacters()).filter(([a, b]) => !busy.includes(a) && !busy.includes(b))
+    const owed = minisVisible() && pairsOf(presentCharacters()).filter(([a, b]) => !busy.includes(a) && !busy.includes(b))
       .map(([a, b]) => Friendship.pairKey(a, b)).find(key => Friendship.level(store[key]?.points || 0) >= 2 && store[key]?.giftShown !== true)
     if (owed) {
       pairChatAt = nowMs

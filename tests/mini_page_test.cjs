@@ -74,7 +74,7 @@ const cases = [
     const e = await fresh(all, Date.UTC(2026, 9, 19, 23, 58, 0))
     const before = ids(e)
     assert(minis(e).length === 6, `6 at most: ${before}`)
-    await e.advance(3 * 60000)   // 23:59:59 → 00:02
+    await e.advance(3 * 60000)   // 23:58 → 00:01（中间过午夜）
     const after = ids(e)
     assert(minis(e).length === 6 && after !== before, `same crew after midnight: ${before} / ${after}`)
   }],
@@ -155,6 +155,27 @@ const cases = [
     const seen = await watchGift(e, 1500)
     assert(seen.has('gemini'), `retro gift not played: ${[...seen]}`)
     assert(giftCalls(e).length === 1 && store(e)['claude+gemini'].giftShown === true, `retro: ${JSON.stringify(giftCalls(e))} ${JSON.stringify(store(e))}`)
+    await e.advance(40000)
+    e.run(`pairChatAt = 0; tryPairChat()`)
+    await e.advance(5000)
+    assert(giftCalls(e).length === 1, `played twice: ${JSON.stringify(giftCalls(e))}`)
+  }],
+  ['gift_waits_until_minis_visible', async () => {
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
+    withGemini(e)
+    e.run(`setShowMinis(false); pairChatAt = 0; tryPairChat()`)
+    const hidden = await watchGift(e, 2000)
+    assert(hidden.size === 0 && giftCalls(e).length === 0 && !store(e)['claude+gemini'].giftShown, `gift while off: ${[...hidden]} ${JSON.stringify(store(e))}`)
+    // 升级那条路也一样：shown 照写，giftShown 不写
+    e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200, shown: 1 } }))`)
+    e.run(`pairChatAt = 0; tryPairChat()`)
+    const talk = e.run('speakingUntil') - e.clk.now()
+    assert(store(e)['claude+gemini'].shown === 2 && !store(e)['claude+gemini'].giftShown, `level-up while off: ${JSON.stringify(store(e))}`)
+    await e.advance(talk + 2000)
+    assert(giftCalls(e).length === 0, `gift scheduled while off: ${JSON.stringify(giftCalls(e))}`)
+    e.run(`setShowMinis(true); pairChatAt = 0; tryPairChat()`)
+    const seen = await watchGift(e, 1500)
+    assert(seen.has('gemini') && giftCalls(e).length === 1 && store(e)['claude+gemini'].giftShown === true, `retro after on: ${[...seen]} ${JSON.stringify(giftCalls(e))}`)
     await e.advance(40000)
     e.run(`pairChatAt = 0; tryPairChat()`)
     await e.advance(5000)
