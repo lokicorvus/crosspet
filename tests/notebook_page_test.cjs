@@ -210,9 +210,9 @@ const cases = [
     assert(empty.page2 && empty.page2.friends.length === 0, JSON.stringify(empty.page2))
   }],
   ['group_chat_when_gathered', async e => {
-    // 三只两两都是挚友（升级都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
+    // 三只两两都是挚友（升级、送礼都演过了），集合出来、闲着：群聊三句，各说一句，整段记进小本子
     const max = 1e6
-    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: max, shown: 3 }, 'claude+grok': { points: max, shown: 3 }, 'gpt+grok': { points: max, shown: 3 } })})`)
+    e.run(`friendStoreWrite(${JSON.stringify({ 'claude+gpt': { points: max, shown: 3, giftShown: true }, 'claude+grok': { points: max, shown: 3, giftShown: true }, 'gpt+grok': { points: max, shown: 3, giftShown: true } })})`)
     e.run(`gather()`)
     await e.advance(1500)
     e.run(`pageHidden = false; Math.random = () => 0; pairChatAt = 0; tryPairChat()`)
