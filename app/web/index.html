@@ -47,7 +47,10 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 @media (prefers-color-scheme: dark) { html:not(.aura-on) #aura, html:not(.aura-on) .aura-rings { display: none; } }
 #shadow { position: absolute; left: 50%; bottom: 7px; width: 110px; height: 10px; margin-left: -55px;
   border-radius: 50%; background: rgba(0,0,0,.13); }
-#body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; }
+/* 她身子 + 迷你小帮手（mini-helper.js 加进来）单独一层：后半圈小帮手 z-index: -1 只沉到她身后。只隔开这一层，不隔开整个 #stage——
+   不然 #stage 里「新功能」卡片的 z-index 4 只在 #stage 里算，排在前面的气泡（z-index 3）会盖住卡片、挡住卡片上的按钮 */
+#figure { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
+#body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; pointer-events: auto; }
 /* 立绘按高度占满人物框；比框宽的（张开翅膀、带小帮手、抱大碗……）往左右多伸出去，最多到整个舞台宽，
    而不是整体缩小——这样所有姿态里人物一样高 */
 #body img { position: absolute; top: 0; bottom: 0; left: -27.5%; width: 155%; height: 100%; object-fit: contain; object-position: 50% 100%;
@@ -205,7 +208,7 @@ html.no-name #caption { display: none; }
   <div id="bubble" class="hide"></div>
   <div id="stage">
     <div id="aura"></div><div id="shadow"></div>
-    <div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div>
+    <div id="figure"><div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div></div>
     <div id="fx"></div>
     <div id="cards"><div id="more"></div></div>
     <div id="newsCard" class="hidden"><div id="newsText"></div><div class="btns"><button class="go" data-action="news-open">去看看 ›</button><button data-action="news-close">知道了</button></div></div>
@@ -405,7 +408,7 @@ let miniHelper = null
 let showMinis = true
 function syncMini() {
   if (!window.MiniHelper || !charId) return
-  miniHelper = miniHelper || MiniHelper.attach($('stage'))
+  miniHelper = miniHelper || MiniHelper.attach($('figure'))
   if (!showMinis || egg || tucked || char()?.egg) { miniHelper.setOn(false); return }
   miniHelper.setCrew(MiniHelper.crew(charId, { store: friendStoreRead(), manifest, today: Friendship.localDay(Date.now()), levelOf: Friendship.level }))
   miniHelper.setOn(true)

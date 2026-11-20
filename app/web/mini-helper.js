@@ -124,11 +124,11 @@ html.tucked .mini { visibility: hidden; }`
     return y >= 0 ? Math.acos(c(x / RX)) / Math.PI / 2 : .5 + Math.acos(c(-x / RX)) / Math.PI / 2
   }
 
-  // stage：#stage；返回 { setCrew([{ id, sheet, move }]), setMood(mood), setOn(on), gift(id), size() }
+  // stage：小帮手放进去的那层（index.html 的 #figure：铺满 #stage、只装她身子，自己 isolation: isolate——后半圈的 z-index: -1 只沉到她身后，不沉到整页后面）；
+  // 返回 { setCrew([{ id, sheet, move }]), setMood(mood), setOn(on), gift(id), size() }
   // 每个成员一个 .mini（外层定位 + z 层 → .mx 左右 → .my 前后 → .mh 飞 / 游 / 扑的起伏 → .mf 翻转 → .spr 精灵图）
   function attach(stage) {
     const style = document.createElement('style'); style.textContent = css(); (document.head || document.documentElement).appendChild(style)
-    stage.style.isolation = 'isolate'   // 后半圈的 z-index: -1 只沉到她身后，不沉到整页后面
     const members = new Map()   // id → 成员，按 crew 顺序
     let order = [], mood = 'idle', on = true, roles = [], regroup = null
     let lapEpoch = 0             // 这一轮干活开始绕圈的时刻

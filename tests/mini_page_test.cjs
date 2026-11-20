@@ -17,10 +17,10 @@ const FRIEND_KEY = 'crosspet-friendship'
 async function fresh(store, startMs = START) {
   const e = makePage(startMs)
   e.run(`
-    // 页面里的小帮手：#stage 下的 .mini，带上她用的图和 class
+    // 页面里的小帮手：#figure（只装她身子和小帮手的那层）下的 .mini，带上她用的图和 class
     function __minis() {
       const spr = el => el.classList.contains('spr') ? el : el.children.map(spr).find(Boolean)
-      return $('stage').children.filter(c => c.classList.contains('mini')).map(c => {
+      return $('figure').children.filter(c => c.classList.contains('mini')).map(c => {
         const s = spr(c), img = (s && s.style.backgroundImage) || ''
         return { id: (img.match(/characters\\/([^/]+)\\/mini/) || [])[1] || '', cls: c.className, spr: s ? s.className : '' }
       })
@@ -53,6 +53,17 @@ const cases = [
   ['crew_shows_self_and_good_friend', async () => {
     const e = await fresh({ 'claude+gemini': { points: 200 } })
     assert(minis(e).length === 2 && ids(e) === 'claude,gemini', `crew: ${JSON.stringify(minis(e))}`)
+  }],
+  // 后半圈 z-index: -1 只沉到她身后：隔开的是只装她身子和小帮手的 #figure，不是整个 #stage
+  // （#stage 隔开的话，里面的「新功能」卡片 z-index 4 只在 #stage 里算，前面的气泡 z-index 3 会盖住它、还挡住卡片上的按钮）
+  ['minis_isolated_in_figure_not_stage', async () => {
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
+    assert(minis(e).length === 2, `minis not in #figure: ${JSON.stringify(minis(e))}`)
+    assert(!e.run(`$('stage').style.isolation`), `#stage isolated: ${e.run(`$('stage').style.isolation`)}`)
+    const html = require('fs').readFileSync(path.join(WEB, 'index.html'), 'utf8')
+    assert(/<div id="figure"><div id="body">(?:<img[^>]*>)+<\/div><\/div>/.test(html), '#figure should hold only #body')
+    assert(/#figure \{[^}]*position: absolute; inset: 0;[^}]*isolation: isolate;[^}]*pointer-events: none;/.test(html), '#figure css')
+    assert(!/#stage \{[^}]*isolation/.test(html), '#stage css isolated')
   }],
   ['show_minis_off_hides_all', async () => {
     const e = await fresh({ 'claude+gemini': { points: 200 } })
@@ -196,7 +207,7 @@ const cases = [
     e.run(`setRole('companion', { id: 'gemini@gather', key: 'gemini@gather', character: 'gemini', client: 'gather', label: '' })`)
     e.run(`init(${JSON.stringify(manifest())})`)
     await e.advance(1000)
-    e.run(`function __n() { return $('stage').children.filter(c => c.classList.contains('mini')).length }`)
+    e.run(`function __n() { return $('figure').children.filter(c => c.classList.contains('mini')).length }`)
     assert(e.run('__n()') === 1, `companion start: ${e.run('__n()')}`)
     e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200 } }))`)
     await e.advance(61000)
