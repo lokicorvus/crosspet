@@ -32,7 +32,7 @@ const manifest = { characters: {
   'egg-claude': { egg: true, poses: { mini: ['…'] } },
 } }
 const lv = p => (p >= 150 ? 2 : p >= 15 ? 1 : 0)
-const S = (pts) => ({ points: pts })
+const S = (pts) => ({ points: pts, shown: 2 })   // 升到好朋友那段对话已经演过（老的一对都是这样）
 
 test('crew_self_first_then_good_friends_by_points', () => {
   const store = { 'claude+deepseek': S(200), 'claude+gemini': S(400), 'claude+gpt': S(20) }
@@ -65,6 +65,14 @@ test('crew_caps_at_six_and_rotates_daily', () => {
   assert.deepEqual(M.crew('claude', { store, manifest: m, today: '2026-11-20', levelOf: lv }), day1)   // 同一天不变
   const week = new Set(['21', '22', '23', '24', '25', '26', '27', '28', '29', '30'].flatMap(d => M.crew('claude', { store, manifest: m, today: `2026-11-${d}`, levelOf: lv }).map(x => x.id)))
   assert.equal(week.size, 8)   // 十天下来 7 个好友都轮到过（种子固定，结果是确定的）
+})
+// 刚升到好朋友、升级那段对话还没演（shown < 2、没 giftShown）：小帮手先不出来，等送礼那一幕
+test('crew_waits_for_level_up_chat_before_showing_friend', () => {
+  const at = rec => M.crew('claude', { store: { 'claude+gemini': rec }, manifest, today: '2026-11-20', levelOf: lv }).map(x => x.id)
+  assert.deepEqual(at({ points: 200, shown: 1 }), ['claude'])
+  assert.deepEqual(at({ points: 200 }), ['claude'])
+  assert.deepEqual(at({ points: 200, shown: 2 }), ['claude', 'gemini'])   // 升级那句演过了（看不见时压着的送礼也是 shown = 2）
+  assert.deepEqual(at({ points: 200, shown: 1, giftShown: true }), ['claude', 'gemini'])
 })
 test('move_of', () => {
   assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'swim')

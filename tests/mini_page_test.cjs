@@ -51,7 +51,7 @@ async function watchGift(e, ms) {
 
 const cases = [
   ['crew_shows_self_and_good_friend', async () => {
-    const e = await fresh({ 'claude+gemini': { points: 200 } })
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
     assert(minis(e).length === 2 && ids(e) === 'claude,gemini', `crew: ${JSON.stringify(minis(e))}`)
   }],
   // 后半圈 z-index: -1 只沉到她身后：隔开的是只装她身子和小帮手的 #figure，不是整个 #stage
@@ -66,7 +66,7 @@ const cases = [
     assert(!/#stage \{[^}]*isolation/.test(html), '#stage css isolated')
   }],
   ['show_minis_off_hides_all', async () => {
-    const e = await fresh({ 'claude+gemini': { points: 200 } })
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
     assert(minis(e).every(m => !m.cls.includes('off')), `on: ${JSON.stringify(minis(e))}`)
     e.run(`setShowMinis(false)`)
     assert(minis(e).length === 2 && minis(e).every(m => m.cls.split(' ').includes('off')), `off: ${JSON.stringify(minis(e))}`)
@@ -76,12 +76,12 @@ const cases = [
   ['crew_recomputed_every_minute', async () => {
     const e = await fresh({})
     assert(ids(e) === 'claude', `start: ${ids(e)}`)
-    e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200 } }))`)
+    e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200, shown: 2 } }))`)
     await e.advance(61000)
     assert(ids(e) === 'claude,gemini', `after a minute: ${ids(e)}`)
   }],
   ['crew_rotates_across_midnight', async () => {
-    const all = Object.fromEntries(['gemini', ...EXTRA].map((id, i) => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200 + i }]))
+    const all = Object.fromEntries(['gemini', ...EXTRA].map((id, i) => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200 + i, shown: 2 }]))
     const e = await fresh(all, Date.UTC(2026, 9, 19, 23, 58, 0))
     const before = ids(e)
     assert(minis(e).length === 6, `6 at most: ${before}`)
@@ -90,7 +90,7 @@ const cases = [
     assert(minis(e).length === 6 && after !== before, `same crew after midnight: ${before} / ${after}`)
   }],
   ['crew_hidden_during_egg_and_tuck', async () => {
-    const e = await fresh({ 'claude+gemini': { points: 200 } })
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
     e.run(`setPose('edge_left')`)
     assert(minis(e).every(m => m.cls.split(' ').includes('off')), `edge: ${JSON.stringify(minis(e))}`)
     e.run(`setPose('idle')`)
@@ -106,7 +106,7 @@ const cases = [
     assert(minis(e).every(m => !m.cls.split(' ').includes('off')), `after egg: ${JSON.stringify(minis(e))}`)
   }],
   ['gift_cancelled_when_turned_off', async () => {
-    const e = await fresh({ 'claude+gemini': { points: 200 } })
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
     e.run(`miniGift('gemini')`)
     assert(minis(e).some(m => m.id === 'gemini' && m.cls.split(' ').includes('f-gift')), `gift not played: ${JSON.stringify(minis(e))}`)
     e.run(`setShowMinis(false)`)
@@ -117,7 +117,7 @@ const cases = [
   }],
   // Task 4 的两条：关了以后没有在演送礼的、没有在绕圈的
   ['off_stops_gift_and_laps', async () => {
-    const e = await fresh({ 'claude+gemini': { points: 200 } })
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
     e.run(`setPose('writing')`)   // 干活：有人绕圈
     await e.advance(500)
     e.run(`miniGift('gemini')`)
@@ -128,7 +128,7 @@ const cases = [
     assert(minis(e).every(m => !m.cls.split(' ').includes('f-gift') && !m.cls.split(' ').includes('lap')), `off later: ${JSON.stringify(minis(e))}`)
   }],
   ['idle_at_most_one_laps', async () => {
-    const six = Object.fromEntries(['gemini', ...EXTRA.slice(0, 4)].map(id => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200 }]))
+    const six = Object.fromEntries(['gemini', ...EXTRA.slice(0, 4)].map(id => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200, shown: 2 }]))
     const e = await fresh(six)
     // 小人自己找事时总挑「跑一圈」（随机数取 0）；页面别的随机事（彩蛋、闲时小动作）不看这里，结尾查一下没演彩蛋
     e.run(`Math.random = () => 0`)
@@ -149,6 +149,8 @@ const cases = [
     withGemini(e)
     assert(ids(e) === 'claude', `start: ${ids(e)}`)
     e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200, shown: 1 } }))`)
+    e.run(`syncMini()`)   // 分数过线了、升级那段对话还没演：送的小帮手先不出来
+    assert(ids(e) === 'claude', `before the talk: ${ids(e)}`)
     e.run(`pairChatAt = 0; tryPairChat()`)
     const until = e.run('speakingUntil') - e.clk.now()
     assert(until > 0, 'no level-up talk')
@@ -209,7 +211,7 @@ const cases = [
     await e.advance(1000)
     e.run(`function __n() { return $('figure').children.filter(c => c.classList.contains('mini')).length }`)
     assert(e.run('__n()') === 1, `companion start: ${e.run('__n()')}`)
-    e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200 } }))`)
+    e.run(`localStorage.setItem('${FRIEND_KEY}', JSON.stringify({ 'claude+gemini': { points: 200, shown: 2 } }))`)
     await e.advance(61000)
     assert(e.run('__n()') === 2, `companion after a minute: ${e.run('__n()')}`)
   }],

@@ -293,8 +293,10 @@ html.tucked .mini { visibility: hidden; }`
       const pair = key.split('+')
       if (pair.length !== 2 || !pair.includes(receiver)) continue
       const id = pair[0] === receiver ? pair[1] : pair[0]
-      const points = Number(store[key] && store[key].points) || 0
+      const rec = store[key] || {}
+      const points = Number(rec.points) || 0
       if (id === receiver || levelOf(points) < 2) continue
+      if (rec.giftShown !== true && (Number(rec.shown) || 0) < 2) continue   // 刚到好朋友、升级那段对话还没演：先不出来，等送礼那一幕
       if (!chars[id] || chars[id].egg) continue
       const e = entry(id)
       if (e.sheet) friends.push({ e, points })
