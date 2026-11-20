@@ -131,6 +131,7 @@ html.tucked .mini { visibility: hidden; }`
     stage.style.isolation = 'isolate'   // 后半圈的 z-index: -1 只沉到她身后，不沉到整页后面
     const members = new Map()   // id → 成员，按 crew 顺序
     let order = [], mood = 'idle', on = true, roles = [], regroup = null
+    let lapEpoch = 0             // 这一轮干活开始绕圈的时刻
     let lapper = null           // 待机时正在绕圈的那个：同一时刻最多一个
     const visible = () => on && mood !== 'hidden'
 
@@ -142,7 +143,8 @@ html.tucked .mini { visibility: hidden; }`
       stage.appendChild(m.el)
       return m
     }
-    const frame = (m, name, anim) => { m.spr.className = 'spr' + (name ? ' f-' + name : '') + (anim ? ' ' + anim : ''); void m.spr.offsetWidth }
+    // 先清空再换：同一个 class 也会从头播（扑跳的帧要和 .mh 的跳一起重来）
+    const frame = (m, name, anim) => { m.spr.className = 'spr'; void m.spr.offsetWidth; m.spr.className = 'spr' + (name ? ' f-' + name : '') + (anim ? ' ' + anim : '') }
     const runAnim = (m, busy) => m.move === 'run' ? (busy ? 'carry' : 'run') : m.move   // 飞 / 游 / 扑的干活时也用自己的移动帧
     function lap(m, yes, delay, count) {
       const parts = [m.el, m.mx, m.my, m.mf]
@@ -172,6 +174,7 @@ html.tucked .mini { visibility: hidden; }`
           const p = phaseOf(m.spot)
           lap(m, true, (-p * LAP).toFixed(3), (1 + p).toFixed(3)); frame(m, null, runAnim(m, false))
           m.el.onanimationend = e => { if (e.target === m.el) idle(m) }
+          m.timer = setTimeout(() => idle(m), LAP * 1000 + 500)   // 兜底：animationend 丢了也会回来；先到的那个调 idle，idle 里 stop 掉另一个
         } else if (t === 'wave') { frame(m, 'wave', 'wave'); m.timer = setTimeout(() => idle(m), 1800) }
         else { frame(m, t, 'breathe'); m.timer = setTimeout(() => idle(m), 5000) }
       }, 9000 + Math.random() * 11000)
@@ -184,7 +187,8 @@ html.tucked .mini { visibility: hidden; }`
       const role = roles[m.i] || 'read'
       if (role === 'lap') {
         const laps = roles.filter(r => r === 'lap').length, j = roles.slice(0, m.i).filter(r => r === 'lap').length
-        lap(m, true, (-LAP * j / laps).toFixed(3), 'infinite'); frame(m, null, runAnim(m, true)); return
+        // 按同一个起点算：中途重跑的（换分工、送完礼）也落在自己该在的位置
+        lap(m, true, (-((Date.now() - lapEpoch) / 1000 % LAP) - LAP * j / laps).toFixed(3), 'infinite'); frame(m, null, runAnim(m, true)); return
       }
       lap(m, false)
       if (role === 'think') return think(m, 0, false)
@@ -208,14 +212,16 @@ html.tucked .mini { visibility: hidden; }`
       clearTimeout(regroup)
       regroup = setTimeout(() => {
         const next = busyRoles(order.length, seed())
-        if (next.join() !== roles.join()) { roles = next; order.forEach(m => act(m)) }
+        const slot = (r, i) => r[i] === 'lap' ? 'lap' + r.slice(0, i).filter(x => x === 'lap').length : r[i]
+        const changed = order.filter((m, i) => slot(next, i) !== slot(roles, i))   // 只动分工或圈上位置变了的，其余照常
+        roles = next; changed.forEach(m => act(m))
         regroupLater()
       }, 120000 - Date.now() % 120000 + 50)
     }
     function render() {
       clearTimeout(regroup); regroup = null
       const show = visible()
-      if (show && mood === 'busy') { roles = busyRoles(order.length, seed()); regroupLater() }
+      if (show && mood === 'busy') { roles = busyRoles(order.length, seed()); lapEpoch = Date.now(); regroupLater() }
       order.forEach((m, i) => {
         stop(m); m.i = i
         m.el.classList.toggle('off', !show)
