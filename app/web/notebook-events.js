@@ -155,8 +155,11 @@
     else if (ev.kind === 'fest') list = mine[ev.n] || mine['*']
     else if (ev.kind === 'pats') list = mine[ev.m === 'pokes' ? 'pokes' : 'pats']
     const lines = [{ who: ev.friend, text: fill(one(list, rnd), ev) }]
-    // 好朋友那天多一句送小帮手，排在主人回复之前
-    if (ev.kind === 'levelup' && (ev.gift ?? ev.n === 2)) lines.push({ who: ev.friend, text: one(of(GIFT_LINE, ev.friend, friendSkin), rnd) })
+    // 好朋友那天多一句送小帮手，排在主人回复之前。这句用自己的种子（同一串加 |gift）：不动 rnd，旧记录里别的句子一字不变
+    if (ev.kind === 'levelup' && (ev.gift ?? ev.n === 2)) {
+      const giftRnd = seeded(`${ev.day}|${owner}|${ev.friend}|${ev.kind}|gift`)
+      lines.push({ who: ev.friend, text: one(of(GIFT_LINE, ev.friend, friendSkin), giftRnd) })
+    }
     if (level >= 2 && EVENT_REPLY[ev.kind]) lines.push({ who: owner, text: one(of(EVENT_REPLY[ev.kind], owner, ownerSkin), rnd) })
     return { lines, quote: ev.kind === 'chat' && ev.q ? ev.q : null }
   }

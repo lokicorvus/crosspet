@@ -117,3 +117,21 @@ test('gift_line_follows_gift_flag：有 gift 字段按它，旧记录按 n===2',
   assert.equal(lv({ n: 2 }, 2).length, 3)               // 旧记录没 gift 字段
   assert.equal(lv({ n: 3 }, 3).length, 2)
 })
+
+test('gift_line_keeps_old_lines：加了送小帮手那句，旧的好朋友记录里别的句子一字不变', () => {
+  // gift: false 走的就是加这句之前的路（只有好友那句 + 主人回复），拿它当「以前写出来的样子」
+  let checked = 0
+  for (const owner of ['claude', 'gpt', 'deepseek', 'gemini'])
+    for (const friend of ['claude', 'gpt', 'deepseek', 'gemini', 'kimi', 'glm']) {
+      if (friend === owner) continue
+      for (let d = 1; d <= 30; d++) {
+        const ev = { kind: 'levelup', n: 2, friend, day: `2026-11-${String(d).padStart(2, '0')}` }
+        const now = E.block({ ev, owner, level: 2 }).lines
+        const before = E.block({ ev: { ...ev, gift: false }, owner, level: 2 }).lines
+        assert.equal(now.length, 3); assert.equal(before.length, 2)
+        assert.deepEqual([now[0], now[2]], before, `${owner}/${friend}/${ev.day}`)
+        checked++
+      }
+    }
+  assert.ok(checked > 300)
+})
