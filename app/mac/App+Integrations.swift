@@ -183,6 +183,8 @@ extension App {
                 defaults.set(value as? Bool ?? true, forKey: "textLinked"); applySizes()
             case "showName":
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showName"); js("setShowName(\(on))")
+            case "showMinis":
+                let on = value as? Bool ?? true; defaults.set(on, forKey: "showMinis"); js("setShowMinis(\(on))")
             case "aura":
                 if let mode = value as? String, ["auto", "on", "off"].contains(mode) { defaults.set(mode, forKey: "auraMode"); js("setAuraMode(\(quote(mode)))") }
             case "followApps":
