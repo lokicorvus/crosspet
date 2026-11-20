@@ -231,6 +231,7 @@ addEventListener('error', e => {
 <script src="quota-bars.js"></script>
 <script src="plugin-update.js"></script>
 <script src="stand-in.js"></script>
+<script src="mini-helper.js"></script>
 <script src="follow-policy.js"></script>
 <script src="codex-resets.js"></script>
 <script src="break-reminders.js"></script>
@@ -395,6 +396,15 @@ function setPose(p, instant) {
   document.documentElement.style.setProperty('--aura', aura[0])
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
   setFx(p)
+  syncMini()
+}
+// 迷你小帮手（mini-helper.js）：角色目录里有 mini.webp 就陪在脚边，跟着她的姿态换动作。彩蛋角色、没画的角色没有，就收起来
+let miniHelper = null
+function syncMini() {
+  if (!window.MiniHelper) return
+  miniHelper = miniHelper || MiniHelper.attach($('stage'))
+  miniHelper.setSheet(char()?.poses?.mini?.[0])
+  miniHelper.setMood(MiniHelper.moodOf(pose))
 }
 // 名牌上的名字：设置里可以关掉（额度照常显示）
 function setShowName(on) { document.documentElement.classList.toggle('no-name', !on) }
@@ -870,7 +880,7 @@ function init(m) {
     if (want && roleInfo?.parked) document.body.classList.add('parked')
     if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want, !!roleInfo?.parked)
     else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
-  } else { $('caption').textContent = char().name }
+  } else { $('caption').textContent = char().name; syncMini() }   // 换衣服时外壳重新 init：小帮手也换成这套的
   sendStoredFriendship()
   askNotebookBackfill()
   restoreGathered()
