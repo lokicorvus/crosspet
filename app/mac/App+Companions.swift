@@ -214,9 +214,10 @@ extension App {
         c.leave()
     }
 
-    /// 主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）；别的不认
+    /// 主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）、集合时答到（answerRoll）、送礼那一幕（miniGift）；别的不认。
+    /// 名单要和页面（index.html 里 companionCall 那几处，送礼在 playGift）、Windows（CompanionCallRule.cs）对齐：页面新加一种，两边都要加
     func companionCall(_ call: [String: Any]) {
-        guard let id = call["id"] as? String, let fn = call["fn"] as? String, ["celebrate", "chat", "answerRoll"].contains(fn), let args = call["args"] as? [Any],
+        guard let id = call["id"] as? String, let fn = call["fn"] as? String, ["celebrate", "chat", "answerRoll", "miniGift"].contains(fn), let args = call["args"] as? [Any],
               let c = companions[id], let data = try? JSONSerialization.data(withJSONObject: args),
               let json = String(data: data, encoding: .utf8) else { return }
         c.js("\(fn).apply(null, \(json))")

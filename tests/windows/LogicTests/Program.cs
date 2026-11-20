@@ -349,6 +349,18 @@ static class Program
         Check("小本子位置：第二块屏幕上照样在她右边", nbSecond.X == 2000 + 260 - 12);
         var nbTiny = NotebookPlace.Place(new CompanionPlace.Rect(100, 100, 260, 362), nbSize, new CompanionPlace.Rect(0, 0, 300, 500), 12);
         Check("小本子位置：屏幕比本子还小时贴左上角", nbTiny.X == 0 && nbTiny.Y == 0);
+        // 主桌宠页面交给外壳转的事（companionCall 的 fn）：外壳只认名单里的；页面新加了一种、名单忘了加，额外那只就收不到（送礼那一幕曾经这样）
+        Check("转话名单：认 celebrate / chat / answerRoll / miniGift", new[] { "celebrate", "chat", "answerRoll", "miniGift" }.All(CompanionCallRule.Allows));
+        Check("转话名单：别的不认", !CompanionCallRule.Allows("eval") && !CompanionCallRule.Allows(null) && !CompanionCallRule.Allows(""));
+        var indexHtml = FindUp(Path.Combine("app", "web", "index.html"));
+        Check("转话名单：找得到 index.html", indexHtml != null);
+        if (indexHtml != null)
+        {
+            var fns = System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(indexHtml), @"companionCall:\s*\{[^}]*?fn:\s*'(\w+)'")
+                .Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups[1].Value).Distinct().ToList();
+            Check("转话名单：页面里交出去的 fn 都在名单里（" + string.Join("、", fns) + "）", fns.Count >= 4 && fns.All(CompanionCallRule.Allows));
+        }
+
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

@@ -2272,6 +2272,7 @@ function chatAs(character, line, pose, fx, ms) {
   if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null, fx || null, ms || PairChat.bubbleMs(line)] } })
 }
 // 送礼：一对里两只各自演「对方送的那个小帮手」落下来。主桌宠自己演，额外那只交给外壳转（companionCall，fn = miniGift）；不在了就算了
+// 外壳只转名单里的 fn：miniGift 要在 macOS（App+Companions.swift 的 companionCall）和 Windows（CompanionCallRule.cs）的名单里，两边要对齐
 function playGift(key) {
   const [a, b] = key.split('+')
   for (const [ch, from] of [[a, b], [b, a]]) {
