@@ -50,7 +50,7 @@ test('block_falls_back_skin_base_generic', () => {
 test('block_reply_only_for_close_friends', () => {
   assert.equal(E.block({ ev: ev('levelup', { n: 1 }), owner: 'claude', level: 1 }).lines.length, 1)
   const b = E.block({ ev: ev('levelup', { n: 2 }), owner: 'claude', level: 2 })
-  assert.equal(b.lines.length, 2); assert.equal(b.lines[1].who, 'claude')
+  assert.equal(b.lines.length, 3); assert.equal(b.lines[2].who, 'claude')  // 中间一行是送小帮手
   assert.equal(E.block({ ev: ev('chat', { q: 'x' }), owner: 'claude', level: 3 }).lines.length, 1)
 })
 
@@ -85,4 +85,26 @@ test('pats_picks_by_kind', () => {
 
 test('skins_have_their_own：四套性格皮肤每种事都有自己的', () => {
   for (const s of ['gpt-onesie', 'deepseek-hoodie', 'claude-saint', 'gemini-magician']) checkWriter(s, { allFests: false })
+})
+
+test('levelup_two_adds_gift_line：好朋友那句后面多一句送小帮手，在主人回复之前', () => {
+  const ev = { kind: 'levelup', n: 2, friend: 'deepseek', day: '2026-11-20' }
+  const b = E.block({ ev, owner: 'claude', level: 2 })
+  assert.equal(b.lines.length, 3)
+  assert.equal(b.lines[0].who, 'deepseek'); assert.equal(b.lines[1].who, 'deepseek'); assert.equal(b.lines[2].who, 'claude')
+  assert.ok(E.GIFT_LINE.deepseek.includes(b.lines[1].text))
+  assert.deepEqual(E.block({ ev, owner: 'claude', level: 2 }), b)
+  const one = E.block({ ev: { ...ev, n: 1 }, owner: 'claude', level: 1 })
+  assert.equal(one.lines.length, 1)
+  const three = E.block({ ev: { ...ev, n: 3 }, owner: 'claude', level: 3 })
+  assert.equal(three.lines.length, 2)
+  // 皮肤退回原角色，没写的退回 '*'
+  const sk = E.block({ ev: { ...ev, friend: 'gpt' }, owner: 'claude', friendSkin: 'gpt-onesie', level: 2 })
+  assert.ok(E.GIFT_LINE.gpt.includes(sk.lines[1].text))
+  const un = E.block({ ev: { ...ev, friend: 'mine' }, owner: 'claude', level: 2 })
+  assert.ok(E.GIFT_LINE['*'].includes(un.lines[1].text))
+  for (const id of ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'kimi', 'qwen']) {
+    assert.ok(E.GIFT_LINE[id].length >= 1)
+    for (const t of E.GIFT_LINE[id]) assert.ok(len(t) <= 22, t)
+  }
 })

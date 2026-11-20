@@ -9,6 +9,19 @@
   const EVENT_REPLY = { levelup: {}, anniv: {} }
   const L = s => s.split('|')
 
+  // 升到好朋友那天，她附带一句「送你一只我的小帮手」；按原角色写，皮肤走 of() 的退回
+  const GIFT_LINE = {
+    '*': ['送你一只我的小帮手，让它陪着你'],
+    claude: ['附上一只小小的我，替我陪你看书'],
+    deepseek: ['送你一只小小的我！饭点它会提醒你'],
+    gemini: ['送你一只小小的我喵，会陪你晒太阳'],
+    glm: ['附赠一只小小的我，帮你盯着账本'],
+    gpt: ['送你一只小的我。让它陪着。'],
+    grok: ['送你一只小的我，嫌烦就让它闭嘴'],
+    kimi: ['送你一只小小的我，它会哼曲给你听'],
+    qwen: ['送你一只小小的我～它会陪你喝茶'],
+  }
+
   // 一个写的人的一整套：up1–3 升到认识了 / 好朋友 / 挚友；fest 按 FESTS 的顺序一个节日一句，'*' 是通用的；reply 是她当本子主人时回的
   function W(id, m) {
     EVENT_MSG.levelup[id] = { 1: L(m.up1), 2: L(m.up2), 3: L(m.up3) }
@@ -142,11 +155,13 @@
     else if (ev.kind === 'fest') list = mine[ev.n] || mine['*']
     else if (ev.kind === 'pats') list = mine[ev.m === 'pokes' ? 'pokes' : 'pats']
     const lines = [{ who: ev.friend, text: fill(one(list, rnd), ev) }]
+    // 好朋友那天多一句送小帮手，排在主人回复之前
+    if (ev.kind === 'levelup' && ev.n === 2) lines.push({ who: ev.friend, text: one(of(GIFT_LINE, ev.friend, friendSkin), rnd) })
     if (level >= 2 && EVENT_REPLY[ev.kind]) lines.push({ who: owner, text: one(of(EVENT_REPLY[ev.kind], owner, ownerSkin), rnd) })
     return { lines, quote: ev.kind === 'chat' && ev.q ? ev.q : null }
   }
 
-  const api = { FEST_NAMES, EVENT_MSG, EVENT_REPLY, block }
+  const api = { FEST_NAMES, EVENT_MSG, EVENT_REPLY, GIFT_LINE, block }
   root.NotebookEvents = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
