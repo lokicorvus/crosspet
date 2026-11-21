@@ -365,6 +365,66 @@ DSH_PROVIDER = """- insert:
 DSH_OURS_ONLY = "    - id: crosspet\n      name: '@local/dsh-plugin-crosspet'\n"
 
 
+class OpenCodeIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='crosspet-opencode-integration-')
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name) / 'config'
+        self.plugin = self.home / 'plugins/crosspet.js'
+        patch = mock.patch.multiple(integrate, OPENCODE_HOME=self.home, OPENCODE_PLUGIN=self.plugin)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def run_target(self, install):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            integrate.opencode(install)
+        return out.getvalue()
+
+    def test_skips_when_opencode_has_not_run(self):
+        self.assertIn('没找到 OpenCode', self.run_target(True))
+        self.assertFalse(self.home.exists())
+        self.assertFalse(integrate.has_opencode())
+
+    def test_install_is_idempotent_and_uninstall_only_removes_ours(self):
+        self.home.mkdir(parents=True)
+        other = self.home / 'plugins/other.js'
+        other.parent.mkdir()
+        other.write_text('export default {}\n', encoding='utf-8')
+        config = self.home / 'opencode.json'
+        config.write_text('{"model":"keep/me"}\n', encoding='utf-8')
+        self.run_target(True)
+        self.assertTrue(integrate.has_opencode())
+        self.assertEqual(self.plugin.read_bytes(), (integrate.REPO / 'integrations/opencode/crosspet.js').read_bytes())
+        first = self.plugin.read_bytes()
+        self.run_target(True)
+        self.assertEqual(self.plugin.read_bytes(), first)
+        self.assertEqual(other.read_text(encoding='utf-8'), 'export default {}\n')
+        self.assertEqual(config.read_text(encoding='utf-8'), '{"model":"keep/me"}\n')
+        self.assertIn('opencode', integrate.installed())
+        self.run_target(False)
+        self.assertFalse(self.plugin.exists())
+        self.assertTrue(other.exists())
+        self.assertTrue(config.exists())
+        self.assertFalse(integrate.has_opencode())
+
+    def test_uninstall_leaves_unrelated_same_name_plugin(self):
+        self.plugin.parent.mkdir(parents=True)
+        self.plugin.write_text('// user-owned plugin\n', encoding='utf-8')
+        self.run_target(False)
+        self.assertEqual(self.plugin.read_text(encoding='utf-8'), '// user-owned plugin\n')
+        self.assertFalse(integrate.has_opencode())
+
+    def test_registered_with_heartbeat_and_diagnostics(self):
+        self.assertIn('opencode', integrate.TARGETS)
+        self.assertEqual(integrate.SEEN_KEY['opencode'], 'opencode')
+        self.home.mkdir(parents=True)
+        self.run_target(True)
+        with mock.patch.object(integrate, 'STATE_DIR', Path(self.tmp.name) / 'state'):
+            text = integrate.diagnose()
+        self.assertIn('[OpenCode]', text)
+        self.assertIn('crosspet.js', text)
+
+
 class GrokIntegrationTests(unittest.TestCase):
     """Grok Build：CrossPet 单独占 ~/.grok/hooks/crosspet.json，接入写它、撤销删它，用户自己的钩子文件不动"""
     def setUp(self):
