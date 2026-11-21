@@ -556,10 +556,10 @@ try:
 except Exception:
     pass
 
-# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code、OpenCode）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi")
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi", "opencode")
 # ZCode 默认用智谱的 GLM；Qwen Code、Kimi Code 默认用自家的模型。它们只在会话开始时告诉模型名，
 # 之后的事件按会话 id 查当时记下的模型
 HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen", "kimi": "kimi"}
@@ -979,7 +979,7 @@ if session_id and (pose or name == "SessionEnd"):
     if name != "SessionEnd":
         retire_session_elsewhere(session_id)
 
-ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "unknown-event")
+ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "model-only" if name == "ModelChanged" else "unknown-event")
 
 _event_lock.close()  # 自动启动可能查父进程 / 等系统响应，不让下一条钩子等这一步。
 

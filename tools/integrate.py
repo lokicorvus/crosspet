@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode
     python3 tools/integrate.py status
 
 原则：
@@ -954,6 +954,35 @@ def has_hermes() -> bool:
     return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
 
 
+# ---- OpenCode ----
+# V2 自动发现全局 plugins 目录里的单个 JS 文件，不用改 opencode.json；插件通过 setup() 注册。
+OPENCODE_HOME = Path(os.environ.get("OPENCODE_CONFIG_DIR") or HOME / ".config" / "opencode")
+OPENCODE_PLUGIN = OPENCODE_HOME / "plugins" / "crosspet.js"
+OPENCODE_MARK = "CrossPet × OpenCode"
+
+
+def has_opencode() -> bool:
+    try:
+        return OPENCODE_MARK in OPENCODE_PLUGIN.read_text(encoding="utf-8")
+    except Exception:
+        return False
+
+
+def opencode(install: bool) -> None:
+    if install:
+        if not found(OPENCODE_HOME, "OpenCode"):
+            return
+        OPENCODE_PLUGIN.parent.mkdir(parents=True, exist_ok=True)
+        backup(OPENCODE_PLUGIN)
+        shutil.copy2(REPO / "integrations/opencode/crosspet.js", OPENCODE_PLUGIN)
+        print(f"  已装插件到 {OPENCODE_PLUGIN}")
+        print("  → 重开 OpenCode 生效；V2 也可以重载插件或运行 opencode service restart；按当前模型换角色")
+    elif has_opencode():
+        backup(OPENCODE_PLUGIN)
+        OPENCODE_PLUGIN.unlink()
+        print(f"  已删除 {OPENCODE_PLUGIN}")
+
+
 # ---- Cursor ----
 # Cursor 的 hooks.json 是扁平的：每个事件直接是命令数组，不是 Codex / Claude 那种 {hooks:[...]} 分组。
 CURSOR_MARK = "crosspet-cursor-bridge.py"
@@ -1081,7 +1110,7 @@ def cursor(install: bool) -> None:
         remove_cursor_hooks(CURSOR_HOOKS)
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok}
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok, "opencode": opencode}
 
 
 def has_hooks(p: Path) -> bool:
@@ -1109,6 +1138,7 @@ def installed() -> list:
     if has_cursor() and found(CURSOR_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("cursor")
     if has_grok(): result.append("grok")
     if has_kimi() and found(KIMI_HOME, "", ("config.toml",), quiet=True): result.append("kimi")
+    if has_opencode(): result.append("opencode")
     return result
 
 
@@ -1142,7 +1172,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode"}
 
 
 def short(p) -> str:
@@ -1339,6 +1369,7 @@ def diagnose() -> str:
     L.append(f"[Kimi Code] {file_state(KIMI_CONFIG, has_kimi)}；环境变量 {env_line('KIMI_CODE_HOME')}；最近消息 {seen('kimi')}")
     L.append(f"[Cursor] {file_state(CURSOR_HOOKS, has_cursor)}；最近消息 {seen('cursor')}")
     L.append(f"[Grok Build] {file_state(GROK_HOOKS, has_grok)}；最近消息 {seen('grok')}")
+    L.append(f"[OpenCode] {file_state(OPENCODE_PLUGIN, has_opencode)}；环境变量 {env_line('OPENCODE_CONFIG_DIR')}；最近消息 {seen('opencode')}")
     L.append(f"[Antigravity] {file_state(ANTIGRAVITY_HOOKS, has_antigravity)}；最近消息 {seen('antigravity')}")
     for d in workbuddy_dirs():
         if d.exists():
@@ -1393,6 +1424,7 @@ def status() -> None:
     print("Kimi Code           :", "已接入" if has_kimi() else "未接入")
     print("Cursor              :", "已接入" if has_cursor() else "未接入")
     print("Grok Build          :", "已接入" if has_grok() else "未接入")
+    print("OpenCode            :", "已接入" if has_opencode() else "未接入")
 
 
 if __name__ == "__main__":
