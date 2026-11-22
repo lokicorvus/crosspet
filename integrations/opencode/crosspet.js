@@ -78,17 +78,21 @@ function createSender() {
 }
 
 const PROMPT_WAIT = 300   // 提问等 context 钩子最多这么久（毫秒），见 setup
+const STOP_WAIT = 3000    // 子会话都结束后，父会话这么久（毫秒）没接着干就补报完成，见 sessionTracker
 
 // 这份插件认得哪些会话（实测 OpenCode 2.3.2）：
 // - 服务端给每个打开过的项目各加载一份全局插件（实测 3 份），事件流每份都收到全部事件。
 //   session.execution.* 之类不带 location，按项目过滤拦不住，每份都转发就成了 3 条 Stop。
 //   所以只转发认得的会话：带本项目 location 的 session.created 里看到的，或本份插件的钩子里出现过的
 //   （prompt / context / tool 钩子只在会话所在项目那份插件里触发）。没有 location 的旧版本（拿不到目录）照旧全转发。
-// - 子会话（task 派出去的）：它的提问不是用户发的，不报 UserPromptSubmit；它的模型、工具算在父会话头上
-//   （同 Claude Code：子代理的工具事件带父会话 id），结束时报 SubagentStop。
+// - 子会话（task 派出去的）：父会话一直演「派小帮手」，到子会话结束（SubagentStop）为止。
+//   子会话自己的提问、模型、工具都不报：它的提问不是用户发的，它的读写一报就把「派小帮手」盖掉了。
+//   OpenCode 的 task 是异步的：派出去后父会话这一轮马上就「完成」了（execution.succeeded），子会话的结果之后再送回来、
+//   父会话接着干。所以父会话还有子会话在跑时，它的完成先压着；子会话都结束后父会话 STOP_WAIT 内没接着干，才补报 Stop。
 function sessionTracker(locationDirectory) {
   const owned = new Set()
   const parents = new Map()
+  const heldStops = new Map()   // 父会话 → 压着的完成（true）或补报的计时器
   const trim = (set) => { if (set.size > 1000) set.delete(set.values().next().value) }
   return {
     own(sid) { if (sid) { owned.add(sid); trim(owned) } },
@@ -96,6 +100,16 @@ function sessionTracker(locationDirectory) {
     addChild(sid, parent) { parents.set(sid, parent); if (parents.size > 1000) parents.delete(parents.keys().next().value) },
     parentOf(sid) { return parents.get(sid) },
     dropChild(sid) { parents.delete(sid) },
+    hasChildren(parent) { for (const p of parents.values()) if (p === parent) return true; return false },
+    holdStop(parent) { heldStops.set(parent, true) },
+    // 子会话都结束了：父会话 STOP_WAIT 内没接着干就补报
+    releaseStop(parent, send) {
+      if (heldStops.get(parent) !== true) return
+      heldStops.set(parent, setTimeout(() => { heldStops.delete(parent); send("Stop", parent) }, STOP_WAIT))
+    },
+    // 父会话自己接着干了 / 真的完成了：不用补报
+    cancelStop(parent) { const t = heldStops.get(parent); if (t !== undefined) { clearTimeout(t); heldStops.delete(parent) } },
+    close() { for (const t of heldStops.values()) clearTimeout(t); heldStops.clear() },
   }
 }
 
@@ -133,6 +147,12 @@ function v2Events(send, locationDirectory, sessions = sessionTracker(locationDir
         if (parent) {
           sessions.dropChild(sid)
           send("SubagentStop", parent)
+          if (!sessions.hasChildren(parent)) sessions.releaseStop(parent, send)
+          break
+        }
+        sessions.cancelStop(sid)
+        if (event.type === "session.execution.succeeded" && sessions.hasChildren(sid)) {
+          sessions.holdStop(sid)
           break
         }
         send(event.type === "session.execution.succeeded" ? "Stop"
@@ -192,10 +212,15 @@ export default {
       pending.delete(sid)
       if (!sessions.parentOf(sid)) send("UserPromptSubmit", sid, { model })
     }
-    const route = (sid) => sessions.parentOf(sid) || sid
+    // context 钩子每一步都来（每个工具做完紧跟着一次，实测只隔二三十毫秒）。每次都报 BeforeModel 的话，
+    // 桌宠 0.3 秒读一次状态，刚报的读文件、跑命令、派小帮手就被「思考」盖掉，一个都看不到。
+    // 工具做完本来就会回到思考（PostToolUse），所以只在一轮开头（刚提问）和换了模型时报
+    const lastModel = new Map()
     await ctx.session.hook("prompt", (event) => {
       const sid = String(event?.sessionID || "")
       sessions.own(sid)
+      sessions.cancelStop(sid)
+      lastModel.delete(sid)
       clearTimeout(pending.get(sid))
       pending.set(sid, setTimeout(() => flushPrompt(sid, ""), PROMPT_WAIT))
     })
@@ -204,12 +229,19 @@ export default {
       sessions.own(sid)
       const model = modelName(event?.model)
       if (pending.has(sid)) flushPrompt(sid, model)
-      const parent = sessions.parentOf(sid)
-      send("BeforeModel", parent || sid, { model: parent ? "" : model })   // 子会话的模型不能把父会话的角色换掉
+      if (sessions.parentOf(sid)) return   // 子会话：父会话在演派小帮手，它的模型也不能把父会话的角色换掉
+      sessions.cancelStop(sid)
+      if (lastModel.has(sid) && lastModel.get(sid) === model) return
+      lastModel.set(sid, model)
+      if (lastModel.size > 1000) lastModel.delete(lastModel.keys().next().value)
+      send("BeforeModel", sid, { model })
     })
     const tool = (name) => (event) => {
-      sessions.own(String(event?.sessionID || ""))
-      send(name, route(String(event?.sessionID || "")), { tool_name: String(event?.tool || "") })
+      const sid = String(event?.sessionID || "")
+      sessions.own(sid)
+      if (sessions.parentOf(sid)) return   // 子会话的工具：不盖掉父会话的派小帮手
+      sessions.cancelStop(sid)
+      send(name, sid, { tool_name: String(event?.tool || "") })
     }
     const before = tool("PreToolUse"), after = tool("PostToolUse"), failed = tool("PostToolUseFailure")
     await ctx.tool.hook("execute.before", before)
@@ -229,6 +261,7 @@ export default {
       controller.abort()
       for (const timer of pending.values()) clearTimeout(timer)
       pending.clear()
+      sessions.close()
       send.close()
     }
   },

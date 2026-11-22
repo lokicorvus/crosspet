@@ -200,31 +200,80 @@ test("V2 服务端给几个项目各加载一份：不带 location 的事件只�
   assert.deepEqual(events, ["BeforeModel s2", "Interrupt s2", "SessionStart s1", "Stop s1", "UserPromptSubmit s2"])
 })
 
-test("V2 子会话：它的提问不当成用户消息，模型和工具算在父会话", async (t) => {
+// 按实测 OpenCode 2.3.2 派子任务的事件顺序：task 工具马上返回、父会话这一轮马上「完成」，
+// 子会话干完把结果送回来，父会话接着干再真正完成
+test("V2 子会话：父会话一直演派小帮手，子会话的提问、模型、工具都不报，父会话中途的完成压着", async (t) => {
   const f = await fixture(t)
   const fake = v2Context()
   fake.ctx.location = { directory: "/project/a" }
   const cleanup = await plugin.setup(fake.ctx)
   t.after(cleanup)
   const at = { directory: "/project/a" }
+  const names = async () => (await f.events()).map(x => `${x.event.hook_event_name} ${x.event.session_id}`)
 
   fake.emit({ id: "p", type: "session.created", location: at, data: { sessionID: "parent", model: { providerID: "deepseek", id: "v4" } } })
   await waitFor(async () => (await f.events()).length === 1)
+  await fake.session.prompt({ sessionID: "parent" })
+  await fake.session.context({ sessionID: "parent", model: { providerID: "deepseek", id: "v4" } })
+  await fake.tool["execute.before"]({ sessionID: "parent", tool: "subagent" })
+  await fake.tool["execute.after"]({ sessionID: "parent", tool: "subagent", status: "completed" })
   // 实测：子会话的 prompt 钩子比它的 session.created 事件先到
   await fake.session.prompt({ sessionID: "child" })
   fake.emit({ id: "c", type: "session.created", location: at, data: { sessionID: "child", parentID: "parent", model: { providerID: "deepseek", id: "v4" } } })
-  await waitFor(async () => (await f.events()).length === 2)
+  await waitFor(async () => (await f.events()).length === 6)
+  await fake.session.context({ sessionID: "parent", model: { providerID: "deepseek", id: "v4" } })
   await fake.session.context({ sessionID: "child", model: { providerID: "openai", id: "gpt-6" } })
+  fake.emit({ id: "pd", type: "session.execution.succeeded", data: { sessionID: "parent" } })
   await fake.tool["execute.before"]({ sessionID: "child", tool: "read" })
-  fake.emit({ id: "cd", type: "session.execution.succeeded", data: { sessionID: "child" } })
-
-  await waitFor(async () => (await f.events()).length >= 5)
-  await new Promise(resolve => setTimeout(resolve, 600))
-  const events = await f.events()
-  assert.deepEqual(events.map(x => [x.event.hook_event_name, x.event.session_id]), [
-    ["SessionStart", "parent"], ["SubagentStart", "parent"], ["BeforeModel", "parent"], ["PreToolUse", "parent"], ["SubagentStop", "parent"],
+  await fake.tool["execute.after"]({ sessionID: "child", tool: "read", status: "completed" })
+  await new Promise(resolve => setTimeout(resolve, 400))
+  assert.deepEqual(await names(), [
+    "SessionStart parent", "UserPromptSubmit parent", "BeforeModel parent", "PreToolUse parent", "PostToolUse parent", "SubagentStart parent",
   ])
-  assert.equal(events[2].event.model, undefined)   // 子会话的模型不能把父会话的角色换掉
+
+  fake.emit({ id: "cd", type: "session.execution.succeeded", data: { sessionID: "child" } })
+  await waitFor(async () => (await f.events()).length === 7)
+  await fake.session.context({ sessionID: "parent", model: { providerID: "deepseek", id: "v4" } })
+  fake.emit({ id: "pd2", type: "session.execution.succeeded", data: { sessionID: "parent" } })
+  await waitFor(async () => (await f.events()).length === 8)
+  await new Promise(resolve => setTimeout(resolve, 200))
+  assert.deepEqual((await names()).slice(6), ["SubagentStop parent", "Stop parent"])
+})
+
+test("V2 子会话结束后父会话没接着干：补报一次完成", async (t) => {
+  const f = await fixture(t)
+  const fake = v2Context()
+  const cleanup = await plugin.setup(fake.ctx)
+  t.after(cleanup)
+  fake.emit({ id: "c", type: "session.created", data: { sessionID: "child", parentID: "parent" } })
+  fake.emit({ id: "pd", type: "session.execution.succeeded", data: { sessionID: "parent" } })
+  fake.emit({ id: "cd", type: "session.execution.succeeded", data: { sessionID: "child" } })
+  await waitFor(async () => (await f.events()).length === 3, 6000)
+  assert.deepEqual((await f.events()).map(x => x.event.hook_event_name), ["SubagentStart", "SubagentStop", "Stop"])
+})
+
+test("V2 工具做完紧跟的 context 不报 BeforeModel（不然工具动作被思考盖掉），换了模型才报", async (t) => {
+  const f = await fixture(t)
+  const fake = v2Context()
+  const cleanup = await plugin.setup(fake.ctx)
+  t.after(cleanup)
+  const deepseek = { providerID: "deepseek", id: "v4" }
+  await fake.session.prompt({ sessionID: "s" })
+  await fake.session.context({ sessionID: "s", model: deepseek })
+  await fake.tool["execute.before"]({ sessionID: "s", tool: "read" })
+  await fake.tool["execute.after"]({ sessionID: "s", tool: "read", status: "completed" })
+  await fake.session.context({ sessionID: "s", model: deepseek })
+  await fake.session.context({ sessionID: "s", model: { providerID: "openai", id: "gpt-6" } })
+  // 下一轮提问：开头照样报
+  await fake.session.prompt({ sessionID: "s" })
+  await fake.session.context({ sessionID: "s", model: { providerID: "openai", id: "gpt-6" } })
+  await waitFor(async () => (await f.events()).length === 7)
+  await new Promise(resolve => setTimeout(resolve, 100))
+  const events = await f.events()
+  assert.deepEqual(events.map(x => x.event.hook_event_name), [
+    "UserPromptSubmit", "BeforeModel", "PreToolUse", "PostToolUse", "BeforeModel", "UserPromptSubmit", "BeforeModel",
+  ])
+  assert.equal(events[4].event.model, "openai/gpt-6")
 })
 
 test("V2 提问一直等不到 context 钩子也照样转发", async (t) => {
