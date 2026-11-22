@@ -176,6 +176,67 @@ test("V2 共享服务端里只处理当前项目的事件", async (t) => {
   assert.deepEqual((await f.events()).map(x => x.event.session_id), ["mine"])
 })
 
+test("V2 服务端给几个项目各加载一份：不带 location 的事件只由认得这个会话的那份转发", async (t) => {
+  const f = await fixture(t)
+  const a = v2Context(), b = v2Context()
+  a.ctx.location = { directory: "/project/a" }
+  b.ctx.location = { directory: "/project/b" }
+  const cleanups = [await plugin.setup(a.ctx), await plugin.setup(b.ctx)]
+  t.after(() => cleanups.forEach(c => c()))
+  const both = (event) => { a.emit(event); b.emit(event) }
+
+  both({ id: "c", type: "session.created", location: { directory: "/project/a" }, data: { sessionID: "s1" } })
+  both({ id: "d1", type: "session.execution.succeeded", data: { sessionID: "s1" } })
+  // 插件加载前就开着的会话：靠自己的钩子认得它
+  await b.session.prompt({ sessionID: "s2" })
+  await b.session.context({ sessionID: "s2", model: { providerID: "deepseek", id: "v4" } })
+  both({ id: "d2", type: "session.execution.interrupted", data: { sessionID: "s2" } })
+  both({ id: "d3", type: "session.execution.succeeded", data: { sessionID: "nobody" } })
+
+  await waitFor(async () => (await f.events()).length >= 5)
+  await new Promise(resolve => setTimeout(resolve, 100))
+  // 两份插件各自排队、各起进程写同一个文件，彼此的先后不固定：只比较各有几条
+  const events = (await f.events()).map(x => `${x.event.hook_event_name} ${x.event.session_id}`).sort()
+  assert.deepEqual(events, ["BeforeModel s2", "Interrupt s2", "SessionStart s1", "Stop s1", "UserPromptSubmit s2"])
+})
+
+test("V2 子会话：它的提问不当成用户消息，模型和工具算在父会话", async (t) => {
+  const f = await fixture(t)
+  const fake = v2Context()
+  fake.ctx.location = { directory: "/project/a" }
+  const cleanup = await plugin.setup(fake.ctx)
+  t.after(cleanup)
+  const at = { directory: "/project/a" }
+
+  fake.emit({ id: "p", type: "session.created", location: at, data: { sessionID: "parent", model: { providerID: "deepseek", id: "v4" } } })
+  await waitFor(async () => (await f.events()).length === 1)
+  // 实测：子会话的 prompt 钩子比它的 session.created 事件先到
+  await fake.session.prompt({ sessionID: "child" })
+  fake.emit({ id: "c", type: "session.created", location: at, data: { sessionID: "child", parentID: "parent", model: { providerID: "deepseek", id: "v4" } } })
+  await waitFor(async () => (await f.events()).length === 2)
+  await fake.session.context({ sessionID: "child", model: { providerID: "openai", id: "gpt-6" } })
+  await fake.tool["execute.before"]({ sessionID: "child", tool: "read" })
+  fake.emit({ id: "cd", type: "session.execution.succeeded", data: { sessionID: "child" } })
+
+  await waitFor(async () => (await f.events()).length >= 5)
+  await new Promise(resolve => setTimeout(resolve, 600))
+  const events = await f.events()
+  assert.deepEqual(events.map(x => [x.event.hook_event_name, x.event.session_id]), [
+    ["SessionStart", "parent"], ["SubagentStart", "parent"], ["BeforeModel", "parent"], ["PreToolUse", "parent"], ["SubagentStop", "parent"],
+  ])
+  assert.equal(events[2].event.model, undefined)   // 子会话的模型不能把父会话的角色换掉
+})
+
+test("V2 提问一直等不到 context 钩子也照样转发", async (t) => {
+  const f = await fixture(t)
+  const fake = v2Context()
+  const cleanup = await plugin.setup(fake.ctx)
+  t.after(cleanup)
+  await fake.session.prompt({ sessionID: "lonely" })
+  await waitFor(async () => (await f.events()).length === 1)
+  assert.deepEqual((await f.events()).map(x => x.event.hook_event_name), ["UserPromptSubmit"])
+})
+
 test("全局表单和关闭后的事件不转发", async (t) => {
   const f = await fixture(t)
   const fake = v2Context()

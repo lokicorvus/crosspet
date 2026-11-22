@@ -77,12 +77,29 @@ function createSender() {
   return send
 }
 
-function toolEvent(send, name, input) {
-  send(name, input?.sessionID, { tool_name: String(input?.tool || "") })
+const PROMPT_WAIT = 300   // 提问等 context 钩子最多这么久（毫秒），见 setup
+
+// 这份插件认得哪些会话（实测 OpenCode 2.3.2）：
+// - 服务端给每个打开过的项目各加载一份全局插件（实测 3 份），事件流每份都收到全部事件。
+//   session.execution.* 之类不带 location，按项目过滤拦不住，每份都转发就成了 3 条 Stop。
+//   所以只转发认得的会话：带本项目 location 的 session.created 里看到的，或本份插件的钩子里出现过的
+//   （prompt / context / tool 钩子只在会话所在项目那份插件里触发）。没有 location 的旧版本（拿不到目录）照旧全转发。
+// - 子会话（task 派出去的）：它的提问不是用户发的，不报 UserPromptSubmit；它的模型、工具算在父会话头上
+//   （同 Claude Code：子代理的工具事件带父会话 id），结束时报 SubagentStop。
+function sessionTracker(locationDirectory) {
+  const owned = new Set()
+  const parents = new Map()
+  const trim = (set) => { if (set.size > 1000) set.delete(set.values().next().value) }
+  return {
+    own(sid) { if (sid) { owned.add(sid); trim(owned) } },
+    owns(sid) { return !locationDirectory || owned.has(sid) },
+    addChild(sid, parent) { parents.set(sid, parent); if (parents.size > 1000) parents.delete(parents.keys().next().value) },
+    parentOf(sid) { return parents.get(sid) },
+    dropChild(sid) { parents.delete(sid) },
+  }
 }
 
-function v2Events(send, locationDirectory) {
-  const children = new Map()
+function v2Events(send, locationDirectory, sessions = sessionTracker(locationDirectory)) {
   const seen = new Set()
   return (event) => {
     if (!event) return
@@ -94,25 +111,27 @@ function v2Events(send, locationDirectory) {
       if (seen.size > 1000) seen.delete(seen.values().next().value)
     }
     const p = event.data || event.properties || {}
-    const sid = sessionID(p)
+    const sid = event.type?.startsWith("form.") && p.form ? String(p.form.sessionID || "") : sessionID(p)
+    if (event.location?.directory) sessions.own(sid)
+    else if (!sessions.owns(sid)) return
     switch (event.type) {
       case "session.created":
         if (p.parentID) {
-          children.set(sid, String(p.parentID))
+          sessions.addChild(sid, String(p.parentID))
           send("SubagentStart", p.parentID, { model: modelName(p.model) })
         } else {
           send("SessionStart", sid, { model: modelName(p.model) })
         }
         break
       case "session.model.selected":
-        if (!children.has(sid)) send("ModelChanged", sid, { model: modelName(p.model) })
+        if (!sessions.parentOf(sid)) send("ModelChanged", sid, { model: modelName(p.model) })
         break
       case "session.execution.succeeded":
       case "session.execution.failed":
       case "session.execution.interrupted": {
-        const parent = children.get(sid)
+        const parent = sessions.parentOf(sid)
         if (parent) {
-          children.delete(sid)
+          sessions.dropChild(sid)
           send("SubagentStop", parent)
           break
         }
@@ -121,8 +140,8 @@ function v2Events(send, locationDirectory) {
         break
       }
       case "session.deleted": {
-        const parent = children.get(sid)
-        children.delete(sid)
+        const parent = sessions.parentOf(sid)
+        sessions.dropChild(sid)
         send(parent ? "SubagentStop" : "SessionEnd", parent || sid)
         break
       }
@@ -161,19 +180,40 @@ export default {
 
   async setup(ctx) {
     const send = createSender()
-    const onEvent = v2Events(send, ctx.location?.directory)
+    const sessions = sessionTracker(ctx.location?.directory)
+    const onEvent = v2Events(send, ctx.location?.directory, sessions)
     const controller = new AbortController()
 
+    // 子会话的 prompt 钩子比它的 session.created 事件先到（实测差几十毫秒），当时还认不出是子会话。
+    // 所以提问先压着：等到这个会话的 context 钩子（带模型，紧跟着就来）再决定，PROMPT_WAIT 内没等到也照发
+    const pending = new Map()
+    function flushPrompt(sid, model) {
+      clearTimeout(pending.get(sid))
+      pending.delete(sid)
+      if (!sessions.parentOf(sid)) send("UserPromptSubmit", sid, { model })
+    }
+    const route = (sid) => sessions.parentOf(sid) || sid
     await ctx.session.hook("prompt", (event) => {
-      send("UserPromptSubmit", event.sessionID)
+      const sid = String(event?.sessionID || "")
+      sessions.own(sid)
+      clearTimeout(pending.get(sid))
+      pending.set(sid, setTimeout(() => flushPrompt(sid, ""), PROMPT_WAIT))
     })
     await ctx.session.hook("context", (event) => {
-      send("BeforeModel", event.sessionID, { model: modelName(event.model) })
+      const sid = String(event?.sessionID || "")
+      sessions.own(sid)
+      const model = modelName(event?.model)
+      if (pending.has(sid)) flushPrompt(sid, model)
+      const parent = sessions.parentOf(sid)
+      send("BeforeModel", parent || sid, { model: parent ? "" : model })   // 子会话的模型不能把父会话的角色换掉
     })
-    await ctx.tool.hook("execute.before", (event) => toolEvent(send, "PreToolUse", event))
-    await ctx.tool.hook("execute.after", (event) => {
-      toolEvent(send, event.status === "error" ? "PostToolUseFailure" : "PostToolUse", event)
-    })
+    const tool = (name) => (event) => {
+      sessions.own(String(event?.sessionID || ""))
+      send(name, route(String(event?.sessionID || "")), { tool_name: String(event?.tool || "") })
+    }
+    const before = tool("PreToolUse"), after = tool("PostToolUse"), failed = tool("PostToolUseFailure")
+    await ctx.tool.hook("execute.before", before)
+    await ctx.tool.hook("execute.after", (event) => (event?.status === "error" ? failed : after)(event))
 
     void (async () => {
       try {
@@ -187,6 +227,8 @@ export default {
 
     return () => {
       controller.abort()
+      for (const timer of pending.values()) clearTimeout(timer)
+      pending.clear()
       send.close()
     }
   },
