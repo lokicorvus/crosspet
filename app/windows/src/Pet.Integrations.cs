@@ -35,7 +35,7 @@ namespace CrossPet
         {
             ["claude-hooks"] = "claude", ["claude-mod"] = "claude-mod", ["codex"] = "gpt", ["deepseek"] = "deepseek", ["gemini"] = "gemini",
             ["antigravity"] = "antigravity", ["workbuddy"] = "workbuddy", ["zcode"] = "zcode", ["hermes"] = "hermes",
-            ["qwen"] = "qwen", ["kimi"] = "kimi", ["cursor"] = "cursor", ["grok"] = "grok", ["opencode"] = "opencode",
+            ["qwen"] = "qwen", ["kimi"] = "kimi", ["cursor"] = "cursor", ["grok"] = "grok", ["opencode"] = "opencode", ["trae"] = "trae",
         };
         static Dictionary<string, object> LastSeen => Store.Settings.TryGetValue("seen", out var v) && v is Dictionary<string, object> d ? d : new Dictionary<string, object>();
         static double? SeenAt(string key) => LastSeen.TryGetValue(key, out var v) ? Convert.ToDouble(v) : (double?)null;
@@ -134,6 +134,7 @@ namespace CrossPet
             ("kimi", "Kimi Code（月之暗面）", "按会话的模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效。Kimi 客户端没有接口"),
             ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
             ("opencode", "OpenCode V2", "按当前模型换角色，没有对应角色的模型由当前角色来演"),
+            ("trae", "TRAE（字节）", "默认由豆包来演；还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」"),
         };
 
         public Dictionary<string, object> SettingsState()

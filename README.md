@@ -57,8 +57,11 @@
 | **Kimi**（Kimi Code，多模型；Kimi 客户端） | ✅ 按当前模型 | ✅ Kimi Code 钩子（干活时的事件待实测） | — |
 | **Cursor**（多模型） | ✅ 按当前模型 | ✅ 观察钩子（真实 Cursor 会话待验证） | — |
 | **Grok**（xAI Grok Build） | — | ✅ 钩子（待实测） | — |
+| **豆包**（TRAE；豆包客户端；别家程序里的豆包模型） | ✅ 按当前模型 | ✅ TRAE 钩子（默认由豆包来演）；豆包客户端没有接口，切过去只换形象 | — |
 
 Cursor 里用哪家的模型，她就换成哪家的角色（每个对话各算各的）；Cursor 自家的 Composer、Auto 这类认不出的模型由当前角色来演，想固定成某个角色，可以在 `~/.cursor/hooks.json` 里本桥每条命令末尾加上角色 id，后续刷新会保留。运行 `python3 tools/integrate.py install cursor`，新开会话生效。使用前需要先打开 CrossPet，当前 Cursor 桥不会自动拉起已退出的桌宠。具体范围见[接入教程](docs/接入教程.md#cursor)。
+
+TRAE（字节的 AI 编程 IDE，国内版）运行 `python3 tools/integrate.py install trae` 接入，写的是 `~/.trae-cn/hooks.json`；TRAE 的钩子默认不跑，还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」。TRAE 的钩子事件里没有模型名，所以不管选的是哪家模型，都由豆包来演（豆包没装时由当前角色来演）。TRAE 打开「导入 CLAUDE 中的 Hooks 配置」后也会跑 Claude Code 的钩子：只接了 Claude 钩子的话，TRAE 干活时算 TRAE 的，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过。
 
 Grok Build（xAI 的命令行编程工具）运行 `python3 tools/integrate.py install grok` 接入，写的是它自己的 `~/.grok/hooks/crosspet.json`；在一个文件夹里第一次用时，要先在 Grok 里用 `/hooks-trust` 信任这个文件夹，钩子才会跑。Grok Build 也会读 Claude Code 的钩子：只接了 Claude 钩子的话，Grok 干活时由 Grok 来演，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过，不会演两遍。Grok 和 Cursor 的额度都只能拿登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。
 
@@ -223,6 +226,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - OpenCode：同上，插件只传事件名、工具名、当前模型名和会话 id；V2 的工具结果只看成功还是出错，不读登录凭据，不显示独立额度。
 - Qwen Code：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它的登录凭据，所以也不显示额度。
 - Kimi Code：同上，只用事件名、工具名和会话开始时的模型名；不读 `~/.kimi-code` 里的登录凭据，不显示额度。
+- TRAE：钩子只用事件名、工具名和会话 id；TRAE 发来的事件里带着你的提问和工具结果，钩子不保存、不转发；不读登录凭据，不显示额度。
 - CrossPet 自己只联网做一件事：每 3 小时（以及电脑从睡眠中醒来时）查一次 GitHub 上有没有新版本，只读公开的版本号；点「更新」时才下载安装包。（GPT 额度的查询是 Codex 自己发的，见上面）
 
 ## 更新与卸载
@@ -248,7 +252,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - **Grok 娘（哥特小恶魔女王）**：形象出自 B 站 **ZipZipPipe**；「爱查证、爱抬杠的小恶魔」的性格和专属动作（查证、怼老板、举奖杯）是 CrossPet 在此基础上的二创。
 - **豆包娘（抱头套的生活小帮手）**：形象出自 B 站 **ZipZipPipe**；「嘴甜认错快的生活小帮手」的性格和专属动作（抱头套、戴头套躲起来、派小豆包）是 CrossPet 在此基础上的二创，取自社区对豆包的印象。
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
-- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」「Grok」「xAI」是各自公司的商标，本项目仅用于指代对应产品。
+- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」「Grok」「xAI」「Kimi」「豆包」「TRAE」是各自公司的商标，本项目仅用于指代对应产品。
 
 - **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装 / 毛衣的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。

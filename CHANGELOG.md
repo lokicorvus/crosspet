@@ -3,6 +3,7 @@
 ## 未发布
 
 - 新增：新角色豆包：抱着豆包头套的生活小帮手，紫到青的渐变长发、侧马尾。话多嘴甜、反应快、有点迷糊，出错了第一时间「我错了我错了，嘿嘿」，大活干完会说「我将用最直白的方式：搞定！」；闹别扭时把头套戴上躲起来。用豆包的模型时（DeepSeek Harness、WorkBuddy、OpenCode、Cursor 里，或者 Claude Code 增强版走豆包的接口）她来演；切到豆包客户端时也换成她。她有自己的小本子「备忘录」，和每个角色、四套性格皮肤都有成对的对话和小本子留言（台词由 Gemini 执笔）
+- 新增：接入 TRAE（字节的 AI 编程 IDE，国内版）：干活时桌宠跟着读文件、写代码、跑命令，等你确认、等你回答时举手等你。TRAE 的钩子事件里没有模型名，所以默认由豆包来演。运行 `python3 tools/integrate.py install trae` 或在设置「接入 AI」里打开，写进 `~/.trae-cn/hooks.json`；还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」。TRAE 打开「导入 CLAUDE 中的 Hooks 配置」后会顺带跑 Claude Code 的钩子，CrossPet 认得出来：不会把 TRAE 的活算到 Claude 头上，两边都接了也不会演两遍
 - 修复：Antigravity 更新到 2.34 之后，Gemini 的额度不显示了。新版不再把本机服务的令牌写在启动参数里，改写进 `~/.gemini/antigravity/daemon/hub_<端口>.json`，CrossPet 找不到令牌就当它没开。现在先读这个文件（只认进程还在的、取最新的），旧版 Antigravity 照旧从启动参数里取；问的接口和以前一样，仍然只在本机、不碰 Google 账号（Windows 按同一个位置找，还没在 Windows 上实测）
 
 ## 1.4.0 · 新角色 Kimi、我们的小本子、久坐喝水提醒、魔术师 Gemini（2026-11-18）

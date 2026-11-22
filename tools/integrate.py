@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode | trae
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode | trae
     python3 tools/integrate.py status
 
 原则：
@@ -717,6 +717,42 @@ def qwen(install: bool) -> None:
         remove_hooks(QWEN_SETTINGS)
 
 
+# ---- TRAE（字节）----
+# 全局钩子在 <配置目录>/hooks.json：国内版 ~/.trae-cn，国际版 ~/.trae（国际版没实测）。格式和 Claude Code 一样，外面多一个 "version": 1。
+# 钩子默认不跑：要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」。命令默认在沙箱里跑，能写 /tmp。
+# 事件里没有模型名，钩子脚本默认由豆包来演（crosspet-hook.py trae）
+TRAE_HOMES = (HOME / ".trae-cn", HOME / ".trae")
+
+
+def trae_dirs() -> list:
+    # 打开过一次 TRAE 才会有 argv.json（~/.trae 里可能只有别的工具装的 skills）
+    return [d for d in TRAE_HOMES if (d / "argv.json").exists()]
+
+
+def trae(install: bool) -> None:
+    dirs = trae_dirs()
+    if install:
+        if not dirs:
+            print("  没找到 TRAE 的配置（~/.trae-cn 或 ~/.trae），请先安装并打开一次 TRAE 再接入")
+            return
+        for d in dirs:
+            merge_hooks(d / "hooks.json", REPO / "integrations/trae/hooks.json")
+            data = load_json(d / "hooks.json")
+            if "version" not in data:
+                save_json(d / "hooks.json", {"version": 1, **data})
+        print("  → 还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」，然后新开对话生效；默认由豆包来演")
+    else:
+        for d in TRAE_HOMES:
+            f = d / "hooks.json"
+            remove_hooks(f)
+            if f.exists() and load_json(f) == {"version": 1}:   # 只剩 CrossPet 写的空壳：删掉（改之前已经备份过）
+                f.unlink()
+
+
+def has_trae() -> bool:
+    return any(has_hooks(d / "hooks.json") for d in trae_dirs())
+
+
 # ---- Kimi Code（月之暗面）----
 # 配置在 ~/.kimi-code/config.toml（可用 KIMI_CODE_HOME 挪走），钩子是 [[hooks]] 表：只认 event / matcher / command / timeout 四个字段，
 # 多一个字段整个配置文件都读不进去。事件名、stdin 里的字段和 Claude Code 一样（tool_name、tool_input、session_id……）；
@@ -1110,7 +1146,7 @@ def cursor(install: bool) -> None:
         remove_cursor_hooks(CURSOR_HOOKS)
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok, "opencode": opencode}
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok, "opencode": opencode, "trae": trae}
 
 
 def has_hooks(p: Path) -> bool:
@@ -1139,6 +1175,7 @@ def installed() -> list:
     if has_grok(): result.append("grok")
     if has_kimi() and found(KIMI_HOME, "", ("config.toml",), quiet=True): result.append("kimi")
     if has_opencode(): result.append("opencode")
+    if has_trae(): result.append("trae")
     return result
 
 
@@ -1172,7 +1209,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode", "trae": "trae"}
 
 
 def short(p) -> str:
@@ -1376,6 +1413,8 @@ def diagnose() -> str:
             L.append(f"[WorkBuddy] {file_state(d / 'settings.json', lambda d=d: has_hooks(d / 'settings.json'))}")
     L.append(f"  WorkBuddy 最近消息 {seen('workbuddy')}；环境变量 {env_line('WORKBUDDY_CONFIG_DIR')}")
     L.append(f"[ZCode] {file_state(ZCODE_CONFIG, has_zcode)}；最近消息 {seen('zcode')}")
+    for d in TRAE_HOMES:
+        L.append(f"[TRAE] {file_state(d / 'hooks.json', lambda: has_hooks(d / 'hooks.json'))}；最近消息 {seen('trae')}")
     hermes_on = HERMES_CONFIG.exists() and re.search(r"^\s+-\s*crosspet\s*$", HERMES_CONFIG.read_text(encoding="utf-8"), re.M)
     L.append(f"[Hermes] {short(HERMES_HOME)}（{'在' if HERMES_HOME.exists() else '不在'}），插件 {'在' if has_hermes() else '不在'}，"
              f"config.yaml 里启用 {'是' if hermes_on else '否'}；"

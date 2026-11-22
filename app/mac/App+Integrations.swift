@@ -21,6 +21,7 @@ extension App {
         ("kimi", "Kimi Code（月之暗面）", "按会话的模型换角色；新开的会话生效。Kimi 客户端没有接口，切到它时换成 Kimi"),
         ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
         ("opencode", "OpenCode V2", "按当前模型换角色；重开或重载插件后生效"),
+        ("trae", "TRAE（字节）", "默认由豆包来演；还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」"),
     ]
     var integrateScript: URL? {
         let url = Bundle.main.resourceURL!.appendingPathComponent("tools/integrate.py")
@@ -65,7 +66,7 @@ extension App {
     // 钩子 / 插件每收到一条事件就在状态目录写 seen-<名字>（时间戳）。状态目录 /tmp 重启会清空，所以桌宠把读到的最新时间存进设置。
     // 设置里据此标出「接上了但从没收到过消息」，反馈里也带着
     static let seenKeys = ["claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode"]
+                           "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode", "trae": "trae"]
     var lastSeen: [String: Double] {
         get { (defaults.dictionary(forKey: "seen") as? [String: Double]) ?? [:] }
         set { defaults.set(newValue, forKey: "seen") }
