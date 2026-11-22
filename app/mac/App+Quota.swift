@@ -61,24 +61,50 @@ extension App {
 
     // MARK: Gemini 额度（可选，默认关）
     // Antigravity 在本机跑着一个后台服务（language_server），它自己的界面就是向它要额度的。
-    // 这里做同样的事：从它的启动参数里取本机接口的防伪令牌（每次启动随机生成、只在本机有效，不是账号凭据），
-    // 只调「用户状态」接口、只取额度数字；令牌只在内存里用，不存盘、不外传。Antigravity 没开就不显示。
+    // 这里做同样的事：取本机接口的防伪令牌（每次启动随机生成、只在本机有效，不是账号凭据），
+    // 只调额度接口、只取额度数字；令牌只在内存里用，不存盘、不外传。Antigravity 没开就不显示。
+    // 令牌在哪：2.34 起（2026-11 实测 2.34.0）不再写在启动参数里，改写进 ~/.gemini/antigravity/daemon/hub_<端口>.json
+    // （pid、httpsPort、csrfToken）；更早的版本在 language_server 的 --csrf_token 参数里。两种都认，新的优先。
 
     func refreshAntigravityQuota() {
         guard ready, defaults.bool(forKey: "agyQuota") else { return }
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self else { return }
-            guard let (pid, token) = self.antigravityServer() else {
-                DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程" }
+            let hub = Self.antigravityHub(dir: Self.agyDaemonDir, alive: Self.pidAlive)
+            guard let (pid, token) = hub.map({ ($0.pid, $0.token) }) ?? self.antigravityServer() else {
+                DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程（daemon/hub_*.json 和启动参数里都没有令牌）" }
                 return
             }
-            let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : self.listeningPorts(pid)
-            DispatchQueue.main.async { self.lastAgyNote = "\(Self.clock()) 找到服务进程，监听端口 \(ports.count) 个" }
+            let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : hub?.port.map { [$0] } ?? self.listeningPorts(pid)
+            let from = hub != nil ? "daemon 文件" : "启动参数"
+            DispatchQueue.main.async { self.lastAgyNote = "\(Self.clock()) 找到服务进程（令牌来自\(from)），端口 \(ports.count) 个" }
             self.askAntigravity(pid: pid, token: token, ports: ports)
         }
     }
 
-    /// 找到 Antigravity 的 language_server 进程，返回 (pid, 令牌)
+    static let agyDaemonDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".gemini/antigravity/daemon")
+
+    static func pidAlive(_ pid: Int32) -> Bool { pid > 0 && (kill(pid, 0) == 0 || errno == EPERM) }
+
+    /// 新版（2.34 起）：Antigravity 把本机服务的 pid、端口、令牌写在 daemon/hub_<端口>.json。
+    /// 可能留着上次没删掉的旧文件，所以只认进程还活着的；有几个就取最新改过的那个。port 是 httpsPort（没有就是 nil，回头查监听端口）
+    static func antigravityHub(dir: URL, alive: (Int32) -> Bool) -> (pid: Int32, token: String, port: Int?)? {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return nil }
+        var found: [(pid: Int32, token: String, port: Int?, at: Date)] = []
+        for n in names where n.hasPrefix("hub_") && n.hasSuffix(".json") {
+            let url = dir.appendingPathComponent(n)
+            guard let data = fm.contents(atPath: url.path),
+                  let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                  let pid = (obj["pid"] as? NSNumber)?.int32Value, alive(pid),
+                  let token = obj["csrfToken"] as? String, !token.isEmpty else { continue }
+            let at = (try? fm.attributesOfItem(atPath: url.path)[.modificationDate] as? Date) ?? .distantPast
+            found.append((pid, token, (obj["httpsPort"] as? NSNumber)?.intValue, at))
+        }
+        return found.max { $0.at < $1.at }.map { ($0.pid, $0.token, $0.port) }
+    }
+
+    /// 旧版：找到 Antigravity 的 language_server 进程，从启动参数 --csrf_token 里取令牌，返回 (pid, 令牌)
     func antigravityServer() -> (Int32, String)? {
         guard let out = run("/bin/ps", ["-axo", "pid=,command="]) else { return nil }
         for line in out.split(separator: "\n") where line.contains("Antigravity.app/Contents/Resources/bin/language_server") {
@@ -115,12 +141,7 @@ extension App {
     static let agyMethods = ["RetrieveUserQuotaSummary", "GetUserStatus"]
     func askAntigravity(pid: Int32, token: String, ports: [Int], method: Int = 0) {
         guard let port = ports.first else { return }
-        var req = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/exa.language_server_pb.LanguageServerService/\(Self.agyMethods[method])")!)
-        req.httpMethod = "POST"
-        req.timeoutInterval = 5
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(token, forHTTPHeaderField: "X-Codeium-Csrf-Token")
-        req.httpBody = #"{"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en"}}"#.data(using: .utf8)
+        let req = Self.agyRequest(port: port, method: Self.agyMethods[method], token: token)
         if agySession == nil { agySession = URLSession(configuration: .ephemeral, delegate: LocalhostTrust(), delegateQueue: nil) }
         agySession!.dataTask(with: req) { [weak self] data, resp, _ in
             guard let self else { return }
@@ -137,6 +158,16 @@ extension App {
             guard let json = try? JSONSerialization.data(withJSONObject: q), let arg = String(data: json, encoding: .utf8) else { return }
             DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', \(arg))") }
         }.resume()
+    }
+
+    static func agyRequest(port: Int, method: String, token: String) -> URLRequest {
+        var req = URLRequest(url: URL(string: "https://127.0.0.1:\(port)/exa.language_server_pb.LanguageServerService/\(method)")!)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 5
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(token, forHTTPHeaderField: "X-Codeium-Csrf-Token")
+        req.httpBody = #"{"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en"}}"#.data(using: .utf8)
+        return req
     }
 
     /// 额度汇总或用户状态，哪种都认（汇总优先）
