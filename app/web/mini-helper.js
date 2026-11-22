@@ -259,10 +259,10 @@ html.tucked .mini { visibility: hidden; }`
     }
   }
 
-  // 移动方式按原版：gpt 飞，deepseek 游，gemini、glm 扑，其他跑。
+  // 移动方式按原版：gpt 飞，gemini、glm 扑，其他跑（deepseek 试过游，loki 觉得还是跑步好看）。
   // 皮肤另说的（MOVE_SKIN）：穿着它、用的又是它自己那套图时按皮肤的。连体衣的翅膀只是衣服上的装饰，跑着走不飞；
   // 皮肤没有自己的图、借原版那套时，帧是原版画的，照原版的走
-  const MOVE = { gpt: 'fly', deepseek: 'swim', gemini: 'pounce', glm: 'pounce' }
+  const MOVE = { gpt: 'fly', gemini: 'pounce', glm: 'pounce' }
   const MOVE_SKIN = { 'gpt-onesie': 'run' }
   const moveOf = (id, c) => (c && c.skin && MOVE_SKIN[c.skin] && c.poses && c.poses.mini && c.poses.mini[0] ? MOVE_SKIN[c.skin] : MOVE[id] || 'run')
 

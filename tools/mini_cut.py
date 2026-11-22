@@ -11,7 +11,7 @@
   mini_more  横图 3×2：跑步 3 帧；挥手、看书、着急
   mini_work  横图 3×2：思考 2 帧、记笔记；抱书（单帧，不用）、指你、递礼物
   mini_carry 横图 3×1：抱书跑 3 帧
-  mini_move  横图 3×1：移动 3 帧（可选；飞 / 游的身体是横的，按头宽对齐大小，脚对齐左右）
+  mini_move  横图 3×1：移动 3 帧（可选；飞 / 游 / 扑的身体是横的，按头宽对齐大小，重心对齐左右）
 缩放：每张按站着的小人缩到 STAND 高（mini 用待机、mini_more 用挥手、mini_work 用指你），抱书跑按 mini_work 里那个抱书的对齐大小，
 四张图之间大小一致。连着播的几帧（跑步、抱书跑按头对齐，思考按脚对齐）共用一个框，放进格子后不会左右抖、腾空那帧还是离地的。
 """
@@ -52,8 +52,35 @@ def cells(im, cols, rows):
     return out
 
 
+def figures(im, n):
+    """一行 n 只、中间留了空的图：按透明的空列分开（扑出去那帧可能越过三等分线，平分会切到隔壁的半个身子）。
+    碎块（发梢、飘带）并到最近的那只；分不出 n 只就退回平分"""
+    cols = mask(im).getprojection()[0]   # 每一列有没有不透明的像素
+    runs, start = [], None
+    for x, v in enumerate(list(cols) + [0]):
+        if v and start is None:
+            start = x
+        elif not v and start is not None:
+            runs.append([start, x])
+            start = None
+    while len(runs) > n:   # 最窄的一段并到离得近的邻居
+        i = min(range(len(runs)), key=lambda j: runs[j][1] - runs[j][0])
+        if i == 0 or (i < len(runs) - 1 and runs[i + 1][0] - runs[i][1] < runs[i][0] - runs[i - 1][1]):
+            runs[i + 1][0] = runs[i][0]
+        else:
+            runs[i - 1][1] = runs[i][1]
+        del runs[i]
+    if len(runs) != n:
+        return cells(im, n, 1)
+    edges = [0] + [(a[1] + b[0]) // 2 for a, b in zip(runs, runs[1:])] + [im.width]
+    return [im.crop((edges[i], 0, edges[i + 1], im.height)) for i in range(n)]
+
+
 def center_x(cell, part):
-    """头（part='head'：外框最上面 25%）或脚（part='feet'：最下面 12%）的左右中线"""
+    """头（part='head'：外框最上面 25%）或脚（part='feet'：最下面 12%）的左右中线；part='mass'：整个人的重心"""
+    if part == "mass":   # 每列不透明像素的多少当权重
+        cols = list(mask(cell).resize((cell.width, 1), Image.BOX).getdata())
+        return sum(x * v for x, v in enumerate(cols)) / max(1, sum(cols))
     b = bbox(cell)
     h = b[3] - b[1]
     band = (b[1], b[1] + h // 4) if part == "head" else (b[3] - max(8, h * 12 // 100), b[3])
@@ -89,9 +116,10 @@ def sheet_path(batch, st, cid, pose, use):
 
 
 def move_frames(cs, k_more, wave):
-    """mini_move 3 格：按头宽缩到和 mini_more 里挥手那个一样大，脚对齐"""
+    """mini_move 3 格：按头宽缩到和 mini_more 里挥手那个一样大；左右按重心对齐。
+    扑的那帧脚在身后，按脚对齐会把身子推到前面、落地那帧又退回来，小帮手本身一直匀速往前走，看起来就一卡一退"""
     k = k_more * head_width(wave) / head_width(cs[0])
-    return {name: scaled(c, k) for name, c in zip(("move-a", "move-b", "move-c"), group(cs, "feet"))}
+    return {name: scaled(c, k) for name, c in zip(("move-a", "move-b", "move-c"), group(cs, "mass"))}
 
 
 def cut(batch, cid, use, move_batch=None):
@@ -133,7 +161,7 @@ def cut(batch, cid, use, move_batch=None):
         out[name] = scaled(c, k)
 
     if mv:
-        out.update(move_frames(cells(Image.open(mv).convert("RGBA"), 3, 1), k_more, m[3]))
+        out.update(move_frames(figures(Image.open(mv).convert("RGBA"), 3), k_more, m[3]))
     else:
         for a, b in (("move-a", "run-a"), ("move-b", "run-b"), ("move-c", "run-c")):
             out[a] = out[b]

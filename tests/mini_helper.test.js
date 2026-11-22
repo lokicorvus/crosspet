@@ -39,7 +39,7 @@ test('crew_self_first_then_good_friends_by_points', () => {
   const c = M.crew('claude', { store, manifest, today: '2026-11-20', levelOf: lv })
   assert.deepEqual(c.map(x => x.id), ['claude', 'gemini', 'deepseek'])   // gpt 只「认识了」不算
   assert.equal(c[2].sheet, 'file:///x/characters/deepseek-pajamas/mini.webp')   // 穿着睡衣就是睡衣那套
-  assert.deepEqual(c.map(x => x.move), ['run', 'pounce', 'swim'])
+  assert.deepEqual(c.map(x => x.move), ['run', 'pounce', 'run'])   // deepseek 跑步（游泳试过不用了）
 })
 test('crew_falls_back_to_base_sheet_when_skin_has_none', () => {
   const c = M.crew('claude', { store: { 'claude+gpt': S(200) }, manifest, today: '2026-11-20', levelOf: lv })
@@ -75,7 +75,7 @@ test('crew_waits_for_level_up_chat_before_showing_friend', () => {
   assert.deepEqual(at({ points: 200, shown: 1, giftShown: true }), ['claude', 'gemini'])
 })
 test('move_of', () => {
-  assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'swim')
+  assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'run')
   assert.equal(M.moveOf('gemini'), 'pounce'); assert.equal(M.moveOf('glm'), 'pounce'); assert.equal(M.moveOf('kimi'), 'run')
 })
 // 连体衣的翅膀只是衣服上的装饰（loki 定的）：穿着它、用它自己那套图时跑着走，不飞
