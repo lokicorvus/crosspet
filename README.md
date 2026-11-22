@@ -10,8 +10,6 @@
 
 一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
-**QQ 交流群：1106613980**，用着有问题、想要新角色、想先看到新版本，都可以来群里聊。
-
 ![Claude、GPT、DeepSeek、Gemini、GLM 五个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
 > 非官方同人项目，与 Anthropic、OpenAI、DeepSeek、Google、智谱、腾讯、阿里巴巴、xAI 无关。角色形象来自社区二创或 CrossPet 原创设定，见 [致谢与授权](#致谢与授权)。
@@ -52,6 +50,7 @@
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 | **GLM**（智谱 ZCode） | ✅ | ✅ ZCode 钩子 | — |
 | **WorkBuddy**（腾讯，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
+| **OpenCode**（本机 CLI / Desktop，多模型） | ✅ 按当前模型 | ✅ 插件（V2） | — |
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
 | **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子（未实测） | — |
 | **Kimi**（Kimi Code，多模型；Kimi 客户端） | ✅ 按当前模型 | ✅ Kimi Code 钩子（干活时的事件待实测） | — |
@@ -62,7 +61,7 @@ Cursor 里用哪家的模型，她就换成哪家的角色（每个对话各算�
 
 Grok Build（xAI 的命令行编程工具）运行 `python3 tools/integrate.py install grok` 接入，写的是它自己的 `~/.grok/hooks/crosspet.json`；在一个文件夹里第一次用时，要先在 Grok 里用 `/hooks-trust` 信任这个文件夹，钩子才会跑。Grok Build 也会读 Claude Code 的钩子：只接了 Claude 钩子的话，Grok 干活时由 Grok 来演，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过，不会演两遍。Grok 和 Cursor 的额度都只能拿登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。
 
-DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。千问角色已内置立绘。**千问的局限**：只有 Qwen Code 能接入；千问桌面客户端没有对外接口，她跟不了它干活。Qwen Code 的接入还没在真实环境里完整测过（干活时的事件要登录才能触发），遇到问题欢迎提 issue。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode 和 Hermes Agent：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
+DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、OpenCode、Qwen Code、Kimi Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。OpenCode 运行 `python3 tools/integrate.py install opencode` 接入，插件同时支持 V2，只适用于本机服务端。千问角色已内置立绘。**千问的局限**：只有 Qwen Code 能接入；千问桌面客户端没有对外接口，她跟不了它干活。Qwen Code 的接入还没在真实环境里完整测过（干活时的事件要登录才能触发），遇到问题欢迎提 issue。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。OpenCode 和 WorkBuddy 一样不提供独立额度显示，只按当前模型换角色。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode、Hermes Agent 和 OpenCode：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
 ## 快速开始
 
@@ -220,6 +219,7 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处；没填 Key 时调 Harness 自己的账号服务查，登录凭据始终留在 Harness 里，插件只拿到余额数字。
 - WorkBuddy、ZCode：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它们的登录凭据，所以也不显示它们的额度 / 积分。
 - Hermes Agent：插件只把事件名、工具名、当前模型名和会话 id 交给钩子脚本，不传对话内容和命令参数；工具结果只看成功还是出错。
+- OpenCode：同上，插件只传事件名、工具名、当前模型名和会话 id；V2 的工具结果只看成功还是出错，不读登录凭据，不显示独立额度。
 - Qwen Code：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它的登录凭据，所以也不显示额度。
 - Kimi Code：同上，只用事件名、工具名和会话开始时的模型名；不读 `~/.kimi-code` 里的登录凭据，不显示额度。
 - CrossPet 自己只联网做一件事：每 3 小时（以及电脑从睡眠中醒来时）查一次 GitHub 上有没有新版本，只读公开的版本号；点「更新」时才下载安装包。（GPT 额度的查询是 Codex 自己发的，见上面）
