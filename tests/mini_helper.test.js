@@ -78,6 +78,14 @@ test('move_of', () => {
   assert.equal(M.moveOf('gpt'), 'fly'); assert.equal(M.moveOf('deepseek'), 'swim')
   assert.equal(M.moveOf('gemini'), 'pounce'); assert.equal(M.moveOf('glm'), 'pounce'); assert.equal(M.moveOf('kimi'), 'run')
 })
+// 连体衣的翅膀只是衣服上的装饰（loki 定的）：穿着它、用它自己那套图时跑着走，不飞
+test('onesie_runs_instead_of_flying', () => {
+  const onesie = { skin: 'gpt-onesie', poses: { idle: ['…/gpt-onesie/idle.webp'], mini: ['…/gpt-onesie/mini.webp'] } }
+  assert.equal(M.moveOf('gpt', onesie), 'run')
+  const m = { characters: { ...manifest.characters, gpt: onesie } }
+  assert.equal(M.crew('claude', { store: { 'claude+gpt': S(200) }, manifest: m, today: '2026-11-20', levelOf: lv })[1].move, 'run')
+  assert.equal(M.moveOf('gpt', { skin: 'gpt-other', poses: { mini: ['…/gpt-other/mini.webp'] } }), 'fly')   // 别的皮肤照原版
+})
 
 // ---- 一组：站位、干活分工 ----
 test('spots_stay_inside_canvas_and_apart', () => {

@@ -259,9 +259,12 @@ html.tucked .mini { visibility: hidden; }`
     }
   }
 
-  // 移动方式按原版：gpt 飞，deepseek 游，gemini、glm 扑，其他跑
+  // 移动方式按原版：gpt 飞，deepseek 游，gemini、glm 扑，其他跑。
+  // 皮肤另说的（MOVE_SKIN）：穿着它、用的又是它自己那套图时按皮肤的。连体衣的翅膀只是衣服上的装饰，跑着走不飞；
+  // 皮肤没有自己的图、借原版那套时，帧是原版画的，照原版的走
   const MOVE = { gpt: 'fly', deepseek: 'swim', gemini: 'pounce', glm: 'pounce' }
-  const moveOf = id => MOVE[id] || 'run'
+  const MOVE_SKIN = { 'gpt-onesie': 'run' }
+  const moveOf = (id, c) => (c && c.skin && MOVE_SKIN[c.skin] && c.poses && c.poses.mini && c.poses.mini[0] ? MOVE_SKIN[c.skin] : MOVE[id] || 'run')
 
   // 小帮手的图：先看姿态 mini；没有且穿着皮肤，就把皮肤目录的 idle 路径换成原角色的 mini.webp；都没有就是没有
   function sheetOf(id, c) {
@@ -285,7 +288,7 @@ html.tucked .mini { visibility: hidden; }`
   const MAX_CREW = 6
   function crew(receiver, { store = {}, manifest = {}, today = '', levelOf = () => 0 } = {}) {
     const chars = (manifest && manifest.characters) || {}
-    const entry = id => ({ id, sheet: sheetOf(id, chars[id]), move: moveOf(id) })
+    const entry = id => ({ id, sheet: sheetOf(id, chars[id]), move: moveOf(id, chars[id]) })
     const self = chars[receiver] && !chars[receiver].egg ? entry(receiver) : null
     const mine = self && self.sheet ? [self] : []
     const friends = []
