@@ -154,9 +154,12 @@ test('说话时挑立绘：写了用写的，没写按字面（胖 → 鼓脸，
   assert.deepEqual(got.lines[1], ['gpt', '嗯……软的哦。', 'pat'])
 })
 
-test('升级台词：每个角色和每套皮肤都有三档，不长', () => {
+const withLevel = () => {
   const skins = fs.readdirSync(DIR).filter(id => CHARS.includes(skinOf(id)))
-  for (const w of [...CHARS, ...skins]) {
+  return [...CHARS, ...skins]
+}
+test('升级台词：每个角色和每套皮肤都有三档，不长', () => {
+  for (const w of withLevel()) {
     const lines = P.LEVEL_LINES[w]
     assert.ok(lines && lines.length === 3, `缺 ${w}`)
     for (const l of lines) assert.ok(l.length > 0 && l.length <= 14, `${w} 这句太长：${l}`)
@@ -164,14 +167,18 @@ test('升级台词：每个角色和每套皮肤都有三档，不长', () => {
 })
 
 test('升级台词的立绘：每句一张、各角色都画了，不是一律同一张', () => {
-  const skins = fs.readdirSync(DIR).filter(id => CHARS.includes(skinOf(id)))
-  for (const w of [...CHARS, ...skins]) {
+  for (const w of withLevel()) {
     const poses = P.LEVEL_POSES[w]
     assert.ok(poses && poses.length === 3, `缺 ${w}`)
     const files = fs.readdirSync(path.join(DIR, w))
     for (const p of poses) assert.ok(files.some(f => f === p + '.webp' || f.startsWith(p + '-')), `${w} 没画 ${p}`)
   }
   assert.ok(new Set(Object.values(P.LEVEL_POSES).flat()).size >= 4)
+})
+
+test('levelUp：新皮肤还没写升级台词时说原角色那句', () => {
+  const up = P.levelUp({ present: ['gpt', 'grok'], shownOf: () => 0, rnd: () => 0, levelOf: () => 1, wear: ch => ch === 'gpt' ? 'gpt-not-yet' : '' })
+  assert.deepEqual(up.lines.find(([w]) => w === 'gpt').slice(1, 3), [P.LEVEL_LINES.gpt[0], P.LEVEL_POSES.gpt[0]])
 })
 
 test('levelUp：升了级没演过才演；只演最高那档；在忙的不算；按穿的说', () => {

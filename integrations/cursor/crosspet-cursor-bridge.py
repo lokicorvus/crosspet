@@ -143,6 +143,8 @@ def character_for_model(model):
         return 'qwen'
     if 'kimi' in m or 'moonshot' in m:
         return 'kimi'
+    if 'doubao' in m:
+        return 'doubao'
     if 'grok' in m:
         return 'grok'
     if 'deepseek' in m:

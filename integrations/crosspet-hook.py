@@ -575,6 +575,8 @@ def character_for_model(model: str):
         return "qwen"
     if "kimi" in m or "moonshot" in m:
         return "kimi"
+    if "doubao" in m:   # 火山方舟的 doubao-seed-…、doubao-1.5-pro-…
+        return "doubao"
     if "grok" in m:   # xAI 的 grok-4.7、OpenRouter 的 x-ai/grok-…
         return "grok"
     if "deepseek" in m:

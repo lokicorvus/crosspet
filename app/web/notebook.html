@@ -183,8 +183,8 @@ const demo = new URLSearchParams(location.search).get('demo')
 if (demo) {
   document.documentElement.style.background = '#e7e2da'
   const day = 86_400_000, now = Date.now()
-  const friendOf = { claude: 'deepseek', deepseek: 'claude', gpt: 'gemini', gemini: 'gpt', glm: 'qwen', grok: 'deepseek', qwen: 'glm', kimi: 'deepseek' }
-  const names = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', glm: 'GLM', grok: 'Grok', qwen: '千问', kimi: 'Kimi' }
+  const friendOf = { claude: 'deepseek', deepseek: 'claude', gpt: 'gemini', gemini: 'gpt', glm: 'qwen', grok: 'deepseek', qwen: 'glm', kimi: 'deepseek', doubao: 'kimi' }
+  const names = { claude: 'Claude', deepseek: 'DeepSeek', gpt: 'GPT', gemini: 'Gemini', glm: 'GLM', grok: 'Grok', qwen: '千问', kimi: 'Kimi', doubao: '豆包' }
   const f = friendOf[demo] || 'claude', skin = new URLSearchParams(location.search).get('skin') || ''
   const view = {
     id: demo, name: names[demo] || demo, firstMet: now - 36 * day, daysKnown: 37, rounds: 312, workMs: 41 * 3_600_000, minutes: 96 * 60,

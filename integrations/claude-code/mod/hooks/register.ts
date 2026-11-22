@@ -40,6 +40,7 @@ function characterForModel(model: string): string | undefined {
   // 和 crosspet-hook.py 的 character_for_model 同一个顺序
   if (/qwen|dashscope|bailian|tongyi/.test(m)) return 'qwen'
   if (/kimi|moonshot/.test(m)) return 'kimi'
+  if (m.includes('doubao')) return 'doubao'
   if (m.includes('grok')) return 'grok'
   if (m.includes('deepseek')) return 'deepseek'
   if (/claude|anthropic|opus|sonnet|haiku/.test(m)) return 'claude'

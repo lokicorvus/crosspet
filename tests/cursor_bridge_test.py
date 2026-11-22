@@ -94,7 +94,7 @@ class CursorBridgeTest(unittest.TestCase):
             return scope["character_for_model"]
         bridge, hook = load(BRIDGE), load(BRIDGE.parent.parent / "crosspet-hook.py")
         for model in ("claude-opus-4-7", "claude-4.5-sonnet-thinking", "gpt-5-codex", "o3", "gemini-2.5-pro", "grok-code-fast-1",
-                      "deepseek-v3.1", "glm-4.6", "qwen3-coder", "kimi-k2", "composer-1", "auto", "cursor-small", ""):
+                      "deepseek-v3.1", "glm-4.6", "qwen3-coder", "kimi-k2", "doubao-seed-1-6-250615", "composer-1", "auto", "cursor-small", ""):
             self.assertEqual(bridge(model), hook(model), model)
 
     def test_model_picks_character(self):

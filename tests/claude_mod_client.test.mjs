@@ -66,4 +66,8 @@ test('turn.step 按模型换角色：kimi / moonshot 认成 kimi，没装 kimi �
   await mkdir(dir, { recursive: true }); await writeFile(join(dir, 'character.json'), '{}')
   assert.equal(await step('s-k1', 'kimi-k2.6'), 'kimi')
   assert.equal(await step('s-k2', 'moonshot-v1-128k'), 'kimi')
+  assert.equal(await step('s-d0', 'doubao-seed-code'), 'claude')   // 没装 doubao
+  const dd = join(root, 'Library', 'Application Support', 'CrossPet', 'characters', 'doubao')
+  await mkdir(dd, { recursive: true }); await writeFile(join(dd, 'character.json'), '{}')
+  assert.equal(await step('s-d1', 'doubao-seed-code'), 'doubao')
 })
