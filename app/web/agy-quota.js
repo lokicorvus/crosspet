@@ -3,6 +3,7 @@
 // - week（默认）：只看 Gemini 组的各个窗口，排得和 GPT / Claude 的额度一样：「5小时 剩余 89% · 15:35 重置 ｜ 本周 剩余 95%」
 //   （文字格式同 codex-quota.js：只在剩得最少的那个后面标重置时间；过了重置时间的算满）
 // - cg：原样，就是外壳挑的两组各一行
+// 两种都会在旧数据后面标「HH:mm 的数据」（见 view）
 ;(function (root) {
   const pad = n => String(n).padStart(2, '0')
   function when(sec, nowSec) {
@@ -10,7 +11,15 @@
     return sec - nowSec < 86400 ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : `${d.getMonth() + 1}/${d.getDate()}`
   }
 
+  // Antigravity 关了 / 问不到时外壳接着交最后一次的数（source: 'stale'，at 是几点问到的）：和 GPT 一样在后面标「HH:mm 的数据」
   function view(q, mode, nowSec) {
+    const v = pick(q, mode, nowSec)
+    if (!v || q.source !== 'stale' || !(q.at > 0)) return v
+    const d = new Date(q.at * 1000), note = `${pad(d.getHours())}:${pad(d.getMinutes())} 的数据`
+    return { ...v, text: `${v.text} · ${note}`, note }
+  }
+
+  function pick(q, mode, nowSec) {
     if (mode === 'cg' || !q || !Array.isArray(q.bars)) return q
     const own = q.bars.filter(b => b.group === 'Gemini')
     if (!own.length) return q

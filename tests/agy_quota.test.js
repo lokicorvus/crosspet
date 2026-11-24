@@ -48,3 +48,22 @@ test('single_window', () => {
   assert.deepEqual(v.bars, [{ label: '本周', left: 0.4 }])
   assert.equal(v.text, '本周 剩余 40%')
 })
+
+// Antigravity 关了：外壳接着交最后一次问到的数，带 source: 'stale' 和 at（几点问到的），和 GPT 一样标「HH:mm 的数据」
+test('stale_marks_time_like_gpt', () => {
+  const at = now - 1800
+  const q = { ...sample(), source: 'stale', at }
+  const w = view(q, 'week', now)
+  assert.equal(w.note, `${hm(at)} 的数据`)
+  assert.ok(w.text.endsWith(` · ${hm(at)} 的数据`), w.text)
+  const c = view(q, 'cg', now)
+  assert.equal(c.note, `${hm(at)} 的数据`)
+  assert.equal(c.text, `${q.text} · ${hm(at)} 的数据`)
+  assert.equal(c.bars, q.bars)
+})
+test('stale_past_reset_counts_full', () => {
+  const v = view({ ...sample({ five: { left: 0.05, reset: now - 60 } }), source: 'stale', at: now - 7200 }, 'week', now)
+  assert.ok(v.text.startsWith('5小时 剩余 100%'), v.text)
+  assert.equal(v.low, false)
+})
+test('live_has_no_note', () => assert.equal(view(sample(), 'week', now).note, undefined))

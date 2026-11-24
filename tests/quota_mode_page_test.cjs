@@ -52,6 +52,15 @@ const cases = [
     e.run(`setAgyQuotaMode('cg'); setAgyQuotaMode('week')`)
     assert(lines(e).length === 0, `null: ${JSON.stringify(lines(e))}`)
   }],
+  // Antigravity 关了：外壳接着交最后一次的数（source: stale），两种模式都标「HH:mm 的数据」
+  ['agy_stale_keeps_last_with_time', async () => {
+    const e = await fresh()
+    e.run(`setQuota('gemini', Object.assign(${JSON.stringify(sample(0))}, { source: 'stale', at: Date.now() / 1000 - 600 }))`)
+    const l = lines(e)
+    assert(l.length === 2 && /· \d\d:\d\d 的数据$/.test(l[1]), `week stale: ${JSON.stringify(l)}`)
+    e.run(`setAgyQuotaMode('cg')`)
+    assert(/· \d\d:\d\d 的数据$/.test(lines(e).at(-1)), `cg stale: ${JSON.stringify(lines(e))}`)
+  }],
   ['agy_mode_bars_style', async () => {
     const e = await fresh(); e.run(`$('foot').offsetHeight = 40; setQuotaStyle('bars')`); feed(e)   // 假 DOM 没有排版：告诉它底栏放得下，不然退回文字
     const labels = e.run(`$('quota').children.map(r => r.children[0]?.textContent)`)

@@ -72,7 +72,7 @@ extension App {
             guard let self else { return }
             let hub = Self.antigravityHub(dir: Self.agyDaemonDir, alive: Self.pidAlive)
             guard let (pid, token) = hub.map({ ($0.pid, $0.token) }) ?? self.antigravityServer() else {
-                DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', null)"); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程（daemon/hub_*.json 和启动参数里都没有令牌）" }
+                DispatchQueue.main.async { self.pushAgyStale(); self.lastAgyNote = "\(Self.clock()) 没找到 Antigravity 的服务进程（daemon/hub_*.json 和启动参数里都没有令牌）" }
                 return
             }
             let ports = self.agyPort?.pid == pid ? [self.agyPort!.port] : hub?.port.map { [$0] } ?? self.listeningPorts(pid)
@@ -151,13 +151,25 @@ extension App {
                     self.askAntigravity(pid: pid, token: token, ports: ports, method: method + 1); return
                 }
                 self.agyPort = nil
+                if ports.count <= 1 { DispatchQueue.main.async { self.pushAgyStale() } }   // 端口都试过了还是没问到
                 self.askAntigravity(pid: pid, token: token, ports: Array(ports.dropFirst()))  // 换下一个端口试
                 return
             }
             self.agyPort = (pid, port)
             guard let json = try? JSONSerialization.data(withJSONObject: q), let arg = String(data: json, encoding: .utf8) else { return }
-            DispatchQueue.main.async { self.quotaJS("gemini", "setQuota('gemini', \(arg))") }
+            DispatchQueue.main.async { self.agyLast = (q, Date()); self.quotaJS("gemini", "setQuota('gemini', \(arg))") }
         }.resume()
+    }
+
+    /// 没问到（Antigravity 关了、或者问不通）：问到过就接着交最后一次的数，标上 source: stale 和几点问到的（网页标「HH:mm 的数据」，
+    /// 过了重置时间的窗口算满，见 agy-quota.js）；从没问到过就不显示。和 GPT 额度（applyCodex）一样
+    func pushAgyStale() {
+        guard defaults.bool(forKey: "agyQuota") else { return }   // 查的途中关掉了额度显示
+        guard let last = agyLast else { quotaJS("gemini", "setQuota('gemini', null)"); return }
+        var q = last.quota
+        q["source"] = "stale"; q["at"] = last.at.timeIntervalSince1970
+        guard let json = try? JSONSerialization.data(withJSONObject: q), let arg = String(data: json, encoding: .utf8) else { return }
+        quotaJS("gemini", "setQuota('gemini', \(arg))")
     }
 
     static func agyRequest(port: Int, method: String, token: String) -> URLRequest {

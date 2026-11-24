@@ -93,6 +93,7 @@ namespace CrossPet
             QuotaJS("gpt", $"setCodexQuota({Store.Json.Serialize(p)})");   // 多桌宠：额外那只是 GPT、显示额度：也拿一份
         }
         bool askingGemini;
+        Dictionary<string, object> agyLast; DateTime agyLastAt;   // 最后一次问到的 Gemini 额度：Antigravity 关了 / 问不到时接着显示它，并标上时间（同 codexLast）
         async Task RefreshGeminiQuota()
         {
             if (askingGemini) return;
@@ -100,7 +101,15 @@ namespace CrossPet
             try
             {
                 var q = await Task.Run(AntigravityQuota.Read);   // 进程查询比较慢，放到后台
-                QuotaJS("gemini", $"setQuota('gemini', {(q == null ? "null" : Store.Json.Serialize(q))})");   // Antigravity 没开就不显示
+                if (!Store.Flag("agyQuota")) return;   // 查的途中关掉了额度显示
+                if (q != null) { agyLast = q; agyLastAt = DateTime.Now; }
+                else if (agyLast != null)
+                {
+                    // 没问到（Antigravity 关了、或者问不通）：接着交最后一次的数，标上 source: stale 和几点问到的（网页标「HH:mm 的数据」，
+                    // 过了重置时间的窗口算满，见 agy-quota.js）。和 GPT 额度一样；从没问到过就不显示
+                    q = new Dictionary<string, object>(agyLast) { ["source"] = "stale", ["at"] = new DateTimeOffset(agyLastAt).ToUnixTimeSeconds() };
+                }
+                QuotaJS("gemini", $"setQuota('gemini', {(q == null ? "null" : Store.Json.Serialize(q))})");
             }
             catch (Exception e) { Store.Log("Gemini 额度: " + e.Message); }
             finally { askingGemini = false; }

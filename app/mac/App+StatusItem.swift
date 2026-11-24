@@ -110,7 +110,7 @@ extension App {
     @objc func toggleAntigravityQuota() {
         let on = !defaults.bool(forKey: "agyQuota")
         defaults.set(on, forKey: "agyQuota")
-        if on { refreshAntigravityQuota() } else { quotaJS("gemini", "setQuota('gemini', null)") }
+        if on { refreshAntigravityQuota() } else { agyLast = nil; quotaJS("gemini", "setQuota('gemini', null)") }
     }
 
     /// 背景光晕：auto（跟着系统深浅色，深色模式下关）/ on / off

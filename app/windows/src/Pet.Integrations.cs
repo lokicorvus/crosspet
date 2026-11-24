@@ -241,7 +241,7 @@ namespace CrossPet
                             break;
                         case "agyQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) _ = RefreshGeminiQuota(); else QuotaJS("gemini", "setQuota('gemini', null)");
+                            if (on) _ = RefreshGeminiQuota(); else { agyLast = null; QuotaJS("gemini", "setQuota('gemini', null)"); }
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
                         case "dsQuota":
