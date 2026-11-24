@@ -36,6 +36,8 @@ check "汇总：同上，周额度排在前面结果一样" summary-tie-weekly-f
 check "汇总：5h 满了显示周额度和重置时间" summary-multi-pool 'q["text"].split(" ｜ ")[0].startswith("Gemini 本周 剩余 99% · ") and q["text"].split(" ｜ ")[2].startswith("Claude/GPT 本周 剩余 100% · ")'
 check "汇总：周额度 ≤10% 时不被 5h 盖住" summary-weekly-low 'q["text"].split(" ｜ ")[0].startswith("Gemini 本周 剩余 5% · ") and q["low"] is True'
 check "汇总：每一行都带重置时间" summary-all-50 'all(seg.endswith(" 重置") for seg in q["text"].split(" ｜ ")) and len(q["text"].split(" ｜ ")) == 3'
+# 2026-11-24 实测：Gemini 4 Argon 并进了「Gemini Models」，不再单独一组：回到两行，bars 里没有 Argon
+check "汇总：Argon 并进 Gemini 后两组两行" summary-argon-merged 'len(q["text"].split(" ｜ ")) == 2 and q["text"].split(" ｜ ")[0].startswith("Gemini 5小时 剩余 96%") and q["text"].split(" ｜ ")[1].startswith("Claude/GPT 本周 剩余 100%") and "Argon" not in q["text"] and [b["group"] for b in q["bars"]] == ["Gemini", "Gemini", "Claude/GPT", "Claude/GPT"] and q["low"] is False'
 # 合并显示用的结构化额度条 bars：每个窗口一项 {label, left, reset?, group}，同一个池的窗口挨着排（短窗口在前）；排版（Gemini + Arg 一行、Agy C/G 另起一行）在网页层
 check "bars：每个窗口一项，label = 池名 + 窗口名，同一个池挨着排" summary-multi-pool '[b["label"] for b in q["bars"]] == ["Gemini 5小时", "Gemini 本周", "Argon 本周", "Claude/GPT 5小时", "Claude/GPT 本周"] and [b["group"] for b in q["bars"]] == ["Gemini", "Gemini", "Argon", "Claude/GPT", "Claude/GPT"] and [b["left"] for b in q["bars"]] == [1, 0.99, 0.46, 1, 1] and all(isinstance(b["reset"], int) and b["reset"] > 1.7e9 for b in q["bars"])'
 check "bars：窗口名按接口的窗口 id（今日 / 本周），没有 Argon 时只有两个池" summary-two-windows '[b["label"] for b in q["bars"]] == ["Gemini 今日", "Gemini 本周", "Claude/GPT 本周"]'
