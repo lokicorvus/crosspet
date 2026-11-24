@@ -64,3 +64,43 @@ test('按模型换了角色：写 <角色>@deepseek-state.json', async () => {
   const sessions = await h.until('gpt-sessions.json', (v) => v?.['ds-2'])
   assert.equal(sessions['ds-2'].client, 'deepseek')
 })
+
+test('同一会话中途从 DeepSeek 换成 GPT：一轮开头记到了 DeepSeek，换过去后给 DeepSeek 收尾，不再卡在听 / 思考', async () => {
+  const h = harness()
+  let route = { provider: 'deepseek-official', model: 'deepseek-chat' }
+  const session = { id: 'ds-3', header: {}, requestContext: () => route }
+  // 先用 DeepSeek 完整干一轮
+  await h.fire('agent/pre-step', { messages: [{ role: 'user', content: 'hi' }] })
+  await h.fire('session/event', session, { type: 'turn/start', data: {} })
+  await h.fire('agent/turn-stopping')
+  await h.fire('session/event', session, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+  await h.until('deepseek@deepseek-state.json', (v) => v?.event === 'Stop')
+  // 在 Harness 里把模型切到 GPT 再发一条：pre-step 时插件还不知道换了模型
+  route = { provider: 'openrouter', model: 'openai/gpt-5' }
+  await h.fire('agent/pre-step', { messages: [{ role: 'user', content: 'again' }] })
+  await h.fire('session/event', session, { type: 'turn/start', data: {} })
+  await h.fire('tools/pre-execute', { name: 'Bash', arguments: {} })
+  await h.fire('session/event', session, { type: 'tool/call', data: { name: 'Bash', arguments: {} } })
+  await h.fire('agent/turn-stopping')
+  await h.fire('session/event', session, { type: 'turn/end', data: { reason: { kind: 'completed' } } })
+  await h.until('gpt@deepseek-state.json', (v) => v?.event === 'Stop')
+  const ds = await h.until('deepseek@deepseek-state.json', (v) => v?.event === 'Stop')
+  assert.equal(ds.pose, 'idle')
+  const main = await h.until('deepseek-state.json', (v) => v?.event === 'Stop')
+  assert.equal(main.pose, 'idle')
+})
+
+test('两个会话各用一个模型、DeepSeek 那个还在干活：换到 GPT 时不给 DeepSeek 收尾', async () => {
+  const h = harness()
+  const ds = { id: 'ds-a', header: {}, requestContext: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }) }
+  const gpt = { id: 'gpt-b', header: {}, requestContext: () => ({ provider: 'openrouter', model: 'openai/gpt-5' }) }
+  await h.fire('agent/pre-step', { messages: [{ role: 'user', content: 'hi' }] })
+  await h.fire('session/event', ds, { type: 'turn/start', data: {} })
+  await h.fire('tools/pre-execute', { name: 'Bash', arguments: {} })
+  await h.fire('session/event', ds, { type: 'tool/call', data: { name: 'Bash', arguments: {} } })
+  await h.until('deepseek@deepseek-state.json', (v) => v?.event === 'PreToolUse')
+  await h.fire('session/event', gpt, { type: 'turn/start', data: {} })
+  await h.until('gpt-sessions.json', (v) => v?.['gpt-b'])
+  await new Promise((r) => setTimeout(r, 100))
+  assert.equal(h.read('deepseek@deepseek-state.json').event, 'PreToolUse')
+})

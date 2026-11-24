@@ -92,20 +92,28 @@ export function apply(ctx, config = {}) {
       writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 }).catch(() => {});
       return;
     }
+    const prev = character;
     character = next;
     writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
       .catch(() => {});
+    // 中途换了模型：一轮开头（agent/pre-step 不带会话，看不到换了模型）已经记到了换下来的那个角色身上，
+    // 后面的工具、完成都记到新角色，换下来的就一直停在听 / 思考。别的会话还在用她干活时不动她
+    if (next !== prev && !busyElsewhere(prev, session?.id)) state("idle", "Stop", "", prev);
+  }
+  function busyElsewhere(who, sid) {
+    const now = Date.now() / 1000;
+    return Object.entries(perChar[who] || {}).some(([id, s]) => id !== sid && s.event !== "Stop" && now - s.ts < 600);
   }
 
   let seenAt = 0;
   let clientChain = Promise.resolve();
-  function state(pose, event, tool = "") {
+  function state(pose, event, tool = "", who = character) {
     if (Date.now() - seenAt > 10000) {   // 心跳：最近一次收到消息（桌宠记下来，设置和反馈里看）
       seenAt = Date.now();
       mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "seen-deepseek"), String(Math.floor(seenAt / 1000)))).catch(() => {});
     }
-    ledger(event, tool, "shown", `${character} ${pose}`);
-    const s = { pose, event, tool, ts: Date.now() / 1000 }, who = character;
+    ledger(event, tool, "shown", `${who} ${pose}`);
+    const s = { pose, event, tool, ts: Date.now() / 1000 };
     const warn = (e) => ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`);
     const main = writeJson(`${who}-state.json`, s).catch(warn);
     // 主文件写完再按客户端另写一份 <角色>@deepseek-state.json（多桌宠时额外那只读它，带 client）。
