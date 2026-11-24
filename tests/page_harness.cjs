@@ -67,6 +67,7 @@ function makePage(startMs = START) {
     removeAttribute(n) { delete this.attrs[n]; if (n === 'src') this._src = '' }
     appendChild(c) { if (c.parentNode) c.remove(); this.children.push(c); c.parentNode = this; return c }
     replaceChildren(...c) { this.children = []; c.forEach(x => this.appendChild(x)) }
+    append(...c) { c.forEach(x => this.appendChild(x)) }
     remove() { if (this.parentNode) { const p = this.parentNode; p.children = p.children.filter(x => x !== this); this.parentNode = null } }
     querySelector(sel) {
       if (sel !== 'svg') return null
@@ -98,7 +99,7 @@ function makePage(startMs = START) {
     setTimeout: clk.setTimeout, clearTimeout: clk.clear, setInterval: clk.setInterval, clearInterval: clk.clear,
     requestAnimationFrame: cb => clk.setTimeout(() => cb(clk.now()), 16), performance: { now: () => clk.now() },
     document, Image: class { set src(v) {} }, MutationObserver: class { observe() {} },
-    getComputedStyle: () => ({ objectPosition: '50% 100%', display: 'block', visibility: 'visible' }),
+    getComputedStyle: () => ({ objectPosition: '50% 100%', display: 'block', visibility: 'visible', getPropertyValue: () => '' }),
     localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) },
     fetch: () => new Promise(() => {}), AbortController: class { constructor() { this.signal = {} } abort() {} },
     addEventListener() {},
@@ -110,7 +111,7 @@ function makePage(startMs = START) {
   ctx.globalThis = ctx
   vm.createContext(ctx)
   vm.runInContext('Math.random = () => 0.99', ctx)   // 不随机出闲时小动作、彩蛋
-  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'break-reminders.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js', 'pair-chat.js', 'pet-talk.js', 'notebook-diary.js', 'notebook.js', 'notebook-lines.js', 'notebook-friends.js', 'notebook-events.js', 'notebook-backfill.js', 'mini-helper.js'])
+  for (const f of ['effects.js', 'text-size.js', 'codex-quota.js', 'quota-aggregate.js', 'agy-quota.js', 'quota-bars.js', 'plugin-update.js', 'stand-in.js', 'follow-policy.js', 'codex-resets.js', 'break-reminders.js', 'peak-hours.js', 'whats-new.js', 'companions.js', 'friendship.js', 'pair-chat.js', 'pet-talk.js', 'notebook-diary.js', 'notebook.js', 'notebook-lines.js', 'notebook-friends.js', 'notebook-events.js', 'notebook-backfill.js', 'mini-helper.js'])
     vm.runInContext(fs.readFileSync(path.join(WEB, f), 'utf8'), ctx, { filename: f })
   const html = fs.readFileSync(path.join(WEB, 'index.html'), 'utf8').replace(/\r\n/g, '\n')
   const start = html.lastIndexOf('<script>\n'), end = html.lastIndexOf('</script>')

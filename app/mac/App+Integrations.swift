@@ -187,6 +187,8 @@ extension App {
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showName"); js("setShowName(\(on))")
             case "showMinis":
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showMinis"); js("setShowMinis(\(on))")
+            case "agyQuotaMode":
+                if let s = value as? String, ["week", "cg"].contains(s) { defaults.set(s, forKey: "agyQuotaMode"); js("setAgyQuotaMode(\(quote(s)))") }
             case "minisFrom":
                 if let s = value as? String, ["own", "all"].contains(s) { defaults.set(s, forKey: "minisFrom"); js("setMinisFrom(\(quote(s)))") }
             case "aura":

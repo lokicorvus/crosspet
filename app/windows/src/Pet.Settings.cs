@@ -25,6 +25,7 @@ namespace CrossPet
         internal static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
                                Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
         static bool ShowMinis => !(Store.Settings.TryGetValue("showMinis", out var v0) && v0 is bool b0 && !b0);
+        static string AgyQuotaMode => Store.Settings.TryGetValue("agyQuotaMode", out var am) && am is string a && a == "cg" ? "cg" : "week";   // Gemini 额度显示哪些：week 5小时和本周（默认）/ cg 5小时和 Claude/GPT
         static string MinisFrom => Store.Settings.TryGetValue("minisFrom", out var mf) && mf is string ms && ms == "own" ? "own" : "all";   // 小帮手显示谁的：all 也显示朋友送的（默认）/ own 只有她自己的
         static bool ShowName => !(Store.Settings.TryGetValue("showName", out var v) && v is bool b && !b);
         static bool EggsEnabled => !(Store.Settings.TryGetValue("eggs", out var v) && v is bool b && !b);

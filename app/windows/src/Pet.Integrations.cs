@@ -144,7 +144,7 @@ namespace CrossPet
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
                 ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["showMinis"] = ShowMinis, ["minisFrom"] = MinisFrom, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
-                ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
+                ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["agyQuotaMode"] = AgyQuotaMode, ["gptQuotaNote"] = codexNote,
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
                 ["sitRemind"] = Store.Flag("sitRemind"), ["sitEvery"] = BreakEvery("sitEvery", 45), ["waterRemind"] = Store.Flag("waterRemind"), ["waterEvery"] = BreakEvery("waterEvery", 60),
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
@@ -205,6 +205,9 @@ namespace CrossPet
                             break;
                         case "textLinked": Store.Settings["textLinked"] = !(value is bool lb) || lb; Store.SaveSettings(); ApplySizes(); break;
                         case "showMinis": Store.Settings["showMinis"] = on; Store.SaveSettings(); Js($"setShowMinis({(on ? "true" : "false")})"); break;
+                        case "agyQuotaMode":
+                            if (value is string am && (am == "week" || am == "cg")) { Store.Settings["agyQuotaMode"] = am; Store.SaveSettings(); Js($"setAgyQuotaMode({Q(am)})"); }
+                            break;
                         case "minisFrom":
                             if (value is string mf && (mf == "own" || mf == "all")) { Store.Settings["minisFrom"] = mf; Store.SaveSettings(); Js($"setMinisFrom({Q(mf)})"); }
                             break;

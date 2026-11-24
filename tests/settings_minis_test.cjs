@@ -194,6 +194,20 @@ const cases = [
     click(p.$('minisFrom').querySelector('[data-v=own]'))
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'minisFrom', value: 'own' }), '消息不对：' + JSON.stringify(p.posted.at(-1)))
   }],
+  // 额度页：Gemini 额度显示哪些（5小时和本周 / 5小时和 Claude/GPT）
+  ['Gemini 额度开着时有「显示哪些」两档，默认「5小时和本周」；关了就藏起来', p => {
+    const seg = p.$('agyQuotaMode'); assert(seg, '没有 #agyQuotaMode')
+    assert([...seg.children].map(b => b.dataset.v).join(',') === 'week,cg', '两档不对')
+    p.push({ agyQuota: true }); assert(!hidden(seg), '开着时该看得见')
+    assert(seg.querySelector('[data-v=week]').classList.contains('on'), '默认该是 week')
+    p.push({ agyQuota: true, agyQuotaMode: 'cg' }); assert(seg.querySelector('[data-v=cg]').classList.contains('on'), '该选中 cg')
+    p.push({ agyQuota: false }); assert(hidden(seg), '关了该藏起来')
+  }],
+  ['点「5小时和 Claude/GPT」发 set agyQuotaMode cg', p => {
+    p.push({ agyQuota: true })
+    click(p.$('agyQuotaMode').querySelector('[data-v=cg]'))
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'agyQuotaMode', value: 'cg' }), '消息不对：' + JSON.stringify(p.posted.at(-1)))
+  }],
 ]
 
 let failed = 0

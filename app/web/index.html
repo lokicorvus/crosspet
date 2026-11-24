@@ -233,6 +233,7 @@ addEventListener('error', e => {
 <script src="codex-quota.js"></script>
 <script src="quota-aggregate.js"></script>
 <script src="quota-bars.js"></script>
+<script src="agy-quota.js"></script>
 <script src="plugin-update.js"></script>
 <script src="stand-in.js"></script>
 <script src="mini-helper.js"></script>
@@ -2371,7 +2372,15 @@ function celebrate(id, ev) {
 
 // GPT 额度：外壳交来问 Codex 服务得到的原始额度（见 codex-quota.js），排好版再走 setQuota
 function setCodexQuota(p) { setQuota('gpt', p ? CodexQuota.view(p, Date.now() / 1000) : null) }
+// Gemini（Antigravity）额度按设置「显示哪些」挑（agy-quota.js）：week 只看 Gemini 的 5 小时和本周（默认，和 GPT / Claude 一样排）/ cg 外壳挑的两组。
+// 留着外壳交来的原始那份，换模式时拿它重算
+let agyQuotaMode = 'week', agyRaw = null
+function setAgyQuotaMode(m) { agyQuotaMode = m === 'cg' ? 'cg' : 'week'; showQuota('gemini', AgyQuota.view(agyRaw, agyQuotaMode, Date.now() / 1000)) }
 function setQuota(id, q) {
+  if (id === 'gemini') { agyRaw = q; q = AgyQuota.view(q, agyQuotaMode, Date.now() / 1000) }
+  showQuota(id, q)
+}
+function showQuota(id, q) {
   const wasLow = quota[id]?.low
   quota[id] = q
   const ev = quotaEvent(id, q)
