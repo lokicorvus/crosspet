@@ -46,7 +46,7 @@
 | AI | 自动换形象 | 跟着干活 | 额度 / 余额 |
 |---|:---:|---|---|
 | **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 |
-| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，问电脑上的 Codex |
+| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子（云端调度的 Work 不支持） | ✅ 可选，问电脑上的 Codex |
 | **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额（填了 API Key 或登录了账号都行；用别家服务商时不显示） |
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 | **GLM**（智谱 ZCode） | ✅ | ✅ ZCode 钩子 | — |
@@ -136,6 +136,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 不管用哪种方式，接入都只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份，撤销后恢复原样。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
 
 > **Codex 用户注意**：新加的钩子要在 Codex 里输入 `/hooks` 亲自「信任」一次才会运行。
+> **ChatGPT Work 用户注意**：云端调度的 Work（Work Cloud）按 OpenAI 的设计不运行本机钩子，桌宠不会跟着干活；Codex 和在本机跑的 Work 不受影响。
 > **接入需要 python3**：macOS 自带。如果提示要安装「命令行开发者工具」，点安装就行。
 
 ## 多桌宠：几个 AI 各来一只
