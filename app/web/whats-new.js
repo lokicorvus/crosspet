@@ -4,6 +4,13 @@
 // 设计见 docs/superpowers/specs/2026-10-16-whats-new-design.md；测试 tests/whats_new.test.js
 ;(function (root) {
   const LIST = [
+    { version: '1.4.1', items: [
+      { icon: '🫘', title: '新角色：豆包', text: '抱着豆包头套的生活小帮手：紫到青的渐变长发、侧马尾，话多嘴甜、反应快，出错了先「我错了我错了，嘿嘿」，闹别扭时把头套戴上躲起来。用豆包的模型时（TRAE、DeepSeek Harness、WorkBuddy、OpenCode、Cursor 里）她来演。她在桌面上时，DeepSeek 偶尔会偷戴她的头套来冒充……', go: { tab: 'character' } },
+      { icon: '🧸', title: '迷你小帮手', text: '她脚边多了一个 Q 版的自己，跟着她思考、干活、睡觉、欢呼。两个 AI 升到「好朋友」时会互送小帮手，送了就一直留在她身边，最多 6 个围着她。不想要可以在「角色」页关掉，或者只显示她自己的。', go: { tab: 'character', key: 'showMinis' } },
+      { icon: '🔭', title: '群星 GPT', text: 'GPT 的新皮肤：观星者，拿着黄铜小望远镜和星图，腰上一圈星环。右键「换角色 → GPT · 群星」。穿着它时，DeepSeek 会趁她不在溜进观星台找「鲸鱼座」……', go: { tab: 'character' } },
+      { icon: '🔌', title: '接入 OpenCode、TRAE、CC GUI', text: 'OpenCode、TRAE（字节的 AI 编程 IDE，国内版）和 CC GUI 里干活时她也会跟着动，按当前模型换角色。在「接入 AI」页点一下就好；TRAE 还要在它的设置 → Hooks 里打开「已配置的 Hooks」，CC GUI 要完全退出再打开。', go: { tab: 'ai' } },
+      { icon: '📊', title: 'Gemini 额度只看 Gemini 的', text: 'Gemini 的额度默认只显示它自己的 5 小时和本周，排法和 GPT、Claude 一样；想看 Antigravity 里 Claude、GPT 模型的额度，在「额度」页换成「5小时和 Claude/GPT」。关掉 Antigravity 后也接着显示最后一次的数。', go: { tab: 'quota', key: 'agyQuotaMode' } },
+    ] },
     { version: '1.4.0', items: [
       { icon: '🎻', title: '新角色：Kimi', text: '从月亮上来的音乐少女小女仆：银白长发、拉小提琴，话多、有点爱做梦，大活干完谢幕鞠躬。用 Kimi 的模型时（ZCode、WorkBuddy、Cursor 里，或者 Claude Code 走 Kimi 的接口）她来演。Kimi 在桌面上时，DeepSeek 偶尔会借了她的发夹和小提琴、举着纸板月亮来冒充她……', go: { tab: 'character' } },
       { icon: '🔌', title: '接入 Kimi Code', text: 'Kimi Code（月之暗面的命令行编程工具）里干活时她也会跟着动，按会话的模型换角色。在「接入 AI」页点一下 Kimi Code 就好。', go: { tab: 'ai' } },
