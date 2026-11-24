@@ -17,7 +17,7 @@ export const inject = ["credentials"];
 
 const ID = "deepseek";
 const CLIENT = "deepseek";   // 多桌宠按「角色 + 客户端」各站一只：Harness 本身就是一个客户端（同 crosspet-hook.py 的 detect_client 用接入名）
-const PLUGIN_VERSION = "1.3.11";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
+const PLUGIN_VERSION = "1.3.12";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 60 * 1000;   // 定时查余额：充了值、没再对话，最多等 1 分钟（以前 10 分钟，用户充值后半天没变）。只是要一次账户余额，不耗 token
 
@@ -65,12 +65,21 @@ export function apply(ctx, config = {}) {
   let tools = 0;
 
   let writes = 0;
-  async function writeJson(file, data) {
+  async function writeNow(file, data) {
     await mkdir(dir, { recursive: true });
     // 临时文件名每次不同：几次写入同时发生时（比如启动时查两次余额、连续的工作事件）不会互相抢同一个文件
     const tmp = join(dir, `.${file}.${process.pid}.${++writes}`);
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, join(dir, file));
+  }
+  // 同一个文件的写入按先后排队：不排队时两次写入同时进行、谁最后改名落盘不一定，
+  // 比如一轮开头写的「听」可能晚于换模型后的收尾落盘，把她盖回「听」（测试里约七次一次）
+  const queues = new Map();
+  function writeJson(file, data) {
+    const next = (queues.get(file) || Promise.resolve()).catch(() => {}).then(() => writeNow(file, data));
+    queues.set(file, next);
+    next.finally(() => { if (queues.get(file) === next) queues.delete(file) }).catch(() => {});
+    return next;
   }
   // 当前在用的模型对应的角色：每条会话事件都看一眼会话的请求路由（和 Harness 自带插件一样用 requestContext）
   const custom = config.characters && typeof config.characters === "object" ? config.characters : {};
