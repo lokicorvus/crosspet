@@ -62,6 +62,7 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     // Gemini 额度 用的
     var agySession: URLSession?
     var agyPort: (pid: Int32, port: Int)?
+    var agyLast: (quota: [String: Any], at: Date)?   // 最后一次问到的 Gemini 额度：Antigravity 关了 / 问不到时接着显示它，并标上时间（同 codexLast）
 
     // 快捷键隐藏 用的
     var userHidden = false {

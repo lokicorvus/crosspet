@@ -349,6 +349,38 @@ static class Program
         Check("小本子位置：第二块屏幕上照样在她右边", nbSecond.X == 2000 + 260 - 12);
         var nbTiny = NotebookPlace.Place(new CompanionPlace.Rect(100, 100, 260, 362), nbSize, new CompanionPlace.Rect(0, 0, 300, 500), 12);
         Check("小本子位置：屏幕比本子还小时贴左上角", nbTiny.X == 0 && nbTiny.Y == 0);
+        // 主桌宠页面交给外壳转的事（companionCall 的 fn）：外壳只认名单里的；页面新加了一种、名单忘了加，额外那只就收不到（送礼那一幕曾经这样）
+        Check("转话名单：认 celebrate / chat / answerRoll / miniGift", new[] { "celebrate", "chat", "answerRoll", "miniGift" }.All(CompanionCallRule.Allows));
+        Check("转话名单：别的不认", !CompanionCallRule.Allows("eval") && !CompanionCallRule.Allows(null) && !CompanionCallRule.Allows(""));
+        var indexHtml = FindUp(Path.Combine("app", "web", "index.html"));
+        Check("转话名单：找得到 index.html", indexHtml != null);
+        if (indexHtml != null)
+        {
+            var fns = System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(indexHtml), @"companionCall:\s*\{[^}]*?fn:\s*'(\w+)'")
+                .Cast<System.Text.RegularExpressions.Match>().Select(m => m.Groups[1].Value).Distinct().ToList();
+            Check("转话名单：页面里交出去的 fn 都在名单里（" + string.Join("、", fns) + "）", fns.Count >= 4 && fns.All(CompanionCallRule.Allows));
+        }
+
+        // Antigravity 2.34 起令牌写在 daemon\hub_<端口>.json（不在启动参数里了），挑法和 macOS 的 tests/antigravity_quota_probe.sh 一样
+        {
+            object H(string json) => Js(JsonDocument.Parse(json).RootElement);
+            Func<int, bool> alive = pid => pid != 999;
+            var now = new DateTime(2026, 11, 22, 12, 0, 0);
+            var h1 = AntigravityQuota.PickHub(new[] { (H("{\"pid\":10,\"httpsPort\":51880,\"httpPort\":51881,\"lsVersion\":\"2.34.0\",\"csrfToken\":\"tok\"}"), now) }, alive);
+            Check("hub：取 pid、https 端口、令牌", h1 != null && h1.Value.pid == 10 && h1.Value.token == "tok" && h1.Value.port == 51880);
+            Check("hub：没有文件 = null（退回查启动参数）", AntigravityQuota.PickHub(new (object, DateTime)[0], alive) == null);
+            var h2 = AntigravityQuota.PickHub(new[] {
+                (H("{\"pid\":10,\"httpsPort\":1,\"csrfToken\":\"old\"}"), now.AddHours(-1)),
+                (H("{\"pid\":999,\"httpsPort\":2,\"csrfToken\":\"dead\"}"), now.AddHours(1)),
+                (H("{\"pid\":11,\"httpsPort\":3,\"csrfToken\":\"new\"}"), now),
+                (H("{\"pid\":12,\"httpsPort\":4,\"csrfToken\":\"\"}"), now.AddHours(2)),
+                ("not json", now.AddHours(3)),
+            }, alive);
+            Check("hub：进程没了的、令牌空的、坏文件都不认，活着的里取最新", h2 != null && h2.Value.token == "new" && h2.Value.port == 3);
+            var h3 = AntigravityQuota.PickHub(new[] { (H("{\"pid\":10,\"csrfToken\":\"tok\"}"), now) }, alive);
+            Check("hub：没写端口 = port 为 null（回头查监听端口）", h3 != null && h3.Value.port == null);
+        }
+
         Console.WriteLine(fails == 0 ? "全部通过" : $"{fails} 项失败");
         return fails == 0 ? 0 : 1;
     }

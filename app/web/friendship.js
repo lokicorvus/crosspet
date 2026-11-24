@@ -73,6 +73,7 @@
 
   // 外壳在数据目录存的备份（friendship.json）并回网页的存储：每一对取分数高的那份（同分留网页的），坏的记录不要。
   // 网页的存储被清掉了靠它找回；备份旧了（比如换回了旧的数据文件夹）也不会把分数往回拉
+  // 两边任一边演过送礼（giftShown）就保留这个记号；不改入参，没变的那条原样返回
   const valid = r => r && typeof r === 'object' && Number.isFinite(r.points) && r.points >= 0
   function merge(local, saved) {
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return local
@@ -80,13 +81,15 @@
     for (const key of Object.keys(saved)) {
       const [a, b] = key.split('+')
       if (pairKey(a, b) !== key || !valid(saved[key])) continue
-      if (valid(local[key]) && local[key].points >= saved[key].points) continue
-      out = { ...out, [key]: saved[key] }
+      const won = valid(local[key]) && local[key].points >= saved[key].points ? local[key] : saved[key]
+      const gift = saved[key].giftShown === true || (local[key] && local[key].giftShown === true)
+      const rec = gift && won.giftShown !== true ? { ...won, giftShown: true } : won
+      if (rec !== local[key]) out = { ...out, [key]: rec }
     }
     return out
   }
 
-  const api = { pairKey, award, hearts, partial, level, rows, merge, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
+  const api = { pairKey, award, hearts, partial, level, rows, merge, localDay, LEVEL_HEARTS, TOGETHER_MS, COFINISH_MS, PATS_MS }
   root.Friendship = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

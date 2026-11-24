@@ -32,3 +32,4 @@ How she shows emotion: with her whole body. Tail wags, droops or flicks; the aho
 - friend_up: Holding a round white rice ball (onigiri with a small nori strip) out in front of her with both hands at chest height, as if offering to share it; big open grin, eyes sparkling, ahoge up, whale tail flicked up.
 - swamped_left: Total chaos, still cute: papers stacked up to her chin, the top sheets sliding toward the viewer's LEFT (still touching the stack), she hops on one foot leaning that way to balance them, swirly eyes, a small wobbly mouth with a tiny fang, ahoge spinning into a tight spiral, tail flailing, a sweat drop.
 - swamped_right: Same as swamped-left but the papers slide toward the viewer's RIGHT and she hops and leans that way.
+- mini_move: Swimming through the air to the right like a little whale, body leaning forward almost horizontal, three frames of one tail stroke: tail fin up, level, down; hair flowing back.

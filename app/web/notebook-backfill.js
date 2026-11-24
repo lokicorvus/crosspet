@@ -11,6 +11,7 @@
     if (m.includes('glm') || m.includes('zhipu') || m.includes('chatglm') || m.includes('z.ai') || m.includes('zai-')) return 'glm'
     if (m.includes('qwen') || m.includes('dashscope') || m.includes('bailian') || m.includes('tongyi') || m === 'coder-model') return 'qwen'
     if (m.includes('kimi') || m.includes('moonshot')) return 'kimi'
+    if (m.includes('doubao')) return 'doubao'
     if (m.includes('grok')) return 'grok'
     if (m.includes('deepseek')) return 'deepseek'
     if (m.includes('claude') || m.includes('anthropic')) return 'claude'

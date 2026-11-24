@@ -39,6 +39,32 @@ if let i = CommandLine.arguments.firstIndex(of: "--agy-quota-probe") {
     print(String(decoding: try! JSONSerialization.data(withJSONObject: q), as: UTF8.self)); exit(0)
 }
 
+// 测试用：从一个目录里找 Antigravity 的 daemon/hub_*.json，打印 {pid, token, port} 或 null 就退出（tests/antigravity_quota_probe.sh）
+if let i = CommandLine.arguments.firstIndex(of: "--agy-hub-probe") {
+    guard i + 1 < CommandLine.arguments.count else { print("null"); exit(1) }
+    guard let h = App.antigravityHub(dir: URL(fileURLWithPath: CommandLine.arguments[i + 1]), alive: App.pidAlive) else { print("null"); exit(0) }
+    var o: [String: Any] = ["pid": Int(h.pid), "token": h.token]
+    if let p = h.port { o["port"] = p }
+    print(String(decoding: try! JSONSerialization.data(withJSONObject: o), as: UTF8.self)); exit(0)
+}
+
+// 测试用：在本机真问一次 Antigravity 额度（只用新版 daemon 文件里的令牌，不打印令牌），打印排好版的额度 JSON 就退出。手动实测用
+if CommandLine.arguments.contains("--agy-live-probe") {
+    guard let h = App.antigravityHub(dir: App.agyDaemonDir, alive: App.pidAlive), let port = h.port else { print("null（没找到 daemon/hub_*.json）"); exit(1) }
+    let sem = DispatchSemaphore(value: 0)
+    var out = "null"
+    URLSession(configuration: .ephemeral, delegate: LocalhostTrust(), delegateQueue: nil)
+        .dataTask(with: App.agyRequest(port: port, method: App.agyMethods[0], token: h.token)) { data, resp, err in
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            if let data, let obj = try? JSONSerialization.jsonObject(with: data), let q = App.antigravityParse(obj),
+               let j = try? JSONSerialization.data(withJSONObject: q) { out = String(decoding: j, as: UTF8.self) }
+            else { out = "null（HTTP \(code) \(err?.localizedDescription ?? "")）" }
+            sem.signal()
+        }.resume()
+    _ = sem.wait(timeout: .now() + 8)
+    print(out); exit(out.hasPrefix("{") ? 0 : 1)
+}
+
 // 测试用：算一次「换大小时窗口放在哪」，打印 x y 宽 高 就退出（tests/window_place_probe.sh）
 if let i = CommandLine.arguments.firstIndex(of: "--window-place-probe") {
     let a = Array(CommandLine.arguments.dropFirst(i + 1))

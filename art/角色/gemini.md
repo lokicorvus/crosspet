@@ -33,3 +33,4 @@ How she shows emotion: cat body language. Ears perk up or flatten, tail puffs, c
 - friend_up: One paw-hand raised beside her cheek in a beckoning-cat wave, the other paw at her chest; ears tilted forward, a delighted ":3" smile with a light blush, fluffy tail curled into a hook.
 - swamped_left: Overwhelmed cat: laptop tucked under one arm, tapping it with the paw-hand, the tail curled up holding a small pencil as a third hand, leaning toward the viewer's LEFT on one foot, fur and tail puffed up, ears flattened back, round surprised eyes, a small wobbly ':3', one sweat drop.
 - swamped_right: Same as swamped-left but leaning toward the viewer's RIGHT with the tasks swapping sides.
+- mini_move: Bounding to the right like a cat: crouch to spring, mid-leap stretched out with both feet off the ground, landing on front paws; tail up.

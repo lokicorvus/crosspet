@@ -9,6 +9,20 @@
   const EVENT_REPLY = { levelup: {}, anniv: {} }
   const L = s => s.split('|')
 
+  // 升到好朋友那天，她附带一句「送你一只我的小帮手」；按原角色写，皮肤走 of() 的退回
+  const GIFT_LINE = {
+    '*': ['送你一只我的小帮手，让它陪着你'],
+    claude: ['附上一只小小的我，替我陪你看书'],
+    deepseek: ['送你一只小小的我！饭点它会提醒你'],
+    gemini: ['送你一只小小的我喵，会陪你晒太阳'],
+    glm: ['附赠一只小小的我，帮你盯着账本'],
+    gpt: ['送你一只小的我。让它陪着。'],
+    grok: ['送你一只小的我，嫌烦就让它闭嘴'],
+    kimi: ['送你一只小小的我，它会哼曲给你听'],
+    doubao: ['送你一只小小的我，替我陪着你～'],
+    qwen: ['送你一只小小的我～它会陪你喝茶'],
+  }
+
   // 一个写的人的一整套：up1–3 升到认识了 / 好朋友 / 挚友；fest 按 FESTS 的顺序一个节日一句，'*' 是通用的；reply 是她当本子主人时回的
   function W(id, m) {
     EVENT_MSG.levelup[id] = { 1: L(m.up1), 2: L(m.up2), 3: L(m.up3) }
@@ -93,6 +107,15 @@
     festAll: '{fest}快乐！为你拉首节日小快板|过{fest}啦，让音符陪你过节～', reUp: '合奏愉快！|留最好的听位！', reAnniv: '合奏这么久啦！|谢谢一直听我拉琴',
   })
 
+  W('doubao', {
+    up1: '正式认识啦，以后天天找你玩！|本子上写下第一笔，请多指教呀', up2: '已经是好朋友啦！有事随时叫我|升到好朋友啦，头套借你抱抱！', up3: '挚友这一页，我用彩笔画满啦！|最铁的好朋友！有心事都找我聊',
+    chat: '今天在桌面上随口跟你说的：|刚才在桌面上对你说的：', anniv: '认识第 {n} 天啦！时间真快|{n} 天了，以后也天天聊～',
+    busy: '昨天忙了 {n} 轮，辛苦啦！|干了 {n} 轮，今天好好歇着', pats: '被摸头 {n} 次，好受宠呀～|今天被摸了 {n} 次，真舒服', pokes: '被戳了 {n} 下，脸都圆啦～|被戳了 {n} 次，头套借你挡',
+    reunion: '{n} 天没见，可想死你啦！|{n} 天没见，又一起站着啦',
+    fest: '万圣节，在头套上贴个小蝙蝠|圣诞快乐！给你塞了满满一袜礼物|新年第一天，新愿望统统实现！|过年好！今天白米饭加红烧肉～|元宵节，煮了碗甜滋滋的芝麻汤圆|端午安康！甜粽子咸粽子都要吃！|中秋快乐！大月饼分你一半尝尝|放长假啦！终于能好好出去玩啦！',
+    festAll: '{fest}快乐！今天多歇歇～|过{fest}啦，一起吃大餐！', reUp: '好朋友，请多关照～|嘿嘿，我也超级开心！', reAnniv: '认识这么久啦，真好|以后也一直一起聊！',
+  })
+
   // ---- 性格不一样的皮肤（节日只写通用的）----
   W('gpt-onesie', {
     up1: '……嗯？认识了，嗷|……给你分一块小饼干', up2: '好朋友了……是吧？嘿嘿|……兜兜里的零食，分你点', up3: '最好的朋友……零食分你，嗷|以后发呆，都在你旁边……嗷',
@@ -142,11 +165,16 @@
     else if (ev.kind === 'fest') list = mine[ev.n] || mine['*']
     else if (ev.kind === 'pats') list = mine[ev.m === 'pokes' ? 'pokes' : 'pats']
     const lines = [{ who: ev.friend, text: fill(one(list, rnd), ev) }]
+    // 好朋友那天多一句送小帮手，排在主人回复之前。这句用自己的种子（同一串加 |gift）：不动 rnd，旧记录里别的句子一字不变
+    if (ev.kind === 'levelup' && (ev.gift ?? ev.n === 2)) {
+      const giftRnd = seeded(`${ev.day}|${owner}|${ev.friend}|${ev.kind}|gift`)
+      lines.push({ who: ev.friend, text: one(of(GIFT_LINE, ev.friend, friendSkin), giftRnd) })
+    }
     if (level >= 2 && EVENT_REPLY[ev.kind]) lines.push({ who: owner, text: one(of(EVENT_REPLY[ev.kind], owner, ownerSkin), rnd) })
     return { lines, quote: ev.kind === 'chat' && ev.q ? ev.q : null }
   }
 
-  const api = { FEST_NAMES, EVENT_MSG, EVENT_REPLY, block }
+  const api = { FEST_NAMES, EVENT_MSG, EVENT_REPLY, GIFT_LINE, block }
   root.NotebookEvents = api
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)

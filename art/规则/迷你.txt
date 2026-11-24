@@ -1,0 +1,13 @@
+Create a sprite sheet of a tiny "mini helper" version of the approved character. It is a desktop-pet companion shown at about 50 pixels tall next to her, so it must read clearly when very small.
+
+REFERENCE: The first attachment (delegating) shows her sending out tiny helpers. The mini is always a tiny version of HER, never an animal, mascot or pet, even if the helpers in that image are animals. The LAST attachment is the approved mini sheet of another character in this app: match its proportions, head size, outline weight, flat shading and level of detail exactly so all the minis look like one set, but draw THIS character, not that one. The mini look: super-deformed, about 2 heads tall, very big head, short limbs, simplified outfit, but the same hair color and shape, hair ornament (on the same side), key outfit colors and signature prop, so it reads as her at a glance. The other attachments are the approved character design: follow them for colors and which side each ornament is on. Do not draw the big character.
+
+LAYOUT: One square image, at least 1024x1024, with a real transparent background (transparent_background: true). Exactly four minis of the same character in a 2x2 grid, one per quadrant, each centered in its quadrant and drawn at the same scale (each about 380 px tall). Leave wide transparent gaps: no part of one mini may touch another mini or the image edge.
+
+THE FOUR POSES, in this order (top-left, top-right, bottom-left, bottom-right):
+1. idle: standing and facing the viewer, small calm smile, holding her prop.
+2. happy: jumping with both arms raised (her prop in one hand), eyes closed in a happy ^^ smile, both feet off the ground.
+3. sleep: sitting curled up and dozing, eyes closed, head tilted, prop hugged to her chest.
+4. walk: walking toward the viewer's RIGHT in three-quarter view, mid-step, prop under one arm.
+
+FORMAT: A thick, continuous dark outline around each whole silhouette; flat two-tone cel shading; few, chunky details and no thin lines that vanish when shrunk. No floor, cast shadow, glow, frame, text, letters, symbols, hearts, Zzz, sparkles or other effects: the app draws all effects itself.

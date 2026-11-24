@@ -1,0 +1,22 @@
+{
+ "about": "mini_move：mini_move · 迷你小帮手 · 移动 3 帧",
+ "items": [
+  {
+   "char": "gpt-astra",
+   "pose": "mini_move",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "warn",
+     "msg": "脚离底边 28%：可能没站在底边"
+    },
+    {
+     "level": "warn",
+     "msg": "人物比待机图小 52%（桌面上会忽大忽小）"
+    }
+   ],
+   "version": 1
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+This is an EDIT of the FIRST attached image: an approved sprite sheet of tiny "mini helper" versions of this character in her ORIGINAL outfit. Make the same sheet for her alternate skin. Change ONLY what the skin changes: her clothes, shoes, hair accessories, hairstyle details and her signature prop, to match the CHARACTER LOCK below. The other attachments show the skin (use them ONLY for the outfit, accessories, hairstyle details and prop, NOT for the face, the poses or the art style).
+
+KEEP EXACTLY AS IN THE FIRST IMAGE (do not redraw, do not "improve"):
+- The image size and layout: the same number of minis, each in the same place, at the same size, with the same transparent gaps.
+- Every pose: head angle, both arms and hands, legs and feet, how high she jumps, which way she faces.
+- Every face and expression, the eye shape and color, the hair color, the proportions (super-deformed, about 2 heads tall).
+- The art style: thick continuous dark outline, flat two-tone cel shading, few chunky details.
+- Where a mini holds or carries her original signature prop, she holds the skin's signature prop the same way instead. Generic items stay as they are: a stack of books, a small notebook and pencil, an open book on her lap, a gift box.
+
+FORMAT: real transparent background (transparent_background: true). No floor, ground line, shadow, glow, frame, text, letters, numbers, symbols, hearts, sweat drops, sparkles or other effects.

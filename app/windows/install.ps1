@@ -1,9 +1,13 @@
-# CrossPet 安装：复制到 %LOCALAPPDATA%\Programs\CrossPet，建开始菜单快捷方式，按新版刷新已经接入的 AI，然后打开。不需要管理员权限。
+# CrossPet 安装：复制到 %LOCALAPPDATA%\Programs\CrossPet（一键更新时是旧版所在的文件夹，见 -Target），建开始菜单快捷方式，按新版刷新已经接入的 AI，然后打开。不需要管理员权限。
 # 覆盖安装即更新：设置、改的名字、自己加的角色、AI 接入都保留。
 # -Update：桌宠右键「更新到 …」时由旧版调用（在后台运行、不弹窗口），出错写到 %LOCALAPPDATA%\CrossPet\update.log
-param([switch]$Update)
+# -Target：一键更新时旧版传它自己所在的文件夹，原地换成新版。以前总是装到 Programs\CrossPet，
+#   自己解压在别处（文档、E 盘……）的人更新完再从原来的位置打开、或开机自启的还是旧版，每次都提示更新。
+#   那个文件夹里只有 CrossPet 自己的文件时才原地换；多了别的东西（怕连带删掉）就照旧装到 Programs\CrossPet
+param([switch]$Update, [string]$Target)   # 不能叫 Destination：PowerShell 变量名不分大小写，会和下面的 $destination 是同一个
 $ErrorActionPreference = 'Stop'
-$destination = Join-Path $env:LOCALAPPDATA 'Programs\CrossPet'
+$default = Join-Path $env:LOCALAPPDATA 'Programs\CrossPet'
+$destination = $default
 $exe = Join-Path $destination 'CrossPet.exe'
 $log = Join-Path $env:LOCALAPPDATA 'CrossPet\update.log'
 
@@ -12,8 +16,33 @@ function Say($text, $color = 'Gray') {
     else { Write-Host $text -ForegroundColor $color }
 }
 
+# 能不能原地换：是一个装着 CrossPet.exe 的文件夹（不是盘符根目录），里面每一项新安装包里都有（系统自己放的 desktop.ini、Thumbs.db 除外）
+function InPlace($dir) {
+    try { $dir = [IO.Path]::GetFullPath($dir).TrimEnd('\') } catch { return $null }
+    if (-not $dir -or $dir.Length -le 3 -or -not (Test-Path -LiteralPath (Join-Path $dir 'CrossPet.exe'))) { return $null }
+    $known = @(Get-ChildItem -LiteralPath $PSScriptRoot -Force | ForEach-Object { $_.Name }) + 'desktop.ini', 'Thumbs.db'
+    $extra = @(Get-ChildItem -LiteralPath $dir -Force | Where-Object { $known -notcontains $_.Name } | ForEach-Object { $_.Name })
+    if ($extra.Count -gt 0) { Say "$dir 里还有别的东西（$($extra -join '、')），不在那里原地更新，装到 $default"; return $null }
+    # 要在它旁边建 .new、把它改名：上一层没有写权限（比如 Program Files）就换不了
+    $probe = Join-Path (Split-Path $dir) ('.crosspet-write-test-' + $PID)
+    try { New-Item -ItemType Directory -Path $probe -ErrorAction Stop | Out-Null; Remove-Item -LiteralPath $probe -Force }
+    catch { Say "$(Split-Path $dir) 没有写权限，不在那里原地更新，装到 $default"; return $null }
+    return $dir
+}
+
 try {
     if ($Update) { New-Item -ItemType Directory -Path (Split-Path $log) -Force | Out-Null }
+    if ($Update -and -not $Target) {
+        # 1.4.0 及以前的旧版不传 -Target：看是哪个 CrossPet.exe 叫起的这个脚本（它这时多半还没退完），就装回它那里。
+        # 它已经退出、看不到了，就照旧装到 Programs\CrossPet
+        try {
+            $caller = Get-Process -Id (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId -ErrorAction Stop
+            # 从解压出来的安装包本身叫起来的（双击 exe 安装）不算：那是要装到 Programs\CrossPet
+            if ($caller.ProcessName -eq 'CrossPet' -and $caller.Path -and [IO.Path]::GetFullPath((Split-Path $caller.Path)) -ne [IO.Path]::GetFullPath($PSScriptRoot)) { $Target = Split-Path $caller.Path }
+        } catch { }
+    }
+    if ($Target) { $here = InPlace $Target; if ($here) { $destination = $here } }
+    $exe = Join-Path $destination 'CrossPet.exe'
     # 只关掉这个位置的 CrossPet（一键更新时旧版自己会退出，这里等它退干净）
     for ($i = 0; $i -lt 20; $i++) {
         $running = @(Get-Process CrossPet -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
@@ -36,7 +65,7 @@ try {
         # 哪一步失败都退得回去：旧目录要么没动过、要么改回原名
         $parent = Split-Path $destination
         $staged = "$destination.new"
-        Get-ChildItem -LiteralPath $parent -Directory -Filter 'CrossPet.old-*' -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue   # 上次没删掉的旧版本
+        Get-ChildItem -LiteralPath $parent -Directory -Filter "$(Split-Path $destination -Leaf).old-*" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue   # 上次没删掉的旧版本
         if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Recurse -Force }
         New-Item -ItemType Directory -Path $staged -Force | Out-Null
         Copy-Item -Path (Join-Path $PSScriptRoot '*') -Destination $staged -Recurse -Force
@@ -69,6 +98,16 @@ try {
     $link.IconLocation = (Join-Path $destination 'AppIcon.ico')
     $link.Save()
     Say "已安装到 $destination" 'Green'
+
+    # 开机自启指着别处的旧版 CrossPet.exe（以前在那份里打开的）：改指这一份，不然每次开机打开的还是旧版
+    try {
+        $run = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name CrossPet -ErrorAction SilentlyContinue
+        $was = if ($run) { $run.CrossPet.Trim('"') } else { $null }
+        if ($was -and $was -like '*\CrossPet.exe' -and $was -ne $exe) {
+            Set-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name CrossPet -Value "`"$exe`""
+            Say "开机自启原来指着 $was，改成 $exe"
+        }
+    } catch { Say "改开机自启失败：$_" 'Yellow' }
 
     # 已经接入的 AI 按新版刷新一遍（没接入过的不动）；失败不影响安装
     try {

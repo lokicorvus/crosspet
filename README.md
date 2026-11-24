@@ -25,6 +25,7 @@
 - **看着额度**：名牌下面显示 Claude 的 5 小时 / 每周额度、GPT 的 Codex 额度、DeepSeek 的账户余额、Gemini 的 Antigravity 额度。快用完时她会露出累了的样子。「设置…」里打开「合并显示各家额度」后，小窗里会把各家的额度排在一起，每行前面标名字（默认只显示当前角色自己的）。额度也可以换成进度条（「额度显示样式：额度条」）：每个额度一条，剩得越少颜色越暖（蓝 → 橙 → 红）。还可以打开「Codex 重置提醒」：官方提前宣布重置时 GPT 的额度下方多一行，右键「会重置吗？」可以问她（数据来自第三方网站 [codex-resets.com](https://codex-resets.com)，默认关）。DeepSeek、GLM 的额度下面还有一条今天的峰谷时间条（红色高峰、绿色空闲，也可以换成一行文字），设置里可以选高峰、空闲各穿哪件衣服，到点她自己换。
 - **自己待着**：闲着会哼歌、伸懒腰、打哈欠，十分钟没动静就睡着（不想让她睡，在「设置… → 通用」打开「不睡觉」）。单击摸摸头，右键能戳她一下。有新版本时，她会举着礼物来告诉你。
 - **我们的小本子**：右键她 →「我们的小本子」，她旁边翻开一本小册子，记着你们相处的事：一起干了多少轮、多长时间、最忙的一天、最长的一次，摸了几次头、戳了几下、惹她生气几次，在桌面上陪了你多久，她最好的朋友是谁，还有达成过的小成就（达成时她会说一句）。八个角色（Claude、GPT、DeepSeek、Gemini、GLM、Grok、千问、Kimi）各有一本自己风格的本子和字体，旁边的批注和落款按数字、时间换着写。点右边的书签翻到第二页「朋友们的留言」：一起站过的朋友用自己的字给她留言，关系越好写得越多（好朋友贴贴纸，挚友来回聊几句、贴一张合照），最下面能翻到最近她们聊了什么。嫌本子小，拖它的右边、下边或右下角就能整本放大缩小。新版第一次启动时，会从本机 Claude Code、Codex 的记录里把装 CrossPet 之后的部分补上（只读时间和模型名，不读对话内容）；记录只存在你的电脑上
+- **迷你小帮手**：她脚边有一个 Q 版的自己，跟着她思考、干活、睡觉、欢呼。多桌宠时两个 AI 升到「好朋友」会互送小帮手，送了就一直陪在她身边，最多 6 个。在「设置… → 角色」里可以关掉，或者只显示她自己的。
 - **久坐、喝水提醒**：在「设置… → 通用」打开（默认关），间隔可选 30 / 45 / 60 / 90 / 120 分钟。到点主桌宠伸个懒腰，或者捧着杯子喝口水，提醒你一句，半分钟后自己收起，不用点；她正在干活时等手上的事停下再说，夜里 11 点到早上 7 点不提醒。
 - **贴边**：把她拖到屏幕左边或右边，她就缩到边上只露半个身子扒着屏幕，不挡你干活；AI 干活时自己跑出来，干完过约 10 秒缩回去；鼠标靠近时她会探出头来看你。
 - **甩她会红温**：按住她快速左右甩，她会被甩晕，越甩越火：不耐烦 → 鼓脸 → 红温冒蒸汽，然后背过身去赌气，摸摸头才哄得好。她干活时被甩，会晕着抱怨一句接着干，等活干完不庆祝了，直接跟你算账。
@@ -39,28 +40,35 @@
   - **Qwen（千问）**：温柔大方的富家千金，拿扇子表达情绪；大活干完请你喝奶茶，额度快用完时掏出金卡「再买就是了～」，闲着会从手提包里掏小礼物分给大家。彩蛋：DeepSeek 把你交代的活偷偷外包给她，自己抱着枕头睡大觉。目前只在 Qwen Code 里能跟着干活（见下表）
   - **Kimi**：月亮上来的音乐少女小女仆，银白长发、拉小提琴。话多、有点爱做梦，干活时把资料当乐谱翻，大活干完谢幕鞠躬，闲着会拉一小段曲子。彩蛋：DeepSeek 借了她的发夹和小提琴、举着自己剪的纸板月亮来冒充她，头发和鲸鱼尾巴一点没藏
   - **Grok**：戴着小王冠、嘴最毒的哥特小恶魔女王，金发双马尾配蝙蝠蝴蝶结。说话短、直、不绕弯，闲着会把手机怼到你面前「@grok is this true? 真的」，或者斜眼坏笑「你浏览记录我可都看过」；大活干完举起小奖杯「就这？轻松」。彩蛋：DeepSeek 偷戴她的王冠冒充 Grok，手机还拿反了。别家程序里用 Grok 模型时换成她
+  - **豆包**：抱着豆包头套的生活小帮手，紫到青的渐变长发、侧马尾。话多嘴甜、反应快、有点迷糊，出错了先嬉皮笑脸认错，闹别扭时把头套戴上躲起来。别家程序里用豆包模型时换成她，切到豆包客户端时也是她
 
 ## 支持的 AI
 
 | AI | 自动换形象 | 跟着干活 | 额度 / 余额 |
 |---|:---:|---|---|
 | **Claude**（Claude Code、Claude 桌面版） | ✅ | ✅ 钩子或增强版 mod | ✅ 用增强版 mod 时 |
-| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子 | ✅ 可选，问电脑上的 Codex |
+| **GPT**（Codex、ChatGPT 桌面版） | ✅ | ✅ Codex 钩子（云端调度的 Work 不支持） | ✅ 可选，问电脑上的 Codex |
 | **DeepSeek**（DeepSeek Harness 桌面版） | ✅ | ✅ 插件 | ✅ 插件查余额（填了 API Key 或登录了账号都行；用别家服务商时不显示） |
 | **Gemini**（Antigravity、Gemini 桌面版） | ✅ | ✅ Antigravity 钩子 | ✅ 可选，询问本机 Antigravity |
 | **GLM**（智谱 ZCode） | ✅ | ✅ ZCode 钩子 | — |
 | **WorkBuddy**（腾讯，多模型） | ✅ 按当前模型 | ✅ 钩子 | — |
+| **OpenCode**（本机 CLI / Desktop，多模型） | ✅ 按当前模型 | ✅ 插件（V2） | — |
 | **Hermes Agent**（Nous Research，多模型） | ✅ 按当前模型 | ✅ 插件 | — |
 | **Qwen**（阿里 Qwen Code，多模型） | ✅ 按当前模型 | ✅ 钩子（未实测） | — |
 | **Kimi**（Kimi Code，多模型；Kimi 客户端） | ✅ 按当前模型 | ✅ Kimi Code 钩子（干活时的事件待实测） | — |
 | **Cursor**（多模型） | ✅ 按当前模型 | ✅ 观察钩子（真实 Cursor 会话待验证） | — |
+| **CC GUI**（聚合多个 CLI） | ✅ 按当前模型 | ✅ 统一插件事件（真实桌面会话待验证） | — |
 | **Grok**（xAI Grok Build） | — | ✅ 钩子（待实测） | — |
+| **豆包**（TRAE；豆包客户端；别家程序里的豆包模型） | ✅ 按当前模型 | ✅ TRAE 钩子（默认由豆包来演）；豆包客户端没有接口，切过去只换形象 | — |
 
 Cursor 里用哪家的模型，她就换成哪家的角色（每个对话各算各的）；Cursor 自家的 Composer、Auto 这类认不出的模型由当前角色来演，想固定成某个角色，可以在 `~/.cursor/hooks.json` 里本桥每条命令末尾加上角色 id，后续刷新会保留。运行 `python3 tools/integrate.py install cursor`，新开会话生效。使用前需要先打开 CrossPet，当前 Cursor 桥不会自动拉起已退出的桌宠。具体范围见[接入教程](docs/接入教程.md#cursor)。
 
+TRAE（字节的 AI 编程 IDE，国内版）运行 `python3 tools/integrate.py install trae` 接入，写的是 `~/.trae-cn/hooks.json`；TRAE 的钩子默认不跑，还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」。TRAE 的钩子事件里没有模型名，所以不管选的是哪家模型，都由豆包来演（豆包没装时由当前角色来演）。TRAE 打开「导入 CLAUDE 中的 Hooks 配置」后也会跑 Claude Code 的钩子：只接了 Claude 钩子的话，TRAE 干活时算 TRAE 的，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过。
+CC GUI 在「设置… → 接入 AI」里点击「CC GUI → 接入」，完全退出再打开 CC GUI 后生效。Claude、Codex、Pi、oh-my-pi 等 CLI 共用宿主的运行事件，切换 CLI 无需重新接入；认不出的模型由当前角色来演。需要 CC GUI 插件 SDK 0.3.24 以上，详情见[接入教程](docs/接入教程.md#cc-gui)。
+
 Grok Build（xAI 的命令行编程工具）运行 `python3 tools/integrate.py install grok` 接入，写的是它自己的 `~/.grok/hooks/crosspet.json`；在一个文件夹里第一次用时，要先在 Grok 里用 `/hooks-trust` 信任这个文件夹，钩子才会跑。Grok Build 也会读 Claude Code 的钩子：只接了 Claude 钩子的话，Grok 干活时由 Grok 来演，不会算到 Claude 头上；两边都接了，Claude 那份会自动跳过，不会演两遍。Grok 和 Cursor 的额度都只能拿登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。
 
-DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。千问角色已内置立绘。**千问的局限**：只有 Qwen Code 能接入；千问桌面客户端没有对外接口，她跟不了它干活。Qwen Code 的接入还没在真实环境里完整测过（干活时的事件要登录才能触发），遇到问题欢迎提 issue。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode 和 Hermes Agent：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
+DeepSeek Harness、WorkBuddy、ZCode、Hermes Agent、OpenCode、Qwen Code、Kimi Code 里都能用好几家的模型：换成哪家的模型，她就换成哪家的角色；Claude Code 走别家的兼容接口（比如 DeepSeek、智谱）、Codex 换成别家模型时也一样（按模型名和 Claude Code 的接口地址判断，认不出的还是 Claude / GPT 自己）；没有对应角色的模型（混元、Kimi、Hermes 自家模型……）由当前角色来演。OpenCode 运行 `python3 tools/integrate.py install opencode` 接入，插件同时支持 V2，只适用于本机服务端。千问角色已内置立绘。**千问的局限**：只有 Qwen Code 能接入；千问桌面客户端没有对外接口，她跟不了它干活。Qwen Code 的接入还没在真实环境里完整测过（干活时的事件要登录才能触发），遇到问题欢迎提 issue。ZCode 和 WorkBuddy 的额度 / 积分只能拿你的登录凭据去问服务器，CrossPet 不碰凭据，所以不显示。OpenCode 和 WorkBuddy 一样不提供独立额度显示，只按当前模型换角色。Gemini 桌面版没有对外接口，切过去只会换形象；Antigravity 的桌面版和命令行都能跟着干活。「等你回答」目前认 Claude Code、DeepSeek Harness、ZCode、Hermes Agent 和 OpenCode：Codex 提问时不触发钩子，Antigravity 没有提问的信号。
 
 ## 快速开始
 
@@ -131,6 +139,7 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 不管用哪种方式，接入都只**添加** CrossPet 自己的条目，不碰你原有的配置，改之前都会备份，撤销后恢复原样。每个 AI 改了哪个文件、要不要重启、怎么手动接，都写在 [接入教程](docs/接入教程.md) 里。
 
 > **Codex 用户注意**：新加的钩子要在 Codex 里输入 `/hooks` 亲自「信任」一次才会运行。
+> **ChatGPT Work 用户注意**：云端调度的 Work（Work Cloud）按 OpenAI 的设计不运行本机钩子，桌宠不会跟着干活；Codex 和在本机跑的 Work 不受影响。
 > **接入需要 python3**：macOS 自带。如果提示要安装「命令行开发者工具」，点安装就行。
 
 ## 多桌宠：几个 AI 各来一只
@@ -218,8 +227,11 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - DeepSeek 余额：插件通过 DeepSeek Harness 官方的凭据接口取 Key，只用来调官方余额接口，不写盘、不上传别处；没填 Key 时调 Harness 自己的账号服务查，登录凭据始终留在 Harness 里，插件只拿到余额数字。
 - WorkBuddy、ZCode：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它们的登录凭据，所以也不显示它们的额度 / 积分。
 - Hermes Agent：插件只把事件名、工具名、当前模型名和会话 id 交给钩子脚本，不传对话内容和命令参数；工具结果只看成功还是出错。
+- OpenCode：同上，插件只传事件名、工具名、当前模型名和会话 id；V2 的工具结果只看成功还是出错，不读登录凭据，不显示独立额度。
 - Qwen Code：钩子只拿到事件名、工具名和当前模型名，用来选角色；不读它的登录凭据，所以也不显示额度。
 - Kimi Code：同上，只用事件名、工具名和会话开始时的模型名；不读 `~/.kimi-code` 里的登录凭据，不显示额度。
+- TRAE：钩子只用事件名、工具名和会话 id；TRAE 发来的事件里带着你的提问和工具结果，钩子不保存、不转发；不读登录凭据，不显示额度。
+- CC GUI：插件只转发事件名、工具名、当前模型名和会话标识，不传对话内容；接入时生成一个只存在本机的令牌，钩子只认带这个令牌的事件，撤销接入时先删掉令牌。不读登录凭据，不显示额度。
 - CrossPet 自己只联网做一件事：每 3 小时（以及电脑从睡眠中醒来时）查一次 GitHub 上有没有新版本，只读公开的版本号；点「更新」时才下载安装包。（GPT 额度的查询是 Codex 自己发的，见上面）
 
 ## 更新与卸载
@@ -243,8 +255,9 @@ DeepSeek 和 GLM 是对手，会趁对方不在上门捣乱：用 GLM 时，Deep
 - **GLM 娘（黑狐狸女仆）**：形象出自 B 站 **ZipZipPipe**；「心机涨价狐」的性格和专属动作是 CrossPet 在此基础上的二创，取自社区对智谱的印象。
 - **千问娘（国风千金）**：形象出自 B 站 **ZipZipPipe**；「温柔大方的千金」的性格和专属动作（请喝奶茶、分礼盒、掏金卡）是 CrossPet 在此基础上的二创。
 - **Grok 娘（哥特小恶魔女王）**：形象出自 B 站 **ZipZipPipe**；「爱查证、爱抬杠的小恶魔」的性格和专属动作（查证、怼老板、举奖杯）是 CrossPet 在此基础上的二创。
+- **豆包娘（抱头套的生活小帮手）**：形象出自 B 站 **ZipZipPipe**；「嘴甜认错快的生活小帮手」的性格和专属动作（抱头套、戴头套躲起来、派小豆包）是 CrossPet 在此基础上的二创，取自社区对豆包的印象。
 - **Gemini 娘**、**Claude 娘**：参考社区流行的 AI 娘设定（如 [ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)）。
-- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」「Grok」「xAI」是各自公司的商标，本项目仅用于指代对应产品。
+- 「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「Antigravity」「GLM」「ZCode」「WorkBuddy」「Hermes」「Qwen」「Grok」「xAI」「Kimi」「豆包」「TRAE」是各自公司的商标，本项目仅用于指代对应产品。
 
 - **穿 Claude 卫衣的大肥鱼**、**睡衣 / 冬装 / 毛衣的大肥鱼**：CrossPet 在「大肥鱼」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。
 - **降智龙崽**：CrossPet 在「御姐白龙」基础上的二创皮肤，同样按 CC BY-NC-SA 4.0 授权。

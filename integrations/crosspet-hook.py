@@ -5,6 +5,7 @@
     python3 crosspet-hook.py <角色id>          # 角色id：claude / gpt / deepseek / gemini
     python3 crosspet-hook.py <角色id> <事件名>  # 事件 JSON 里不带事件名的（Antigravity）
     python3 crosspet-hook.py workbuddy          # 一个程序里能用好几家模型（WorkBuddy、ZCode、Hermes Agent）：按模型选角色
+    python3 crosspet-hook.py trae               # TRAE（字节）：事件里没有模型名，默认由豆包来演
     python3 crosspet-hook.py --ensure           # 只确保桌宠在跑（没开着就打开；用户手动退出过或关了这个功能就不管）
 钩子事件 JSON 从 stdin 传入。认得 Claude Code、Codex、DeepSeek Harness、Gemini CLI、Antigravity 的事件。
 
@@ -15,6 +16,7 @@
 用 /tmp 是因为有的 AI（比如 DeepSeek Harness）的钩子跑在沙箱里，只允许写 /tmp。
 """
 import hashlib
+import base64
 import json
 import os
 import re
@@ -80,6 +82,10 @@ def _lock(f, timeout: float = .15) -> None:
 
 
 def ledger(result: str, detail: str) -> None:
+    # TRAE 的钩子默认跑在它的沙箱里，只许写 /tmp：碰一下数据目录（哪怕只是打开锁文件）就被拦，
+    # 整个钩子以退出码 1 结束、在 TRAE 里记成出错（2026-11-22 实测）。状态文件在 /tmp 不受影响，这份记录就不写了
+    if os.environ.get("TRAE_SANDBOX_SBOX_ID"):
+        return
     try:
         d = app_data / "events"
         d.mkdir(parents=True, exist_ok=True)
@@ -332,12 +338,24 @@ def read_event():
 
 
 try:
-    event = read_event()
+    # CC GUI SDK 的命令执行不提供 stdin；参数中只传白名单元数据，不传对话或工具参数。
+    event = json.loads(base64.b64decode(sys.argv[3], validate=True).decode("utf-8")) \
+        if len(sys.argv) == 4 and sys.argv[2] == "--event-base64" else read_event()
 except Exception:
     event = None
 if not isinstance(event, dict):
     ledger("dropped", "bad-json")
     sys.exit(0)
+
+if character == "ccgui":
+    try:
+        enabled = json.loads((app_data / "ccgui-bridge.json").read_text(encoding="utf-8"))
+        token = enabled.get("token") if isinstance(enabled, dict) else None
+        if not isinstance(token, str) or not token or token != os.environ.get("CROSSPET_CCGUI_TOKEN"):
+            raise ValueError("retired bridge")
+    except (OSError, ValueError):
+        ledger("dropped", "ccgui-disconnected")
+        sys.exit(0)
 
 _sid = str(event.get("session_id") or event.get("sessionId") or event.get("conversationId") or "")
 _call = event.get("toolCall") if isinstance(event.get("toolCall"), dict) else {}
@@ -383,6 +401,25 @@ if os.environ.get("GROK_HOOK_EVENT") and character != "grok":
         ledger("dropped", "grok-imported-claude-hook")
         sys.exit(0)
     character = "grok"
+
+# TRAE（字节）：每个钩子进程都带 TRAE_PROJECT_DIR。在 TRAE 设置 → Hooks 里打开「导入 CLAUDE 中的 Hooks 配置」后，
+# 它也跑 ~/.claude/settings.json 的钩子，CrossPet 的 Claude 钩子就会以 claude 的名义被触发（还带着 CLAUDE_PROJECT_DIR）。
+# 和 Grok 一样：单独接入了 TRAE 时丢掉，没接入时改成 TRAE 来演
+def trae_hooks_installed() -> bool:
+    for d in (".trae-cn", ".trae"):
+        try:
+            if "crosspet-hook.py" in (Path.home() / d / "hooks.json").read_text(encoding="utf-8"):
+                return True
+        except (OSError, ValueError):
+            pass
+    return False
+
+
+if os.environ.get("TRAE_PROJECT_DIR") and character != "trae":
+    if trae_hooks_installed():
+        ledger("dropped", "trae-imported-claude-hook")
+        sys.exit(0)
+    character = "trae"
 # Grok Build 关闭会话时，在 SessionEnd 之后还会补发一个 reason=shutdown 的 Stop（不是一轮做完）：
 # 演了会把刚睡着的她拉回「开心」（10-27 实测）
 if os.environ.get("GROK_HOOK_EVENT") and event.get("hook_event_name") == "Stop" and event.get("reason") == "shutdown":
@@ -427,7 +464,7 @@ if character == "gpt" and "transcript_path" in event:
         ledger("dropped", "codex-suggestion")
         sys.exit(0)
 
-arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
+arg_event = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "--event-base64" else ""
 name = event.get("hook_event_name") or arg_event
 source_host = character  # 不能用按模型换过的角色来分会话 / 工具计数
 client = detect_client(source_host)
@@ -556,13 +593,14 @@ try:
 except Exception:
     pass
 
-# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
+# 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code、OpenCode）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi")
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi", "opencode", "trae", "ccgui")
 # ZCode 默认用智谱的 GLM；Qwen Code、Kimi Code 默认用自家的模型。它们只在会话开始时告诉模型名，
 # 之后的事件按会话 id 查当时记下的模型
-HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen", "kimi": "kimi"}
+# TRAE 的钩子事件里一直没有模型名（2026-11 TRAE CN 3.4 实测），只能按默认：字节自家的豆包
+HOST_DEFAULT_MODEL = {"zcode": "glm", "qwen": "qwen", "kimi": "kimi", "trae": "doubao"}
 characters_dir = app_data / "characters"
 
 
@@ -575,6 +613,8 @@ def character_for_model(model: str):
         return "qwen"
     if "kimi" in m or "moonshot" in m:
         return "kimi"
+    if "doubao" in m:   # 火山方舟的 doubao-seed-…、doubao-1.5-pro-…
+        return "doubao"
     if "grok" in m:   # xAI 的 grok-4.7、OpenRouter 的 x-ai/grok-…
         return "grok"
     if "deepseek" in m:
@@ -718,8 +758,10 @@ ANTIGRAVITY_IGNORE = ("task_boundary", "notify_user", "planner_response", "ask_q
 # AI 停下来问你问题、让你选选项的工具：Claude Code 的 AskUserQuestion、Codex 的 request_user_input、
 # DeepSeek Harness 的 ask_user_question 等
 ASKING_TOOLS = ("askuserquestion", "request_user_input", "ask_user_question", "ask_user", "ask_question", "clarify")
-# Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI、WorkBuddy）；idle_prompt 是一轮做完后闲着，不算
-ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission", "agent_needs_input")
+# Notification 里表示「在等你授权 / 等你填」的类型（Claude Code、Gemini CLI、WorkBuddy；
+# TRAE 另有等你回答、等你看方案文档、等你在浏览器里操作）；idle_prompt 是一轮做完后闲着，不算
+ASKING_NOTIFICATIONS = ("permission_prompt", "elicitation_dialog", "toolpermission", "agent_needs_input",
+                        "ask_user_question", "document_review", "browser_interaction")
 
 
 def pose_for_tool(t: str) -> str:
@@ -731,7 +773,7 @@ def pose_for_tool(t: str) -> str:
     # Hermes Agent：在本地找文件 / 翻历史会话 / 看终端输出 / 看图，都算看资料（名字里带 search，别当成上网搜）
     if t in ("search_files", "session_search", "read_terminal", "vision_analyze"):
         return "reading"
-    if "view_image" in t or t in ("find_by_name", "zoom_image"):   # zoom_image：Qwen Code 放大看图
+    if "view_image" in t or t in ("find_by_name", "zoom_image", "ls"):   # zoom_image：Qwen Code 放大看图；LS：TRAE 列目录
         return "reading"
     if t in ("read_url_content",) or t.startswith("browser"):
         return "searching"
@@ -979,7 +1021,7 @@ if session_id and (pose or name == "SessionEnd"):
     if name != "SessionEnd":
         retire_session_elsewhere(session_id)
 
-ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "unknown-event")
+ledger("shown", f"{character} {pose}") if pose else ledger("dropped", "model-only" if name == "ModelChanged" else "unknown-event")
 
 _event_lock.close()  # 自动启动可能查父进程 / 等系统响应，不让下一条钩子等这一步。
 

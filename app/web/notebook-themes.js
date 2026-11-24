@@ -1,4 +1,4 @@
-// 小本子面板的八套角色主题（皮面手账、潮汐日志、冰晶匣、星夜、狐狸掌柜的流水账、毒舌批改本、扇底春风录、月光琴谱）和面板 HTML。
+// 小本子面板的九套角色主题（皮面手账、潮汐日志、冰晶匣、星夜、狐狸掌柜的流水账、毒舌批改本、扇底春风录、月光琴谱、备忘录）和面板 HTML。
 // 定稿原型 build/notebook-preview.html；样式在 notebook-themes.css，字体在 fonts/notebook/。
 // 浏览器里是 window.NotebookThemes；Node 测试里 require 进来（只拼字符串，不碰 DOM）。
 // 规则：只画几何类插画（纹样、器物、光效），动物、人物不手画；批注 / 落款默认值在这里，character.json 的 notebook 覆盖。
@@ -19,6 +19,7 @@
     slash: '<circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2.5 13.5 13.5 2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
     wave: '<path d="M1 9c2-3 4-3 6 0s4 3 6 0M1 13c2-3 4-3 6 0s4 3 6 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="4" r="1.6" fill="none" stroke="currentColor" stroke-width="1.2"/>',
     coin: '<circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6" y="6" width="4" height="4" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+    bubble: '<path d="M3.5 2.5h9a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H8l-3.2 2.6V11.5H3.5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z" fill="currentColor"/>',
     sparkle: '<path d="M8 1l1.4 5.6L15 8l-5.6 1.4L8 15l-1.4-5.6L1 8l5.6-1.4z" fill="currentColor"/>',
   }
   const svg = (k, cls = '') => `<svg viewBox="0 0 16 16" class="${cls}" aria-hidden="true">${ICON[k]}</svg>`
@@ -234,6 +235,24 @@
         </svg>`
       },
     },
+    doubao: {
+      icon: 'bubble', notes: ['第一轮！开工大吉～', null, null], sign: '随时都在的 · 豆包',
+      bg: () => {
+        const dots = []
+        for (let y = 18; y < 720; y += 18) for (let x = 18; x < 364; x += 18) dots.push(`<circle cx="${x}" cy="${y}" r=".9"/>`)
+        return `<svg width="364" height="720" style="left:0;top:0"><g fill="#b9b2ea" opacity=".45">${dots.join('')}</g>
+          <g fill="none" stroke="#8fd3dc" stroke-width="1.2" opacity=".55"><path d="M22 640h34a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10H40l-8 8v-8h-10a10 10 0 0 1-10-10v-12a10 10 0 0 1 10-10z"/>
+            <path d="M300 600h30a9 9 0 0 1 9 9v10a9 9 0 0 1-9 9h-6l6 7-12-7h-18a9 9 0 0 1-9-9v-10a9 9 0 0 1 9-9z"/></g></svg>`
+      },
+      head: () => `<svg style="position:absolute;right:-6px;top:-12px;width:126px;height:96px" viewBox="0 0 126 96">
+          <defs><linearGradient id="dbgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7cf0"/><stop offset="1" stop-color="#4cc3cf"/></linearGradient></defs>
+          <path d="M46 10h58a14 14 0 0 1 14 14v18a14 14 0 0 1-14 14H76l-12 11v-11H46a14 14 0 0 1-14-14V24a14 14 0 0 1 14-14z" fill="url(#dbgrad)"/>
+          <g fill="#fff"><circle cx="61" cy="33" r="3.2"/><circle cx="75" cy="33" r="3.2"/><circle cx="89" cy="33" r="3.2"/></g>
+          <path d="M10 52h34a10 10 0 0 1 10 10v8a10 10 0 0 1-10 10H26l-8 8v-8h-8A10 10 0 0 1 0 70v-8a10 10 0 0 1 10-10z" fill="#fff" stroke="#b9b2ea" stroke-width="1.4"/>
+          <g stroke="#8b7cf0" stroke-width="1.6" stroke-linecap="round"><path d="M12 63h28M12 70h18"/></g>
+          ${sparkle4(116, 72, .45, '#8fd3dc', 'tw', .4)}${sparkle4(26, 18, .4, '#b9b2ea', 'tw', 1.2)}
+        </svg>`,
+    },
   }
 
   let hid = 0
@@ -282,6 +301,19 @@
     qwen: () => `<svg class="cv-art" viewBox="0 0 364 600" preserveAspectRatio="none"><g stroke="#d8b25a" stroke-width="1.2" opacity=".8">${[70, 200, 330, 460].map(y => `<path d="M0 ${y}h20"/>`).join('')}</g>
         ${[70, 200, 330, 460].map(y => `<circle cx="10" cy="${y}" r="2.4" fill="#1d2552"/>`).join('')}</svg>
         <div class="cv-label cv-vertical"><span class="cv-title">扇底春风录</span></div><div class="cv-seal">千问</div>`,
+    doubao: () => {
+      const bubble = (x, y, w, h, tail, fill, op) => `<g transform="translate(${x} ${y})" opacity="${op}"><rect width="${w}" height="${h}" rx="${h / 2}" fill="${fill}"/><path d="M${tail} ${h - 2}l-8 14 18-12z" fill="${fill}"/></g>`
+      return `<svg class="cv-art" viewBox="0 0 364 600" preserveAspectRatio="xMidYMid slice">
+        <defs><linearGradient id="cvdbring" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9f4f6"/></linearGradient></defs>
+        <g fill="#ffffff" opacity=".16">${[60, 120, 180, 240, 300].map(x => `<rect x="${x}" y="0" width="1" height="600"/>`).join('')}${[100, 200, 300, 400, 500].map(y => `<rect x="0" y="${y}" width="364" height="1"/>`).join('')}</g>
+        ${bubble(40, 70, 120, 40, 30, '#ffffff', .9)}${bubble(196, 128, 120, 40, 96, '#c8f0f3', .85)}${bubble(70, 186, 90, 32, 24, '#ffffff', .7)}
+        <g fill="#8b7cf0"><circle cx="76" cy="90" r="4"/><circle cx="96" cy="90" r="4"/><circle cx="116" cy="90" r="4"/></g>
+        <circle cx="182" cy="470" r="38" fill="none" stroke="url(#cvdbring)" stroke-width="9"/>
+        <circle cx="182" cy="470" r="20" fill="none" stroke="#ffffffaa" stroke-width="2"/>
+        ${sparkle4(250, 430, .9, '#ffffff', 'tw', .2)}${sparkle4(112, 520, .6, '#c8f0f3', 'tw', .9)}${sparkle4(300, 300, .5, '#ffffff', 'tw', 1.5)}
+        <rect x="14" y="14" width="336" height="572" rx="14" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="2 6" stroke-linecap="round" opacity=".7"/></svg>
+        <div class="cv-label"><span class="cv-icon">${svg('bubble')}</span><span class="cv-title">备忘录</span><span class="cv-sub">DOUBAO · 收到收到</span></div>`
+    },
     kimi: () => `<svg class="cv-art" viewBox="0 0 364 600" preserveAspectRatio="xMidYMid slice">${starfield(46, 31, 364, 600)}
         <defs><radialGradient id="cvkglow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#e6eaff" stop-opacity=".55"/><stop offset="1" stop-color="#e6eaff" stop-opacity="0"/></radialGradient></defs>
         <circle cx="236" cy="150" r="80" fill="url(#cvkglow)"/>
@@ -295,7 +327,7 @@
   // 本子名；标题是「她的名字 + 的 + 本子名」，名字用用户在设置里改的（没改就是默认名），比如「白龙的冰晶匣」
   const BOOKS = {
     claude: '随身手册', deepseek: '潮汐日志', gpt: '冰晶匣', gemini: '星光小心愿',
-    glm: '掌柜流水账', grok: '毒舌批改本', qwen: '扇底春风录', kimi: '月光琴谱',
+    glm: '掌柜流水账', grok: '毒舌批改本', qwen: '扇底春风录', kimi: '月光琴谱', doubao: '备忘录',
   }
   // 名字以英文字母或数字结尾时空一格（「Claude 的随身手册」），中文名紧挨着（「白龙的冰晶匣」）
   const bookTitle = (name, book) => { const n = String(name || '').trim(); return n ? `${n}${/[A-Za-z0-9]$/.test(n) ? ' ' : ''}的${book}` : book }
@@ -339,7 +371,7 @@
 
   // ---- 第二页：朋友们的留言 ----
   // v.page2 = { now, ownerImage, friends: [{ id, name, image, levelName, hearts, block }], cameo, chats: [{ t, lines: [{ who, name, text }] }] }
-  // 每个人的字用 .w-<她>（八个角色各自本子的字体和批注色，别的角色 .w-other）
+  // 每个人的字用 .w-<她>（九个角色各自本子的字体和批注色，别的角色 .w-other）
   const WRITERS = new Set(Object.keys(BOOKS))
   const hand = id => `w-${WRITERS.has(id) ? id : 'other'}`
   const hhmm = ms => { const d = new Date(ms); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}` }

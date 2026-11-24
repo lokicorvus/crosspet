@@ -130,6 +130,8 @@ extension App {
         if bundle.hasPrefix("com.workbuddy.") { return "workbuddy" }
         if bundle == "dev.zcode.app" { return "zcode" }
         if bundle == "com.todesktop.230313mzl4w4u92" { return "cursor" }
+        if bundle == "cn.trae.app" { return "trae" }   // TRAE 国内版
+        if bundle == "com.zhukunpenglinyutong.ccgui" { return "ccgui" }
         return nil
     }
 
@@ -146,7 +148,7 @@ extension App {
         guard let c = obj["character"] as? String, characterIds.contains(c) else { return id }   // 认不出的模型（写的 null）：不换人
         return c
     }
-    static let hostDefaults = ["zcode": "glm", "qwen": "qwen"]
+    static let hostDefaults = ["zcode": "glm", "qwen": "qwen", "trae": "doubao"]
 
     // 菜单和控制台都能直接 reload；统一在导航开始时撤销旧页面上的异步选择。
     // didFinish 仍按原流程恢复角色、清空 stamps 并重新跟随前台，不改 pendingSwitch 的调度。

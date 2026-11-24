@@ -125,7 +125,7 @@ namespace CrossPet
                 if (!File.Exists(Path.Combine(root, "CrossPet.exe")) || !File.Exists(script) || version != tag.TrimStart('v', 'V'))
                     throw new Exception("下载的安装包不完整");
                 Store.Log($"更新：{Store.Version} → {version}");
-                Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{script}\" -Update")
+                Process.Start(new ProcessStartInfo("powershell.exe", $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{script}\" -Update -Target \"{Store.Install}\"")
                     { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root });
                 Quit();   // install.ps1 等这边退出后再覆盖文件
             }

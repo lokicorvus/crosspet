@@ -18,6 +18,9 @@ extension App {
     }
     var textLinked: Bool { defaults.object(forKey: "textLinked") as? Bool ?? true }
     var showName: Bool { defaults.object(forKey: "showName") as? Bool ?? true }
+    var showMinis: Bool { defaults.object(forKey: "showMinis") as? Bool ?? true }
+    var agyQuotaMode: String { defaults.string(forKey: "agyQuotaMode") == "cg" ? "cg" : "week" }   // Gemini 额度显示哪些：week 5小时和本周（默认）/ cg 5小时和 Claude/GPT
+    var minisFrom: String { defaults.string(forKey: "minisFrom") == "own" ? "own" : "all" }   // 小帮手显示谁的：all 也显示朋友送的（默认）/ own 只有她自己的
     var followApps: Bool { defaults.object(forKey: "followApps") as? Bool ?? true }
     // 跟随 AI 工作事件（#23 给 macOS 补上的）：默认关——macOS 以前没有这个行为，升级后不该突然按事件换角色；Windows 一直默认开
     var followEvents: Bool { defaults.object(forKey: "followEvents") as? Bool ?? false }
@@ -178,8 +181,8 @@ extension App {
         let names = defaults.dictionary(forKey: "names") as? [String: String] ?? [:]
         var state: [String: Any] = [
             "version": currentVersion, "appVersion": currentVersion, "whatsNewSeen": defaults.string(forKey: "whatsNewSeen") ?? currentVersion, "platform": "mac",
-            "size": Double(petScale), "textSize": textScale, "textLinked": textLinked, "showName": showName, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps, "followEvents": followEvents,
-            "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"), "gptQuotaNote": codexNote,
+            "size": Double(petScale), "textSize": textScale, "textLinked": textLinked, "showName": showName, "showMinis": showMinis, "minisFrom": minisFrom, "eggs": eggsEnabled, "hideFullscreen": hideInFullscreen, "aura": auraMode, "followApps": followApps, "followEvents": followEvents,
+            "gptQuota": defaults.bool(forKey: "gptQuota"), "agyQuota": defaults.bool(forKey: "agyQuota"), "agyQuotaMode": agyQuotaMode, "gptQuotaNote": codexNote,
             "login": SMAppService.mainApp.status == .enabled,
             "edgeDock": edgeDockEnabled, "dsQuota": dsQuotaEnabled, "quotaAggregate": quotaAggregate, "codexResets": codexResets, "peakStyle": peakStyle, "quotaStyle": quotaStyle, "peakSkins": peakSkins, "powerSave": powerSave, "noSleep": noSleep,
             "sitRemind": defaults.bool(forKey: "sitRemind"), "sitEvery": breakEvery("sitEvery", 45), "waterRemind": defaults.bool(forKey: "waterRemind"), "waterEvery": breakEvery("waterEvery", 60),

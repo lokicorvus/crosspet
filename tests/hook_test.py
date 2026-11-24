@@ -202,5 +202,94 @@ class HookGrokTests(unittest.TestCase):
         self.fire('claude', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'tool_name': 'Read', 'tool_input': {}}, grok=False)
         self.assertEqual(self.read('claude-state.json')['pose'], 'reading')
 
+
+class HookTraeTests(unittest.TestCase):
+    """TRAE（字节）：事件格式和 Claude Code 一样，但没有模型名（2026-11-22 TRAE CN 3.4.22 实测），默认由豆包来演；
+    每个钩子进程都带 TRAE_PROJECT_DIR。打开「导入 CLAUDE 中的 Hooks 配置」后它也会以 claude 的名义触发 CrossPet 的 Claude 钩子"""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        self.data, self.state, self.home = root / 'data', root / 'state', root / 'home'
+        for d in (self.data, self.state, self.home):
+            d.mkdir()
+    def tearDown(self):
+        self.tmp.cleanup()
+    def add_character(self, cid):
+        c = self.data / 'characters' / cid
+        c.mkdir(parents=True)
+        (c / 'character.json').write_text('{}', encoding='utf-8')
+        (c / 'idle.webp').write_bytes(b'x')
+    def fire(self, character, event, trae=True):
+        env = dict(os.environ, CROSSPET_DATA_DIR=str(self.data), CROSSPET_STATE_DIR=str(self.state), HOME=str(self.home))
+        for k in ('TRAE_PROJECT_DIR', 'GROK_HOOK_EVENT', 'ANTHROPIC_MODEL', 'ANTHROPIC_BASE_URL'):
+            env.pop(k, None)
+        if trae:
+            env['TRAE_PROJECT_DIR'] = str(self.home / 'proj')
+        p = subprocess.run([sys.executable, str(HOOK), character], input=json.dumps(event).encode(), capture_output=True, env=env)
+        self.assertEqual(p.returncode, 0, p.stderr.decode('utf-8', 'replace'))
+    def read(self, name):
+        try:
+            return json.loads((self.state / name).read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            return None
+    def ev(self, name, **kw):
+        return dict(kw, hook_event_name=name, session_id='6b02', agent_id='solo_agent', agent_type='solo_agent')
+
+    def test_doubao_plays_by_default(self):
+        self.add_character('doubao')
+        for tool, pose in (('Glob', 'reading'), ('LS', 'reading'), ('Read', 'reading'), ('Write', 'writing'),
+                           ('RunCommand', 'running'), ('WebSearch', 'searching'), ('AskUserQuestion', 'asking')):
+            self.fire('trae', self.ev('PreToolUse', tool_name=tool, tool_input={}))
+            self.assertEqual(self.read('doubao-state.json')['pose'], pose, tool)
+        self.assertEqual(self.read('trae-host.json')['character'], 'doubao')
+
+    def test_without_doubao_current_plays(self):
+        self.fire('trae', self.ev('PreToolUse', tool_name='Read', tool_input={}))
+        self.assertEqual(self.read('current-state.json')['pose'], 'reading')
+        self.assertIsNone(self.read('doubao-state.json'))
+
+    def test_asking_notifications(self):
+        self.add_character('doubao')
+        for kind in ('permission_prompt', 'ask_user_question', 'document_review', 'browser_interaction'):
+            self.fire('trae', self.ev('UserPromptSubmit', prompt='x'))
+            self.fire('trae', self.ev('Notification', notification_type=kind, message='m'))
+            self.assertEqual(self.read('doubao-state.json')['pose'], 'asking', kind)
+        # 一轮做完后的 idle_prompt 不算在等你
+        self.fire('trae', self.ev('Stop', stop_hook_active=False))
+        self.fire('trae', self.ev('Notification', notification_type='idle_prompt', message='Agent has completed the task'))
+        self.assertEqual(self.read('doubao-state.json')['pose'], 'happy')
+
+    def test_claude_hook_fired_by_trae_plays_trae(self):
+        self.add_character('doubao')
+        self.add_character('claude')
+        self.fire('claude', self.ev('PreToolUse', tool_name='Read', tool_input={}))
+        self.assertEqual(self.read('doubao-state.json')['pose'], 'reading')
+        self.assertIsNone(self.read('claude-state.json'))
+
+    def test_claude_hook_fired_by_trae_is_dropped_when_trae_is_integrated(self):
+        self.add_character('doubao')
+        (self.home / '.trae-cn').mkdir()
+        (self.home / '.trae-cn' / 'hooks.json').write_text('{"version": 1, "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "python3 crosspet-hook.py trae"}]}]}}', encoding='utf-8')
+        self.fire('claude', self.ev('PreToolUse', tool_name='Read', tool_input={}))
+        self.assertIsNone(self.read('doubao-state.json'))
+        self.assertIsNone(self.read('claude-state.json'))
+
+    def test_real_claude_is_untouched(self):
+        self.add_character('claude')
+        self.fire('claude', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'tool_name': 'Read', 'tool_input': {}}, trae=False)
+        self.assertEqual(self.read('claude-state.json')['pose'], 'reading')
+
+    def test_sandbox_does_not_touch_data_dir(self):
+        # TRAE 的沙箱只许写 /tmp：碰数据目录（事件记录和它的锁文件）整个钩子就被判出错
+        self.add_character('doubao')
+        before = sorted(p.relative_to(self.data) for p in self.data.rglob('*'))
+        env = dict(os.environ, CROSSPET_DATA_DIR=str(self.data), CROSSPET_STATE_DIR=str(self.state), HOME=str(self.home),
+                   TRAE_PROJECT_DIR=str(self.home), TRAE_SANDBOX_SBOX_ID='x')
+        p = subprocess.run([sys.executable, str(HOOK), 'trae'], input=json.dumps(self.ev('PreToolUse', tool_name='Read', tool_input={})).encode(),
+                           capture_output=True, env=env)
+        self.assertEqual(p.returncode, 0)
+        self.assertEqual(self.read('doubao-state.json')['pose'], 'reading')
+        self.assertEqual(sorted(p.relative_to(self.data) for p in self.data.rglob('*')), before)
+
 if __name__ == '__main__':
     unittest.main()

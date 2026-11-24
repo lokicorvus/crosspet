@@ -47,7 +47,10 @@ html.aura-off #aura, html.aura-off .aura-rings { display: none; }
 @media (prefers-color-scheme: dark) { html:not(.aura-on) #aura, html:not(.aura-on) .aura-rings { display: none; } }
 #shadow { position: absolute; left: 50%; bottom: 7px; width: 110px; height: 10px; margin-left: -55px;
   border-radius: 50%; background: rgba(0,0,0,.13); }
-#body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; }
+/* 她身子 + 迷你小帮手（mini-helper.js 加进来）单独一层：后半圈小帮手 z-index: -1 只沉到她身后。只隔开这一层，不隔开整个 #stage——
+   不然 #stage 里「新功能」卡片的 z-index 4 只在 #stage 里算，排在前面的气泡（z-index 3）会盖住卡片、挡住卡片上的按钮 */
+#figure { position: absolute; inset: 0; isolation: isolate; pointer-events: none; }
+#body { position: absolute; left: 17.8%; top: 21.1%; width: 64.5%; height: 75%; transform-origin: 50% 100%; pointer-events: auto; }
 /* 立绘按高度占满人物框；比框宽的（张开翅膀、带小帮手、抱大碗……）往左右多伸出去，最多到整个舞台宽，
    而不是整体缩小——这样所有姿态里人物一样高 */
 #body img { position: absolute; top: 0; bottom: 0; left: -27.5%; width: 155%; height: 100%; object-fit: contain; object-position: 50% 100%;
@@ -116,7 +119,8 @@ html.no-name #caption { display: none; }
 #quota .qbar { display: contents; white-space: nowrap; }   /* 一行四格：名字、条、百分比、时间，各行对齐成表 */
 #quota.bars > div:not(.qbar) { grid-column: 1 / -1; }   /* 文字行（余额）、重置提醒、峰谷条、备注占满一行 */
 #quota .ql { padding-right: calc(4px * var(--k)); white-space: nowrap; }
-#quota .qtrack { min-width: calc(30px * var(--k)); height: calc(5px * var(--k)); border-radius: calc(3px * var(--k)); background: #e4dcd6; overflow: hidden; }
+/* 条最短 56：整块按内容收窄，名字长（Antigravity 的「Claude/GPT 5小时」）时条只剩最低宽度，挤成一小截 */
+#quota .qtrack { min-width: calc(56px * var(--k)); height: calc(5px * var(--k)); border-radius: calc(3px * var(--k)); background: #e4dcd6; overflow: hidden; }
 #quota .qtrack i { display: block; height: 100%; border-radius: inherit; background: var(--bar); }
 #quota .qp { padding-left: calc(4px * var(--k)); font-weight: 700; color: var(--bar); text-align: right; white-space: nowrap; }
 #quota .qt { padding-left: calc(4px * var(--k)); font-size: calc(8.5px * var(--k)); color: #a8958a; white-space: nowrap; }
@@ -205,7 +209,7 @@ html.no-name #caption { display: none; }
   <div id="bubble" class="hide"></div>
   <div id="stage">
     <div id="aura"></div><div id="shadow"></div>
-    <div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div>
+    <div id="figure"><div id="body"><img id="a" class="on"><img id="b"><img id="blink"></div></div>
     <div id="fx"></div>
     <div id="cards"><div id="more"></div></div>
     <div id="newsCard" class="hidden"><div id="newsText"></div><div class="btns"><button class="go" data-action="news-open">去看看 ›</button><button data-action="news-close">知道了</button></div></div>
@@ -229,8 +233,10 @@ addEventListener('error', e => {
 <script src="codex-quota.js"></script>
 <script src="quota-aggregate.js"></script>
 <script src="quota-bars.js"></script>
+<script src="agy-quota.js"></script>
 <script src="plugin-update.js"></script>
 <script src="stand-in.js"></script>
+<script src="mini-helper.js"></script>
 <script src="follow-policy.js"></script>
 <script src="codex-resets.js"></script>
 <script src="break-reminders.js"></script>
@@ -395,6 +401,34 @@ function setPose(p, instant) {
   document.documentElement.style.setProperty('--aura', aura[0])
   document.documentElement.style.setProperty('--aura-o', Math.min(.75, aura[1] * 1.4))
   setFx(p)
+  syncMini()
+}
+// 迷你小帮手（mini-helper.js）：她自己的 + 好朋友送的（好感度到 2 级），最多 6 个，陪在脚边，跟着她的姿态换动作。
+// 谁出来按好感度记录算（MiniHelper.crew）；记录在共用的 localStorage 里，额外那只也照样读，每分钟重算一次（分数涨了、过了午夜轮换）。
+// 设置里关了（showMinis）、演彩蛋、缩在边上、彩蛋角色：整组收起来
+let miniHelper = null
+let showMinis = true
+let minisFrom = 'all'   // 设置：all 自己的加朋友送的（默认）/ own 只有她自己的
+function syncMini() {
+  if (!window.MiniHelper || !charId) return
+  miniHelper = miniHelper || MiniHelper.attach($('figure'))
+  if (!showMinis || egg || tucked || char()?.egg) { miniHelper.setOn(false); return }
+  miniHelper.setCrew(MiniHelper.crew(charId, { store: friendStoreRead(), manifest, today: Friendship.localDay(Date.now()), levelOf: Friendship.level, friends: minisFrom !== 'own' }))
+  miniHelper.setOn(true)
+  miniHelper.setMood(MiniHelper.moodOf(pose))
+}
+setInterval(syncMini, 60_000)
+// 主桌宠这边小帮手看得见：看不见时不记送礼、不演，等看得见了补演（不然那一次就白丢了）。
+// 设成「只有她自己的」时朋友送的不出来，送礼那一幕也看不到，同样先不记
+const minisVisible = () => showMinis && minisFrom !== 'own' && !tucked && !egg
+// 外壳调：设置里的「迷你小帮手」开关，和下面那两档（只有她自己的 / 也显示朋友送的）
+function setShowMinis(on) { showMinis = !!on; syncMini() }
+function setMinisFrom(s) { minisFrom = s === 'own' ? 'own' : 'all'; syncMini() }
+// 送礼那一幕：她身边 from 送的那个小帮手落下来鞠个躬。主桌宠自己调，额外那只由主桌宠交过来（companionCall）。
+// 先重算一次：刚升到好朋友时，那个小帮手可能还没赶上每分钟的重算
+function miniGift(from) {
+  syncMini()
+  miniHelper?.gift(from)
 }
 // 名牌上的名字：设置里可以关掉（额度照常显示）
 function setShowName(on) { document.documentElement.classList.toggle('no-name', !on) }
@@ -870,7 +904,7 @@ function init(m) {
     if (want && roleInfo?.parked) document.body.classList.add('parked')
     if (want && manifest.characters[want] && !manifest.characters[want].egg) setCharacter(want, !!roleInfo?.parked)
     else setCharacter(Object.keys(m.characters).sort().find(k => !m.characters[k].egg), true)
-  } else { $('caption').textContent = char().name }
+  } else { $('caption').textContent = char().name; syncMini() }   // 换衣服时外壳重新 init：小帮手也换成这套的
   sendStoredFriendship()
   askNotebookBackfill()
   restoreGathered()
@@ -2167,8 +2201,20 @@ function tryPairChat() {
     const up = PairChat.levelUp({ present: presentCharacters(), busy, wear, levelOf: key => Friendship.level(store[key]?.points || 0), shownOf: key => store[key]?.shown || 0 })
     if (up) {
       pairChatAt = nowMs
-      friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level } })
+      // 升到好朋友：送礼记号和 shown 一起写，对话说完半秒后两边演送礼；小帮手这会儿看不见就先不记，等补演
+      const gift = up.level >= 2 && store[up.key]?.giftShown !== true && minisVisible()
+      friendStoreWrite({ ...store, [up.key]: { ...store[up.key], shown: up.level, ...(gift ? { giftShown: true } : {}) } })
       speak(up.lines)
+      if (gift) setTimeout(() => playGift(up.key), Math.max(0, speakingUntil - nowMs) + 500)
+      return
+    }
+    // 老早就是好朋友、还没演过送礼的一对（更新前升的）：两只都在、都闲着时补演一次，不说话；先写记号，只演一次
+    const owed = minisVisible() && pairsOf(presentCharacters()).filter(([a, b]) => !busy.includes(a) && !busy.includes(b))
+      .map(([a, b]) => Friendship.pairKey(a, b)).find(key => Friendship.level(store[key]?.points || 0) >= 2 && store[key]?.giftShown !== true)
+    if (owed) {
+      pairChatAt = nowMs
+      friendStoreWrite({ ...store, [owed]: { ...store[owed], giftShown: true } })
+      playGift(owed)
       return
     }
   }
@@ -2232,6 +2278,16 @@ function chatAs(character, line, pose, fx, ms) {
   if (character === mainCharacter()) { chat(line, pose, fx, ms); return }
   const p = companionsState?.pets.find(x => x.character === character)
   if (p) toShell({ companionCall: { id: p.id, fn: 'chat', args: [line, pose || null, fx || null, ms || PairChat.bubbleMs(line)] } })
+}
+// 送礼：一对里两只各自演「对方送的那个小帮手」落下来。主桌宠自己演，额外那只交给外壳转（companionCall，fn = miniGift）；不在了就算了
+// 外壳只转名单里的 fn：miniGift 要在 macOS（App+Companions.swift 的 companionCall）和 Windows（CompanionCallRule.cs）的名单里，两边要对齐
+function playGift(key) {
+  const [a, b] = key.split('+')
+  for (const [ch, from] of [[a, b], [b, a]]) {
+    if (ch === mainCharacter()) { miniGift(from); continue }
+    const p = companionsState?.pets.find(x => x.character === ch)
+    if (p) toShell({ companionCall: { id: p.id, fn: 'miniGift', args: [from] } })
+  }
 }
 // 说一句闲聊（主桌宠和额外那只都用）：在干活、演彩蛋、道别时不说；ms 后收起（没给按字数，PairChat.bubbleMs；气泡已经换成别的话就不管）。
 // look：说这句时换的立绘（pair-chat.js 按台词挑的；没画的顺着替补找），收起时回到常态；缩在边上时不换。
@@ -2316,7 +2372,15 @@ function celebrate(id, ev) {
 
 // GPT 额度：外壳交来问 Codex 服务得到的原始额度（见 codex-quota.js），排好版再走 setQuota
 function setCodexQuota(p) { setQuota('gpt', p ? CodexQuota.view(p, Date.now() / 1000) : null) }
+// Gemini（Antigravity）额度按设置「显示哪些」挑（agy-quota.js）：week 只看 Gemini 的 5 小时和本周（默认，和 GPT / Claude 一样排）/ cg 外壳挑的两组。
+// 留着外壳交来的原始那份，换模式时拿它重算
+let agyQuotaMode = 'week', agyRaw = null
+function setAgyQuotaMode(m) { agyQuotaMode = m === 'cg' ? 'cg' : 'week'; showQuota('gemini', AgyQuota.view(agyRaw, agyQuotaMode, Date.now() / 1000)) }
 function setQuota(id, q) {
+  if (id === 'gemini') { agyRaw = q; q = AgyQuota.view(q, agyQuotaMode, Date.now() / 1000) }
+  showQuota(id, q)
+}
+function showQuota(id, q) {
   const wasLow = quota[id]?.low
   quota[id] = q
   const ev = quotaEvent(id, q)

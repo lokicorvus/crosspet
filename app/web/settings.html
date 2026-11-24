@@ -165,6 +165,10 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
       <div class="choices stack"><label><input type="radio" name="petsRest" value="auto">干活时出来，闲下来就走</label>
         <label><input type="radio" name="petsRest" value="stay">干活时出来，程序关了才走</label>
         <label><input type="radio" name="petsRest" value="open">程序开着就在，关了才走</label></div></div></div>
+  <div class="item"><div class="label">显示小帮手<small>她脚边陪着自己的小帮手；和别的 AI 成为好朋友后会互送，收到的也一起陪着（最多 6 个）</small></div>
+    <div class="ctl"><label class="switch"><input type="checkbox" data-key="showMinis"><span></span></label></div></div>
+  <div class="item indent" id="minisFromRow"><div class="label">显示谁的</div>
+    <div class="ctl"><div class="seg" id="minisFrom" data-key="minisFrom"><button data-v="own">只有她自己的</button><button data-v="all">也显示朋友送的</button></div></div></div>
 </div>
 
 <div class="card hidden" data-tab="character" id="friendship">
@@ -177,6 +181,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="gptQuota"><span></span></label></div></div>
   <div class="item"><div class="label">显示 Gemini 额度<small>询问本机正在运行的 Antigravity</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="agyQuota"><span></span></label></div></div>
+  <div class="item indent" id="agyQuotaModeRow"><div class="label">显示哪些<small>默认只看 Gemini 自己的 5 小时和本周；另一种把 Antigravity 里 Claude 和 GPT 模型的额度也列出来</small></div>
+    <div class="ctl"><div class="seg" id="agyQuotaMode" data-key="agyQuotaMode"><button data-v="week">5小时和本周</button><button data-v="cg">5小时和 Claude/GPT</button></div></div></div>
   <div class="item"><div class="label">显示 DeepSeek 余额<small>DeepSeek Harness 插件查的官方账户余额，余额低时她会没精神；用 OpenCode Go 等别家订阅的话可以关掉</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="dsQuota"><span></span></label></div></div>
   <div class="item"><div class="label">合并显示各家额度<small>额度小窗里把各家 AI 的额度排在一起，每行前面标名字；关着时只显示当前角色自己的</small></div>
@@ -265,6 +271,10 @@ function setState(s) {
   // 久坐、喝水提醒的间隔（外壳没给就是默认的 45 / 60 分钟）；正在选的时候不改
   for (const [id, def] of [['sitEvery', 45], ['waterEvery', 60]]) if (document.activeElement !== $(id)) $(id).value = String(s[id] || def)
   for (const b of $('quotaStyle').children) b.classList.toggle('on', b.dataset.v === (s.quotaStyle || 'text'))
+  for (const b of $('minisFrom').children) b.classList.toggle('on', b.dataset.v === (s.minisFrom === 'own' ? 'own' : 'all'))
+  $('minisFromRow').classList.toggle('hidden', s.showMinis === false)
+  for (const b of $('agyQuotaMode').children) b.classList.toggle('on', b.dataset.v === (s.agyQuotaMode === 'cg' ? 'cg' : 'week'))
+  $('agyQuotaModeRow').classList.toggle('hidden', s.agyQuota === false)
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
@@ -403,6 +413,8 @@ const NEVER_SEEN = {
   hermes: '新开一个 Hermes 会话试试',
   qwen: '新开一个 Qwen Code 会话试试',
   kimi: '新开一个 Kimi Code 会话试试',
+  trae: '在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」，再开个新对话试试',
+  ccgui: '完全退出再打开 CC GUI，然后用任意 CLI 发起一轮对话；需要 CC GUI 插件 SDK 0.3.24 以上',
   grok: '新开一个 Grok Build 会话试试；在新文件夹里要先用 /hooks-trust 信任这个文件夹（grok -p 不用）',
 }
 const agoText = s => s < 60 ? '刚刚' : s < 3600 ? `${Math.floor(s / 60)} 分钟前` : s < 86400 ? `${Math.floor(s / 3600)} 小时前` : `${Math.floor(s / 86400)} 天前`
@@ -440,6 +452,8 @@ for (const el of document.querySelectorAll('input[data-key]')) el.onchange = () 
 for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
 for (const b of $('peakStyle').children) b.onclick = () => post({ cmd: 'set', key: 'peakStyle', value: b.dataset.v })
 for (const b of $('quotaStyle').children) b.onclick = () => post({ cmd: 'set', key: 'quotaStyle', value: b.dataset.v })
+for (const b of $('minisFrom').children) b.onclick = () => post({ cmd: 'set', key: 'minisFrom', value: b.dataset.v })
+for (const b of $('agyQuotaMode').children) b.onclick = () => post({ cmd: 'set', key: 'agyQuotaMode', value: b.dataset.v })
 for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
 // 锁链图标：锁着 = 两节扣在一起；解开 = 断开
 const LINK_ON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1a2.5 2.5 0 01-3.5-3.5l1-1"/></svg>'

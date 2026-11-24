@@ -21,6 +21,7 @@
 | 千问 | 国风千金：B 站 **ZipZipPipe**（「温柔大方的千金」的性格和专属动作是 CrossPet 的二创） |
 | 彩蛋（DeepSeek 把活外包给千问） | CrossPet 原创情节，基于以上角色 |
 | Kimi | 月亮音乐小女仆：B 站 **ZipZipPipe**（「拉小提琴的音乐少女」的性格和专属动作是 CrossPet 的二创） |
+| 豆包 | 抱头套的豆包娘：B 站 **ZipZipPipe**（「嘴甜认错快的生活小帮手」的性格和专属动作是 CrossPet 的二创，取自社区对豆包的印象） |
 | Grok | 哥特小恶魔女王：B 站 **ZipZipPipe**（「爱查证、爱抬杠的小恶魔」的性格和专属动作是 CrossPet 的二创） |
 | 彩蛋（DeepSeek 偷穿 Grok 的衣服） | CrossPet 原创情节，基于以上角色 |
 | Gemini | 社区流行的 Gemini 娘设定（猫耳、异色瞳、四芒星发饰） |
@@ -29,6 +30,6 @@
 
 参考资料：[萌娘百科 DeepSeek 娘](https://zh.moegirl.org.cn/DeepSeek%E5%A8%98)、[ai-school-op](https://github.com/lshhhhhhh/ai-school-op)、[openpet-ai-girls](https://github.com/AwesomeHou/openpet-ai-girls)。
 
-「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「GLM」「Qwen」「千问」「Grok」「xAI」「Kimi」「月之暗面」是各自公司的商标，本项目为非官方同人项目，与这些公司无关。
+「Claude」「GPT」「ChatGPT」「Codex」「DeepSeek」「Gemini」「GLM」「Qwen」「千问」「Grok」「xAI」「Kimi」「月之暗面」「豆包」「字节跳动」是各自公司的商标，本项目为非官方同人项目，与这些公司无关。
 
 如果你是原作者并且对使用方式有异议，请在 GitHub 提 Issue，我们会第一时间修改或移除。

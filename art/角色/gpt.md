@@ -34,3 +34,4 @@ How she shows emotion: through wings and tail (wings spread when happy or proud,
 - friend_up: Looking away to one side with the back of one hand raised to her mouth, but her eyes glance back toward the viewer; a faint blush, a tiny smile she is trying to hide, tail tip curling, wings lifted just slightly. Composed, not giddy.
 - swamped_left: Composure cracking: leaning toward the viewer's LEFT tapping the tablet, the tail holding a scroll, one wing curled forward pinning a second small tablet against her side, a forced elegant smile with two sweat drops, slightly wide eyes, a few hair strands out of place.
 - swamped_right: Same as swamped-left but leaning toward the viewer's RIGHT, with the tablet, scroll and pinned tablet swapping sides accordingly.
+- mini_move: Flying to the right with her small dragon wings, three frames of one wingbeat: wings up, wings level, wings down; feet off the ground, tail streaming behind.

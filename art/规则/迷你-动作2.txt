@@ -1,0 +1,15 @@
+Create a second sprite sheet for the SAME tiny "mini helper" as the first attachment. The first attachment is her approved mini sheet (idle, happy, sleep, walk): copy that exact mini — same head size, face, eyes, hair, hair ornaments on the same side, outfit, colors, signature prop, outline weight and shading. It must look like more frames from the same sheet, not a new design. The other attachments are the approved big character design, for colors only. Do not draw the big character. It is shown at about 100 pixels tall next to her, so it must read clearly when small.
+
+LAYOUT: One landscape image, 1536x1024, with a real transparent background (transparent_background: true). Exactly six minis in a 3-column x 2-row grid, one per cell, each centered in its cell and drawn at the same scale as each other and as the minis in the first attachment (each about 360 px tall when standing). Leave wide transparent gaps: no part of one mini may touch another mini or the image edge.
+
+TOP ROW, left to right: a 3-frame run cycle, all three running toward the viewer's RIGHT in three-quarter view, the same angle as the walk pose in the first attachment, her signature prop tucked under one arm or held in one hand. Same head size and same body proportions in all three frames; only the legs, arms, hair and skirt move.
+1. run-a: her near (front) leg stretched forward with the heel just touching the ground, back leg pushing off behind her, opposite arm swinging forward; body slightly low.
+2. run-b: passing pose: body at its highest, both feet off the ground, one knee bent up under her, legs close together; hair and skirt lifted a little.
+3. run-c: the mirror step of run-a: her far (back) leg now stretched forward touching the ground and the near leg pushing off behind; the other arm swinging forward; body slightly low.
+
+BOTTOM ROW, left to right:
+4. wave: standing and facing the viewer, cheerful smile, one hand raised high waving, her signature prop held against her chest with the other arm.
+5. read: sitting on the ground with legs out in front, a small book open on her lap, looking down reading it, calm content face.
+6. worried: standing and facing the viewer, hugging her signature prop tightly to her chest with both arms, eyebrows raised in worry, small wobbly mouth.
+
+FORMAT: A thick, continuous dark outline around each whole silhouette; flat two-tone cel shading; few, chunky details and no thin lines that vanish when shrunk. No floor, ground line, cast shadow, motion lines, dust, glow, frame, text, letters, numbers, symbols, hearts, sweat drops, sparkles or other effects: the app draws all effects itself.

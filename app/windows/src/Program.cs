@@ -50,7 +50,9 @@ namespace CrossPet
         }
 
         /// <summary>「双击 exe 就安装」先关着：它每次启动都要判断，判断错了已装好的也会被当成安装包（每次问要不要安装，等于打不开）。
-        /// 1.3.8 正式版不带，下一个测试版打开它单独测</summary>
+        /// 1.3.8 正式版不带，下一个测试版打开它单独测。
+        /// 要打开它得先改 Locate：一键更新现在会在解压出来的文件夹里原地换新版（install.ps1 -Destination），那里有 install.ps1、文件夹也齐全，
+        /// 会被当成安装包</summary>
         const bool SelfInstall = false;
 
         /// <summary>不是从安装目录打开的（#28）：解压出来的安装包就问要不要现在安装（和一键更新一样在后台跑 install.ps1，装好自己打开），

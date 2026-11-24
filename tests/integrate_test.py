@@ -133,6 +133,41 @@ class IntegrationTests(unittest.TestCase):
         for event in integrate.load_json(integrate.REPO / 'integrations/qwen/hooks.json')['hooks']:
             self.assertIn(f'"{event}"', hook, event)
 
+    # ---- TRAE（字节）----
+    # 全局钩子写在 ~/.trae-cn/hooks.json（国际版 ~/.trae），格式和 Claude Code 一样，外面要有 "version": 1
+    def test_trae_template(self):
+        data = integrate.load_json(integrate.REPO / 'integrations/trae/hooks.json')
+        self.assertEqual(data['version'], 1)
+        entries = [c for gs in data['hooks'].values() for g in gs for c in g['hooks']]
+        self.assertEqual({e['command'] for e in entries}, {'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py" trae'})
+        hook = (integrate.REPO / 'integrations/crosspet-hook.py').read_text(encoding='utf-8')
+        for event in data['hooks']:
+            self.assertIn(f'"{event}"', hook, event)
+    def test_trae_install_and_uninstall(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cn, intl = Path(tmp) / '.trae-cn', Path(tmp) / '.trae'
+            cn.mkdir(); intl.mkdir()
+            (cn / 'argv.json').write_text('{}')
+            (intl / 'skills').mkdir()   # 只有别的工具装的 skills、没打开过国际版：不往这里写
+            with mock.patch.object(integrate, 'TRAE_HOMES', (cn, intl)), contextlib.redirect_stdout(io.StringIO()):
+                integrate.trae(True)
+                self.assertEqual(integrate.load_json(cn / 'hooks.json')['version'], 1)
+                self.assertTrue(integrate.has_trae())
+                self.assertFalse((intl / 'hooks.json').exists())
+                integrate.trae(False)
+                self.assertFalse((cn / 'hooks.json').exists())   # 只剩 CrossPet 写的空壳：删掉
+                # 用户自己也有钩子：撤销时只拿掉 CrossPet 的
+                other = {'type': 'command', 'command': 'echo keep-me'}
+                integrate.save_json(cn / 'hooks.json', {'version': 1, 'hooks': {'Stop': [{'hooks': [other]}]}})
+                integrate.trae(True)
+                integrate.trae(True)
+                self.assertEqual(len(integrate.load_json(cn / 'hooks.json')['hooks']['Stop']), 2)   # 重复接入不叠加
+                integrate.trae(False)
+                self.assertEqual(integrate.load_json(cn / 'hooks.json'), {'version': 1, 'hooks': {'Stop': [{'hooks': [other]}]}})
+    def test_trae_registered_as_target(self):
+        self.assertIn('trae', integrate.TARGETS)
+        self.assertEqual(integrate.SEEN_KEY['trae'], 'trae')
+
     # Kimi Code：钩子写在 ~/.kimi-code/config.toml 的 [[hooks]] 表里，CrossPet 的条目整段夹在两行标记之间
     KIMI_TOML = 'default_model = "kimi-code/k3"\n\n[[hooks]]\nevent = "Notification"\ncommand = "terminal-notifier -message done"\n\n[thinking]\nenabled = true\n'
     def run_kimi(self, tmp, install, text=None):
@@ -363,6 +398,66 @@ DSH_PROVIDER = """- insert:
         apiKey: sk-xxx
 """
 DSH_OURS_ONLY = "    - id: crosspet\n      name: '@local/dsh-plugin-crosspet'\n"
+
+
+class OpenCodeIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='crosspet-opencode-integration-')
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name) / 'config'
+        self.plugin = self.home / 'plugins/crosspet.js'
+        patch = mock.patch.multiple(integrate, OPENCODE_HOME=self.home, OPENCODE_PLUGIN=self.plugin)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def run_target(self, install):
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            integrate.opencode(install)
+        return out.getvalue()
+
+    def test_skips_when_opencode_has_not_run(self):
+        self.assertIn('没找到 OpenCode', self.run_target(True))
+        self.assertFalse(self.home.exists())
+        self.assertFalse(integrate.has_opencode())
+
+    def test_install_is_idempotent_and_uninstall_only_removes_ours(self):
+        self.home.mkdir(parents=True)
+        other = self.home / 'plugins/other.js'
+        other.parent.mkdir()
+        other.write_text('export default {}\n', encoding='utf-8')
+        config = self.home / 'opencode.json'
+        config.write_text('{"model":"keep/me"}\n', encoding='utf-8')
+        self.run_target(True)
+        self.assertTrue(integrate.has_opencode())
+        self.assertEqual(self.plugin.read_bytes(), (integrate.REPO / 'integrations/opencode/crosspet.js').read_bytes())
+        first = self.plugin.read_bytes()
+        self.run_target(True)
+        self.assertEqual(self.plugin.read_bytes(), first)
+        self.assertEqual(other.read_text(encoding='utf-8'), 'export default {}\n')
+        self.assertEqual(config.read_text(encoding='utf-8'), '{"model":"keep/me"}\n')
+        self.assertIn('opencode', integrate.installed())
+        self.run_target(False)
+        self.assertFalse(self.plugin.exists())
+        self.assertTrue(other.exists())
+        self.assertTrue(config.exists())
+        self.assertFalse(integrate.has_opencode())
+
+    def test_uninstall_leaves_unrelated_same_name_plugin(self):
+        self.plugin.parent.mkdir(parents=True)
+        self.plugin.write_text('// user-owned plugin\n', encoding='utf-8')
+        self.run_target(False)
+        self.assertEqual(self.plugin.read_text(encoding='utf-8'), '// user-owned plugin\n')
+        self.assertFalse(integrate.has_opencode())
+
+    def test_registered_with_heartbeat_and_diagnostics(self):
+        self.assertIn('opencode', integrate.TARGETS)
+        self.assertEqual(integrate.SEEN_KEY['opencode'], 'opencode')
+        self.home.mkdir(parents=True)
+        self.run_target(True)
+        with mock.patch.object(integrate, 'STATE_DIR', Path(self.tmp.name) / 'state'):
+            text = integrate.diagnose()
+        self.assertIn('[OpenCode]', text)
+        self.assertIn('crosspet.js', text)
 
 
 class GrokIntegrationTests(unittest.TestCase):

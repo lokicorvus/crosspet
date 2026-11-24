@@ -130,6 +130,70 @@ def ground_helpers(im: Image.Image, labels, keep, main) -> Image.Image:
     return Image.fromarray(out, "RGBA")
 
 
+def find_cut(rgba: np.ndarray, side: str):
+    """贴边立绘的切口：画面里那条从她身上直直切下去的竖线。返回 (切口在第几列, 多少行落在切口上)，找不到返回 (None, 0)。
+    生图模型很少把切口正好画在边框上：常常离边框几像素到一百多像素，几缕头发、扒边的手指还会伸出切口外，
+    有时切口上还描了一道深色边。这里不指望它画准，直接找：每一行最靠切口那侧的第一个不透明像素，
+    落在同一窄条里的行最多的那条就是切口；取条里九成的行都够得着的那列，切口上的行几乎都能贴到边上。"""
+    a = rgba[..., 3] >= 16
+    if side == "right":
+        rgba, a = rgba[:, ::-1], a[:, ::-1]
+    W = a.shape[1]
+    rows = a.any(1)
+    if not rows.any():
+        return None, 0
+    first = np.where(rows, a.argmax(1), W)
+    f = first[rows]
+    tol = max(3, W // 200)
+    counts = np.array([((f >= c) & (f <= c + tol)).sum() for c in range(W // 2)])
+    c = int(counts.argmax())
+    share = counts[c] / len(f)
+    cut = int(np.percentile(f[(f >= c) & (f <= c + tol)], 90))
+    # 切口上描了深色边（规则写了不要，模型有时还是画）：比里面暗一大截的那几列一起裁掉
+    on = (first >= c) & (first <= c + tol)
+    lum = rgba[on][:, :, :3].mean(-1)
+    # 描边不一定从切口第一列就开始（前面常有一两列半透明的过渡），所以看切口往里 10 列内最靠里的那列深色
+    if lum.shape[1] > cut + 24:
+        prof = lum[:, cut:cut + 24].mean(0)
+        inside = np.median(prof[12:])
+        dark = np.where(prof[:10] < inside - 40)[0]
+        if len(dark):
+            cut += int(dark[-1]) + 1
+    if side == "right":
+        cut = W - 1 - cut
+    return cut, share
+
+
+def snap_to_cut(im: Image.Image, side: str) -> Image.Image:
+    """裁到切口：切口那一侧的透明缝、伸出切口的碎发和描边都去掉，切口正好压在图片边框上。
+    App 把图片边框对齐屏幕边缘（index.html 的 dockCut），切口离边框差几像素，贴边时就看得到一条缝。"""
+    cut, share = find_cut(np.array(im), side)
+    if cut is None or share < 0.25:
+        print(f"  没找到{'左' if side == 'left' else '右'}边的切口（只有 {share:.0%} 的行对得上），不裁")
+        return im
+    box = (cut, 0, im.width, im.height) if side == "left" else (0, 0, cut + 1, im.height)
+    gap = cut if side == "left" else im.width - 1 - cut
+    if gap:
+        print(f"  切口离{'左' if side == 'left' else '右'}边框 {gap} 像素（{share:.0%} 的行在切口上）：裁到切口")
+    return im.crop(box)
+
+
+def soften_alpha(im: Image.Image, side: str) -> Image.Image:
+    """边缘收一像素再羽化，去掉抠图留下的硬边和杂色。切口那一侧先把边上那列往外复制几列再做，
+    做完再裁回来：不然切口也会被收进去、变成半透明，贴在屏幕边上看得到一条缝。"""
+    alpha = im.getchannel("A")
+    pad = 6 if side in ("left", "right") else 0
+    if pad:
+        a = np.array(alpha)
+        a = np.pad(a, ((0, 0), (pad, 0) if side == "left" else (0, pad)), mode="edge")
+        alpha = Image.fromarray(a, "L")
+    alpha = alpha.filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1))
+    if pad:
+        alpha = alpha.crop((pad, 0, pad + im.width, im.height) if side == "left" else (0, 0, im.width, im.height))
+    im.putalpha(alpha)
+    return im
+
+
 def prepare(src: str, character: str, name: str) -> Path:
     im = Image.open(src).convert("RGBA")
     skip = os.environ.get("SKIP_EDGE", "")
@@ -152,7 +216,9 @@ def prepare(src: str, character: str, name: str) -> Path:
         mask, labels, keep, main = drop_debris(background_mask(im))
     im.putalpha(mask)
     im = ground_helpers(im, labels, keep, main)  # 先挪，再柔化边缘，免得原位置留下一圈看不见的晕边
-    im.putalpha(im.getchannel("A").filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(1)))
+    if skip in ("left", "right"):
+        im = snap_to_cut(im, skip)
+    im = soften_alpha(im, skip)
     im = im.crop(im.getbbox())
     im = im.resize((round(im.width * TARGET_H / im.height), TARGET_H), Image.LANCZOS)
     out_dir = CHARACTERS / character

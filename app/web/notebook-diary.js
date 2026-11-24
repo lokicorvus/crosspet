@@ -60,7 +60,8 @@
       const lv = levelOfPoints(points(k)), p = pairs[k]
       // 升级：没记过关系的只记下现在的（刚装新版时不把已有的关系都算成刚升级）
       if (!p || !Number.isFinite(p.lv)) { if (points(k) > 0) pairs[k] = { first: 0, minutes: 0, ...(p || {}), lv } }
-      else if (lv > p.lv) { both('levelup', a, b, { n: lv }); pairs[k] = { ...p, lv } }
+      // gift：这一下才成好朋友（越级也算），本子上补一句收到小帮手
+      else if (lv > p.lv) { both('levelup', a, b, { n: lv, gift: p.lv < 2 && lv >= 2 }); pairs[k] = { ...p, lv } }
       if (!p) continue
       if (lv >= 1 && p.first && isAnniv(daysBetween(p.first, nowMs))) both('anniv', a, b, { n: daysBetween(p.first, nowMs) })
       if (p.last && present.includes(a) && present.includes(b)) {

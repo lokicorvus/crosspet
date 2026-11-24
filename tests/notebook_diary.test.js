@@ -129,3 +129,13 @@ test('merge_events_dedupes', () => {
   assert.deepEqual(m.map(e => e.day), [TODAY, YESTERDAY, ymd(NOW - 2 * DAY)])
   assert.deepEqual(D.eventsOn({ events: m }, 'claude', TODAY).map(e => e.kind), ['chat'])
 })
+
+test('levelup_gift_flag：越级升到 2 以上记 gift，2 升 3 不记', () => {
+  const k = key('claude', 'gpt')
+  const jump = tick(base({ pairs: { [k]: { first: NOW - 3 * DAY, minutes: 50, lv: 1 } } }), { friendship: { [k]: { points: P[3] } } })
+  assert.ok(ev(jump, 'levelup').length === 2 && ev(jump, 'levelup').every(e => e.n === 3 && e.gift === true))
+  const normal = tick(base({ pairs: { [k]: { first: NOW - 3 * DAY, minutes: 50, lv: 1 } } }), { friendship: { [k]: { points: P[2] } } })
+  assert.ok(ev(normal, 'levelup').every(e => e.n === 2 && e.gift === true))
+  const later = tick(base({ pairs: { [k]: { first: NOW - 3 * DAY, minutes: 50, lv: 2 } } }), { friendship: { [k]: { points: P[3] } } })
+  assert.ok(ev(later, 'levelup').length === 2 && ev(later, 'levelup').every(e => e.n === 3 && e.gift === false))
+})

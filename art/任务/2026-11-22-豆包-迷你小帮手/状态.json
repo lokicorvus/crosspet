@@ -1,0 +1,62 @@
+{
+ "about": "mini：mini · 迷你小帮手（好感度礼物）；mini_more：mini_more · 迷你小帮手 · 第二张（跑步 3 帧 + 挥手、看书、着急）；mini_work：mini_work · 迷你小帮手 · 第三张（思考 2 帧、记笔记、搬书、喊你、递礼物）；mini_carry：mini_carry · 迷你小帮手 · 抱书跑 3 帧",
+ "items": [
+  {
+   "char": "doubao",
+   "pose": "mini",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "doubao",
+   "pose": "mini_more",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "doubao",
+   "pose": "mini_work",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "doubao",
+   "pose": "mini_carry",
+   "state": "待验收",
+   "notes": [],
+   "checks": [
+    {
+     "level": "warn",
+     "msg": "脚离底边 26%：可能没站在底边"
+    },
+    {
+     "level": "warn",
+     "msg": "人物比待机图小 45%（桌面上会忽大忽小）"
+    }
+   ],
+   "version": 4,
+   "pick": 3
+  }
+ ]
+}

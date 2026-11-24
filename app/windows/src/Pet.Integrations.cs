@@ -35,7 +35,7 @@ namespace CrossPet
         {
             ["claude-hooks"] = "claude", ["claude-mod"] = "claude-mod", ["codex"] = "gpt", ["deepseek"] = "deepseek", ["gemini"] = "gemini",
             ["antigravity"] = "antigravity", ["workbuddy"] = "workbuddy", ["zcode"] = "zcode", ["hermes"] = "hermes",
-            ["qwen"] = "qwen", ["kimi"] = "kimi", ["cursor"] = "cursor", ["grok"] = "grok",
+            ["qwen"] = "qwen", ["kimi"] = "kimi", ["cursor"] = "cursor", ["grok"] = "grok", ["opencode"] = "opencode", ["trae"] = "trae", ["ccgui"] = "ccgui",
         };
         static Dictionary<string, object> LastSeen => Store.Settings.TryGetValue("seen", out var v) && v is Dictionary<string, object> d ? d : new Dictionary<string, object>();
         static double? SeenAt(string key) => LastSeen.TryGetValue(key, out var v) ? Convert.ToDouble(v) : (double?)null;
@@ -130,9 +130,12 @@ namespace CrossPet
             ("zcode", "ZCode（智谱）", "按会话的模型换角色，GLM 角色没装时由当前角色来演"),
             ("hermes", "Hermes Agent", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
             ("cursor", "Cursor", "按当前模型换角色，认不出的模型由当前角色来演；新开的对话生效"),
+            ("ccgui", "CC GUI", "一次接入所有 CLI；按当前模型换角色；完全退出再打开 CC GUI 生效"),
             ("qwen", "Qwen Code（阿里）", "按当前模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效"),
             ("kimi", "Kimi Code（月之暗面）", "按会话的模型换角色，没有对应角色的模型由当前角色来演；新开的会话生效。Kimi 客户端没有接口"),
             ("grok", "Grok Build（xAI）", "新开的会话生效；新文件夹第一次用要在 Grok 里 /hooks-trust 信任一次"),
+            ("opencode", "OpenCode V2", "按当前模型换角色，没有对应角色的模型由当前角色来演"),
+            ("trae", "TRAE（字节）", "默认由豆包来演；还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」"),
         };
 
         public Dictionary<string, object> SettingsState()
@@ -140,9 +143,9 @@ namespace CrossPet
             var state = new Dictionary<string, object>
             {
                 ["version"] = Store.Version + " Windows", ["platform"] = "windows",
-                ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
+                ["size"] = Scale, ["textSize"] = TextScale, ["textLinked"] = TextLinked, ["showName"] = ShowName, ["showMinis"] = ShowMinis, ["minisFrom"] = MinisFrom, ["eggs"] = EggsEnabled, ["hideFullscreen"] = HideFullscreen, ["aura"] = AuraMode,
                 ["followApps"] = Store.Flag("followApps"), ["followEvents"] = Store.Flag("followEvents"),
-                ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["gptQuotaNote"] = codexNote,
+                ["gptQuota"] = Store.Flag("gptQuota"), ["agyQuota"] = Store.Flag("agyQuota"), ["agyQuotaMode"] = AgyQuotaMode, ["gptQuotaNote"] = codexNote,
                 ["login"] = LoginEnabled, ["edgeDock"] = EdgeDockEnabled, ["dsQuota"] = DsQuotaEnabled, ["quotaAggregate"] = QuotaAggregate, ["codexResets"] = CodexResets, ["peakStyle"] = PeakStyle, ["quotaStyle"] = QuotaStyle, ["peakSkins"] = PeakSkins, ["appVersion"] = Store.Version, ["whatsNewSeen"] = Store.Settings.TryGetValue("whatsNewSeen", out var wns) && wns is string ws ? ws : Store.Version, ["powerSave"] = PowerSave, ["noSleep"] = NoSleep,
                 ["sitRemind"] = Store.Flag("sitRemind"), ["sitEvery"] = BreakEvery("sitEvery", 45), ["waterRemind"] = Store.Flag("waterRemind"), ["waterEvery"] = BreakEvery("waterEvery", 60),
                 ["hideHotkey"] = HideHotkey, ["hotkeyFailed"] = hotkeyFailed,
@@ -202,6 +205,13 @@ namespace CrossPet
                             Store.Settings["textLinked"] = false; Store.SaveSettings(); ApplySizes();
                             break;
                         case "textLinked": Store.Settings["textLinked"] = !(value is bool lb) || lb; Store.SaveSettings(); ApplySizes(); break;
+                        case "showMinis": Store.Settings["showMinis"] = on; Store.SaveSettings(); Js($"setShowMinis({(on ? "true" : "false")})"); break;
+                        case "agyQuotaMode":
+                            if (value is string am && (am == "week" || am == "cg")) { Store.Settings["agyQuotaMode"] = am; Store.SaveSettings(); Js($"setAgyQuotaMode({Q(am)})"); }
+                            break;
+                        case "minisFrom":
+                            if (value is string mf && (mf == "own" || mf == "all")) { Store.Settings["minisFrom"] = mf; Store.SaveSettings(); Js($"setMinisFrom({Q(mf)})"); }
+                            break;
                         case "showName": Store.Settings["showName"] = on; Store.SaveSettings(); Js($"setShowName({(on ? "true" : "false")})"); break;
                         case "hideFullscreen": Store.Settings["hideFullscreen"] = on; Store.SaveSettings(); ApplyLayer(); break;
                         case "hideHotkey": if (value is string hk) { Store.Settings["hideHotkey"] = hk; Store.SaveSettings(); RegisterHideHotKey(); } break;
@@ -232,7 +242,7 @@ namespace CrossPet
                             break;
                         case "agyQuota":
                             Store.Settings[key] = on; Store.SaveSettings();
-                            if (on) _ = RefreshGeminiQuota(); else QuotaJS("gemini", "setQuota('gemini', null)");
+                            if (on) _ = RefreshGeminiQuota(); else { agyLast = null; QuotaJS("gemini", "setQuota('gemini', null)"); }
                             break;
                         case "aiAutostart": SetAIAutostart(on); break;
                         case "dsQuota":

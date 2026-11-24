@@ -164,7 +164,7 @@ function posesOf(id) {
   add(c.pokePose); add(c.longThink?.pose); add(c.correctedPose)
   if ((c.fx || {}).reset || c.poses.reset) add('reset')
   if ((c.fx || {}).feast || c.poses.feast) add('feast')
-  Object.keys(c.poses).forEach(add)
+  Object.keys(c.poses).filter(p => p !== 'mini').forEach(add)   // mini.webp 是迷你小帮手的拼图，不是她的姿态
   return list
 }
 function whenOf(id, p) {

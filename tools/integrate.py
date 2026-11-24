@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """把 CrossPet 接入各个 AI（或撤销）。install.sh / uninstall.sh 调用它，也可以单独用：
 
-    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok
-    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok
+    python3 tools/integrate.py install   claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode | trae | ccgui
+    python3 tools/integrate.py uninstall claude-hooks | claude-mod | codex | deepseek | gemini | antigravity | workbuddy | zcode | hermes | qwen | kimi | cursor | grok | opencode | trae | ccgui
     python3 tools/integrate.py status
 
 原则：
@@ -17,6 +17,8 @@ import shlex
 import shutil
 import sys
 import time
+import contextlib
+import uuid
 from pathlib import Path
 
 HOME = Path.home()
@@ -717,6 +719,42 @@ def qwen(install: bool) -> None:
         remove_hooks(QWEN_SETTINGS)
 
 
+# ---- TRAE（字节）----
+# 全局钩子在 <配置目录>/hooks.json：国内版 ~/.trae-cn，国际版 ~/.trae（国际版没实测）。格式和 Claude Code 一样，外面多一个 "version": 1。
+# 钩子默认不跑：要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」。命令默认在沙箱里跑，能写 /tmp。
+# 事件里没有模型名，钩子脚本默认由豆包来演（crosspet-hook.py trae）
+TRAE_HOMES = (HOME / ".trae-cn", HOME / ".trae")
+
+
+def trae_dirs() -> list:
+    # 打开过一次 TRAE 才会有 argv.json（~/.trae 里可能只有别的工具装的 skills）
+    return [d for d in TRAE_HOMES if (d / "argv.json").exists()]
+
+
+def trae(install: bool) -> None:
+    dirs = trae_dirs()
+    if install:
+        if not dirs:
+            print("  没找到 TRAE 的配置（~/.trae-cn 或 ~/.trae），请先安装并打开一次 TRAE 再接入")
+            return
+        for d in dirs:
+            merge_hooks(d / "hooks.json", REPO / "integrations/trae/hooks.json")
+            data = load_json(d / "hooks.json")
+            if "version" not in data:
+                save_json(d / "hooks.json", {"version": 1, **data})
+        print("  → 还要在 TRAE 设置 → Hooks 里打开「已配置的 Hooks」，然后新开对话生效；默认由豆包来演")
+    else:
+        for d in TRAE_HOMES:
+            f = d / "hooks.json"
+            remove_hooks(f)
+            if f.exists() and load_json(f) == {"version": 1}:   # 只剩 CrossPet 写的空壳：删掉（改之前已经备份过）
+                f.unlink()
+
+
+def has_trae() -> bool:
+    return any(has_hooks(d / "hooks.json") for d in trae_dirs())
+
+
 # ---- Kimi Code（月之暗面）----
 # 配置在 ~/.kimi-code/config.toml（可用 KIMI_CODE_HOME 挪走），钩子是 [[hooks]] 表：只认 event / matcher / command / timeout 四个字段，
 # 多一个字段整个配置文件都读不进去。事件名、stdin 里的字段和 Claude Code 一样（tool_name、tool_input、session_id……）；
@@ -954,6 +992,35 @@ def has_hermes() -> bool:
     return HERMES_PLUGIN.is_dir() and (HERMES_PLUGIN / "plugin.yaml").exists()
 
 
+# ---- OpenCode ----
+# V2 自动发现全局 plugins 目录里的单个 JS 文件，不用改 opencode.json；插件通过 setup() 注册。
+OPENCODE_HOME = Path(os.environ.get("OPENCODE_CONFIG_DIR") or HOME / ".config" / "opencode")
+OPENCODE_PLUGIN = OPENCODE_HOME / "plugins" / "crosspet.js"
+OPENCODE_MARK = "CrossPet × OpenCode"
+
+
+def has_opencode() -> bool:
+    try:
+        return OPENCODE_MARK in OPENCODE_PLUGIN.read_text(encoding="utf-8")
+    except Exception:
+        return False
+
+
+def opencode(install: bool) -> None:
+    if install:
+        if not found(OPENCODE_HOME, "OpenCode"):
+            return
+        OPENCODE_PLUGIN.parent.mkdir(parents=True, exist_ok=True)
+        backup(OPENCODE_PLUGIN)
+        shutil.copy2(REPO / "integrations/opencode/crosspet.js", OPENCODE_PLUGIN)
+        print(f"  已装插件到 {OPENCODE_PLUGIN}")
+        print("  → 重开 OpenCode 生效；V2 也可以重载插件或运行 opencode service restart；按当前模型换角色")
+    elif has_opencode():
+        backup(OPENCODE_PLUGIN)
+        OPENCODE_PLUGIN.unlink()
+        print(f"  已删除 {OPENCODE_PLUGIN}")
+
+
 # ---- Cursor ----
 # Cursor 的 hooks.json 是扁平的：每个事件直接是命令数组，不是 Codex / Claude 那种 {hooks:[...]} 分组。
 CURSOR_MARK = "crosspet-cursor-bridge.py"
@@ -1081,7 +1148,115 @@ def cursor(install: bool) -> None:
         remove_cursor_hooks(CURSOR_HOOKS)
 
 
-TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok}
+# ---- CC GUI（官方插件 SDK 的统一生命周期，不依赖各 CLI 是否提供 hooks）----
+# 便携版可用 CROSSPET_CCGUI_HOME 指向 portable-data.json 的 appHome。
+CCGUI_HOME = Path(os.environ.get("CROSSPET_CCGUI_HOME") or HOME / ".ccgui-next")
+
+
+@contextlib.contextmanager
+def ccgui_lock():
+    """和宿主的 plugins.json.lock 使用同一把内核锁，防止覆盖并发的插件设置。"""
+    with (CCGUI_HOME / "plugins.json.lock").open("a+b") as lock:
+        if os.name == "nt":
+            import msvcrt
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    lock.seek(0)
+                    msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("CC GUI 正在保存插件设置，请稍后重试")
+                    time.sleep(.05)
+        else:
+            import fcntl
+            fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                lock.seek(0)
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+def ccgui_atomic(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(path)
+    finally:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+
+
+def has_ccgui() -> bool:
+    try:
+        record = load_json(CCGUI_HOME / "plugins.json").get("plugins", {}).get("crosspet", {})
+        return bool(record.get("enabled") and not record.get("quarantined")
+                    and (CCGUI_HOME / "plugins/crosspet/main.js").is_file()
+                    and (SUPPORT / "ccgui-bridge.json").is_file())
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def existing_ccgui_token(marker: Path):
+    try:
+        saved = json.loads(marker.read_text(encoding="utf-8"))
+        token = saved.get("token") if isinstance(saved, dict) else None
+        if isinstance(token, str) and token:
+            return token
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def ccgui(install: bool) -> None:
+    registry = CCGUI_HOME / "plugins.json"
+    if install:
+        if not found(CCGUI_HOME, "CC GUI", ("plugins", "plugins.json", "plugins.json.lock")):
+            return
+    elif not registry.exists():
+        return
+    with ccgui_lock():
+        data = load_json(registry)  # 无法解析时保留原文件，不用空配置覆盖。
+        plugins = data.setdefault("plugins", {})
+        marker = SUPPORT / "ccgui-bridge.json"
+        if install:
+            manifest = load_json(REPO / "integrations/ccgui/manifest.json")
+            manifest["permissions"][-1] = "exec:powershell" if os.name == "nt" else "exec:python3"
+            SUPPORT.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+            config = {"windows": os.name == "nt", "python": sys.executable,
+                      "hook": str(SUPPORT / MARK), "data": str(SUPPORT), "state": str(STATE_DIR),
+                      "token": existing_ccgui_token(marker) or uuid.uuid4().hex}
+            plugin = CCGUI_HOME / "plugins/crosspet"
+            source = (REPO / "integrations/ccgui/main.js").read_text(encoding="utf-8")
+            for name, content in (("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2)),
+                                  ("main.js", source.replace("const CONFIG = null", "const CONFIG = " + json.dumps(config, ensure_ascii=False), 1))):
+                backup(plugin / name)
+                ccgui_atomic(plugin / name, content + "\n")
+            plugins["crosspet"] = {"version": manifest["version"], "enabled": True, "source": "local",
+                                   "permissions": manifest["permissions"], "quarantined": False,
+                                   "lastError": None, "installedAt": int(time.time())}
+            backup(marker)
+            ccgui_atomic(marker, json.dumps({"token": config["token"]}))
+            print(f"  已安装 CC GUI 桥接插件到 {plugin}")
+            print("  → 完全退出再打开 CC GUI 后生效。所有 CLI 共用这份接入，不用逐个接；按当前模型换角色")
+        else:
+            if "crosspet" not in plugins:
+                return
+            # 先撤销桥接令牌：已在运行的旧插件、排队的事件也不能再写桌宠状态。
+            backup(marker)
+            marker.unlink(missing_ok=True)
+            del plugins["crosspet"]
+            print("  已撤销 CC GUI 桥接；其他插件和 CLI 配置不变")
+        backup(registry)
+        ccgui_atomic(registry, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+
+
+TARGETS = {"claude-hooks": claude_hooks, "claude-mod": claude_mod, "codex": codex, "deepseek": deepseek, "gemini": gemini, "antigravity": antigravity, "workbuddy": workbuddy, "zcode": zcode, "hermes": hermes, "qwen": qwen, "kimi": kimi, "cursor": cursor, "grok": grok, "opencode": opencode, "trae": trae, "ccgui": ccgui}
 
 
 def has_hooks(p: Path) -> bool:
@@ -1109,6 +1284,9 @@ def installed() -> list:
     if has_cursor() and found(CURSOR_HOOKS.parent, "", ("hooks.json",), quiet=True): result.append("cursor")
     if has_grok(): result.append("grok")
     if has_kimi() and found(KIMI_HOME, "", ("config.toml",), quiet=True): result.append("kimi")
+    if has_opencode(): result.append("opencode")
+    if has_trae(): result.append("trae")
+    if has_ccgui(): result.append("ccgui")
     return result
 
 
@@ -1142,7 +1320,7 @@ def plugin_status(ids=None, bundled: Path = None, plugin_dir: Path = None, state
     return [{"id": "deepseek", "label": "DeepSeek Harness", "bundled": _plugin_version(bundled),
              "installed": _plugin_version(plugin_dir / "lib/index.js"), "running": running}]
 SEEN_KEY = {"claude-hooks": "claude", "claude-mod": "claude-mod", "codex": "gpt", "deepseek": "deepseek", "gemini": "gemini",
-            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok"}
+            "antigravity": "antigravity", "workbuddy": "workbuddy", "zcode": "zcode", "hermes": "hermes", "qwen": "qwen", "kimi": "kimi", "cursor": "cursor", "grok": "grok", "opencode": "opencode", "trae": "trae", "ccgui": "ccgui"}
 
 
 def short(p) -> str:
@@ -1338,13 +1516,17 @@ def diagnose() -> str:
     L.append(f"[Qwen Code] {file_state(QWEN_SETTINGS, lambda: has_hooks(QWEN_SETTINGS))}；最近消息 {seen('qwen')}")
     L.append(f"[Kimi Code] {file_state(KIMI_CONFIG, has_kimi)}；环境变量 {env_line('KIMI_CODE_HOME')}；最近消息 {seen('kimi')}")
     L.append(f"[Cursor] {file_state(CURSOR_HOOKS, has_cursor)}；最近消息 {seen('cursor')}")
+    L.append(f"[CC GUI] {file_state(CCGUI_HOME / 'plugins.json', has_ccgui)}；最近消息 {seen('ccgui')}")
     L.append(f"[Grok Build] {file_state(GROK_HOOKS, has_grok)}；最近消息 {seen('grok')}")
+    L.append(f"[OpenCode] {file_state(OPENCODE_PLUGIN, has_opencode)}；环境变量 {env_line('OPENCODE_CONFIG_DIR')}；最近消息 {seen('opencode')}")
     L.append(f"[Antigravity] {file_state(ANTIGRAVITY_HOOKS, has_antigravity)}；最近消息 {seen('antigravity')}")
     for d in workbuddy_dirs():
         if d.exists():
             L.append(f"[WorkBuddy] {file_state(d / 'settings.json', lambda d=d: has_hooks(d / 'settings.json'))}")
     L.append(f"  WorkBuddy 最近消息 {seen('workbuddy')}；环境变量 {env_line('WORKBUDDY_CONFIG_DIR')}")
     L.append(f"[ZCode] {file_state(ZCODE_CONFIG, has_zcode)}；最近消息 {seen('zcode')}")
+    for d in TRAE_HOMES:
+        L.append(f"[TRAE] {file_state(d / 'hooks.json', lambda: has_hooks(d / 'hooks.json'))}；最近消息 {seen('trae')}")
     hermes_on = HERMES_CONFIG.exists() and re.search(r"^\s+-\s*crosspet\s*$", HERMES_CONFIG.read_text(encoding="utf-8"), re.M)
     L.append(f"[Hermes] {short(HERMES_HOME)}（{'在' if HERMES_HOME.exists() else '不在'}），插件 {'在' if has_hermes() else '不在'}，"
              f"config.yaml 里启用 {'是' if hermes_on else '否'}；"
@@ -1392,7 +1574,9 @@ def status() -> None:
     print("Qwen Code           :", "已接入" if has_hooks(QWEN_SETTINGS) else "未接入")
     print("Kimi Code           :", "已接入" if has_kimi() else "未接入")
     print("Cursor              :", "已接入" if has_cursor() else "未接入")
+    print("CC GUI              :", "已接入" if has_ccgui() else "未接入")
     print("Grok Build          :", "已接入" if has_grok() else "未接入")
+    print("OpenCode            :", "已接入" if has_opencode() else "未接入")
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ test('block_falls_back_skin_base_generic', () => {
 test('block_reply_only_for_close_friends', () => {
   assert.equal(E.block({ ev: ev('levelup', { n: 1 }), owner: 'claude', level: 1 }).lines.length, 1)
   const b = E.block({ ev: ev('levelup', { n: 2 }), owner: 'claude', level: 2 })
-  assert.equal(b.lines.length, 2); assert.equal(b.lines[1].who, 'claude')
+  assert.equal(b.lines.length, 3); assert.equal(b.lines[2].who, 'claude')  // 中间一行是送小帮手
   assert.equal(E.block({ ev: ev('chat', { q: 'x' }), owner: 'claude', level: 3 }).lines.length, 1)
 })
 
@@ -85,4 +85,53 @@ test('pats_picks_by_kind', () => {
 
 test('skins_have_their_own：四套性格皮肤每种事都有自己的', () => {
   for (const s of ['gpt-onesie', 'deepseek-hoodie', 'claude-saint', 'gemini-magician']) checkWriter(s, { allFests: false })
+})
+
+test('levelup_two_adds_gift_line：好朋友那句后面多一句送小帮手，在主人回复之前', () => {
+  const ev = { kind: 'levelup', n: 2, friend: 'deepseek', day: '2026-11-20' }
+  const b = E.block({ ev, owner: 'claude', level: 2 })
+  assert.equal(b.lines.length, 3)
+  assert.equal(b.lines[0].who, 'deepseek'); assert.equal(b.lines[1].who, 'deepseek'); assert.equal(b.lines[2].who, 'claude')
+  assert.ok(E.GIFT_LINE.deepseek.includes(b.lines[1].text))
+  assert.deepEqual(E.block({ ev, owner: 'claude', level: 2 }), b)
+  const one = E.block({ ev: { ...ev, n: 1 }, owner: 'claude', level: 1 })
+  assert.equal(one.lines.length, 1)
+  const three = E.block({ ev: { ...ev, n: 3 }, owner: 'claude', level: 3 })
+  assert.equal(three.lines.length, 2)
+  // 皮肤退回原角色，没写的退回 '*'
+  const sk = E.block({ ev: { ...ev, friend: 'gpt' }, owner: 'claude', friendSkin: 'gpt-onesie', level: 2 })
+  assert.ok(E.GIFT_LINE.gpt.includes(sk.lines[1].text))
+  const un = E.block({ ev: { ...ev, friend: 'mine' }, owner: 'claude', level: 2 })
+  assert.ok(E.GIFT_LINE['*'].includes(un.lines[1].text))
+  for (const id of ['claude', 'deepseek', 'gemini', 'glm', 'gpt', 'grok', 'kimi', 'qwen']) {
+    assert.ok(E.GIFT_LINE[id].length >= 1)
+    for (const t of E.GIFT_LINE[id]) assert.ok(len(t) <= 22, t)
+  }
+})
+
+test('gift_line_follows_gift_flag：有 gift 字段按它，旧记录按 n===2', () => {
+  const ev = { kind: 'levelup', friend: 'deepseek', day: '2026-11-20' }
+  const lv = (e, level) => E.block({ ev: { ...ev, ...e }, owner: 'claude', level }).lines
+  assert.equal(lv({ n: 3, gift: true }, 3).length, 3)   // 1 直接跳到 3
+  assert.equal(lv({ n: 3, gift: false }, 3).length, 2)  // 2 升 3
+  assert.equal(lv({ n: 2 }, 2).length, 3)               // 旧记录没 gift 字段
+  assert.equal(lv({ n: 3 }, 3).length, 2)
+})
+
+test('gift_line_keeps_old_lines：加了送小帮手那句，旧的好朋友记录里别的句子一字不变', () => {
+  // gift: false 走的就是加这句之前的路（只有好友那句 + 主人回复），拿它当「以前写出来的样子」
+  let checked = 0
+  for (const owner of ['claude', 'gpt', 'deepseek', 'gemini'])
+    for (const friend of ['claude', 'gpt', 'deepseek', 'gemini', 'kimi', 'glm']) {
+      if (friend === owner) continue
+      for (let d = 1; d <= 30; d++) {
+        const ev = { kind: 'levelup', n: 2, friend, day: `2026-11-${String(d).padStart(2, '0')}` }
+        const now = E.block({ ev, owner, level: 2 }).lines
+        const before = E.block({ ev: { ...ev, gift: false }, owner, level: 2 }).lines
+        assert.equal(now.length, 3); assert.equal(before.length, 2)
+        assert.deepEqual([now[0], now[2]], before, `${owner}/${friend}/${ev.day}`)
+        checked++
+      }
+    }
+  assert.ok(checked > 300)
 })

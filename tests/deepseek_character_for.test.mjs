@@ -41,6 +41,11 @@ test('Kimi：模型名或服务商名（moonshot）认出来换成 kimi', async 
     assert.equal(await hostCharacterFor(provider, model), 'kimi', `${provider}/${model}`)
   }
 })
+test('豆包：模型名里带 doubao 认出来换成 doubao', async () => {
+  for (const [provider, model] of [['', 'doubao-seed-1-6-250615'], ['volcengine', 'doubao-1.5-pro-32k'], ['doubao', 'ep-20260101-abcde']]) {
+    assert.equal(await hostCharacterFor(provider, model), 'doubao', `${provider}/${model}`)
+  }
+})
 test('认不出的还是由 DeepSeek 自己来演', async () => {
   assert.equal(await hostCharacterFor('some-gateway', 'mystery-model-1'), 'deepseek')
 })

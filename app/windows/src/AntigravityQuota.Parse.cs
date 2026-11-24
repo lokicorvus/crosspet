@@ -113,5 +113,32 @@ namespace CrossPet
             });
             return new Dictionary<string, object> { ["text"] = string.Join(" ｜ ", parts), ["low"] = groups.Min(g => g.left) <= 0.1 };
         }
+
+        /// <summary>
+        /// 新版（2.34 起）Antigravity 把本机服务的 pid、端口、令牌写在 %USERPROFILE%\.gemini\antigravity\daemon\hub_&lt;端口&gt;.json
+        /// （pid、httpsPort、csrfToken；2026-11 在 macOS 2.34.0 上实测，Windows 按同一个位置找，未实测）。
+        /// 可能留着上次没删掉的旧文件，所以只认进程还活着的；有几个就取最新改过的那个。port 是 httpsPort，没写就是 null（回头查监听端口）。
+        /// 和 macOS 版 antigravityHub 一致
+        /// </summary>
+        public static (int pid, string token, int? port)? PickHub(IEnumerable<(object json, DateTime at)> files, Func<int, bool> alive)
+        {
+            (int pid, string token, int? port, DateTime at)? best = null;
+            foreach (var (json, at) in files)
+            {
+                if (!(json is Dictionary<string, object> o)) continue;
+                int pid, port;
+                if (!o.TryGetValue("pid", out var p) || !TryInt(p, out pid) || !alive(pid)) continue;
+                if (!o.TryGetValue("csrfToken", out var t) || !(t is string token) || token.Length == 0) continue;
+                int? hp = o.TryGetValue("httpsPort", out var hpo) && TryInt(hpo, out port) ? port : (int?)null;
+                if (best == null || at > best.Value.at) best = (pid, token, hp, at);
+            }
+            return best == null ? ((int, string, int?)?)null : (best.Value.pid, best.Value.token, best.Value.port);
+        }
+
+        static bool TryInt(object v, out int n)
+        {
+            n = 0;
+            try { if (v == null || v is string || v is bool) return false; n = Convert.ToInt32(v); return true; } catch { return false; }
+        }
     }
 }

@@ -139,6 +139,15 @@ body { padding: calc(36px * var(--z, 1)) calc(22px * var(--z, 1)) calc(30px * va
 .t-gemini .stat:after { content: ""; position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; background: #f4cb7f; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
 .t-gemini .ms li.new .badge { color: #2a2358; }
 
+/* ======================= 豆包：备忘录（站酷快乐体，紫到青的渐变，像她的头发） ======================= */
+.t-doubao { --title-font: "ZCOOL KuaiLe", sans-serif; --hand: "ZCOOL KuaiLe", sans-serif; --label-font: "ZCOOL KuaiLe", sans-serif; --label-size: 13px; --title-size: 22px; --title-weight: 400; --note: #6a5ad8; --note-size: 15px; --radius: 22px;
+  --paper: radial-gradient(80% 40% at 100% 0%, #e4f6f8, transparent 70%), linear-gradient(180deg, #fbfaff, #f2f0fd 60%, #ebe8fb); --paper-solid: #fbfaff;
+  --ink: #33305a; --muted: #8b88ad; --accent: #6a5ad8; --num: #5848c4; --title: #4b3fb0;
+  --tile: #ffffff; --line: #e2def6; --line-strong: #cfc9f0; --tint: #ecebfb; --badge-bg: #e5e2fa; --avatar-ring: #8fd3dc;
+  --rule: linear-gradient(90deg, transparent, #8b7cf0 30%, #4cc3cf 70%, transparent); }
+.t-doubao .stat { border-color: #e2def6; background: #fff; box-shadow: 0 1px 0 #ecebfb; }
+.t-doubao .ms li.new .badge { background: #6a5ad8; color: #fff; }
+
 /* ======================= Kimi：月光琴谱（小赖字体） ======================= */
 .t-kimi { --title-font: "Xiaolai", "Kaiti SC", serif; --hand: "Xiaolai", "Kaiti SC", serif; --label-font: "Xiaolai", serif; --label-size: 13px; --title-size: 22px; --note: #6b5bb5; --note-size: 15px; --radius: 18px;
   --paper: radial-gradient(70% 40% at 90% 0%, #dfe4fb, transparent 70%), linear-gradient(180deg, #f7f8fe, #eef0fb 60%, #e6e9f8); --paper-solid: #f7f8fe;
@@ -261,6 +270,9 @@ body { padding: calc(36px * var(--z, 1)) calc(22px * var(--z, 1)) calc(30px * va
 .cv-seal { position: absolute; right: 30px; bottom: 34px; padding: 5px 4px; writing-mode: vertical-rl; font-family: "Kaiti SC", "STKaiti", "KaiTi", serif; font-size: 13px; font-weight: 700; color: #fff; background: #c23b2e; border-radius: 3px; transform: rotate(-6deg); letter-spacing: 2px; }
 .t-kimi { --cover-bg: radial-gradient(70% 45% at 70% 22%, #5f6fc0, transparent 60%), linear-gradient(170deg, #2f3d86, #222c66 65%, #1a2252); --cover-ink: #eef1ff; }
 .t-kimi .cv-label { top: 58%; }
+.t-doubao { --cover-bg: radial-gradient(70% 45% at 20% 15%, #9b8df5, transparent 60%), linear-gradient(165deg, #7566dc, #5b6fd4 45%, #3fa9c4 100%); --cover-ink: #ffffff; }
+.t-doubao .cv-label { top: 50%; }
+.t-doubao .cv-title { text-shadow: 0 2px 0 #3b2f9a55; }
 
 /* ================= 第二页「朋友们的留言」 =================
    两页叠在同一个格子里（高度取高的那页，翻页时窗口不跳）；#root.p2 显示第二页。翻页时一张纸从右往左翻过去（.flip，同打开时的纸） */
@@ -329,6 +341,7 @@ body { padding: calc(36px * var(--z, 1)) calc(22px * var(--z, 1)) calc(30px * va
 .w-grok { --wf: "Long Cang", "Kaiti SC", cursive; --wc: #d63c3c; --ws: 17.5px; }
 .w-qwen { --wf: "Zhi Mang Xing", "Kaiti SC", serif; --wc: #3e4c9c; --ws: 17px; }
 .w-kimi { --wf: "Xiaolai", "Kaiti SC", serif; --wc: #5a4fb0; --ws: 15px; }
+.w-doubao { --wf: "ZCOOL KuaiLe", sans-serif; --wc: #6a5ad8; --ws: 15px; }
 .w-other { --wf: "Kaiti SC", "STKaiti", "KaiTi", cursive; --wc: var(--ink); --ws: 15px; }
 .t-gemini [class*="w-"], .t-grok [class*="w-"] { --wc-dark: color-mix(in srgb, var(--wc) 45%, #fff); }
 .t-gemini .ln, .t-gemini .chat > span:not(.when), .t-gemini .cameo span, .t-gemini .stamp,

@@ -36,10 +36,42 @@ check "汇总：同上，周额度排在前面结果一样" summary-tie-weekly-f
 check "汇总：5h 满了显示周额度和重置时间" summary-multi-pool 'q["text"].split(" ｜ ")[0].startswith("Gemini 本周 剩余 99% · ") and q["text"].split(" ｜ ")[2].startswith("Claude/GPT 本周 剩余 100% · ")'
 check "汇总：周额度 ≤10% 时不被 5h 盖住" summary-weekly-low 'q["text"].split(" ｜ ")[0].startswith("Gemini 本周 剩余 5% · ") and q["low"] is True'
 check "汇总：每一行都带重置时间" summary-all-50 'all(seg.endswith(" 重置") for seg in q["text"].split(" ｜ ")) and len(q["text"].split(" ｜ ")) == 3'
+# 2026-11-24 实测：Gemini 4 Argon 并进了「Gemini Models」，不再单独一组：回到两行，bars 里没有 Argon
+check "汇总：Argon 并进 Gemini 后两组两行" summary-argon-merged 'len(q["text"].split(" ｜ ")) == 2 and q["text"].split(" ｜ ")[0].startswith("Gemini 5小时 剩余 96%") and q["text"].split(" ｜ ")[1].startswith("Claude/GPT 本周 剩余 100%") and "Argon" not in q["text"] and [b["group"] for b in q["bars"]] == ["Gemini", "Gemini", "Claude/GPT", "Claude/GPT"] and q["low"] is False'
 # 合并显示用的结构化额度条 bars：每个窗口一项 {label, left, reset?, group}，同一个池的窗口挨着排（短窗口在前）；排版（Gemini + Arg 一行、Agy C/G 另起一行）在网页层
 check "bars：每个窗口一项，label = 池名 + 窗口名，同一个池挨着排" summary-multi-pool '[b["label"] for b in q["bars"]] == ["Gemini 5小时", "Gemini 本周", "Argon 本周", "Claude/GPT 5小时", "Claude/GPT 本周"] and [b["group"] for b in q["bars"]] == ["Gemini", "Gemini", "Argon", "Claude/GPT", "Claude/GPT"] and [b["left"] for b in q["bars"]] == [1, 0.99, 0.46, 1, 1] and all(isinstance(b["reset"], int) and b["reset"] > 1.7e9 for b in q["bars"])'
 check "bars：窗口名按接口的窗口 id（今日 / 本周），没有 Argon 时只有两个池" summary-two-windows '[b["label"] for b in q["bars"]] == ["Gemini 今日", "Gemini 本周", "Claude/GPT 本周"]'
 check "bars：全部用完（比例被省略）= left 0，每项都带 reset" summary-all-used-up 'len(q["bars"]) == 5 and all(b["left"] == 0 and "reset" in b for b in q["bars"])'
 check "bars：没有重置时间就不写 reset 字段" summary-no-reset 'q["bars"] == [{"label": "Gemini 本周", "left": 0.7, "group": "Gemini"}]'
 check "汇总是空的：不显示（程序会退回查用户状态）" summary-empty 'q == {}'
+# 令牌在哪：Antigravity 2.34 起不写在启动参数里了，写在 ~/.gemini/antigravity/daemon/hub_<端口>.json（2026-11 实测 2.34.0）
+D=$(mktemp -d); trap 'rm -rf "$D"' EXIT
+hub() {   # 名字 期望（q 是结果），目录 $D 由调用前准备好
+  out=$(perl -e 'alarm 5; exec @ARGV' "$BIN" --agy-hub-probe "$D" 2>/dev/null || echo '"（没有输出）"')
+  python3 - "$1" "$2" "$out" <<'PY' || fail=1
+import json, sys
+name, expect, out = sys.argv[1:4]
+try: q = json.loads(out)
+except Exception: q = "bad"
+ok = False
+try: ok = bool(eval(expect, {"q": q}))
+except Exception: pass
+print(("PASS" if ok else "FAIL"), name, "" if ok else out)
+sys.exit(0 if ok else 1)
+PY
+}
+ALIVE=$$; DEAD=2147480
+hub "没有 daemon 文件：null（程序退回查启动参数，兼容旧版）" 'q is None'
+printf '{"pid":%s,"httpsPort":51880,"httpPort":51881,"lsVersion":"2.34.0","csrfToken":"tok-live"}' $ALIVE > "$D/hub_51881.json"
+hub "新版：从 hub 文件取 pid、https 端口、令牌" 'q == {"pid": '$ALIVE', "token": "tok-live", "port": 51880}'
+printf '{"pid":%s,"httpsPort":40000,"csrfToken":"tok-dead"}' $DEAD > "$D/hub_40001.json"
+hub "进程已经没了的旧文件不认（哪怕更新）" 'q["token"] == "tok-live"'
+printf '{"pid":%s,"httpsPort":50000,"csrfToken":"tok-old"}' $ALIVE > "$D/hub_50001.json"; touch -t 202001010000 "$D/hub_50001.json"
+hub "几个都活着：取最新改过的那个" 'q["token"] == "tok-live"'
+printf '{"pid":%s,"httpsPort":51880,"csrfToken":""}' $ALIVE > "$D/hub_51881.json"
+hub "令牌是空的不认，退到别的文件" 'q["token"] == "tok-old"'
+printf '{"pid":%s,"csrfToken":"tok-noport"}' $ALIVE > "$D/hub_51881.json"
+hub "没写端口：port 不给（程序回头查监听端口）" 'q == {"pid": '$ALIVE', "token": "tok-noport"}'
+echo 'not json' > "$D/hub_51881.json"
+hub "坏文件跳过" 'q["token"] == "tok-old"'
 exit $fail

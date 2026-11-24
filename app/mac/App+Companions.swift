@@ -214,9 +214,10 @@ extension App {
         c.leave()
     }
 
-    /// 主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）；别的不认
+    /// 主桌宠页面让某只额外的桌宠做的事：额度庆祝（celebrate）、每对台词里她那句（chat）、集合时答到（answerRoll）、送礼那一幕（miniGift）；别的不认。
+    /// 名单要和页面（index.html 里 companionCall 那几处，送礼在 playGift）、Windows（CompanionCallRule.cs）对齐：页面新加一种，两边都要加
     func companionCall(_ call: [String: Any]) {
-        guard let id = call["id"] as? String, let fn = call["fn"] as? String, ["celebrate", "chat", "answerRoll"].contains(fn), let args = call["args"] as? [Any],
+        guard let id = call["id"] as? String, let fn = call["fn"] as? String, ["celebrate", "chat", "answerRoll", "miniGift"].contains(fn), let args = call["args"] as? [Any],
               let c = companions[id], let data = try? JSONSerialization.data(withJSONObject: args),
               let json = String(data: data, encoding: .utf8) else { return }
         c.js("\(fn).apply(null, \(json))")
@@ -318,7 +319,7 @@ extension App {
         switch key {
         case "size": companions.values.forEach { $0.applySizes(anchor: .bottom) }
         case "textSize", "textLinked": companions.values.forEach { $0.applySizes(anchor: .feet) }
-        case "showName", "aura", "powerSave", "noSleep", "quotaStyle", "peakStyle": companionsJS(companionLookJS)
+        case "showName", "showMinis", "minisFrom", "agyQuotaMode", "aura", "powerSave", "noSleep", "quotaStyle", "peakStyle": companionsJS(companionLookJS)
         case "edgeDock": if !edgeDockEnabled { companions.values.forEach { $0.undock() } }
         default: break
         }
@@ -326,7 +327,7 @@ extension App {
 
     /// 额外那只的外观设置（共用的那几项）。合并额度表只在主桌宠身上，所以她的关着
     var companionLookJS: String {
-        "setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(false); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle)))"
+        "setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setShowMinis(\(showMinis)); setMinisFrom(\(quote(minisFrom))); setAgyQuotaMode(\(quote(agyQuotaMode))); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(false); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle)))"
     }
 
     func companionsJS(_ code: String) { (Array(companions.values) + leavingCompanions).forEach { $0.js(code) } }

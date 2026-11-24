@@ -17,7 +17,7 @@ export const inject = ["credentials"];
 
 const ID = "deepseek";
 const CLIENT = "deepseek";   // 多桌宠按「角色 + 客户端」各站一只：Harness 本身就是一个客户端（同 crosspet-hook.py 的 detect_client 用接入名）
-const PLUGIN_VERSION = "1.3.11";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
+const PLUGIN_VERSION = "1.3.12";  // 出现在 deepseek-plugin.json 里，用来确认跑的是哪一版插件。必须是三段的合法版本号（同步写进 package.json，Harness 装插件时会校验）
 const BIG_JOB_TOOLS = 8;
 const BALANCE_EVERY_MS = 60 * 1000;   // 定时查余额：充了值、没再对话，最多等 1 分钟（以前 10 分钟，用户充值后半天没变）。只是要一次账户余额，不耗 token
 
@@ -44,6 +44,7 @@ function characterFor(provider, model, custom = {}) {
     if (/glm|zhipu|bigmodel|chatglm|z-ai|zai-/.test(s)) return "glm";
     if (/qwen|dashscope|bailian|tongyi/.test(s)) return "qwen";
     if (/kimi|moonshot/.test(s)) return "kimi";
+    if (/doubao/.test(s)) return "doubao";
     if (/grok|x-ai|xai/.test(s)) return "grok";
     if (/claude|anthropic/.test(s)) return "claude";
     if (/gemini|google|vertex/.test(s)) return "gemini";
@@ -64,12 +65,21 @@ export function apply(ctx, config = {}) {
   let tools = 0;
 
   let writes = 0;
-  async function writeJson(file, data) {
+  async function writeNow(file, data) {
     await mkdir(dir, { recursive: true });
     // 临时文件名每次不同：几次写入同时发生时（比如启动时查两次余额、连续的工作事件）不会互相抢同一个文件
     const tmp = join(dir, `.${file}.${process.pid}.${++writes}`);
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, join(dir, file));
+  }
+  // 同一个文件的写入按先后排队：不排队时两次写入同时进行、谁最后改名落盘不一定，
+  // 比如一轮开头写的「听」可能晚于换模型后的收尾落盘，把她盖回「听」（测试里约七次一次）
+  const queues = new Map();
+  function writeJson(file, data) {
+    const next = (queues.get(file) || Promise.resolve()).catch(() => {}).then(() => writeNow(file, data));
+    queues.set(file, next);
+    next.finally(() => { if (queues.get(file) === next) queues.delete(file) }).catch(() => {});
+    return next;
   }
   // 当前在用的模型对应的角色：每条会话事件都看一眼会话的请求路由（和 Harness 自带插件一样用 requestContext）
   const custom = config.characters && typeof config.characters === "object" ? config.characters : {};
@@ -91,20 +101,28 @@ export function apply(ctx, config = {}) {
       writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 }).catch(() => {});
       return;
     }
+    const prev = character;
     character = next;
     writeJson(`${ID}-host.json`, { character, provider: route.provider ?? "", model: route.model ?? "", ts: Date.now() / 1000 })
       .catch(() => {});
+    // 中途换了模型：一轮开头（agent/pre-step 不带会话，看不到换了模型）已经记到了换下来的那个角色身上，
+    // 后面的工具、完成都记到新角色，换下来的就一直停在听 / 思考。别的会话还在用她干活时不动她
+    if (next !== prev && !busyElsewhere(prev, session?.id)) state("idle", "Stop", "", prev);
+  }
+  function busyElsewhere(who, sid) {
+    const now = Date.now() / 1000;
+    return Object.entries(perChar[who] || {}).some(([id, s]) => id !== sid && s.event !== "Stop" && now - s.ts < 600);
   }
 
   let seenAt = 0;
   let clientChain = Promise.resolve();
-  function state(pose, event, tool = "") {
+  function state(pose, event, tool = "", who = character) {
     if (Date.now() - seenAt > 10000) {   // 心跳：最近一次收到消息（桌宠记下来，设置和反馈里看）
       seenAt = Date.now();
       mkdir(dir, { recursive: true }).then(() => writeFile(join(dir, "seen-deepseek"), String(Math.floor(seenAt / 1000)))).catch(() => {});
     }
-    ledger(event, tool, "shown", `${character} ${pose}`);
-    const s = { pose, event, tool, ts: Date.now() / 1000 }, who = character;
+    ledger(event, tool, "shown", `${who} ${pose}`);
+    const s = { pose, event, tool, ts: Date.now() / 1000 };
     const warn = (e) => ctx.logger?.warn?.(`crosspet: 写状态失败 ${String(e)}`);
     const main = writeJson(`${who}-state.json`, s).catch(warn);
     // 主文件写完再按客户端另写一份 <角色>@deepseek-state.json（多桌宠时额外那只读它，带 client）。

@@ -128,6 +128,25 @@ class HookClientTests(unittest.TestCase):
         self.assertEqual(self.read('claude-sessions.json')['k2']['client'], 'kimi')
         self.assertIsNotNone((self.state / 'seen-kimi').exists() or None)
 
+    def test_opencode_model_routing_and_client(self):
+        for c in ('claude', 'gpt'):
+            self.add_character(c)
+        self.fire('opencode', {'hook_event_name': 'SessionStart', 'session_id': 'oc1',
+                               'model': 'anthropic/claude-sonnet-5'})
+        self.fire('opencode', {'hook_event_name': 'PreToolUse', 'session_id': 'oc1', 'tool_name': 'Read'})
+        own = self.read('claude@opencode-state.json')
+        self.assertEqual((own['pose'], own['client'], own['host']), ('reading', 'opencode', 'opencode'))
+        self.assertEqual(self.read('claude-sessions.json')['oc1']['client'], 'opencode')
+        self.assertEqual(self.read('opencode-sessions.json')['oc1'], 'anthropic/claude-sonnet-5')
+        self.assertTrue((self.state / 'seen-opencode').exists())
+        self.fire('opencode', {'hook_event_name': 'ModelChanged', 'session_id': 'oc1', 'model': 'openai/gpt-6'})
+        self.assertEqual(self.read('opencode-host.json')['character'], 'gpt')
+        self.assertEqual(self.read('opencode-host.json')['model'], 'openai/gpt-6')
+        self.fire('opencode', {'hook_event_name': 'PreToolUse', 'session_id': 'oc1', 'tool_name': 'Bash'})
+        self.assertEqual(self.read('gpt@opencode-state.json')['pose'], 'running')
+        self.assertNotIn('oc1', self.read('claude-sessions.json'))
+        self.assertEqual(self.ledger('opencode')[-1]['client'], 'opencode')
+
     def test_codex_client(self):
         self.fire('gpt', {'hook_event_name': 'PreToolUse', 'session_id': 's1', 'turn_id': 'T1', 'cwd': '/tmp',
                           'model': 'gpt-test', 'tool_name': 'exec_command', 'transcript_path': str(self.transcript)})

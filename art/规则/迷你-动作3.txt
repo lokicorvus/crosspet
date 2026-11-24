@@ -1,0 +1,15 @@
+Create a third sprite sheet for the SAME tiny "mini helper" as the first attachment. The first attachment is her approved mini sheet (idle, happy, sleep, walk): copy that exact mini — same head size, face, eyes, hair, hair ornaments on the same side, outfit, colors, signature prop, outline weight and shading. It must look like more frames from the same sheet, not a new design. The other attachments are the approved big character design, for colors only. Do not draw the big character. It is shown at about 100 pixels tall next to her, so it must read clearly when small.
+
+LAYOUT: One landscape image, 1536x1024, with a real transparent background (transparent_background: true). Exactly six minis in a 3-column x 2-row grid, one per cell, each centered in its cell and drawn at the same scale as each other and as the minis in the first attachment (each about 360 px tall when standing). Leave wide transparent gaps: no part of one mini may touch another mini or the image edge.
+
+TOP ROW, left to right:
+1. think-a: standing and facing the viewer, one finger on her chin, eyes looking up to one side, small thoughtful "hmm" mouth, her signature prop held against her side with the other arm.
+2. think-b: the second frame of the same thinking loop: exactly the same body, feet, prop and arm as think-a; only her head tilts a little to the OTHER side, eyes looking up to the other side, and the finger taps her cheek instead of her chin.
+3. notes: standing in three-quarter view, a small notebook held open in one hand, writing in it with a tiny pencil in the other hand, focused face.
+
+BOTTOM ROW, left to right:
+4. carry: running toward the viewer's RIGHT in three-quarter view, mid-stride, carrying a tall stack of three books in both arms, peeking over the stack, busy determined face.
+5. point: standing and facing the viewer, looking straight at the viewer, one arm stretched up pointing at the viewer as if saying "hey, you!", mouth open, her signature prop under her other arm.
+6. gift: bowing slightly toward the viewer, holding out a small wrapped gift box with a ribbon in both hands, shy happy smile, eyes closed; her signature prop is not in this pose.
+
+FORMAT: A thick, continuous dark outline around each whole silhouette; flat two-tone cel shading; few, chunky details and no thin lines that vanish when shrunk. No floor, ground line, cast shadow, motion lines, dust, glow, frame, text, letters, numbers, question marks, symbols, hearts, sweat drops, sparkles or other effects: the app draws all effects itself.
