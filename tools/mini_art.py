@@ -10,6 +10,8 @@
 
     python3 tools/mini_art.py new <批次> mini_move --chars gpt,… --base-batch <批次>
 --base-batch：本批没有底图（原版的 mini_more）时去那个批次找（loki 选的那版优先，没选用版本号最大的）。
+退回重画一串时按底图顺序退（mini → mini_more → mini_work → mini_carry，原版再皮肤）：底图那张已经退回的，
+后面的提示词就指向它要画的新版（…__vN.png），不会拿退回前的旧版当底图。
 
 出题 / 退回重写提示词的 mini 批次请用这个，不要直接用 art.py（art.py 会按普通姿态重写，皮肤就没了底图）。
 check、review、status 两个都一样。
@@ -28,6 +30,11 @@ BASE_BATCH = None
 
 def base_source(batch, st, cid, base_pose):
     src, in_batch = _base_source(batch, st, cid, base_pose)
+    if in_batch:   # 底图那张被退回重画了（现有版本都不算数）：指向要画的新版，不用旧的
+        item = next((i for i in st["items"] if i["char"] == cid and i["pose"] == base_pose), {})
+        vs = art.versions(batch, cid, base_pose)
+        if item.get("state") == "退回" and vs and item.get("rejected", 0) >= vs[-1][0]:
+            return art.done_pattern(batch, cid, base_pose), True
     if in_batch or not BASE_BATCH:
         return src, in_batch
     other = art.load(BASE_BATCH)
@@ -68,20 +75,27 @@ def write_md(batch, item, ch, title, attach, blocks):
     p.write_text("\n".join(md))
 
 
+def own_mini(cid):
+    """角色文件写了「迷你: 自己画」的皮肤：小帮手不照原版改衣服，像新角色一样按她自己的动作画（比如降智龙崽）"""
+    p = art.ART / "角色" / f"{cid}.md"
+    return p.exists() and bool(art.re.search(r"^迷你: *自己画\s*$", p.read_text(), art.re.M))
+
+
 def write_prompt(batch, st, item):
     ch, pose = art.read_character(item["char"]), read_pose(item["pose"], item["char"])
     if not pose["pose"].startswith("mini"):
         return _write_prompt(batch, st, item)
     out = art.done_pattern(batch, ch["id"], pose["pose"])
-    if ch["base"]:   # 皮肤：拿原版同一张改衣服
+    if ch["base"] and not own_mini(ch["id"]):   # 皮肤：拿原版同一张改衣服
         src, in_batch = art.base_source(batch, st, ch["base"], pose["pose"])
         if in_batch:
             src = art.done_pattern(batch, ch["base"], pose["pose"])
         attach = [(src, f"底图：原版 {ch['base']} 的 {pose['pose']}"
                    + ("（本批画好的那张：loki 在验收页选了哪版就用哪版，没选用版本号最大的）" if in_batch else "") + "，要改的就是它")]
         attach += [(art.ROOT / r, "换装参考：只看衣服、发饰和道具，不要照它画脸和姿势") for r in ch["refs"]]
-        blocks = [art.rule("迷你-换衣"), ch["lock"],
-                  f"POSE ({pose['pose']}): the same sheet as the first image, in this skin.\nSave as: {out.name}"]
+        # 皮肤自己写了这一张的动作（比如换成哪个道具）就用它写的，没写就是「照第一张、换这身衣服」
+        own = ch["lines"].get(pose["pose"]) or "the same sheet as the first image, in this skin."
+        blocks = [art.rule("迷你-换衣"), ch["lock"], f"POSE ({pose['pose']}): {own}\nSave as: {out.name}"]
         return write_md(batch, item, ch, pose["title"] + "（皮肤：拿原版改衣服）", attach, blocks)
     _write_prompt(batch, st, item)   # 原版：照常出题，再补上画风参考
     if pose["style"] and ch["id"] not in Path(pose["style"]).stem.split("-"):
