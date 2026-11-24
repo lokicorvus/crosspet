@@ -1,0 +1,70 @@
+{
+ "about": "pop：pop · 彩蛋·登场；pretend：pretend · 彩蛋·装模作样；caught：caught · 彩蛋·被识破；bye：bye · 彩蛋·道别；escape：escape · 彩蛋·溜走",
+ "items": [
+  {
+   "char": "egg-deepseek-star",
+   "pose": "pop",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-star",
+   "pose": "pretend",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-star",
+   "pose": "caught",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-star",
+   "pose": "bye",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "fail",
+     "msg": "头顶贴着上边框：头顶可能被切掉了（上面要留一点空）"
+    }
+   ],
+   "version": 1
+  },
+  {
+   "char": "egg-deepseek-star",
+   "pose": "escape",
+   "state": "已导入",
+   "notes": [],
+   "checks": [
+    {
+     "level": "ok",
+     "msg": "机检通过"
+    }
+   ],
+   "version": 1
+  }
+ ]
+}
