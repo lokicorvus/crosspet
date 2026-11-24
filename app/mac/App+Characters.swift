@@ -131,6 +131,7 @@ extension App {
         if bundle == "dev.zcode.app" { return "zcode" }
         if bundle == "com.todesktop.230313mzl4w4u92" { return "cursor" }
         if bundle == "cn.trae.app" { return "trae" }   // TRAE 国内版
+        if bundle == "com.zhukunpenglinyutong.ccgui" { return "ccgui" }
         return nil
     }
 

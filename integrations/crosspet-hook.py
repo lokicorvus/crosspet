@@ -16,6 +16,7 @@
 用 /tmp 是因为有的 AI（比如 DeepSeek Harness）的钩子跑在沙箱里，只允许写 /tmp。
 """
 import hashlib
+import base64
 import json
 import os
 import re
@@ -337,12 +338,24 @@ def read_event():
 
 
 try:
-    event = read_event()
+    # CC GUI SDK 的命令执行不提供 stdin；参数中只传白名单元数据，不传对话或工具参数。
+    event = json.loads(base64.b64decode(sys.argv[3], validate=True).decode("utf-8")) \
+        if len(sys.argv) == 4 and sys.argv[2] == "--event-base64" else read_event()
 except Exception:
     event = None
 if not isinstance(event, dict):
     ledger("dropped", "bad-json")
     sys.exit(0)
+
+if character == "ccgui":
+    try:
+        enabled = json.loads((app_data / "ccgui-bridge.json").read_text(encoding="utf-8"))
+        token = enabled.get("token") if isinstance(enabled, dict) else None
+        if not isinstance(token, str) or not token or token != os.environ.get("CROSSPET_CCGUI_TOKEN"):
+            raise ValueError("retired bridge")
+    except (OSError, ValueError):
+        ledger("dropped", "ccgui-disconnected")
+        sys.exit(0)
 
 _sid = str(event.get("session_id") or event.get("sessionId") or event.get("conversationId") or "")
 _call = event.get("toolCall") if isinstance(event.get("toolCall"), dict) else {}
@@ -451,7 +464,7 @@ if character == "gpt" and "transcript_path" in event:
         ledger("dropped", "codex-suggestion")
         sys.exit(0)
 
-arg_event = sys.argv[2] if len(sys.argv) > 2 else ""
+arg_event = sys.argv[2] if len(sys.argv) > 2 and sys.argv[2] != "--event-base64" else ""
 name = event.get("hook_event_name") or arg_event
 source_host = character  # 不能用按模型换过的角色来分会话 / 工具计数
 client = detect_client(source_host)
@@ -583,7 +596,7 @@ except Exception:
 # 多模型宿主（WorkBuddy、ZCode、Hermes Agent、Qwen Code、Kimi Code、OpenCode）：事件里带当前模型名就按它选角色；认不出的模型（混元、Kimi、GLM……）
 # 写给「当前角色」（current），桌宠用正在显示的角色演，不换人。当前角色另外记在 <宿主>-host.json，
 # 桌宠切到这个程序的窗口时按它换角色
-MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi", "opencode", "trae")
+MULTI_MODEL_HOSTS = ("workbuddy", "zcode", "hermes", "qwen", "kimi", "opencode", "trae", "ccgui")
 # ZCode 默认用智谱的 GLM；Qwen Code、Kimi Code 默认用自家的模型。它们只在会话开始时告诉模型名，
 # 之后的事件按会话 id 查当时记下的模型
 # TRAE 的钩子事件里一直没有模型名（2026-11 TRAE CN 3.4 实测），只能按默认：字节自家的豆包
