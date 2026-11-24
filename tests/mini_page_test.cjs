@@ -73,6 +73,14 @@ const cases = [
     e.run(`setShowMinis(true)`)
     assert(minis(e).length === 2 && minis(e).every(m => !m.cls.split(' ').includes('off')), `back: ${JSON.stringify(minis(e))}`)
   }],
+  // 设置「只显示她自己的」：朋友送的收起来；切回来又出来
+  ['minis_from_own_hides_friends', async () => {
+    const e = await fresh({ 'claude+gemini': { points: 200, shown: 2 } })
+    e.run(`setMinisFrom('own')`)
+    assert(ids(e) === 'claude', `own: ${ids(e)}`)
+    e.run(`setMinisFrom('all')`)
+    assert(ids(e) === 'claude,gemini', `all: ${ids(e)}`)
+  }],
   ['crew_recomputed_every_minute', async () => {
     const e = await fresh({})
     assert(ids(e) === 'claude', `start: ${ids(e)}`)
@@ -127,22 +135,46 @@ const cases = [
     await e.advance(5000)
     assert(minis(e).every(m => !m.cls.split(' ').includes('f-gift') && !m.cls.split(' ').includes('lap')), `off later: ${JSON.stringify(minis(e))}`)
   }],
-  ['idle_at_most_one_laps', async () => {
-    const six = Object.fromEntries(['gemini', ...EXTRA.slice(0, 4)].map(id => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200, shown: 2 }]))
-    const e = await fresh(six)
-    // 小人自己找事时总挑「跑一圈」（随机数取 0）；页面别的随机事（彩蛋、闲时小动作）不看这里，结尾查一下没演彩蛋
-    e.run(`Math.random = () => 0`)
-    e.run(`setPose('idle')`)
-    let most = 0, ever = 0
-    for (let t = 0; t < 60000; t += 250) {
-      await e.advance(250)
-      const n = minis(e).filter(m => m.cls.split(' ').includes('lap')).length
-      most = Math.max(most, n); ever += n
+  // 两只的站位正好在跑道两端（x = ±88 = 绕圈半宽）：只让一只跑，另一只站着看书，跑的那只每圈都要穿过她。
+  // 干活时大家一起跑，在圈上均匀错开（两只就差半圈），谁也不站在跑道上挡路
+  ['busy_everyone_laps_evenly', async () => {
+    for (const friends of [['gemini'], ['gemini', 'ava', 'bob']]) {
+      const e = await fresh(Object.fromEntries(friends.map(f => [`claude+${f}`, { points: 200, shown: 2 }])))
+      e.run(`setPose('writing')`)
+      await e.advance(500)
+      const ms = minis(e)
+      assert(ms.length === friends.length + 1, `count: ${JSON.stringify(ms)}`)
+      assert(ms.every(m => m.cls.split(' ').includes('lap')), `not everyone laps: ${JSON.stringify(ms)}`)
+      const lap = 5.2
+      const phase = e.run(`$('figure').children.filter(c => c.classList.contains('mini')).map(c => parseFloat(c.style.animationDelay))`)
+        .map(d => ((-d % lap) + lap) % lap).sort((a, b) => a - b)
+      for (let i = 0; i < phase.length; i++) {
+        const gap = ((i + 1 < phase.length ? phase[i + 1] : phase[0] + lap) - phase[i])
+        assert(Math.abs(gap - lap / phase.length) < .05, `uneven: ${phase.map(p => p.toFixed(2))}`)
+      }
     }
-    assert(minis(e).length === 6, `crew: ${ids(e)}`)
-    assert(!e.state().egg, 'an egg played; the sample is meaningless')
-    assert(ever > 0, 'nobody lapped in 60 s')
-    assert(most <= 1, `${most} lapping at once while idle`)
+  }],
+  // 待机时有人想跑一圈，站在跑道上的（前四个站位，|x| ≤ 绕圈半宽）一起从各自的位置跑一圈、跑回原位，
+  // 不会一只跑、另一只站在跑道上挡路；身后两侧那两个（|x| = 104，在跑道外）不跑：从她们的位置起跑会和最前面那只叠在一起
+  ['idle_laps_together', async () => {
+    for (const friends of [['gemini'], ['gemini', ...EXTRA.slice(0, 4)]]) {
+      const e = await fresh(Object.fromEntries(friends.map(id => [id < 'claude' ? `${id}+claude` : `claude+${id}`, { points: 200, shown: 2 }])))
+      // 小人自己找事时总挑「跑一圈」（随机数取 0）；页面别的随机事（彩蛋、闲时小动作）不看这里，结尾查一下没演彩蛋
+      e.run(`Math.random = () => 0`)
+      e.run(`setPose('idle')`)
+      const n = friends.length + 1, track = Math.min(n, 4)
+      let ever = 0
+      for (let t = 0; t < 60000; t += 250) {
+        await e.advance(250)
+        const laps = minis(e).map((m, i) => m.cls.split(' ').includes('lap') ? i : -1).filter(i => i >= 0)
+        if (!laps.length) continue
+        ever++
+        assert(laps.length === track && laps.every(i => i < 4), `n=${n} lapping: ${laps}`)
+      }
+      assert(minis(e).length === n, `crew: ${ids(e)}`)
+      assert(!e.state().egg, 'an egg played; the sample is meaningless')
+      assert(ever > 0, `n=${n} nobody lapped in 60 s`)
+    }
   }],
   ['level_up_to_two_plays_gift_and_marks', async () => {
     const e = await fresh({ 'claude+gemini': { points: 100, shown: 1 } })

@@ -167,6 +167,8 @@ input[type=range] { width: 150px; accent-color: var(--accent); }
         <label><input type="radio" name="petsRest" value="open">程序开着就在，关了才走</label></div></div></div>
   <div class="item"><div class="label">显示小帮手<small>她脚边陪着自己的小帮手；和别的 AI 成为好朋友后会互送，收到的也一起陪着（最多 6 个）</small></div>
     <div class="ctl"><label class="switch"><input type="checkbox" data-key="showMinis"><span></span></label></div></div>
+  <div class="item indent" id="minisFromRow"><div class="label">显示谁的</div>
+    <div class="ctl"><div class="seg" id="minisFrom" data-key="minisFrom"><button data-v="own">只有她自己的</button><button data-v="all">也显示朋友送的</button></div></div></div>
 </div>
 
 <div class="card hidden" data-tab="character" id="friendship">
@@ -267,6 +269,8 @@ function setState(s) {
   // 久坐、喝水提醒的间隔（外壳没给就是默认的 45 / 60 分钟）；正在选的时候不改
   for (const [id, def] of [['sitEvery', 45], ['waterEvery', 60]]) if (document.activeElement !== $(id)) $(id).value = String(s[id] || def)
   for (const b of $('quotaStyle').children) b.classList.toggle('on', b.dataset.v === (s.quotaStyle || 'text'))
+  for (const b of $('minisFrom').children) b.classList.toggle('on', b.dataset.v === (s.minisFrom === 'own' ? 'own' : 'all'))
+  $('minisFromRow').classList.toggle('hidden', s.showMinis === false)
   if (s.loginNote) $('loginLabel').innerHTML = `登录时自动启动<small>${s.loginNote}</small>`
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
@@ -443,6 +447,7 @@ for (const el of document.querySelectorAll('input[data-key]')) el.onchange = () 
 for (const b of $('aura').children) b.onclick = () => post({ cmd: 'set', key: 'aura', value: b.dataset.v })
 for (const b of $('peakStyle').children) b.onclick = () => post({ cmd: 'set', key: 'peakStyle', value: b.dataset.v })
 for (const b of $('quotaStyle').children) b.onclick = () => post({ cmd: 'set', key: 'quotaStyle', value: b.dataset.v })
+for (const b of $('minisFrom').children) b.onclick = () => post({ cmd: 'set', key: 'minisFrom', value: b.dataset.v })
 for (const b of document.querySelectorAll('[data-action]')) b.onclick = () => post({ cmd: 'action', name: b.dataset.action })
 // 锁链图标：锁着 = 两节扣在一起；解开 = 断开
 const LINK_ON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 013.5 3.5l-1 1M9 11.5l-1 1a2.5 2.5 0 01-3.5-3.5l1-1"/></svg>'

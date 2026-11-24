@@ -181,6 +181,19 @@ const cases = [
     click(sw(p))
     assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'showMinis', value: true }), '再点该发 true')
   }],
+  ['小帮手开着时下面有「谁的」两档，默认「也显示朋友送的」；关了就藏起来', p => {
+    const seg = p.$('minisFrom'); assert(seg, '没有 #minisFrom')
+    assert([...seg.children].map(b => b.dataset.v).join(',') === 'own,all', '两档不对')
+    p.push({ showMinis: true }); assert(!hidden(seg), '开着时该看得见')
+    assert(seg.querySelector('[data-v=all]').classList.contains('on'), '默认该是 all')
+    p.push({ showMinis: true, minisFrom: 'own' }); assert(seg.querySelector('[data-v=own]').classList.contains('on'), '该选中 own')
+    p.push({ showMinis: false }); assert(hidden(seg), '关了该藏起来')
+  }],
+  ['点「只有她自己的」发 set minisFrom own', p => {
+    p.push({ showMinis: true })
+    click(p.$('minisFrom').querySelector('[data-v=own]'))
+    assert(JSON.stringify(p.posted.at(-1)) === JSON.stringify({ cmd: 'set', key: 'minisFrom', value: 'own' }), '消息不对：' + JSON.stringify(p.posted.at(-1)))
+  }],
 ]
 
 let failed = 0

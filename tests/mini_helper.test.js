@@ -41,6 +41,11 @@ test('crew_self_first_then_good_friends_by_points', () => {
   assert.equal(c[2].sheet, 'file:///x/characters/deepseek-pajamas/mini.webp')   // 穿着睡衣就是睡衣那套
   assert.deepEqual(c.map(x => x.move), ['run', 'pounce', 'run'])   // deepseek 跑步（游泳试过不用了）
 })
+// 设置「只显示她自己的」：朋友送的一个都不出来
+test('crew_own_only_when_friends_off', () => {
+  const store = { 'claude+deepseek': S(200), 'claude+gemini': S(400) }
+  assert.deepEqual(M.crew('claude', { store, manifest, today: '2026-11-20', levelOf: lv, friends: false }).map(x => x.id), ['claude'])
+})
 test('crew_falls_back_to_base_sheet_when_skin_has_none', () => {
   const c = M.crew('claude', { store: { 'claude+gpt': S(200) }, manifest, today: '2026-11-20', levelOf: lv })
   assert.equal(c[1].sheet, 'https://crosspet.data/characters/gpt/mini.webp')
@@ -88,6 +93,15 @@ test('onesie_runs_instead_of_flying', () => {
 })
 
 // ---- 一组：站位、干活分工 ----
+// 人少（3 个以内）挤在她右边站成一小堆；4 个起分到两边
+test('spots_one_side_when_few_both_sides_when_many', () => {
+  for (let n = 1; n <= 3; n++) assert.ok(M.spotsFor(n).every(p => p.x > 0), `n=${n}: ${JSON.stringify(M.spotsFor(n))}`)
+  for (let n = 4; n <= 6; n++) {
+    const s = M.spotsFor(n)
+    assert.ok(s.some(p => p.x > 0) && s.some(p => p.x < 0), `n=${n}: ${JSON.stringify(s)}`)
+  }
+})
+
 test('spots_stay_inside_canvas_and_apart', () => {
   for (let n = 1; n <= 6; n++) {
     const s = M.spotsFor(n)
@@ -96,14 +110,5 @@ test('spots_stay_inside_canvas_and_apart', () => {
     assert.deepEqual(s[0], M.spotsFor(1)[0])   // 第一个（她自己）的位置不随人数变
     for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++)   // 不叠成一团：左右至少差 16，或者前后至少差 10
       assert.ok(Math.abs(s[i].x - s[j].x) >= 16 || Math.abs(s[i].y - s[j].y) >= 10, `n=${n} ${i}/${j}`)
-  }
-})
-test('busy_roles_at_most_three_laps_and_everyone_busy', () => {
-  for (let n = 1; n <= 6; n++) for (let seed = 0; seed < 20; seed++) {
-    const r = M.busyRoles(n, seed)
-    assert.equal(r.length, n)
-    assert.ok(r.filter(x => x === 'lap').length <= 3)
-    assert.ok(r.filter(x => x === 'lap').length >= Math.min(n, 1))
-    for (const x of r) assert.ok(['lap', 'read', 'notes', 'think'].includes(x))
   }
 })

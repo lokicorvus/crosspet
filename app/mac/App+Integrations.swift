@@ -187,6 +187,8 @@ extension App {
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showName"); js("setShowName(\(on))")
             case "showMinis":
                 let on = value as? Bool ?? true; defaults.set(on, forKey: "showMinis"); js("setShowMinis(\(on))")
+            case "minisFrom":
+                if let s = value as? String, ["own", "all"].contains(s) { defaults.set(s, forKey: "minisFrom"); js("setMinisFrom(\(quote(s)))") }
             case "aura":
                 if let mode = value as? String, ["auto", "on", "off"].contains(mode) { defaults.set(mode, forKey: "auraMode"); js("setAuraMode(\(quote(mode)))") }
             case "followApps":

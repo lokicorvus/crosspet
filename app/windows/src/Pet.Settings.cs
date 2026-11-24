@@ -25,6 +25,7 @@ namespace CrossPet
         internal static double Scale => Store.Settings.TryGetValue("size", out var v) && (v is double || v is int || v is decimal) &&
                                Convert.ToDouble(v) >= 0.6 && Convert.ToDouble(v) <= 1.6 ? Convert.ToDouble(v) : 1;
         static bool ShowMinis => !(Store.Settings.TryGetValue("showMinis", out var v0) && v0 is bool b0 && !b0);
+        static string MinisFrom => Store.Settings.TryGetValue("minisFrom", out var mf) && mf is string ms && ms == "own" ? "own" : "all";   // 小帮手显示谁的：all 也显示朋友送的（默认）/ own 只有她自己的
         static bool ShowName => !(Store.Settings.TryGetValue("showName", out var v) && v is bool b && !b);
         static bool EggsEnabled => !(Store.Settings.TryGetValue("eggs", out var v) && v is bool b && !b);
         /// <summary>文字大小（只在解锁时用）和锁：没存过 = 锁着，文字跟着人物，和以前一样</summary>

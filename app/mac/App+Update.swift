@@ -239,7 +239,7 @@ extension App {
         if let side = defaults.string(forKey: "dock"), edgeDockEnabled {   // 上次是贴着边的
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.setDock(side) }
         }
-        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setShowMinis(\(showMinis)); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(\(quotaAggregate)); setCodexResets(\(codexResets)); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle))); setPeakSkins(\(peakSkinsJSON)); \(breakRemindersJS)")
+        js("setAuraMode(\(quote(auraMode))); setShowName(\(showName)); setShowMinis(\(showMinis)); setMinisFrom(\(quote(minisFrom))); setEggsEnabled(\(eggsEnabled)); setPowerSave(\(powerSave)); setNeverSleep(\(noSleep)); setQuotaAggregate(\(quotaAggregate)); setCodexResets(\(codexResets)); setPeakStyle(\(quote(peakStyle))); setQuotaStyle(\(quote(quotaStyle))); setPeakSkins(\(peakSkinsJSON)); \(breakRemindersJS)")
         applySizes(anchor: .corner)   // 解锁过文字大小的：按画布重设窗口，左下角不动（锁着的尺寸不变）
         updatePageHidden()
         stamps = [:]

@@ -3,7 +3,7 @@
 // 外壳把它当「姿态 mini」扫进清单，网页从 char().poses.mini 拿地址。
 // 动作全交给代码：主桌宠换姿态时 moodOf(姿态) 决定小帮手在干嘛；绕圈跑、换帧、上下浮动都是 CSS 动画，
 // 她干活一干几个小时时也不用 JS 每帧算位置。
-// moodOf、crew、spotsFor、busyRoles 是纯函数，网页和测试（tests/mini_helper.test.js）共用；attach 只在网页里用。
+// moodOf、crew、spotsFor 是纯函数，网页和测试（tests/mini_helper.test.js）共用；attach 只在网页里用。
 ;(function (root) {
   const FRAMES = ['idle', 'happy', 'sleep', 'run-a', 'run-b', 'run-c', 'wave', 'read', 'worried',
     'think-a', 'think-b', 'notes', 'carry-a', 'carry-b', 'carry-c', 'point', 'gift',
@@ -36,16 +36,12 @@
   // 待机站位（画布坐标：x 离中线、y 正 = 靠前），按顺序填：右、左、脚前偏右、偏左、身后两侧（往后、高一点，从前面那个头上探出来）。
   // 第一个是她自己的，位置不随人数变；|x| ≤ 104 才不出画布（画布半宽 125，小人半宽约 21）
   const SPOTS = [[88, 2], [-88, 2], [42, 11], [-42, 11], [104, -12], [-104, -12]]
-  const spotsFor = n => SPOTS.slice(0, Math.max(0, Math.min(n, SPOTS.length))).map(([x, y]) => ({ x, y }))
-
-  // 她干活时谁干什么：最多 3 个绕圈（约一半），其余在原位看书 / 记笔记 / 思考；种子定了结果就定了
-  function busyRoles(n, seed) {
-    const rnd = seeded(String(seed))
-    const laps = n > 0 ? Math.min(3, Math.ceil(n / 2)) : 0
-    const r = []
-    for (let i = 0; i < n; i++) r.push(i < laps ? 'lap' : ['read', 'notes', 'think'][Math.floor(rnd() * 3)])
-    for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [r[i], r[j]] = [r[j], r[i]] }
-    return r
+  // 人少（3 个以内）挤在她右边站成一小堆：她自己的照旧在右边，第二个站到脚前偏右，第三个在右后方从头上探出来。
+  // 待机一起跑一圈时第二个跟在第一个后面，像排队；干活时照旧在圈上均匀错开
+  const FEW = [[88, 2], [48, 11], [104, -12]]
+  const spotsFor = n => {
+    const k = Math.max(0, Math.min(n, SPOTS.length))
+    return (k <= FEW.length ? FEW : SPOTS).slice(0, k).map(([x, y]) => ({ x, y }))
   }
 
   // 帧序列 → background-position 的关键帧（配 steps(1) 用）
@@ -130,9 +126,10 @@ html.tucked .mini { visibility: hidden; }`
   function attach(stage) {
     const style = document.createElement('style'); style.textContent = css(); (document.head || document.documentElement).appendChild(style)
     const members = new Map()   // id → 成员，按 crew 顺序
-    let order = [], mood = 'idle', on = true, roles = [], regroup = null
+    let order = [], mood = 'idle', on = true
     let lapEpoch = 0             // 这一轮干活开始绕圈的时刻
-    let lapper = null           // 待机时正在绕圈的那个：同一时刻最多一个
+    const laps = new Set()       // 待机时正在一起跑一圈的
+    const onTrack = m => Math.abs(m.spot.x) <= RX   // 站位在跑道上（前四个）
     const visible = () => on && mood !== 'hidden'
 
     function make(c) {
@@ -160,21 +157,27 @@ html.tucked .mini { visibility: hidden; }`
     }
     function stop(m) {
       clearTimeout(m.timer); m.timer = null; m.el.onanimationend = null
-      if (lapper === m) lapper = null
+      laps.delete(m)
       m.el.classList.remove('f-gift')
     }
     function idle(m) {   // 站在自己的位置轻轻晃，隔 9–20 秒自己找点事：跑一圈 / 挥手 / 坐下看书（她自己的偶尔记笔记）
       stop(m); lap(m, false); frame(m, 'idle', 'bob')
       m.timer = setTimeout(() => {
-        const tricks = m.i === 0 ? ['lap', 'wave', 'read', 'notes'] : ['lap', 'wave', 'read']
+        // 身后两侧那两个（在跑道外）不跑：从那里起跑和最前面那只同一个起点，会叠在一起
+        const tricks = [...(onTrack(m) ? ['lap'] : []), 'wave', 'read', ...(m.i === 0 ? ['notes'] : [])]
         let t = tricks[Math.floor(Math.random() * tricks.length)]
-        if (t === 'lap' && lapper) t = 'wave'   // 有人在跑就改成挥手
+        if (t === 'lap' && laps.size) t = 'wave'   // 已经在跑了就改成挥手
         if (t === 'lap') {
-          lapper = m
-          const p = phaseOf(m.spot)
-          lap(m, true, (-p * LAP).toFixed(3), (1 + p).toFixed(3)); frame(m, null, runAnim(m, false))
-          m.el.onanimationend = e => { if (e.target === m.el) idle(m) }
-          m.timer = setTimeout(() => idle(m), LAP * 1000 + 500)   // 兜底：animationend 丢了也会回来；先到的那个调 idle，idle 里 stop 掉另一个
+          // 站在跑道上的一起跑：各自从自己的位置起跑、跑一圈回到原位，不会有人站在跑道上挡路
+          // （分两边站时左右两只正好在两端；人少挤在右边时第二个跟在第一个后面跑）
+          for (const o of order) {
+            if (!onTrack(o) || o.el.classList.contains('f-gift')) continue
+            stop(o); laps.add(o)
+            const p = phaseOf(o.spot)
+            lap(o, true, (-p * LAP).toFixed(3), (1 + p).toFixed(3)); frame(o, null, runAnim(o, false))
+            o.el.onanimationend = e => { if (e.target === o.el) idle(o) }
+            o.timer = setTimeout(() => idle(o), LAP * 1000 + 500)   // 兜底：animationend 丢了也会回来；先到的那个调 idle，idle 里 stop 掉另一个
+          }
         } else if (t === 'wave') { frame(m, 'wave', 'wave'); m.timer = setTimeout(() => idle(m), 1800) }
         else { frame(m, t, 'breathe'); m.timer = setTimeout(() => idle(m), 5000) }
       }, 9000 + Math.random() * 11000)
@@ -183,16 +186,10 @@ html.tucked .mini { visibility: hidden; }`
       if (notes && n % 5 === 4) { frame(m, 'notes', 'breathe'); m.timer = setTimeout(() => think(m, n + 1, notes), 2600); return }
       frame(m, n % 2 ? 'think-b' : 'think-a', 'bob'); m.timer = setTimeout(() => think(m, n + 1, notes), 1500)
     }
-    function busy(m) {   // 绕圈的在圈上均匀错开；其余在原位做忙的样子
-      const role = roles[m.i] || 'read'
-      if (role === 'lap') {
-        const laps = roles.filter(r => r === 'lap').length, j = roles.slice(0, m.i).filter(r => r === 'lap').length
-        // 按同一个起点算：中途重跑的（换分工、送完礼）也落在自己该在的位置
-        lap(m, true, (-((Date.now() - lapEpoch) / 1000 % LAP) - LAP * j / laps).toFixed(3), 'infinite'); frame(m, null, runAnim(m, true)); return
-      }
-      lap(m, false)
-      if (role === 'think') return think(m, 0, false)
-      frame(m, role, 'breathe')
+    // 干活：大家一起绕圈，在圈上均匀错开（两只差半圈）。不留人站着：待机站位就在跑道上（左右两只正好在两端），
+    // 站着的会挡住跑过来的那只。都按同一个起点算，中途重跑的（送完礼）也落在自己该在的位置
+    function busy(m) {
+      lap(m, true, (-((Date.now() - lapEpoch) / 1000 % LAP) - LAP * m.i / order.length).toFixed(3), 'infinite'); frame(m, null, runAnim(m, true))
     }
     function act(m) {   // 按现在的 mood 做事（不含错开的等待）
       stop(m); place(m)
@@ -207,21 +204,9 @@ html.tucked .mini { visibility: hidden; }`
       if (mood === 'worried') return frame(m, 'worried', 'shake')
       idle(m)
     }
-    const seed = () => Math.floor(Date.now() / 120000)   // 每 2 分钟换一次谁跑谁坐
-    function regroupLater() {
-      clearTimeout(regroup)
-      regroup = setTimeout(() => {
-        const next = busyRoles(order.length, seed())
-        const slot = (r, i) => r[i] === 'lap' ? 'lap' + r.slice(0, i).filter(x => x === 'lap').length : r[i]
-        const changed = order.filter((m, i) => slot(next, i) !== slot(roles, i))   // 只动分工或圈上位置变了的，其余照常
-        roles = next; changed.forEach(m => act(m))
-        regroupLater()
-      }, 120000 - Date.now() % 120000 + 50)
-    }
     function render() {
-      clearTimeout(regroup); regroup = null
       const show = visible()
-      if (show && mood === 'busy') { roles = busyRoles(order.length, seed()); lapEpoch = Date.now(); regroupLater() }
+      if (show && mood === 'busy') lapEpoch = Date.now()
       order.forEach((m, i) => {
         stop(m); m.i = i
         m.el.classList.toggle('off', !show)
@@ -284,15 +269,15 @@ html.tucked .mini { visibility: hidden; }`
   }
 
   // 该显示哪几个：她自己（有图的话）排第一，后面是好感度到 2 级的好友，按分数从高到低；
-  // 好友多了按「今天 + 她的 id」每天轮换，同一天不变
+  // 好友多了按「今天 + 她的 id」每天轮换，同一天不变。friends: false（设置「只有她自己的」）就只要她自己
   const MAX_CREW = 6
-  function crew(receiver, { store = {}, manifest = {}, today = '', levelOf = () => 0 } = {}) {
+  function crew(receiver, { store = {}, manifest = {}, today = '', levelOf = () => 0, friends: withFriends = true } = {}) {
     const chars = (manifest && manifest.characters) || {}
     const entry = id => ({ id, sheet: sheetOf(id, chars[id]), move: moveOf(id, chars[id]) })
     const self = chars[receiver] && !chars[receiver].egg ? entry(receiver) : null
     const mine = self && self.sheet ? [self] : []
     const friends = []
-    for (const key of Object.keys(store || {})) {
+    for (const key of withFriends ? Object.keys(store || {}) : []) {
       const pair = key.split('+')
       if (pair.length !== 2 || !pair.includes(receiver)) continue
       const id = pair[0] === receiver ? pair[1] : pair[0]
@@ -316,7 +301,7 @@ html.tucked .mini { visibility: hidden; }`
     return mine.concat(pick.map(f => f.e))
   }
 
-  const api = { FRAMES, moodOf, moveOf, crew, MAX_CREW, spotsFor, busyRoles }
+  const api = { FRAMES, moodOf, moveOf, crew, MAX_CREW, spotsFor }
   root.MiniHelper = Object.assign({ attach }, api)
   if (typeof module !== 'undefined') module.exports = api
 })(typeof window !== 'undefined' ? window : globalThis)
