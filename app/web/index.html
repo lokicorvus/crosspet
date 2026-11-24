@@ -119,7 +119,8 @@ html.no-name #caption { display: none; }
 #quota .qbar { display: contents; white-space: nowrap; }   /* 一行四格：名字、条、百分比、时间，各行对齐成表 */
 #quota.bars > div:not(.qbar) { grid-column: 1 / -1; }   /* 文字行（余额）、重置提醒、峰谷条、备注占满一行 */
 #quota .ql { padding-right: calc(4px * var(--k)); white-space: nowrap; }
-#quota .qtrack { min-width: calc(30px * var(--k)); height: calc(5px * var(--k)); border-radius: calc(3px * var(--k)); background: #e4dcd6; overflow: hidden; }
+/* 条最短 56：整块按内容收窄，名字长（Antigravity 的「Claude/GPT 5小时」）时条只剩最低宽度，挤成一小截 */
+#quota .qtrack { min-width: calc(56px * var(--k)); height: calc(5px * var(--k)); border-radius: calc(3px * var(--k)); background: #e4dcd6; overflow: hidden; }
 #quota .qtrack i { display: block; height: 100%; border-radius: inherit; background: var(--bar); }
 #quota .qp { padding-left: calc(4px * var(--k)); font-weight: 700; color: var(--bar); text-align: right; white-space: nowrap; }
 #quota .qt { padding-left: calc(4px * var(--k)); font-size: calc(8.5px * var(--k)); color: #a8958a; white-space: nowrap; }
