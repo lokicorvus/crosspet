@@ -430,6 +430,169 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
         rect = reg.get_rectangle(0)
         self.assertEqual((rect.x, rect.y, rect.width, rect.height), (15, 30, 45, 60))
 
+    def test_no_undefined_self_attributes_in_linux_shell(self):
+        import ast
+
+        for py_path in sorted((REPO / "app" / "linux").glob("*.py")):
+            tree = ast.parse(py_path.read_text(encoding="utf-8"), str(py_path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                defined: set[str] = set()
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        defined.add(item.name)
+                    elif isinstance(item, ast.Assign):
+                        for t in item.targets:
+                            if isinstance(t, ast.Name):
+                                defined.add(t.id)
+                    elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                        defined.add(item.target.id)
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Assign):
+                        for t in sub.targets:
+                            if isinstance(t, ast.Attribute) and isinstance(t.value, ast.Name) and t.value.id == "self":
+                                defined.add(t.attr)
+                    elif isinstance(sub, ast.AnnAssign):
+                        if (
+                            isinstance(sub.target, ast.Attribute)
+                            and isinstance(sub.target.value, ast.Name)
+                            and sub.target.value.id == "self"
+                        ):
+                            defined.add(sub.target.attr)
+                used = {
+                    sub.attr
+                    for sub in ast.walk(node)
+                    if isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name) and sub.value.id == "self"
+                }
+                self.assertEqual(sorted(used - defined), [], f"{py_path.name}:{node.name}")
+
+    def test_poll_states_and_timer_resilience(self):
+        from app.linux import app as linux_app
+
+        class _StubWM:
+            name = "wayland"
+
+            def active_window(self):
+                return None
+
+            def is_fullscreen_on(self, _mon_name):
+                return False
+
+        class _StubSurface:
+            layer_mode = "overlay"
+
+            def current_monitor(self):
+                return None
+
+            def set_layer(self, mode):
+                self.layer_mode = mode
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            data = tmp_path / "data"
+            st = tmp_path / "state"
+            data.mkdir()
+            st.mkdir()
+
+            inst = object.__new__(linux_app.CrossPetApp)
+            inst.root = data
+            inst.src_root = REPO
+            inst.state_dir = st
+            inst.config = paths.ConfigStore(data / "config.json")
+            inst.ready = True
+            inst.character_ids = ["gemini", "claude"]
+            inst.current_id = "gemini"
+            inst.stamps = {}
+            inst.last_pose = {}
+            inst.pause_real_events = False
+            inst.follow_event_gen = 0
+            inst.user_hidden = False
+            inst.hidden_for_fullscreen = False
+            inst.fullscreen_override = False
+            inst.fullscreen_checked_at = time.monotonic()
+            inst.dock = None
+            inst.companions = {}
+            inst.leaving_companions = []
+            inst.page_gathering = False
+            inst.client_state_seen = set()
+            inst.char_states = {}
+            inst.sessions_text = {}
+            inst.quota_code = {}
+            inst.quota_seq = 0
+            inst.app_to_character = {}
+            inst.wm = _StubWM()
+            inst.surface = _StubSurface()
+
+            js_calls: list[str] = []
+            dev_calls: list[str] = []
+            inst.js = lambda code, cb=None: js_calls.append(code)
+            inst.dev_js = lambda code: dev_calls.append(code)
+            inst.events_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. Fresh state + sessions triggers applyCharState, setSessions, last_pose, and pet.jsonl played
+            now = time.time()
+            (st / "gemini-state.json").write_text(
+                json.dumps({"pose": "thinking", "event": "PreInvocation", "tool": "", "ts": now}),
+                encoding="utf-8",
+            )
+            (st / "gemini-sessions.json").write_text(
+                json.dumps({"s1": {"pose": "running", "event": "PreToolUse", "ts": now, "client": "antigravity"}}),
+                encoding="utf-8",
+            )
+            inst.poll_states()
+
+            self.assertTrue(any(c.startswith('applyCharState("gemini",') for c in js_calls), js_calls)
+            self.assertTrue(any(c.startswith('setSessions("gemini",') for c in js_calls), js_calls)
+            self.assertEqual(inst.last_pose["gemini"][0], "thinking")
+            rows = [json.loads(line) for line in inst.pet_events_url.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(rows[-1]["char"], "gemini")
+            self.assertEqual(rows[-1]["ev"], "PreInvocation")
+            self.assertEqual(rows[-1]["result"], "played")
+
+            # 2. Stale (>600s) state is skipped without calling applyCharState
+            js_calls.clear()
+            stale_file = st / "claude-state.json"
+            stale_file.write_text(
+                json.dumps({"pose": "running", "event": "PreToolUse", "ts": now - 700}),
+                encoding="utf-8",
+            )
+            os.utime(stale_file, (now - 700, now - 700))
+            inst.poll_states()
+
+            self.assertFalse(any("applyCharState" in c for c in js_calls), js_calls)
+            rows = [json.loads(line) for line in inst.pet_events_url.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual((rows[-1]["char"], rows[-1]["result"], rows[-1]["detail"]), ("claude", "skipped", "stale"))
+
+            # 3. pause_real_events logs skipped/paused without calling applyCharState
+            js_calls.clear()
+            inst.pause_real_events = True
+            (st / "gemini-state.json").write_text(
+                json.dumps({"pose": "happy", "event": "Stop", "ts": now + 1}),
+                encoding="utf-8",
+            )
+            os.utime(st / "gemini-state.json", (now + 1, now + 1))
+            inst.poll_states()
+
+            self.assertFalse(any("applyCharState" in c for c in js_calls), js_calls)
+            rows = [json.loads(line) for line in inst.pet_events_url.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual((rows[-1]["char"], rows[-1]["result"], rows[-1]["detail"]), ("gemini", "skipped", "paused"))
+
+            # 4. _timer_poll_states returns True even when poll_states raises
+            inst.poll_states = mock.Mock(side_effect=RuntimeError("boom"))
+            with mock.patch.object(linux_app, "app_log"):
+                self.assertTrue(inst._timer_poll_states())
+
+            # 5. _mark_launched registers launcher symlink when missing
+            src_bundle = tmp_path / "bundle"
+            src_bundle.mkdir()
+            wrapper = src_bundle / "crosspet"
+            wrapper.write_text("#!/bin/sh\n", encoding="utf-8")
+            wrapper.chmod(0o755)
+            inst.src_root = src_bundle
+            inst._mark_launched()
+            self.assertEqual((data / "launcher").resolve(), wrapper.resolve())
+
 
 if __name__ == "__main__":
     unittest.main()

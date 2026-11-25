@@ -347,6 +347,14 @@ class CrossPetApp:
     def switches_url(self) -> Path:
         return self.root / "switches.jsonl"
 
+    def _note_pet(self, cid: str, state: dict[str, Any] | None, result: str, detail: str = "") -> None:
+        ev = state.get("event") if isinstance(state, dict) and isinstance(state.get("event"), str) else ""
+        pose = state.get("pose") if isinstance(state, dict) and isinstance(state.get("pose"), str) else ""
+        Ledger.append(
+            self.pet_events_url,
+            {"char": cid, "ev": ev, "pose": pose, "result": result, "detail": detail},
+        )
+
     @property
     def feedback_file(self) -> Path:
         return self.root / "dev-feedback.md"
@@ -540,6 +548,18 @@ class CrossPetApp:
             (self.state_dir / "pet.pid").write_text(str(os.getpid()), encoding="utf-8")
         except OSError:
             pass
+        launcher = self.root / "launcher"
+        if not launcher.exists():
+            for cand in (self.src_root / "crosspet", self.src_root / "app" / "linux" / "crosspet"):
+                if cand.is_file() and os.access(cand, os.X_OK):
+                    try:
+                        launcher.parent.mkdir(parents=True, exist_ok=True)
+                        if launcher.is_symlink():
+                            launcher.unlink()
+                        launcher.symlink_to(cand)
+                    except OSError:
+                        pass
+                    break
 
     def _cleanup_on_exit(self) -> None:
         try:
@@ -912,7 +932,10 @@ class CrossPetApp:
         self.apply_sizes(anchor="corner")
         self.update_page_hidden()
         self.stamps = {}
-        self.poll_states()
+        try:
+            self.poll_states()
+        except Exception as exc:
+            app_log(f"首次读取状态出错：{exc!r}")
         self.refresh_codex_quota("now")
         self.refresh_antigravity_quota()
         self.refresh_plugins(tell_pet=True)
@@ -940,15 +963,18 @@ class CrossPetApp:
             self.apply_dock()
 
     def _timer_wm_poll(self) -> bool:
-        win = self.wm.active_window()
-        sig = tuple(win.identifiers) if win else ()
-        full = bool(win and win.fullscreen)
-        if sig != self._last_active_sig:
-            self._last_active_sig = sig
-            self._handle_active_window_change(win)
-        elif full != self._last_fullscreen_flag:
-            self._last_fullscreen_flag = full
-            self.check_fullscreen()
+        try:
+            win = self.wm.active_window()
+            sig = tuple(win.identifiers) if win else ()
+            full = bool(win and win.fullscreen)
+            if sig != self._last_active_sig:
+                self._last_active_sig = sig
+                self._handle_active_window_change(win)
+            elif full != self._last_fullscreen_flag:
+                self._last_fullscreen_flag = full
+                self.check_fullscreen()
+        except Exception as exc:
+            app_log(f"定时任务出错（wm_poll）：{exc!r}")
         return True
 
     def _handle_active_window_change(self, win: ActiveWindow | None = None) -> None:
@@ -989,7 +1015,10 @@ class CrossPetApp:
         self._pending_switch_source = GLib.timeout_add(500, do_switch)
 
     def _timer_poll_states(self) -> bool:
-        self.poll_states()
+        try:
+            self.poll_states()
+        except Exception as exc:
+            app_log(f"定时任务出错（poll_states）：{exc!r}")
         return True
 
     def poll_states(self) -> None:
@@ -1217,22 +1246,25 @@ class CrossPetApp:
         self._yield_key_held = (ctrl or alt) and not (shift or sup)
 
     def _timer_click_through(self) -> bool:
-        cursor = self.wm.cursor_pos()
-        if self.wm.name == "x11":
-            try:
-                gdk_win = self.surface.win.get_window()
-                display = Gdk.Display.get_default()
-                seat = display.get_default_seat() if display else None
-                ptr = seat.get_pointer() if seat else None
-                if gdk_win and ptr:
-                    _, _, _, mod = ptr.get_state(gdk_win)
-                    self._update_yield_key_from_state(mod)
-            except Exception:
-                pass
+        try:
+            cursor = self.wm.cursor_pos()
+            if self.wm.name == "x11":
+                try:
+                    gdk_win = self.surface.win.get_window()
+                    display = Gdk.Display.get_default()
+                    seat = display.get_default_seat() if display else None
+                    ptr = seat.get_pointer() if seat else None
+                    if gdk_win and ptr:
+                        _, _, _, mod = ptr.get_state(gdk_win)
+                        self._update_yield_key_from_state(mod)
+                except Exception:
+                    pass
 
-        self._update_main_click_through(cursor, self._yield_key_held)
-        for c in list(self.companions.values()):
-            c.update_click_through(cursor, self._yield_key_held)
+            self._update_main_click_through(cursor, self._yield_key_held)
+            for c in list(self.companions.values()):
+                c.update_click_through(cursor, self._yield_key_held)
+        except Exception as exc:
+            app_log(f"定时任务出错（click_through）：{exc!r}")
         return True
 
     def _update_main_click_through(self, cursor: tuple[float, float] | None, yield_key: bool) -> None:
@@ -1909,7 +1941,10 @@ class CrossPetApp:
         return sorted(f"{cid}@{cl}" for cl in clients for cid in self.character_ids)
 
     def _timer_push_running(self) -> bool:
-        self.push_running()
+        try:
+            self.push_running()
+        except Exception as exc:
+            app_log(f"定时任务出错（push_running）：{exc!r}")
         return True
 
     def push_running(self, force: bool = False) -> None:
@@ -2042,8 +2077,11 @@ class CrossPetApp:
     # ---- Quota ----
 
     def _timer_quota(self) -> bool:
-        self.refresh_codex_quota("tick")
-        self.refresh_antigravity_quota()
+        try:
+            self.refresh_codex_quota("tick")
+            self.refresh_antigravity_quota()
+        except Exception as exc:
+            app_log(f"定时任务出错（quota）：{exc!r}")
         return True
 
     def refresh_codex_quota(self, why: str) -> None:
@@ -2210,19 +2248,22 @@ class CrossPetApp:
                 self.push_settings()
 
     def _timer_watch_claude(self) -> bool:
-        self.refresh_seen()
-        if not self.ready:
-            return True
-        claude_cfg = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude")) / "settings.json"
         try:
-            stamp = claude_cfg.stat().st_mtime
-        except OSError:
-            return True
-        if stamp != self._claude_config_stamp:
-            self._claude_config_stamp = stamp
-            if self._heal_pending is not None:
-                GLib.source_remove(self._heal_pending)
-            self._heal_pending = GLib.timeout_add(2000, lambda: (self._heal_integrations(), False)[1])
+            self.refresh_seen()
+            if not self.ready:
+                return True
+            claude_cfg = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude")) / "settings.json"
+            try:
+                stamp = claude_cfg.stat().st_mtime
+            except OSError:
+                return True
+            if stamp != self._claude_config_stamp:
+                self._claude_config_stamp = stamp
+                if self._heal_pending is not None:
+                    GLib.source_remove(self._heal_pending)
+                self._heal_pending = GLib.timeout_add(2000, lambda: (self._heal_integrations(), False)[1])
+        except Exception as exc:
+            app_log(f"定时任务出错（watch_claude）：{exc!r}")
         return True
 
     def _heal_integrations(self) -> None:
@@ -3274,7 +3315,10 @@ class CrossPetApp:
     # ---- Update Check ----
 
     def _timer_update_check(self) -> bool:
-        self.check_for_update(manual=False)
+        try:
+            self.check_for_update(manual=False)
+        except Exception as exc:
+            app_log(f"定时任务出错（update_check）：{exc!r}")
         return True
 
     def check_for_update(self, manual: bool = False) -> None:
