@@ -387,6 +387,49 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
         wm_out = json.loads(run_probe("--wm-info"))
         self.assertIn("backend", wm_out)
 
+    def test_input_region_reset_when_unhidden_without_hit_rects(self):
+        from app.linux import window
+
+        class _StubWin:
+            def __init__(self):
+                self.regions = []
+                self.draws = 0
+
+            def input_shape_combine_region(self, reg):
+                self.regions.append(reg)
+
+            def queue_draw(self):
+                self.draws += 1
+
+        surf = object.__new__(window.PetSurface)
+        surf.win = _StubWin()
+        surf.hidden = True
+        surf.yielding = False
+        surf._has_hit_rects = False
+        surf._hit_rects = []
+        surf.zoom = 1.5
+        surf.use_layer_shell = False
+
+        # Hidden -> empty cairo.Region()
+        window.PetSurface._apply_input_region(surf)
+        self.assertEqual(len(surf.win.regions), 1)
+        self.assertIsNotNone(surf.win.regions[-1])
+        self.assertEqual(surf.win.regions[-1].num_rectangles(), 0)
+
+        # Unhidden without hitRects (notebook window) -> None resets to full-window input
+        surf.hidden = False
+        window.PetSurface._apply_input_region(surf)
+        self.assertIsNone(surf.win.regions[-1])
+
+        # With hitRects -> scaled non-empty region
+        surf._has_hit_rects = True
+        surf._hit_rects = [placement.Rect(10, 20, 30, 40)]
+        window.PetSurface._apply_input_region(surf)
+        reg = surf.win.regions[-1]
+        self.assertEqual(reg.num_rectangles(), 1)
+        rect = reg.get_rectangle(0)
+        self.assertEqual((rect.x, rect.y, rect.width, rect.height), (15, 30, 45, 60))
+
 
 if __name__ == "__main__":
     unittest.main()

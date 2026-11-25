@@ -296,23 +296,26 @@ class PetSurface:
         self._apply_input_region()
 
     def _apply_input_region(self) -> None:
-        gdk_win = self.win.get_window()
-        if gdk_win is None:
-            return
         if self.hidden or self.yielding:
-            gdk_win.input_shape_combine_region(cairo.Region(), 0, 0)
-            return
-        if not self._has_hit_rects:
-            return
-        region = cairo.Region()
-        z = self.zoom
-        for r in self._hit_rects:
-            rx = int(math.floor(r.x * z))
-            ry = int(math.floor(r.y * z))
-            rw = max(1, int(math.ceil((r.x + r.w) * z)) - rx)
-            rh = max(1, int(math.ceil((r.y + r.h) * z)) - ry)
-            region.union(cairo.RectangleInt(rx, ry, rw, rh))
-        gdk_win.input_shape_combine_region(region, 0, 0)
+            self.win.input_shape_combine_region(cairo.Region())
+        elif not self._has_hit_rects:
+            self.win.input_shape_combine_region(None)
+        else:
+            region = cairo.Region()
+            z = self.zoom
+            for r in self._hit_rects:
+                rx = int(math.floor(r.x * z))
+                ry = int(math.floor(r.y * z))
+                rw = max(1, int(math.ceil((r.x + r.w) * z)) - rx)
+                rh = max(1, int(math.ceil((r.y + r.h) * z)) - ry)
+                region.union(cairo.RectangleInt(rx, ry, rw, rh))
+            self.win.input_shape_combine_region(region)
+        self.win.queue_draw()
+        if self.use_layer_shell:
+            try:
+                GtkLayerShell.try_force_commit(self.win)
+            except Exception:
+                pass
 
     def _find_monitor_and_gdk(self, x: float, y: float, w: float, h: float) -> tuple[MonitorRect | None, Gdk.Monitor | None]:
         mons = self.wm.monitors()
