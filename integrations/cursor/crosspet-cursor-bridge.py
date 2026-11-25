@@ -18,10 +18,14 @@ else:
 # 认不出的模型（Cursor 自家的 Composer、Auto……）用接入时指定的角色（命令末尾的参数），没指定就由当前角色来演
 FALLBACK = sys.argv[1] if len(sys.argv) > 1 else None
 
-# Same folders as crosspet-hook.py and the shells: the macOS pet reads /tmp/crosspet.
+# Same folders as crosspet-hook.py and the shells: the macOS/Linux pet reads /tmp/crosspet.
 if os.name == 'nt':
     ROOT = Path(os.environ.get('CROSSPET_DATA_DIR') or Path(os.environ['LOCALAPPDATA']) / 'CrossPet')
     STATE = Path(os.environ.get('CROSSPET_STATE_DIR') or ROOT / 'state')
+elif sys.platform.startswith('linux'):
+    _xdg = os.environ.get('XDG_DATA_HOME')
+    ROOT = Path(os.environ.get('CROSSPET_DATA_DIR') or (Path(_xdg) / 'crosspet' if _xdg else Path.home() / '.local/share/crosspet'))
+    STATE = Path(os.environ.get('CROSSPET_STATE_DIR') or '/tmp/crosspet')
 else:
     ROOT = Path(os.environ.get('CROSSPET_DATA_DIR') or Path.home() / 'Library/Application Support/CrossPet')
     STATE = Path(os.environ.get('CROSSPET_STATE_DIR') or '/tmp/crosspet')

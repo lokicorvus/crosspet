@@ -50,9 +50,26 @@ function characterForModel(model: string): string | undefined {
 }
 // 会话 id → 正在演的角色（还没看到模型时是 Claude）
 const actors = new Map<string, string>()
+async function dataDir($: EngineInterface): Promise<string> {
+  const override = await $.env.get('CROSSPET_DATA_DIR')
+  if (override) return override
+  const local = await $.env.get('LOCALAPPDATA')
+  if (local) return `${local}\\CrossPet`
+  const home = await $.env.get('HOME')
+  if (process.platform === 'linux') {
+    const xdg = await $.env.get('XDG_DATA_HOME')
+    const linuxDir = `${xdg || `${home}/.local/share`}/crosspet`
+    if (await $.fs.exists(`${linuxDir}/characters`)) return linuxDir
+    const macDir = `${home}/Library/Application Support/CrossPet`
+    if (await $.fs.exists(`${macDir}/characters`)) return macDir
+    return linuxDir
+  }
+  return `${home}/Library/Application Support/CrossPet`
+}
 async function charactersDir($: EngineInterface): Promise<string> {
   const local = await $.env.get('LOCALAPPDATA')
-  return local ? `${local}\\CrossPet\\characters` : `${await $.env.get('HOME')}/Library/Application Support/CrossPet/characters`
+  const sep = local ? '\\' : '/'
+  return `${await dataDir($)}${sep}characters`
 }
 async function noteModel($: EngineInterface, model: string): Promise<void> {
   if (!model) return
@@ -164,13 +181,17 @@ async function ensurePet($: EngineInterface): Promise<void> {
     return
   }
   // macOS：不用 Python（没装开发者工具的 Mac 上调 python3 会弹安装框）
-  const data = `${await $.env.get('HOME')}/Library/Application Support/CrossPet`
+  const data = await dataDir($)
   if (await $.fs.exists(`${data}/ai-autostart-off`)) return
   if (await $.fs.exists(`${data}/user-quit`) && await appStartedAt($) <= (await $.fs.stat(`${data}/user-quit`)).mtimeMs) return
   try {
     const pid = (await $.fs.read(`${await stateDir($)}/pet.pid`)).trim()
     if (/^\d+$/.test(pid) && (await $.process.run(['/bin/kill', '-0', pid])).exitCode === 0) return  // 在跑
   } catch {}
+  if (process.platform === 'linux') {
+    await $.process.run(['python3', `${data}/crosspet-hook.py`, '--ensure'], { timeoutMs: 10_000 })
+    return
+  }
   await $.process.run(['/usr/bin/open', '-g', '-b', 'io.github.crosspet'], { timeoutMs: 10_000 })  // -g：后台打开，不抢焦点
 }
 

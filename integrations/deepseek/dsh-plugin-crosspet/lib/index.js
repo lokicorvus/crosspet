@@ -134,7 +134,11 @@ export function apply(ctx, config = {}) {
   // ---- 跟着 AI 出现 ----
   // 桌宠在跑时把自己的进程号写在 <状态目录>/pet.pid；从菜单手动退出时在数据目录写 user-quit（Harness 重开或重启电脑后作废），
   // 设置里关掉时写 ai-autostart-off。用独立进程打开（detached），Harness 退出时桌宠不会被一起关掉
-  const appData = process.platform === "win32" ? data : join(homedir(), "Library", "Application Support", "CrossPet");
+  const appData = process.platform === "win32"
+    ? data
+    : process.platform === "linux"
+      ? join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "crosspet")
+      : join(homedir(), "Library", "Application Support", "CrossPet");
 
   // ---- 事件记录（反馈「AI 干活时她没反应」用）：数据目录 events/deepseek.jsonl，格式和 crosspet-hook.py 一样（见 docs/架构.md「记录」）。
   // 只记事件名、工具名、结果，不记消息和工具参数；只留最近 200 行。插件只有一个进程，按顺序排队写就行
@@ -190,6 +194,10 @@ export function apply(ctx, config = {}) {
         child = spawn(explorer, [exe], { detached: true, stdio: "ignore" });
       } else if (process.platform === "darwin") {
         child = spawn("/usr/bin/open", ["-g", "-b", "io.github.crosspet"], { detached: true, stdio: "ignore" });
+      } else if (process.platform === "linux") {
+        const localBin = join(homedir(), ".local", "bin", "crosspet");
+        const cmd = existsSync(localBin) ? localBin : "crosspet";
+        child = spawn(cmd, [], { detached: true, stdio: "ignore" });
       } else return;
       child.on("error", (e) => noteAutostart(source, `打开失败：${String(e?.message ?? e)}`));
       child.unref();
