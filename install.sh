@@ -3,6 +3,10 @@
 set -e
 cd "$(dirname "$0")"
 
+if [ "$(uname -s)" = "Linux" ]; then
+  exec "$(pwd)/app/linux/install.sh" "$@"
+fi
+
 say() { printf "\n\033[1m%s\033[0m\n" "$1"; }
 ask() { printf "%s [y/N] " "$1"; read -r a; [ "$a" = "y" ] || [ "$a" = "Y" ]; }
 
