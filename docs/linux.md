@@ -15,24 +15,24 @@ CrossPet Linux 版基于 **Python 3 + GTK 3 + WebKit2GTK 4.1 + `gtk-layer-shell`
    - **全屏自动隐藏**：通过合成器 IPC 检测当前显示器是否全屏；全屏看视频/演示时自动隐藏桌宠，全屏使用 AI 工具时照常保留。
 2. **Niri / i3 / bspwm / dwm / 传统桌面兼容**
    - 原生支持 **Hyprland**（`.socket.sock` / `.socket2.sock` 事件流）、**Sway / i3**（`SWAYSOCK` / `I3SOCK`）、**Niri**（`NIRI_SOCKET`）和 **X11 EWMH**（`xprop` + `XGrabKey`）。
-   - 在 X11 平铺式 WM 上，桌宠窗口使用 `UTILITY` + 无边框透明 + 输入区域裁剪，自动浮动且不占用平铺槽位。
+   - 在 X11 桌面（XFCE / LXQt / Openbox / KDE / i3）上，桌宠窗口使用无边框 RGBA 透明、`NORMAL` 类型 + `SKIP_TASKBAR` / `SKIP_PAGER` / `STICKY` + 输入区域裁剪（避免被 KWin / Openbox 等在失焦时自动隐藏），并支持置顶 / 沉底层级切换。
    - 设置、换角色、反馈、开发者控制台等辅助窗口均为标准可调大小的 `Gtk.Window`（`WM_CLASS` 分别为 `crosspet-settings`、`crosspet-characters`、`crosspet-feedback`、`crosspet-devconsole`）。
 
 ## 依赖安装
 
 ### Arch Linux
 ```bash
-sudo pacman -S python-gobject gtk3 webkit2gtk-4.1 gtk-layer-shell libayatana-appindicator
+sudo pacman -S python-gobject python-cairo gtk3 webkit2gtk-4.1 gtk-layer-shell libayatana-appindicator
 ```
 
 ### Ubuntu / Debian
 ```bash
-sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-gtklayershell-0.1 gir1.2-ayatanaappindicator3-0.1
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-gtklayershell-0.1 gir1.2-ayatanaappindicator3-0.1
 ```
 
 ### Fedora
 ```bash
-sudo dnf install python3-gobject gtk3 webkit2gtk4.1 gtk-layer-shell libayatana-appindicator-gtk3
+sudo dnf install python3-gobject python3-cairo gtk3 webkit2gtk4.1 gtk-layer-shell libayatana-appindicator-gtk3
 ```
 
 ## 安装与启动

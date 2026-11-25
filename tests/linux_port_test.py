@@ -614,6 +614,191 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
         )
         self.assertIsNotNone(ss)
 
+    def test_transparent_webview_dirty_bounds_stylesheet(self):
+        import gi
+
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2
+        from app.linux import window
+
+        css = window.TRANSPARENT_WEBVIEW_CSS
+        self.assertIn("#fit", css)
+        self.assertIn("crosspet_dirty_bounds", css)
+        ss = WebKit2.UserStyleSheet(
+            css,
+            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+            WebKit2.UserStyleLevel.USER,
+            None,
+            None,
+        )
+        self.assertIsNotNone(ss)
+
+
+class X11AndNonTilingWMTests(unittest.TestCase):
+    def test_wm_cursor_pos_and_backend_detection(self):
+        self.assertIsNone(wm.WMBackend().cursor_pos())
+        self.assertIsNot(wm.X11Backend.cursor_pos, wm.WMBackend.cursor_pos)
+        self.assertIn("qterminal", wm.TERMINAL_CLASSES)
+        self.assertIn("lxterminal", wm.TERMINAL_CLASSES)
+
+        with mock.patch.dict(
+            os.environ,
+            {
+                "GDK_BACKEND": "x11",
+                "HYPRLAND_INSTANCE_SIGNATURE": "fake-sig",
+                "WAYLAND_DISPLAY": "wayland-1",
+            },
+            clear=False,
+        ):
+            self.assertIsInstance(wm.detect_wm_backend(), wm.X11Backend)
+
+    def test_x11_active_window_wm_name_fallback(self):
+        with mock.patch("app.linux.wm.shutil.which", return_value="/usr/bin/xprop"):
+            backend = wm.X11Backend()
+
+        def make_run(id_stdout: str):
+            def _fake_run(cmd, **_kwargs):
+                res = mock.Mock(returncode=0)
+                if "-root" in cmd:
+                    res.stdout = "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x1a00007\n"
+                else:
+                    res.stdout = id_stdout
+                return res
+
+            return _fake_run
+
+        net_wm_out = (
+            'WM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n'
+            "_NET_WM_PID(CARDINAL) = 1234\n"
+            "_NET_WM_STATE(ATOM) = _NET_WM_STATE_FULLSCREEN\n"
+            '_NET_WM_NAME(UTF8_STRING) = "CrossPet-Term"\n'
+            'WM_NAME(STRING) = "Fallback-Ignored"\n'
+        )
+        with mock.patch("app.linux.wm.subprocess.run", side_effect=make_run(net_wm_out)):
+            aw = backend.active_window()
+        self.assertIsNotNone(aw)
+        self.assertEqual(aw.win_class, "Xfce4-terminal")
+        self.assertEqual(aw.initial_class, "xfce4-terminal")
+        self.assertEqual(aw.title, "CrossPet-Term")
+        self.assertEqual(aw.pid, 1234)
+        self.assertTrue(aw.fullscreen)
+
+        wm_name_only_out = (
+            'WM_CLASS(STRING) = "xterm", "XTerm"\n'
+            "_NET_WM_PID(CARDINAL) = 5678\n"
+            "_NET_WM_STATE(ATOM) = \n"
+            "_NET_WM_NAME:  not found.\n"
+            'WM_NAME(STRING) = "CrossPet-Test-Term"\n'
+        )
+        with mock.patch("app.linux.wm.subprocess.run", side_effect=make_run(wm_name_only_out)):
+            aw2 = backend.active_window()
+        self.assertIsNotNone(aw2)
+        self.assertEqual(aw2.win_class, "XTerm")
+        self.assertEqual(aw2.title, "CrossPet-Test-Term")
+        self.assertFalse(aw2.fullscreen)
+
+    def test_x11_window_state_and_noncomposited_hide_show(self):
+        from app.linux import window
+
+        class _StubScreen:
+            def __init__(self, composited: bool):
+                self._composited = composited
+
+            def is_composited(self):
+                return self._composited
+
+        class _StubWin:
+            def __init__(self, composited: bool):
+                self.screen = _StubScreen(composited)
+                self.calls = []
+                self.above = None
+                self.below = None
+
+            def get_screen(self):
+                return self.screen
+
+            def set_skip_taskbar_hint(self, val):
+                self.calls.append(("taskbar", val))
+
+            def set_skip_pager_hint(self, val):
+                self.calls.append(("pager", val))
+
+            def stick(self):
+                self.calls.append(("stick",))
+
+            def set_keep_above(self, val):
+                self.above = val
+                self.calls.append(("above", val))
+
+            def set_keep_below(self, val):
+                self.below = val
+                self.calls.append(("below", val))
+
+            def hide(self):
+                self.calls.append(("hide",))
+
+            def show_all(self):
+                self.calls.append(("show_all",))
+
+            def set_opacity(self, val):
+                self.calls.append(("opacity", val))
+
+            def set_size_request(self, w, h):
+                self.calls.append(("size_req", w, h))
+
+            def resize(self, w, h):
+                self.calls.append(("resize", w, h))
+
+            def move(self, x, y):
+                self.calls.append(("move", x, y))
+
+            def input_shape_combine_region(self, reg):
+                self.calls.append(("input_region", reg is not None))
+
+            def queue_draw(self):
+                self.calls.append(("queue_draw",))
+
+        surf = object.__new__(window.PetSurface)
+        surf.win = _StubWin(composited=False)
+        surf.use_layer_shell = False
+        surf.hidden = False
+        surf.yielding = False
+        surf._has_hit_rects = False
+        surf._hit_rects = []
+        surf.zoom = 1.0
+        surf.rect = placement.Rect(10, 20, 260, 362)
+        surf.layer_mode = "overlay"
+
+        window.PetSurface._apply_x11_window_state(surf)
+        self.assertIn(("taskbar", True), surf.win.calls)
+        self.assertIn(("pager", True), surf.win.calls)
+        self.assertIn(("stick",), surf.win.calls)
+        self.assertTrue(surf.win.above)
+        self.assertFalse(surf.win.below)
+
+        surf.layer_mode = "bottom"
+        window.PetSurface._apply_x11_window_state(surf)
+        self.assertFalse(surf.win.above)
+        self.assertTrue(surf.win.below)
+
+        surf.layer_mode = "top"
+        window.PetSurface._apply_x11_window_state(surf)
+        self.assertFalse(surf.win.above)
+        self.assertFalse(surf.win.below)
+
+        surf.win.calls.clear()
+        window.PetSurface.set_hidden(surf, True)
+        self.assertIn(("hide",), surf.win.calls)
+        self.assertFalse(any(c[0] == "opacity" for c in surf.win.calls))
+
+        surf.win.calls.clear()
+        window.PetSurface.set_hidden(surf, False)
+        self.assertIn(("show_all",), surf.win.calls)
+        self.assertIn(("move", 10, 20), surf.win.calls)
+        self.assertIn(("stick",), surf.win.calls)
+        self.assertIn(("queue_draw",), surf.win.calls)
+        self.assertFalse(any(c[0] == "opacity" for c in surf.win.calls))
+
 
 if __name__ == "__main__":
     unittest.main()

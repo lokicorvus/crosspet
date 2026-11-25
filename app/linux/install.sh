@@ -24,6 +24,10 @@ import sys
 import gi
 
 missing = []
+try:
+    import cairo  # noqa: F401
+except Exception as e:
+    missing.append(f"cairo ({e})")
 for ns, ver in (("Gtk", "3.0"), ("Gdk", "3.0"), ("WebKit2", "4.1"), ("GtkLayerShell", "0.1")):
     try:
         gi.require_version(ns, ver)
@@ -55,11 +59,11 @@ then
 
 请先安装对应发行版的依赖包后再运行本脚本：
   Arch Linux:
-    sudo pacman -S python-gobject gtk3 webkit2gtk-4.1 gtk-layer-shell libayatana-appindicator
+    sudo pacman -S python-gobject python-cairo gtk3 webkit2gtk-4.1 gtk-layer-shell libayatana-appindicator
   Ubuntu / Debian:
-    sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-gtklayershell-0.1 gir1.2-ayatanaappindicator3-0.1
+    sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-gtklayershell-0.1 gir1.2-ayatanaappindicator3-0.1
   Fedora:
-    sudo dnf install python3-gobject gtk3 webkit2gtk4.1 gtk-layer-shell libayatana-appindicator-gtk3
+    sudo dnf install python3-gobject python3-cairo gtk3 webkit2gtk4.1 gtk-layer-shell libayatana-appindicator-gtk3
 HINT
   exit 1
 fi

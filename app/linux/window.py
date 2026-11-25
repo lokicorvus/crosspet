@@ -18,6 +18,7 @@ gi.require_version("GtkLayerShell", "0.1")
 import cairo
 from gi.repository import Gdk, GLib, Gtk, GtkLayerShell, WebKit2
 
+from .paths import app_log
 from .placement import Rect
 from .wm import MonitorRect, WMBackend
 
@@ -67,6 +68,11 @@ select option {
   background-color: var(--panel, #fff);
   color: var(--ink, #3b2a22);
 }
+"""
+
+TRANSPARENT_WEBVIEW_CSS = """
+@keyframes crosspet_dirty_bounds { 0% { opacity: 0.996; } 100% { opacity: 1; } }
+#fit { animation: crosspet_dirty_bounds 1s linear infinite; }
 """
 
 
@@ -183,6 +189,7 @@ class PetSurface:
         self._hit_rects: list[Rect] = []
         self._slide_timer: int | None = None
         self._current_monitor_name: str | None = None
+        self._x11_noncomp_logged = False
 
         self._on_click = on_click
         self._on_menu = on_menu
@@ -235,11 +242,21 @@ class PetSurface:
             GtkLayerShell.set_keyboard_mode(self.win, kb)
             GtkLayerShell.set_layer(self.win, GtkLayerShell.Layer.OVERLAY)
         else:
-            self.win.set_type_hint(Gdk.WindowTypeHint.UTILITY)
-            self.win.stick()
-            self.win.set_keep_above(True)
+            self.win.set_type_hint(Gdk.WindowTypeHint.NORMAL)
+            self.win.set_position(Gtk.WindowPosition.NONE)
+            self.win.set_gravity(Gdk.Gravity.STATIC)
+            self._apply_x11_window_state()
 
         self.webview = create_webview(context, handler_name, on_message, transparent=True)
+        self.webview.get_user_content_manager().add_style_sheet(
+            WebKit2.UserStyleSheet(
+                TRANSPARENT_WEBVIEW_CSS,
+                WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit2.UserStyleLevel.USER,
+                None,
+                None,
+            )
+        )
         self.win.add(self.webview)
 
         def _on_load_changed(_wv: WebKit2.WebView, ev: WebKit2.LoadEvent) -> None:
@@ -269,9 +286,30 @@ class PetSurface:
 
         self.set_geometry(initial_rect.x, initial_rect.y, initial_rect.w, initial_rect.h)
 
+    def _apply_x11_window_state(self) -> None:
+        self.win.set_skip_taskbar_hint(True)
+        self.win.set_skip_pager_hint(True)
+        self.win.stick()
+        if self.layer_mode == "overlay":
+            self.win.set_keep_below(False)
+            self.win.set_keep_above(True)
+        elif self.layer_mode == "bottom":
+            self.win.set_keep_above(False)
+            self.win.set_keep_below(True)
+        else:
+            self.win.set_keep_above(False)
+            self.win.set_keep_below(False)
+
     def show(self) -> None:
         self.win.show_all()
         self.set_geometry(self.rect.x, self.rect.y, self.rect.w, self.rect.h)
+        if not self.use_layer_shell:
+            self._apply_x11_window_state()
+            if not self._x11_noncomp_logged:
+                screen = self.win.get_screen()
+                if screen is not None and not screen.is_composited():
+                    self._x11_noncomp_logged = True
+                    app_log("当前 X11 桌面未启用混成器，窗口边缘无法透明（可安装 picom 或启用桌面混成）")
         self._apply_input_region()
 
     def close(self) -> None:
@@ -311,20 +349,23 @@ class PetSurface:
             }
             GtkLayerShell.set_layer(self.win, layer_map.get(mode, GtkLayerShell.Layer.OVERLAY))
         else:
-            if mode == "overlay":
-                self.win.set_keep_below(False)
-                self.win.set_keep_above(True)
-            elif mode == "bottom":
-                self.win.set_keep_above(False)
-                self.win.set_keep_below(True)
-            else:
-                self.win.set_keep_above(False)
-                self.win.set_keep_below(False)
+            self._apply_x11_window_state()
 
     def set_hidden(self, hidden: bool) -> None:
         if hidden == self.hidden:
             return
         self.hidden = hidden
+        if not self.use_layer_shell:
+            screen = self.win.get_screen()
+            if screen is not None and not screen.is_composited():
+                if hidden:
+                    self.win.hide()
+                else:
+                    self.win.show_all()
+                    self.set_geometry(self.rect.x, self.rect.y, self.rect.w, self.rect.h)
+                    self._apply_x11_window_state()
+                    self._apply_input_region()
+                return
         self.win.set_opacity(0.0 if hidden else 1.0)
         self._apply_input_region()
 

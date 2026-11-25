@@ -34,6 +34,10 @@ TERMINAL_CLASSES = frozenset({
     "kgx",
     "konsole",
     "xfce4-terminal",
+    "qterminal",
+    "lxterminal",
+    "mate-terminal",
+    "sakura",
     "xterm",
     "urxvt",
     "rxvt",
@@ -187,25 +191,7 @@ class WMBackend:
             return []
 
     def cursor_pos(self) -> tuple[float, float] | None:
-        try:
-            import gi
-
-            gi.require_version("Gdk", "3.0")
-            from gi.repository import Gdk
-
-            display = Gdk.Display.get_default()
-            if display is None:
-                return None
-            seat = display.get_default_seat()
-            if seat is None:
-                return None
-            ptr = seat.get_pointer()
-            if ptr is None:
-                return None
-            _, x, y = ptr.get_position()
-            return float(x), float(y)
-        except Exception:
-            return None
+        return None
 
     def running_classes(self) -> set[str]:
         return scan_proc_names()
@@ -709,18 +695,46 @@ class X11Backend(WMBackend):
         if not m or m.group(0) == "0x0":
             return None
         wid = m.group(0)
-        info = self._run_xprop(["-id", wid, "WM_CLASS", "_NET_WM_PID", "_NET_WM_STATE", "_NET_WM_NAME"])
+        info = self._run_xprop(["-id", wid, "WM_CLASS", "_NET_WM_PID", "_NET_WM_STATE", "_NET_WM_NAME", "WM_NAME"])
         if not info:
             return None
         classes = re.findall(r'"([^"]+)"', next((l for l in info.splitlines() if "WM_CLASS" in l), ""))
         win_class = classes[-1] if classes else ""
         init_class = classes[0] if classes else ""
+        title = ""
+        for prefix in ("_NET_WM_NAME", "WM_NAME"):
+            line = next((l for l in info.splitlines() if l.startswith(prefix)), "")
+            m_title = re.search(r'=\s*"((?:[^"\\]|\\.)*)"', line)
+            if m_title:
+                title = m_title.group(1).replace('\\"', '"').replace("\\\\", "\\")
+                break
         pid_m = re.search(r"_NET_WM_PID.*?=\s*(\d+)", info)
         pid = int(pid_m.group(1)) if pid_m else 0
         full = "_NET_WM_STATE_FULLSCREEN" in info
         if not (win_class or init_class or pid):
             return None
-        return ActiveWindow(win_class=win_class, initial_class=init_class, pid=pid, fullscreen=full)
+        return ActiveWindow(win_class=win_class, initial_class=init_class, title=title, pid=pid, fullscreen=full)
+
+    def cursor_pos(self) -> tuple[float, float] | None:
+        try:
+            import gi
+
+            gi.require_version("Gdk", "3.0")
+            from gi.repository import Gdk
+
+            display = Gdk.Display.get_default()
+            if display is None:
+                return None
+            seat = display.get_default_seat()
+            if seat is None:
+                return None
+            ptr = seat.get_pointer()
+            if ptr is None:
+                return None
+            _, x, y = ptr.get_position()
+            return float(x), float(y)
+        except Exception:
+            return None
 
     def running_classes(self) -> set[str]:
         out = scan_proc_names()
@@ -787,6 +801,10 @@ class X11Backend(WMBackend):
             x11.XPending.restype = ctypes.c_int
             x11.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.POINTER(XEvent)]
             x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+            x11.XSetErrorHandler.argtypes = [ctypes.c_void_p]
+            x11.XSetErrorHandler.restype = ctypes.c_void_p
+            x11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            x11.XSync.restype = ctypes.c_int
 
             dpy = x11.XOpenDisplay(None)
             if not dpy:
@@ -797,9 +815,28 @@ class X11Backend(WMBackend):
             if not keycode:
                 x11.XCloseDisplay(dpy)
                 return False
-            mod_ctrl_alt = (1 << 2) | (1 << 3)  # ControlMask | Mod1Mask
-            for extra in (0, 1 << 1, 1 << 4, (1 << 1) | (1 << 4)):  # ignore LockMask / Mod2Mask
-                x11.XGrabKey(dpy, int(keycode), mod_ctrl_alt | extra, root, 1, 1, 1)
+
+            err_cb_type = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+            grab_error = False
+
+            def _on_x_error(_dpy: Any, _ev: Any) -> int:
+                nonlocal grab_error
+                grab_error = True
+                return 0
+
+            err_cb = err_cb_type(_on_x_error)
+            prev_handler = x11.XSetErrorHandler(err_cb)
+            try:
+                mod_ctrl_alt = (1 << 2) | (1 << 3)  # ControlMask | Mod1Mask
+                for extra in (0, 1 << 1, 1 << 4, (1 << 1) | (1 << 4)):  # ignore LockMask / Mod2Mask
+                    x11.XGrabKey(dpy, int(keycode), mod_ctrl_alt | extra, root, 1, 1, 1)
+                x11.XSync(dpy, 0)
+            finally:
+                x11.XSetErrorHandler(prev_handler)
+
+            if grab_error:
+                x11.XCloseDisplay(dpy)
+                return False
 
             self._hk_stop.clear()
 
@@ -832,6 +869,8 @@ class GenericBackend(WMBackend):
 
 def detect_wm_backend(dispatcher: Callable[[Callable[[], None]], None] | None = None) -> WMBackend:
     """Detect active compositor / WM backend."""
+    if os.environ.get("GDK_BACKEND", "").lower() == "x11":
+        return X11Backend(dispatcher=dispatcher)
     if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
         return HyprlandBackend(dispatcher=dispatcher)
     if os.environ.get("SWAYSOCK") or os.environ.get("I3SOCK"):
