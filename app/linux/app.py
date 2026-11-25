@@ -2605,7 +2605,23 @@ class CrossPetApp:
             except Exception:
                 pass
         wv = create_webview(self.web_context, handler_name, on_msg, transparent=False)
-        wv.connect("load-changed", lambda w, ev: on_load(w) if ev == WebKit2.LoadEvent.FINISHED else None)
+
+        def _apply_gtk_dark_hint(val: Any) -> None:
+            if val is True:
+                try:
+                    settings = Gtk.Settings.get_default()
+                    if settings is not None:
+                        settings.set_property("gtk-application-prefer-dark-theme", True)
+                except Exception:
+                    pass
+
+        def _on_load_changed(w: WebKit2.WebView, ev: WebKit2.LoadEvent) -> None:
+            if ev != WebKit2.LoadEvent.FINISHED:
+                return
+            eval_js(w, "window.matchMedia('(prefers-color-scheme: dark)').matches", _apply_gtk_dark_hint)
+            on_load(w)
+
+        wv.connect("load-changed", _on_load_changed)
         win.add(wv)
         win.connect("delete-event", lambda *_a: (on_close(), False)[1])
         win.show_all()

@@ -35,6 +35,41 @@ def create_shared_web_context(root: Path) -> WebKit2.WebContext:
     return WebKit2.WebContext.new_with_website_data_manager(mgr)
 
 
+SECONDARY_WEBVIEW_CSS = """
+:root { color-scheme: light dark; }
+select {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background-color: var(--field, #fffdfa) !important;
+  color: var(--ink, #3b2a22) !important;
+  border: 1px solid var(--line, #e7dfd5) !important;
+  border-radius: 6px !important;
+  padding: 3px 26px 3px 8px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%238a7a70' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 8px center !important;
+  background-size: 10px 6px !important;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23a8998d' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") !important;
+  }
+}
+select:hover:not(:disabled) {
+  border-color: var(--accent, #c8792f) !important;
+}
+select:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+select option {
+  background-color: var(--panel, #fff);
+  color: var(--ink, #3b2a22);
+}
+"""
+
+
 def create_webview(
     context: WebKit2.WebContext,
     handler_name: str,
@@ -44,6 +79,16 @@ def create_webview(
     """Create a WebKit2.WebView configured for local file access and JS-to-Python messaging."""
     ucm = WebKit2.UserContentManager()
     ucm.register_script_message_handler(handler_name)
+    if not transparent:
+        ucm.add_style_sheet(
+            WebKit2.UserStyleSheet(
+                SECONDARY_WEBVIEW_CSS,
+                WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit2.UserStyleLevel.USER,
+                None,
+                None,
+            )
+        )
 
     def _on_msg(_ucm: WebKit2.UserContentManager, js_result: WebKit2.JavascriptResult) -> None:
         try:

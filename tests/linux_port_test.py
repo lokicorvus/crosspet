@@ -593,6 +593,27 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
             inst._mark_launched()
             self.assertEqual((data / "launcher").resolve(), wrapper.resolve())
 
+    def test_secondary_webview_select_stylesheet(self):
+        import gi
+
+        gi.require_version("WebKit2", "4.1")
+        from gi.repository import WebKit2
+        from app.linux import window
+
+        css = window.SECONDARY_WEBVIEW_CSS
+        self.assertIn("appearance: none", css)
+        self.assertIn("var(--field", css)
+        self.assertIn("var(--ink", css)
+        self.assertIn("select option", css)
+        ss = WebKit2.UserStyleSheet(
+            css,
+            WebKit2.UserContentInjectedFrames.ALL_FRAMES,
+            WebKit2.UserStyleLevel.USER,
+            None,
+            None,
+        )
+        self.assertIsNotNone(ss)
+
 
 if __name__ == "__main__":
     unittest.main()
