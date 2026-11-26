@@ -229,6 +229,23 @@ class AntigravityQuota:
     """Query local Antigravity daemon quota without touching Google credentials."""
 
     METHODS = ("RetrieveUserQuotaSummary", "GetUserStatus")
+    _ssl_ctx: ssl.SSLContext | None = None
+
+    @classmethod
+    def _tls_context(cls) -> ssl.SSLContext:
+        if cls._ssl_ctx is None:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            cls._ssl_ctx = ctx
+        return cls._ssl_ctx
+
+    @classmethod
+    def antigravity_tick_due(cls, since: float, busy_ago: float | None, has_live: bool) -> bool:
+        if not has_live:
+            return since >= 10.0
+        busy = busy_ago is not None and busy_ago < 600.0
+        return since >= (14.0 if busy else 28.0)
 
     @staticmethod
     def daemon_dir() -> Path:
@@ -334,9 +351,7 @@ class AntigravityQuota:
     @classmethod
     def query_ports(cls, pid: int, token: str, ports: list[int]) -> tuple[dict[str, Any] | None, int | None]:
         """Try each port with RetrieveUserQuotaSummary then GetUserStatus."""
-        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        ctx = cls._tls_context()
         body = b'{"metadata":{"ideName":"antigravity","extensionName":"antigravity","locale":"en"}}'
         for port in ports:
             url_base = f"https://127.0.0.1:{port}/exa.language_server_pb.LanguageServerService"
@@ -351,7 +366,7 @@ class AntigravityQuota:
                     },
                 )
                 try:
-                    with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+                    with urllib.request.urlopen(req, timeout=2.5, context=ctx) as resp:
                         if resp.status != 200:
                             continue
                         obj = json.loads(resp.read().decode("utf-8"))

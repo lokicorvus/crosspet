@@ -520,6 +520,14 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
             inst.sessions_text = {}
             inst.quota_code = {}
             inst.quota_seq = 0
+            inst.agy_port = None
+            inst.agy_last = None
+            inst.agy_live = False
+            inst.agy_live_at = 0.0
+            inst.agy_busy_at = None
+            inst.agy_in_flight = False
+            inst.agy_pending_force = False
+            inst._agy_hub_sig = None
             inst.app_to_character = {}
             inst.wm = _StubWM()
             inst.surface = _StubSurface()
@@ -592,6 +600,147 @@ class LinuxIntegrateAndProbeTests(unittest.TestCase):
             inst.src_root = src_bundle
             inst._mark_launched()
             self.assertEqual((data / "launcher").resolve(), wrapper.resolve())
+
+    def test_antigravity_quota_cache_daemon_and_turn_triggers(self):
+        from app.linux import app as linux_app
+
+        class _StubWM:
+            name = "wayland"
+
+            def active_window(self):
+                return None
+
+            def is_fullscreen_on(self, _mon_name):
+                return False
+
+        class _StubSurface:
+            layer_mode = "overlay"
+
+            def current_monitor(self):
+                return None
+
+            def set_layer(self, mode):
+                self.layer_mode = mode
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            data = tmp_path / "data"
+            st = tmp_path / "state"
+            daemon = tmp_path / "daemon"
+            data.mkdir()
+            st.mkdir()
+            daemon.mkdir()
+
+            inst = object.__new__(linux_app.CrossPetApp)
+            inst.root = data
+            inst.src_root = REPO
+            inst.state_dir = st
+            inst.config = paths.ConfigStore(data / "config.json")
+            inst.config.set("agyQuota", True)
+            inst.ready = True
+            inst.character_ids = ["gemini", "claude"]
+            inst.current_id = "gemini"
+            inst.stamps = {}
+            inst.last_pose = {}
+            inst.pause_real_events = False
+            inst.follow_event_gen = 0
+            inst.user_hidden = False
+            inst.hidden_for_fullscreen = False
+            inst.fullscreen_override = False
+            inst.fullscreen_checked_at = time.monotonic()
+            inst.dock = None
+            inst.companions = {}
+            inst.leaving_companions = []
+            inst.page_gathering = False
+            inst.client_state_seen = set()
+            inst.char_states = {}
+            inst.sessions_text = {}
+            inst.quota_code = {}
+            inst.quota_seq = 0
+            inst.agy_port = None
+            inst.agy_last = None
+            inst.agy_live = False
+            inst.agy_live_at = 0.0
+            inst.agy_busy_at = None
+            inst.agy_in_flight = False
+            inst.agy_pending_force = False
+            inst._agy_hub_sig = None
+            inst.app_to_character = {}
+            inst.wm = _StubWM()
+            inst.surface = _StubSurface()
+
+            js_calls: list[str] = []
+            dev_calls: list[str] = []
+            inst.js = lambda code, cb=None: js_calls.append(code)
+            inst.dev_js = lambda code: dev_calls.append(code)
+            inst.events_dir.mkdir(parents=True, exist_ok=True)
+
+            # 1. Tick cadence thresholds
+            self.assertFalse(quota.AntigravityQuota.antigravity_tick_due(9.0, None, has_live=False))
+            self.assertTrue(quota.AntigravityQuota.antigravity_tick_due(10.0, None, has_live=False))
+            self.assertFalse(quota.AntigravityQuota.antigravity_tick_due(13.0, 30.0, has_live=True))
+            self.assertTrue(quota.AntigravityQuota.antigravity_tick_due(14.0, 30.0, has_live=True))
+            self.assertFalse(quota.AntigravityQuota.antigravity_tick_due(27.0, None, has_live=True))
+            self.assertTrue(quota.AntigravityQuota.antigravity_tick_due(28.0, None, has_live=True))
+
+            # 2. Disk cache save/load/clear + stale push before Antigravity starts
+            sample = {"text": "Gemini 5小时 剩余 98%", "low": False, "bars": []}
+            inst._save_agy_cache(sample, 1700000000.0)
+            loaded = inst._load_agy_cache()
+            self.assertEqual(loaded, (sample, 1700000000.0))
+            inst.agy_last = loaded
+            inst._push_agy_stale()
+            self.assertTrue(any('"source": "stale"' in c and "setQuota('gemini'" in c for c in js_calls), js_calls)
+            inst._clear_agy_cache()
+            self.assertIsNone(inst._load_agy_cache())
+
+            # 3. Daemon hub watcher triggers immediate query on appear and marks stale on disappear
+            refresh_calls: list[str] = []
+            with (
+                mock.patch.object(quota.AntigravityQuota, "daemon_dir", return_value=daemon),
+                mock.patch.object(inst, "refresh_antigravity_quota", side_effect=lambda why="now": refresh_calls.append(why)),
+            ):
+                inst._check_antigravity_daemon()
+                self.assertEqual(refresh_calls, [])
+
+                hub_file = daemon / "hub_42399.json"
+                hub_file.write_text(
+                    json.dumps({"pid": os.getpid(), "httpsPort": 42399, "csrfToken": "tok-live"}),
+                    encoding="utf-8",
+                )
+                inst.agy_live = True
+                inst._check_antigravity_daemon()
+                self.assertEqual(refresh_calls, ["daemon"])
+
+                hub_file.unlink()
+                js_calls.clear()
+                inst._check_antigravity_daemon()
+                self.assertFalse(inst.agy_live)
+                self.assertTrue(any('"source": "stale"' in c for c in js_calls), js_calls)
+
+            # 4. Gemini state transitions trigger event & turnEnd quota refreshes
+            refresh_calls.clear()
+            now = time.time()
+            with mock.patch.object(inst, "refresh_antigravity_quota", side_effect=lambda why="now": refresh_calls.append(why)):
+                (st / "gemini-state.json").write_text(
+                    json.dumps({"pose": "thinking", "event": "PreInvocation", "tool": "", "ts": now}),
+                    encoding="utf-8",
+                )
+                inst.poll_states()
+                self.assertIsNotNone(inst.agy_busy_at)
+                self.assertEqual(refresh_calls, ["event"])
+
+                with mock.patch.object(linux_app.GLib, "timeout_add") as mock_to:
+                    (st / "gemini-state.json").write_text(
+                        json.dumps({"pose": "happy", "event": "Stop", "tool": "", "ts": now + 1}),
+                        encoding="utf-8",
+                    )
+                    os.utime(st / "gemini-state.json", (now + 1, now + 1))
+                    inst.poll_states()
+                    self.assertIsNone(inst.agy_busy_at)
+                    delays = [c.args[0] for c in mock_to.call_args_list]
+                    self.assertIn(800, delays)
+                    self.assertIn(3000, delays)
 
     def test_secondary_webview_select_stylesheet(self):
         import gi

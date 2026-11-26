@@ -29,6 +29,7 @@ from .notebook_scan import scan_all as scan_notebook_history
 from .paths import (
     ConfigStore,
     Ledger,
+    _atomic_write_text,
     app_log,
     current_version,
     data_dir,
@@ -197,7 +198,15 @@ class CrossPetApp:
         self.last_gpt_quota = "还没读过"
 
         self.agy_port: tuple[int, int] | None = None
-        self.agy_last: tuple[dict[str, Any], float] | None = None
+        self.agy_last: tuple[dict[str, Any], float] | None = (
+            self._load_agy_cache() if self.config.get_bool("agyQuota", False) else None
+        )
+        self.agy_live = False
+        self.agy_live_at = 0.0
+        self.agy_busy_at: float | None = None
+        self.agy_in_flight = False
+        self.agy_pending_force = False
+        self._agy_hub_sig: tuple[int, int | None] | None = None
         self.last_agy_note = "还没查过"
 
         # Visibility / Layer / Fullscreen
@@ -324,7 +333,7 @@ class CrossPetApp:
         GLib.timeout_add(50, self._timer_click_through)
         GLib.timeout_add(500, self._timer_wm_poll)
         GLib.timeout_add(5000, self._timer_push_running)
-        GLib.timeout_add(60000, self._timer_quota)
+        GLib.timeout_add(15000, self._timer_quota)
         GLib.timeout_add(3000, self._timer_watch_claude)
         GLib.timeout_add(3 * 3600 * 1000, self._timer_update_check)
         GLib.timeout_add(20000, lambda: (self.check_for_update(manual=False), False)[1])
@@ -937,7 +946,9 @@ class CrossPetApp:
         except Exception as exc:
             app_log(f"首次读取状态出错：{exc!r}")
         self.refresh_codex_quota("now")
-        self.refresh_antigravity_quota()
+        if self.agy_last is not None and self.config.get_bool("agyQuota", False):
+            self._push_agy_stale()
+        self.refresh_antigravity_quota("now")
         self.refresh_plugins(tell_pet=True)
         if self.companions_forwarding:
             self.start_forwarding()
@@ -989,9 +1000,11 @@ class CrossPetApp:
         if win is None:
             win = self.wm.active_window()
         self.push_foreground(win)
+        mapped, ident = self._map_window_to_target(win)
+        if mapped == "gemini" or (win is not None and any(i in self.AGY_CLASSES for i in win.identifiers)):
+            self.refresh_antigravity_quota("front")
         if not self.follow_apps:
             return
-        mapped, ident = self._map_window_to_target(win)
         if not mapped:
             return
         cid = self.host_character(mapped)
@@ -1095,6 +1108,14 @@ class CrossPetApp:
                         GLib.timeout_add(1500, lambda: (self.refresh_codex_quota("turnEnd"), False)[1])
                     else:
                         self.codex_busy_at = stamp
+                elif kind == "state" and cid == "gemini":
+                    if '"event": "Stop"' in text or '"event":"Stop"' in text:
+                        self.agy_busy_at = None
+                        GLib.timeout_add(800, lambda: (self.refresh_antigravity_quota("turnEnd"), False)[1])
+                        GLib.timeout_add(3000, lambda: (self.refresh_antigravity_quota("turnEnd"), False)[1])
+                    else:
+                        self.agy_busy_at = stamp
+                        self.refresh_antigravity_quota("event")
 
         if latest_active[0] is not None:
             self.follow_event(latest_active[0])
@@ -1228,6 +1249,7 @@ class CrossPetApp:
         away = self.screens_asleep or self.user_hidden
         if self.was_away and not away:
             self.refresh_codex_quota("tick")
+            self.refresh_antigravity_quota("wake")
         self.was_away = away
 
     def _on_modifier_event(self, _w: Gtk.Widget, ev: Gdk.EventKey) -> bool:
@@ -2076,10 +2098,56 @@ class CrossPetApp:
 
     # ---- Quota ----
 
+    @property
+    def agy_cache_file(self) -> Path:
+        return self.root / "agy-quota-cache.json"
+
+    def _load_agy_cache(self) -> tuple[dict[str, Any], float] | None:
+        try:
+            obj = json.loads(self.agy_cache_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        if not isinstance(obj, dict):
+            return None
+        q = obj.get("quota")
+        at = obj.get("at")
+        if isinstance(q, dict) and isinstance(at, (int, float)) and not isinstance(at, bool) and at > 0:
+            return q, float(at)
+        return None
+
+    def _save_agy_cache(self, quota_obj: dict[str, Any], at: float) -> None:
+        try:
+            _atomic_write_text(
+                self.agy_cache_file,
+                json.dumps({"quota": quota_obj, "at": float(at)}, ensure_ascii=False),
+            )
+        except OSError:
+            pass
+
+    def _clear_agy_cache(self) -> None:
+        try:
+            self.agy_cache_file.unlink()
+        except OSError:
+            pass
+
+    def _check_antigravity_daemon(self) -> None:
+        if not self.ready or not self.config.get_bool("agyQuota", False):
+            return
+        hub = AntigravityQuota.antigravity_hub(AntigravityQuota.daemon_dir())
+        sig = (hub[0], hub[2]) if hub is not None else None
+        if sig == self._agy_hub_sig:
+            return
+        self._agy_hub_sig = sig
+        if sig is not None:
+            self.refresh_antigravity_quota("daemon")
+        else:
+            self.agy_live = False
+            self._push_agy_stale()
+
     def _timer_quota(self) -> bool:
         try:
             self.refresh_codex_quota("tick")
-            self.refresh_antigravity_quota()
+            self.refresh_antigravity_quota("tick")
         except Exception as exc:
             app_log(f"定时任务出错（quota）：{exc!r}")
         return True
@@ -2144,42 +2212,98 @@ class CrossPetApp:
         payload["at"] = self.codex_last[1]
         self.quota_js("gpt", f"setCodexQuota({json.dumps(payload, ensure_ascii=False)})")
 
-    def refresh_antigravity_quota(self) -> None:
+    def refresh_antigravity_quota(self, why: str = "now") -> None:
         if not self.ready or not self.config.get_bool("agyQuota", False):
             return
+        if why == "tick" and (self.screens_asleep or self.user_hidden):
+            return
+        since = time.monotonic() - self.agy_live_at
+        if why in ("now", "daemon"):
+            due = True
+        elif why == "turnEnd":
+            due = since >= 1.5
+        elif why in ("front", "wake"):
+            due = (not self.agy_live) or since >= 5.0
+        elif why == "event":
+            due = (not self.agy_live) or since >= 8.0
+        else:
+            busy_ago = (time.time() - self.agy_busy_at) if self.agy_busy_at is not None else None
+            due = AntigravityQuota.antigravity_tick_due(since, busy_ago, self.agy_live)
+        if not due:
+            return
+        if self.agy_in_flight:
+            if why in ("now", "daemon", "turnEnd"):
+                self.agy_pending_force = True
+            return
+
+        self.agy_in_flight = True
+        self.agy_live_at = time.monotonic()
 
         def worker() -> None:
             hub = AntigravityQuota.antigravity_hub(AntigravityQuota.daemon_dir())
             if hub is not None:
                 pid, token, port = hub
-                ports = [self.agy_port[1]] if (self.agy_port and self.agy_port[0] == pid) else ([port] if port else AntigravityQuota.listening_ports(pid))
+                ports: list[int] = []
+                if self.agy_port and self.agy_port[0] == pid:
+                    ports.append(self.agy_port[1])
+                if port and port not in ports:
+                    ports.append(port)
+                if not ports:
+                    ports.extend(AntigravityQuota.listening_ports(pid))
                 src_note = "daemon 文件"
             else:
                 srv = AntigravityQuota.antigravity_server()
                 if srv is None:
                     def no_srv() -> bool:
+                        self.agy_in_flight = False
+                        self.agy_live = False
+                        self.agy_port = None
                         self._push_agy_stale()
                         self.last_agy_note = f"{_clock()} 没找到 Antigravity 的服务进程（daemon/hub_*.json 和启动参数里都没有令牌）"
+                        if self.agy_pending_force:
+                            self.agy_pending_force = False
+                            GLib.timeout_add(300, lambda: (self.refresh_antigravity_quota("now"), False)[1])
                         return False
 
                     GLib.idle_add(no_srv)
                     return
                 pid, token = srv
-                ports = [self.agy_port[1]] if (self.agy_port and self.agy_port[0] == pid) else AntigravityQuota.listening_ports(pid)
+                ports = [self.agy_port[1]] if (self.agy_port and self.agy_port[0] == pid) else []
+                for p in AntigravityQuota.listening_ports(pid):
+                    if p not in ports:
+                        ports.append(p)
                 src_note = "启动参数"
 
-            note = f"{_clock()} 找到服务进程（令牌来自{src_note}），端口 {len(ports)} 个"
             parsed, ok_port = AntigravityQuota.query_ports(pid, token, ports)
+            if parsed is None and self.agy_port and self.agy_port[0] == pid:
+                extra_ports = [p for p in AntigravityQuota.listening_ports(pid) if p not in ports]
+                if extra_ports:
+                    ports.extend(extra_ports)
+                    parsed, ok_port = AntigravityQuota.query_ports(pid, token, extra_ports)
+            note = f"{_clock()} 找到服务进程（令牌来自{src_note}），端口 {len(ports)} 个"
 
             def finish() -> bool:
+                self.agy_in_flight = False
                 self.last_agy_note = note
+                if not self.config.get_bool("agyQuota", False):
+                    self.agy_pending_force = False
+                    return False
                 if parsed is not None and ok_port is not None:
+                    now_ts = time.time()
                     self.agy_port = (pid, ok_port)
-                    self.agy_last = (parsed, time.time())
+                    self.agy_last = (parsed, now_ts)
+                    self.agy_live = True
+                    self._save_agy_cache(parsed, now_ts)
                     self.quota_js("gemini", f"setQuota('gemini', {json.dumps(parsed, ensure_ascii=False)})")
                 else:
                     self.agy_port = None
+                    self.agy_live = False
                     self._push_agy_stale()
+                    if why in ("daemon", "now", "front"):
+                        GLib.timeout_add(2500, lambda: (self.refresh_antigravity_quota("turnEnd"), False)[1])
+                if self.agy_pending_force:
+                    self.agy_pending_force = False
+                    GLib.timeout_add(300, lambda: (self.refresh_antigravity_quota("now"), False)[1])
                 return False
 
             GLib.idle_add(finish)
@@ -2252,6 +2376,7 @@ class CrossPetApp:
             self.refresh_seen()
             if not self.ready:
                 return True
+            self._check_antigravity_daemon()
             claude_cfg = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude")) / "settings.json"
             try:
                 stamp = claude_cfg.stat().st_mtime
@@ -2934,9 +3059,12 @@ class CrossPetApp:
                     on = not self.config.get_bool("agyQuota", False)
                     self.config.set("agyQuota", on)
                     if on:
-                        self.refresh_antigravity_quota()
+                        self.refresh_antigravity_quota("now")
                     else:
                         self.agy_last = None
+                        self.agy_live = False
+                        self.agy_pending_force = False
+                        self._clear_agy_cache()
                         self.quota_js("gemini", "setQuota('gemini', null)")
             elif key == "hideHotkey" and isinstance(val, str) and val in ("off", "p", "h"):
                 self.config.set("hideHotkey", val)
