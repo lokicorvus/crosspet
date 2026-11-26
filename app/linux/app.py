@@ -2534,7 +2534,7 @@ class CrossPetApp:
         menu = Gtk.Menu()
         if self.latest_release is not None:
             tag, _url = self.latest_release
-            it = Gtk.MenuItem(label=f"⬆️ 有新版本 {tag}，点这里下载")
+            it = Gtk.MenuItem(label=f"⬆️ 有新版本 {tag}（打开发布页）")
             it.connect("activate", lambda _i: self.open_release())
             menu.append(it)
             menu.append(Gtk.SeparatorMenuItem())

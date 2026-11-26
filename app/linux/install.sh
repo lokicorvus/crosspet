@@ -76,6 +76,12 @@ DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/crosspet"
 APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 ICON_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 
+if command -v crosspet >/dev/null 2>&1; then
+  crosspet --quit >/dev/null 2>&1 || true
+fi
+pkill -f "app\.linux\.main" 2>/dev/null || true
+sleep 0.3
+
 mkdir -p "$BIN_DIR" "$DATA_DIR" "$APPS_DIR" "$ICON_DIR"
 ln -sf "$ROOT/app/linux/crosspet" "$BIN_DIR/crosspet"
 ln -sf "$ROOT/app/linux/crosspet" "$DATA_DIR/launcher"

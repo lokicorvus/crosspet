@@ -1,6 +1,8 @@
-# CrossPet Linux 版（兼容 Hyprland / Sway / Niri / i3 等平铺式窗口管理器）
+# CrossPet Linux 版（实验性，由社区维护）
 
 CrossPet Linux 版基于 **Python 3 + GTK 3 + WebKit2GTK 4.1 + `gtk-layer-shell` + `AyatanaAppIndicator3`** 构建，与 macOS / Windows 版共用全部网页层（`app/web/`）、角色立绘（`characters/`）和 AI 接入层（`integrations/`）。
+
+> **维护说明与测试情况**：Linux 版目前为**实验性支持，由社区（[@msksbr515](https://github.com/msksbr515)）维护**。已在 **Arch Linux + Hyprland 真机**，以及 **Arch Linux 虚拟机（XFCE、LXQt、labwc、KWin Wayland）** 上实测；Sway、Niri、i3 等其他窗口管理器以及 Ubuntu、Fedora 等发行版尚未实测。
 
 ## 平铺式窗口管理器兼容设计
 
@@ -49,6 +51,22 @@ cd crosspet
 ```bash
 crosspet
 ```
+
+## 更新与卸载
+
+官方 Releases 只提供 macOS 和 Windows 安装包，不提供 Linux 安装包；Linux 版检测到新版本时，点菜单顶部的更新提示只会打开 GitHub 发布页查看更新说明，**不会自动下载安装**。
+
+- **更新（保留已有设置、自定义角色与小本子记录）**：进入源码目录拉取最新代码后重新运行 `./install.sh`，会自动刷新已接入的 AI 钩子并重启桌宠：
+  ```bash
+  cd crosspet
+  git pull --ff-only
+  CROSSPET_CONNECT=none ./install.sh   # 跳过对未接入 AI 的逐个询问；想补接新支持的 AI 可去掉 CROSSPET_CONNECT=none
+  ```
+- **卸载**：
+  ```bash
+  cd crosspet
+  ./uninstall.sh
+  ```
 
 ## Hyprland 推荐配置
 

@@ -109,11 +109,8 @@ def load_template(template: Path, via_cmd: bool = False) -> dict:
     data = load_json(template)
     if os.name != "nt" and not sys.platform.startswith("linux"):
         return data
-    try:
-        SUPPORT.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
-    except OSError:
-        pass
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
     original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py"'
 
     if os.name != "nt":
@@ -802,11 +799,8 @@ KIMI_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", 
 def kimi_command() -> str:
     if os.name != "nt" and not sys.platform.startswith("linux"):
         return 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py" kimi'
-    try:
-        SUPPORT.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
-    except OSError:
-        pass
+    SUPPORT.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
     if os.name != "nt":
         return f"{shlex.quote(sys.executable)} {shlex.quote(str(SUPPORT / MARK))} kimi"
     return f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)} kimi"
