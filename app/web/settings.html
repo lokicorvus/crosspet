@@ -279,7 +279,7 @@ function setState(s) {
   if (s.hotkeys) {
     $('hideHotkey').replaceChildren(...s.hotkeys.map(h => new Option(h.label, h.id, false, h.id === s.hideHotkey)))
     const n = $('hotkeyNote')
-    n.textContent = s.hotkeyFailed ? '这个快捷键被别的程序占用了，换一个试试' : '按一下藏起来，再按一下出来；也可以点菜单栏的爪印（Windows 双击托盘图标）叫她出来'
+    n.textContent = s.hotkeyFailed ? '这个快捷键被别的程序占用了，换一个试试' : (s.hotkeyNote || '按一下藏起来，再按一下出来；也可以点菜单栏的爪印（Windows 双击托盘图标）叫她出来')
     n.classList.toggle('warn', !!s.hotkeyFailed)
   }
   // GPT 额度问不到 Codex 时，外壳把原因交过来（没找到 codex、没登录……）

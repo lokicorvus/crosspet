@@ -23,7 +23,15 @@ from pathlib import Path
 
 HOME = Path.home()
 REPO = Path(__file__).resolve().parent.parent
-SUPPORT = Path(os.environ.get("CROSSPET_DATA_DIR") or (str(Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet") if os.name == "nt" else str(HOME / "Library/Application Support/CrossPet")))
+if os.environ.get("CROSSPET_DATA_DIR"):
+    SUPPORT = Path(os.environ["CROSSPET_DATA_DIR"])
+elif os.name == "nt":
+    SUPPORT = Path(os.environ.get("LOCALAPPDATA", str(HOME / "AppData/Local"))) / "CrossPet"
+elif sys.platform.startswith("linux"):
+    _xdg_data = os.environ.get("XDG_DATA_HOME")
+    SUPPORT = (Path(_xdg_data) if _xdg_data else (HOME / ".local/share")) / "crosspet"
+else:
+    SUPPORT = HOME / "Library/Application Support/CrossPet"
 MARK = "crosspet-hook.py"
 
 
@@ -95,15 +103,32 @@ def win_arg(path: Path) -> str:
 
 
 def load_template(template: Path, via_cmd: bool = False) -> dict:
-    """读接入模板；在 Windows 上把 macOS 的 python3 + $HOME 路径换成随包 Python 和本机钩子脚本的绝对路径。
+    """读接入模板；在 Windows 上把 macOS 的 python3 + $HOME 路径换成随包 Python 和本机钩子脚本的绝对路径，
+    在 Linux 上改写成当前 Python 和 XDG 数据目录下的 crosspet-hook.py。
     via_cmd：这个 AI 用 cmd /c 跑钩子（Antigravity），命令以引号开头时要再包一层引号，抵消 cmd 剥引号。"""
     data = load_json(template)
-    if os.name != "nt":
+    if os.name != "nt" and not sys.platform.startswith("linux"):
         return data
     SUPPORT.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / "crosspet-hook.py")
-    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)}"
+    shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
     original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py"'
+
+    if os.name != "nt":
+        prefix = f"{shlex.quote(sys.executable)} {shlex.quote(str(SUPPORT / MARK))}"
+
+        def adapt_linux(obj):
+            if isinstance(obj, dict):
+                return {
+                    key: (prefix + value[len(original):] if key == "command" and isinstance(value, str) and value.startswith(original) else adapt_linux(value))
+                    for key, value in obj.items()
+                }
+            if isinstance(obj, list):
+                return [adapt_linux(item) for item in obj]
+            return obj
+
+        return adapt_linux(data)
+
+    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)}"
 
     def command(value: str) -> str:
         cmd = prefix + value[len(original):]
@@ -772,10 +797,12 @@ KIMI_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", 
 
 
 def kimi_command() -> str:
-    if os.name != "nt":
+    if os.name != "nt" and not sys.platform.startswith("linux"):
         return 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-hook.py" kimi'
     SUPPORT.mkdir(parents=True, exist_ok=True)
     shutil.copy2(REPO / "integrations/crosspet-hook.py", SUPPORT / MARK)
+    if os.name != "nt":
+        return f"{shlex.quote(sys.executable)} {shlex.quote(str(SUPPORT / MARK))} kimi"
     return f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / MARK)} kimi"
 
 
@@ -1031,10 +1058,13 @@ def load_cursor_template() -> dict:
     data = load_json(REPO / "integrations/cursor/hooks.json")
     SUPPORT.mkdir(parents=True, exist_ok=True)
     shutil.copy2(REPO / "integrations/cursor/crosspet-cursor-bridge.py", SUPPORT / "crosspet-cursor-bridge.py")
-    if os.name != "nt":
+    if os.name != "nt" and not sys.platform.startswith("linux"):
         return data
-    prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / 'crosspet-cursor-bridge.py')}"
     original = 'python3 "$HOME/Library/Application Support/CrossPet/crosspet-cursor-bridge.py"'
+    if os.name != "nt":
+        prefix = f"{shlex.quote(sys.executable)} {shlex.quote(str(SUPPORT / 'crosspet-cursor-bridge.py'))}"
+    else:
+        prefix = f"{win_arg(Path(sys.executable))} {win_arg(SUPPORT / 'crosspet-cursor-bridge.py')}"
 
     def command(value: str) -> str:
         if isinstance(value, str) and value.startswith(original):
@@ -1430,6 +1460,11 @@ def codex_programs() -> list:
             cands += [l.strip() for l in out.splitlines() if l.strip()]
         except Exception:
             pass
+    elif sys.platform.startswith("linux"):
+        p = shutil.which("codex")
+        if p:
+            cands.append(p)
+        cands += [str(HOME / ".local/bin/codex"), str(HOME / ".npm-global/bin/codex"), "/usr/local/bin/codex", "/usr/bin/codex"]
     else:
         cands.append("/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex")
         p = shutil.which("codex")

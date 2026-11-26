@@ -5,10 +5,11 @@
 [![最新版本](https://img.shields.io/github/v/release/lokicorvus/crosspet?label=%E6%9C%80%E6%96%B0%E7%89%88%E6%9C%AC)](https://github.com/lokicorvus/crosspet/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
 ![Windows 10+](https://img.shields.io/badge/Windows-10%2B-lightgrey)
+![Linux 实验性（社区维护）](https://img.shields.io/badge/Linux-%E5%AE%9E%E9%AA%8C%E6%80%A7%EF%BC%88%E7%A4%BE%E5%8C%BA%E7%BB%B4%E6%8A%A4%EF%BC%89-lightgrey)
 [![代码 MIT](https://img.shields.io/badge/%E4%BB%A3%E7%A0%81-MIT-blue)](LICENSE)
 [![立绘 CC BY-NC-SA 4.0](https://img.shields.io/badge/%E7%AB%8B%E7%BB%98-CC%20BY--NC--SA%204.0-orange)](characters/LICENSE.md)
 
-一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
+一只浮在桌面角落的小桌宠，Mac 和 Windows 都能用，也提供实验性的 Linux 支持（由社区维护）。**你切到哪个 AI，她就变成哪个 AI 娘；AI 干什么活，她就跟着做什么动作。**
 
 ![Claude、GPT、DeepSeek、Gemini、GLM 五个角色，名牌下显示各自的额度和余额](docs/images/characters.webp)
 
@@ -133,6 +134,21 @@ python3 tools/integrate.py status            # 看看现在接了哪些
 
 > **测试情况**：在 Windows 11 ARM64 虚拟机和一台 Windows 10 x64 实体电脑上测过：透明显示、拖动、置顶、托盘、右键菜单、设置窗口、全屏隐藏、快捷键隐藏、WorkBuddy 和 ZCode 接入、跟随前台程序换角色、Codex 和 DeepSeek Harness 接入、GPT 额度、DeepSeek 余额、开发者控制台、一键更新。
 > **还没测过**：Claude Code 增强版 mod 的额度显示、Gemini（Antigravity）额度、多显示器 / 不同缩放比例的屏幕混用。遇到问题右键「反馈问题…」就行，会按问题类型自动带上排查要用的信息。
+
+### Linux（实验性，由社区维护）
+
+支持 Wayland（基于 `gtk-layer-shell` 悬浮且像素级点击穿透，不干扰平铺布局）和 X11：
+
+```bash
+git clone https://github.com/lokicorvus/crosspet.git
+cd crosspet
+./install.sh
+```
+
+详细依赖、快捷键绑定、窗口规则与更新方式见 [Linux 使用说明](docs/linux.md)。
+
+> **测试情况**：实验性支持，由社区（[@msksbr515](https://github.com/msksbr515)）维护。已在 **Arch Linux + Hyprland 真机**，以及 **Arch Linux 虚拟机（XFCE、LXQt、labwc、KWin Wayland）** 上实测。
+> **还没测过**：Sway、Niri、i3 等其他窗口管理器，以及 Ubuntu、Fedora 等发行版尚未实测。
 
 ### 接入 AI 改了什么
 

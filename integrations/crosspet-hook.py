@@ -28,8 +28,14 @@ BIG_JOB_TOOLS = 8  # 一轮里用了这么多次工具，结束时「得意」�
 
 character = sys.argv[1] if len(sys.argv) > 1 else "claude"
 default_data = Path(os.environ.get("CROSSPET_DATA_DIR") or str(Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData/Local"))) / "CrossPet"))
-# 桌宠的数据目录（角色、退出记号）：设了 CROSSPET_DATA_DIR 就用它（测试也靠它），没设时 Windows 在 %LOCALAPPDATA%\CrossPet，macOS 在 Application Support
-app_data = default_data if (os.name == "nt" or os.environ.get("CROSSPET_DATA_DIR")) else Path.home() / "Library/Application Support/CrossPet"
+# 桌宠的数据目录（角色、退出记号）：设了 CROSSPET_DATA_DIR 就用它（测试也靠它），没设时 Windows 在 %LOCALAPPDATA%\CrossPet，Linux 在 XDG_DATA_HOME/crosspet，macOS 在 Application Support
+if os.name == "nt" or os.environ.get("CROSSPET_DATA_DIR"):
+    app_data = default_data
+elif sys.platform.startswith("linux"):
+    _xdg_data = os.environ.get("XDG_DATA_HOME")
+    app_data = (Path(_xdg_data) if _xdg_data else (Path.home() / ".local/share")) / "crosspet"
+else:
+    app_data = Path.home() / "Library/Application Support/CrossPet"
 state_dir = Path(os.environ.get("CROSSPET_STATE_DIR") or (str(default_data / "state") if os.name == "nt" else "/tmp/crosspet"))
 
 # ---- 事件记录（反馈「AI 干活时她没反应」用）：数据目录 events/<接入名>.jsonl，每条事件一行，记处理结果 ----
@@ -195,8 +201,13 @@ def app_started_at():
                 secs = secs * 60 + int(piece)
             procs[int(parts[0])] = (int(parts[1]), secs + int(days or 0) * 86400, parts[3])
     pid = os.getpid()
+    linux_roots = {"systemd", "init", "hyprland", "sway", "niri", "i3", "gnome-shell", "kwin_wayland", "plasmashell", "xfce4-session", "dbus-daemon"}
     while pid in procs and procs[pid][0] > 1 and procs[pid][0] in procs:
-        pid = procs[pid][0]
+        parent = procs[pid][0]
+        p_comm = procs[parent][2].rsplit("/", 1)[-1].lower()
+        if sys.platform.startswith("linux") and p_comm in linux_roots:
+            break
+        pid = parent
     if pid not in procs:
         return 0, ""
     name = procs[pid][2]
@@ -251,6 +262,21 @@ def ensure_pet() -> str:
             return "已经在跑"
         except Exception:
             pass
+        if sys.platform.startswith("linux"):
+            import shutil
+            launcher = shutil.which("crosspet")
+            if not launcher:
+                cand = Path.home() / ".local/bin/crosspet"
+                if cand.is_file() and os.access(cand, os.X_OK):
+                    launcher = str(cand)
+            if not launcher:
+                cand = app_data / "launcher"
+                if cand.is_file() and os.access(cand, os.X_OK):
+                    launcher = str(cand)
+            if not launcher:
+                return "不打开：没找到 crosspet 启动命令"
+            subprocess.Popen([launcher], start_new_session=True, **quiet)
+            return fresh_note + "已打开"
         # -g：在后台打开，不抢你正在用的窗口的焦点
         subprocess.Popen(["/usr/bin/open", "-g", "-b", "io.github.crosspet"], start_new_session=True, **quiet)
         return fresh_note + "已打开"

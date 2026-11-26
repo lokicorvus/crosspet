@@ -27,7 +27,9 @@ function createSender() {
     if (closed) return Promise.resolve()
     const root = process.env.CROSSPET_DATA_DIR || (process.platform === "win32"
       ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "CrossPet")
-      : join(homedir(), "Library", "Application Support", "CrossPet"))
+      : process.platform === "linux"
+        ? join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "crosspet")
+        : join(homedir(), "Library", "Application Support", "CrossPet"))
     const hook = process.env.CROSSPET_HOOK || join(root, "crosspet-hook.py")
     if (!existsSync(hook)) return Promise.resolve()
     const python = process.env.CROSSPET_PYTHON || (process.platform === "win32"
